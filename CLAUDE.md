@@ -20,11 +20,20 @@ No test suite exists in this branch.
 
 ## Packaging
 
-Linux packages are built via Docker (`.deb`) and makepkg (Arch). Dockerfiles and PKGBUILD in `packaging/linux/`. AppImage built with linuxdeploy. All packages at https://github.com/baptisterajaut/olive/releases/tag/v0.1.3-nightly
+All packages at https://github.com/baptisterajaut/olive/releases/tag/v0.1.3-nightly
+
+Docker multi-stage builds (build stage compiles, package stage produces artifact):
+- `packaging/linux/debian.dockerfile` — Debian 12 `.deb` (`--target package`)
+- `packaging/linux/ubuntu.dockerfile` — Ubuntu 24.04 `.deb` (`--target deb`) + AppImage (`--target appimage`), shared build stage
+- `packaging/windows/cross-compile.dockerfile` — Windows NSIS installer via Fedora mingw64 (`--target package`)
+- `packaging/linux/PKGBUILD` — Arch, run with `makepkg` natively
+
+## Platform support
+
+Tested on Arch Linux only. Debian, Ubuntu, AppImage and Windows builds are best-effort.
 
 ## Known issues
 
-- **Wayland compositing (fixed)**: Qt6's `QOpenGLWidget` FBO had alpha < 1.0 pixels, causing transparent areas on Wayland (hall-of-mirrors). Fixed by forcing alpha=1.0 via masked `glClear` at the end of `paintGL()` in both `ViewerWidget` and `ViewerWindow`. Same approach as FreeCAD PR #19499.
 - **FFmpeg compat**: `#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)` guards needed for `avcodec_get_supported_config()` (replaces `codec->pix_fmts`/`codec->sample_fmts`). `#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)` for `AV_FRAME_FLAG_INTERLACED`.
 - **Qt 6.4 compat**: `QStringView == "literal"` doesn't compile on Qt 6.4 (Debian/Ubuntu). All `stream.name()`, `attr.name()`, `attr.value()`, `reader.name()` comparisons must use `QLatin1String()` wrapper.
 

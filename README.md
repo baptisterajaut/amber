@@ -25,16 +25,37 @@ make -j$(nproc)
 
 **Dependencies:** Qt 6 (Core, Gui, Widgets, Multimedia, OpenGL, OpenGLWidgets, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample), OpenGL.
 
-## Build (Windows cross-compile)
+## Build (Docker)
 
 ```bash
-docker build -f packaging/windows/cross-compile.dockerfile -t olive-win64 .
-docker run --rm -v $(pwd)/out:/host olive-win64 cp -r /out /host/olive-eva01
+# NSIS installer
+docker build -f packaging/windows/cross-compile.dockerfile --target package -t olive-win64 .
+
+# Debian 12 .deb
+docker build -f packaging/linux/debian.dockerfile --target package -t olive-debian .
+
+# Ubuntu 24.04 .deb
+docker build -f packaging/linux/ubuntu.dockerfile --target deb -t olive-ubuntu-deb .
+
+# AppImage
+docker build -f packaging/linux/ubuntu.dockerfile --target appimage -t olive-appimage .
 ```
 
 ## Packages
 
-Linux `.deb`, Arch PKGBUILD, and AppImage build scripts in `packaging/linux/`.
+Pre-built packages available at [v0.1.3-nightly](https://github.com/baptisterajaut/olive/releases/tag/v0.1.3-nightly):
+
+| Platform | File |
+|----------|------|
+| Windows (installer) | `olive-setup.exe` |
+| Linux (AppImage) | `Olive-0.1.3-x86_64.AppImage` |
+| Debian 12 | `olive-editor_0.1.3-1_debian12_amd64.deb` |
+| Ubuntu 24.04 | `olive-editor_0.1.3-1_ubuntu2404_amd64.deb` |
+| Arch Linux | `olive-editor-0.1.3-1-x86_64.pkg.tar.zst` |
+
+Tested on Arch Linux only. Other builds are best-effort.
+
+Build scripts in `packaging/linux/` (Dockerfiles, PKGBUILD) and `packaging/windows/` (cross-compile Dockerfile, NSIS).
 
 ## Upstream
 
