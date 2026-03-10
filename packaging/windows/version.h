@@ -10,7 +10,7 @@
 #define VER_COMPANYNAME_STR         "Olive Team"
 #define VER_FILEDESCRIPTION_STR     "Olive"
 #define VER_INTERNALNAME_STR        "Olive"
-#define VER_LEGALCOPYRIGHT_STR      "Copyright © 2018 Olive Team"
+#define VER_LEGALCOPYRIGHT_STR      "Copyright © 2018-2026 Olive Team"
 #define VER_LEGALTRADEMARKS1_STR    "All Rights Reserved"
 #define VER_LEGALTRADEMARKS2_STR    VER_LEGALTRADEMARKS1_STR
 #define VER_ORIGINALFILENAME_STR    "Olive.exe"

@@ -111,12 +111,9 @@ private:
   AVFrame* audio_frame;
   AVFrame* swr_frame;
   AVCodecContext* acodec_ctx;
-  AVPacket video_pkt;
-  AVPacket audio_pkt;
+  AVPacket* video_pkt;
+  AVPacket* audio_pkt;
   SwrContext* swr_ctx;
-
-  bool vpkt_alloc;
-  bool apkt_alloc;
 
   int aframe_bytes;
   int ret;

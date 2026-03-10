@@ -123,7 +123,11 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
       enc_ctx->width = qFloor(dec_ctx->width*info.size_multiplier);
       enc_ctx->height = qFloor(dec_ctx->height*info.size_multiplier);
       enc_ctx->sample_aspect_ratio = dec_ctx->sample_aspect_ratio;
-      enc_ctx->pix_fmt = enc_codec->pix_fmts[0];
+      const enum AVPixelFormat *pix_fmts = nullptr;
+      int num_pix_fmts = 0;
+      avcodec_get_supported_config(nullptr, enc_codec, AV_CODEC_CONFIG_PIX_FORMAT, 0,
+                                   (const void **)&pix_fmts, &num_pix_fmts);
+      enc_ctx->pix_fmt = (pix_fmts && num_pix_fmts > 0) ? pix_fmts[0] : AV_PIX_FMT_YUV420P;
       enc_ctx->framerate = dec_ctx->framerate;
       enc_ctx->time_base = in_stream->time_base;
       out_stream->time_base = in_stream->time_base;
@@ -175,8 +179,7 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   }
 
   // packet that av_read_frame will dump file packets into
-  AVPacket packet;
-  av_init_packet(&packet);
+  AVPacket *packet = av_packet_alloc();
 
   // frame that decoder will decode into
   AVFrame* dec_frame = av_frame_alloc();
@@ -185,14 +188,14 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   while (!skip) {
 
     // cache stream index
-    int stream_index = packet.stream_index;
+    int stream_index = packet->stream_index;
 
     // retrieve frame from decoder (this will clear the last frame so we don't have to do that)
     int read_ret = -1;
     int recfr_ret = -1;
     do {
       // read from input file
-      read_ret = av_read_frame(input_fmt_ctx, &packet);
+      read_ret = av_read_frame(input_fmt_ctx, packet);
 
       // handle errors
       if (read_ret < 0) {
@@ -206,31 +209,31 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
         break;
       }
 
-      stream_index = packet.stream_index;
+      stream_index = packet->stream_index;
 
       // determine whether this frame is from a stream we're transcoding
       if (input_streams.at(stream_index) == nullptr) {
         // if we didn't allocate a decoder for this earlier, we just pass it through
 
-        av_packet_rescale_ts(&packet, input_fmt_ctx->streams[stream_index]->time_base, output_fmt_ctx->streams[stream_index]->time_base);
+        av_packet_rescale_ts(packet, input_fmt_ctx->streams[stream_index]->time_base, output_fmt_ctx->streams[stream_index]->time_base);
 
         // write packet to output
-        av_interleaved_write_frame(output_fmt_ctx, &packet);
+        av_interleaved_write_frame(output_fmt_ctx, packet);
 
       } else {
         // we're going to transcode this packet.
 
         // send packet to decoder
-        avcodec_send_packet(input_streams.at(stream_index), &packet);
+        avcodec_send_packet(input_streams.at(stream_index), packet);
 
         // use timestamp and stream duration to create a rough estimation of the progress through this file
-        current_progress = qCeil((double(packet.pts)/double(input_fmt_ctx->streams[packet.stream_index]->duration))*100);
+        current_progress = qCeil((double(packet->pts)/double(input_fmt_ctx->streams[packet->stream_index]->duration))*100);
 
       }
 
       // free packet allocated by av_read_frame
-      av_packet_unref(&packet);
-    } while ((recfr_ret = avcodec_receive_frame(input_streams.at(packet.stream_index), dec_frame)) == AVERROR(EAGAIN) && !skip);
+      av_packet_unref(packet);
+    } while ((recfr_ret = avcodec_receive_frame(input_streams.at(packet->stream_index), dec_frame)) == AVERROR(EAGAIN) && !skip);
 
     // error/eof handling - cancel while loop
     if (read_ret < 0 || skip) {
@@ -238,7 +241,7 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
     }
 
     // free packet as we're about to use it for encoding
-    av_packet_unref(&packet);
+    av_packet_unref(packet);
 
     // rescale input frame timestamp to output timestamp
     dec_frame->pts = av_rescale_q(dec_frame->pts,
@@ -280,22 +283,23 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
     int recret;
 
     // loop through receiving packets
-    while ((recret = avcodec_receive_packet(output_streams.at(stream_index), &packet)) >= 0 && !skip) {
+    while ((recret = avcodec_receive_packet(output_streams.at(stream_index), packet)) >= 0 && !skip) {
 
       // set packet stream index to current stream index
-      packet.stream_index = stream_index;
+      packet->stream_index = stream_index;
 
       // write frame to file
-      av_interleaved_write_frame(output_fmt_ctx, &packet);
+      av_interleaved_write_frame(output_fmt_ctx, packet);
 
       // unref old packet
-      av_packet_unref(&packet);
+      av_packet_unref(packet);
 
     }
 
   }
 
-  // free dec_frame
+  // free packet and dec_frame
+  av_packet_free(&packet);
   av_frame_free(&dec_frame);
 
   // write video trailer

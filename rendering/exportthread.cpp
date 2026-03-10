@@ -65,8 +65,6 @@ ExportThread::ExportThread(const ExportParams &params,
   swr_frame(nullptr),
   acodec_ctx(nullptr),
   swr_ctx(nullptr),
-  vpkt_alloc(false),
-  apkt_alloc(false),
   c_filename(nullptr)
 {
   // Create offscreen surface for rendering while exporting
@@ -199,7 +197,7 @@ bool ExportThread::SetupVideo() {
   video_frame->height = olive::ActiveSequence->height;
   av_frame_get_buffer(video_frame, 0);
 
-  av_init_packet(&video_pkt);
+  video_pkt = av_packet_alloc();
 
   // Set up conversion context
   sws_ctx = sws_getContext(
@@ -257,7 +255,11 @@ bool ExportThread::SetupAudio() {
   acodec_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
   acodec_ctx->sample_rate = params_.audio_sampling_rate;
   av_channel_layout_from_mask(&acodec_ctx->ch_layout, AV_CH_LAYOUT_STEREO);  // change this to support surround/mono sound in the future (this is what the user sets the output audio to)
-  acodec_ctx->sample_fmt = acodec->sample_fmts[0];
+  const enum AVSampleFormat *sample_fmts = nullptr;
+  int num_sample_fmts = 0;
+  avcodec_get_supported_config(nullptr, acodec, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0,
+                               (const void **)&sample_fmts, &num_sample_fmts);
+  acodec_ctx->sample_fmt = (sample_fmts && num_sample_fmts > 0) ? sample_fmts[0] : AV_SAMPLE_FMT_S16;
   acodec_ctx->bit_rate = params_.audio_bitrate * 1000;
 
   acodec_ctx->time_base.num = 1;
@@ -326,7 +328,7 @@ bool ExportThread::SetupAudio() {
   }
   aframe_bytes = av_samples_get_buffer_size(nullptr, audio_frame->ch_layout.nb_channels, audio_frame->nb_samples, static_cast<AVSampleFormat>(audio_frame->format), 0);
 
-  av_init_packet(&audio_pkt);
+  audio_pkt = av_packet_alloc();
 
   // init converted audio frame
   swr_frame = av_frame_alloc();
@@ -480,7 +482,7 @@ void ExportThread::Export()
       sws_frame->pts = qRound(timecode_secs/av_q2d(vcodec_ctx->time_base));
 
       // Send frame to encoder
-      if (!Encode(fmt_ctx, vcodec_ctx, sws_frame, &video_pkt, video_stream)) {
+      if (!Encode(fmt_ctx, vcodec_ctx, sws_frame, video_pkt, video_stream)) {
         return;
       }
 
@@ -525,7 +527,7 @@ void ExportThread::Export()
         swr_frame->pts = file_audio_samples;
 
         // Send frame to encoder
-        if (!Encode(fmt_ctx, acodec_ctx, swr_frame, &audio_pkt, audio_stream)) {
+        if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) {
           return;
         }
 
@@ -562,9 +564,6 @@ void ExportThread::Export()
     return;
   }
 
-  if (params_.video_enabled) vpkt_alloc = true;
-  if (params_.audio_enabled) apkt_alloc = true;
-
   olive::Global->set_rendering_state(false);
   close_active_clips(olive::ActiveSequence.get());
 
@@ -576,7 +575,7 @@ void ExportThread::Export()
       swr_convert_frame(swr_ctx, swr_frame, nullptr);
       if (swr_frame->nb_samples == 0) break;
       swr_frame->pts = file_audio_samples;
-      if (!Encode(fmt_ctx, acodec_ctx, swr_frame, &audio_pkt, audio_stream)) {
+      if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) {
         return;
       }
       file_audio_samples += swr_frame->nb_samples;
@@ -591,10 +590,10 @@ void ExportThread::Export()
 
   // Flush remaining packets out of video and audio encoders by sending a null frame
   if (params_.video_enabled) {
-    Encode(fmt_ctx, vcodec_ctx, nullptr, &video_pkt, video_stream);
+    Encode(fmt_ctx, vcodec_ctx, nullptr, video_pkt, video_stream);
   }
   if (params_.audio_enabled) {
-    Encode(fmt_ctx, acodec_ctx, nullptr, &audio_pkt, audio_stream);
+    Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
   }
 
   // Write container trailer
@@ -623,8 +622,8 @@ void ExportThread::Cleanup()
     av_frame_free(&audio_frame);
   }
 
-  if (apkt_alloc) {
-    av_packet_unref(&audio_pkt);
+  if (audio_pkt != nullptr) {
+    av_packet_free(&audio_pkt);
   }
 
   if (vcodec_ctx != nullptr) {
@@ -635,8 +634,8 @@ void ExportThread::Cleanup()
     av_frame_free(&video_frame);
   }
 
-  if (vpkt_alloc) {
-    av_packet_unref(&video_pkt);
+  if (video_pkt != nullptr) {
+    av_packet_free(&video_pkt);
   }
 
   if (sws_ctx != nullptr) {

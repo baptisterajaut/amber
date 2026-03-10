@@ -21,6 +21,7 @@
 #include "exportdialog.h"
 
 extern "C" {
+#include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 }
 
@@ -636,8 +637,14 @@ void ExportDialog::vcodec_changed(int index) {
                             tr("Invalid Codec"),
                             tr("Failed to find a suitable encoder for this codec. Export will likely fail."));
     } else {
-      vcodec_params.pix_fmt = codec_info->pix_fmts[0];
-      if (vcodec_params.pix_fmt == -1) {
+      const enum AVPixelFormat *pix_fmts = nullptr;
+      int num_pix_fmts = 0;
+      if (avcodec_get_supported_config(nullptr, codec_info, AV_CODEC_CONFIG_PIX_FORMAT, 0,
+                                       (const void **)&pix_fmts, &num_pix_fmts) == 0
+          && pix_fmts && num_pix_fmts > 0) {
+        vcodec_params.pix_fmt = pix_fmts[0];
+      } else {
+        vcodec_params.pix_fmt = -1;
         QMessageBox::critical(this,
                               tr("Invalid Codec"),
                               tr("Failed to find pixel format for this encoder. Export will likely fail."));

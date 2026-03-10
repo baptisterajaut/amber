@@ -54,19 +54,19 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
   pix_fmt_combo_ = new QComboBox();
 
   // loop through available pixel formats for this codec
-  int pix_fmt_index = 0;
-  while (codec_info->pix_fmts[pix_fmt_index] != -1) { // AVCodec->pix_fmts is terminated by "-1"
+  const enum AVPixelFormat *pix_fmts = nullptr;
+  int num_pix_fmts = 0;
+  if (avcodec_get_supported_config(nullptr, codec_info, AV_CODEC_CONFIG_PIX_FORMAT, 0,
+                                   (const void **)&pix_fmts, &num_pix_fmts) == 0 && pix_fmts) {
+    for (int i = 0; i < num_pix_fmts; i++) {
+      // get the name of the pixel format and add it to the combobox (with the pixel format constant)
+      pix_fmt_combo_->addItem(av_get_pix_fmt_name(pix_fmts[i]), pix_fmts[i]);
 
-    // get the name of the pixel format and add it to the combobox (with the pixel format constant)
-    pix_fmt_combo_->addItem(av_get_pix_fmt_name(codec_info->pix_fmts[pix_fmt_index]),
-                           codec_info->pix_fmts[pix_fmt_index]);
-
-    // if the user has already selected a pixel format, set the combobox to it as well
-    if (codec_info->pix_fmts[pix_fmt_index] == params_.pix_fmt) {
-      pix_fmt_combo_->setCurrentIndex(pix_fmt_combo_->count()-1);
+      // if the user has already selected a pixel format, set the combobox to it as well
+      if (pix_fmts[i] == params_.pix_fmt) {
+        pix_fmt_combo_->setCurrentIndex(pix_fmt_combo_->count()-1);
+      }
     }
-
-    pix_fmt_index++;
   }
 
   layout->addWidget(pix_fmt_combo_, row, 1);
