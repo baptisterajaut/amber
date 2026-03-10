@@ -37,7 +37,7 @@
 // Load libraries for retrieving the native window handle. Used for VST plugins that have a separate window
 // dedicated to controls.
 #if defined(Q_OS_WIN)
-#include <Windows.h>
+#include <windows.h>
 #elif defined(Q_OS_MACOS)
 #include <CoreFoundation/CoreFoundation.h>
 class NSWindow;

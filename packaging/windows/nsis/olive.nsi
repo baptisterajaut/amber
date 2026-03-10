@@ -1,3 +1,5 @@
+Target amd64-unicode
+
 !include "MUI.nsh"
 
 !define MUI_ICON "install icon.ico"
@@ -11,7 +13,7 @@
 SetCompressor lzma
 
 Name ${APP_NAME}
-
+OutFile "olive-setup.exe"
 
 !ifdef X64
 InstallDir "$PROGRAMFILES64\${APP_NAME}"
@@ -33,7 +35,7 @@ InstallDir "$PROGRAMFILES32\${APP_NAME}"
 !insertmacro MUI_LANGUAGE "English"
 
 Section "Olive (required)"
-	
+
 	SectionIn RO
 
 	SetOutPath $INSTDIR
@@ -72,7 +74,7 @@ Section "uninstall"
 
 	Delete "$DESKTOP\${APP_NAME}.lnk"
 	rmdir /r "$SMPROGRAMS\${APP_NAME}"
-	
+
 	DeleteRegKey HKCR ".ove"
 	DeleteRegKey HKCR "OliveEditor.OVEFile"
 	DeleteRegKey HKCR "OliveEditor.OVEFile\DefaultIcon" ""

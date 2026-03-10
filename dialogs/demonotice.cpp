@@ -27,7 +27,7 @@
 DemoNotice::DemoNotice(QWidget *parent) :
   QDialog(parent)
 {
-  setWindowTitle(tr("Welcome to Olive!"));
+  setWindowTitle(tr("Welcome to Olive EVA-01!"));
 
   QVBoxLayout* vlayout = new QVBoxLayout(this);
 
@@ -36,19 +36,20 @@ DemoNotice::DemoNotice(QWidget *parent) :
   layout->setSpacing(20);
 
   QLabel* icon = new QLabel("<html><head/><body>"
-                            "<p><img src=\":/icons/olive-splash.png\"/></p>"
+                            "<p><img src=\":/icons/olive-eva01-splash.png\"/></p>"
                             "</body></html>", this);
   layout->addWidget(icon);
 
   QLabel* text = new QLabel("<html><head/><body><p>"
                             "<span style=\" font-size:14pt;\">"
-                            + tr("Welcome to Olive!")
+                            + tr("Welcome to Olive EVA-01!")
                             + "</span></p><p>"
-                            + tr("Olive is a free open-source video editor released under the GNU GPL. If you have paid for this software, you have been scammed.")
+                            + tr("This is a community fork of Olive 0.1, ported to Qt 6 and FFmpeg 7/8. "
+                                 "The original code is by the Olive Team — this fork is AI-maintained.")
                             + "</p><p>"
-                            + tr("This software is currently in ALPHA which means it is unstable and very likely to crash, have bugs, and have missing features. We offer no warranty so use at your own risk. Please report any bugs or feature requests at %1").arg("<a href=\"https://olivevideoeditor.org/\"><span style=\" text-decoration: underline; color:#007af4;\">www.olivevideoeditor.org</span></a>")
+                            + tr("This software is currently in ALPHA which means it is unstable and very likely to crash, have bugs, and have missing features. We offer no warranty so use at your own risk. Please report any bugs or feature requests at %1").arg("<a href=\"https://github.com/baptisterajaut/olive\"><span style=\" text-decoration: underline; color:#007af4;\">github.com/baptisterajaut/olive</span></a>")
                             + "</p><p>"
-                            + tr("Thank you for trying Olive and we hope you enjoy it!")
+                            + tr("Olive is free open-source software released under the GNU GPL.")
                             + "</p></body></html>", this);
   text->setWordWrap(true);
   layout->addWidget(text);

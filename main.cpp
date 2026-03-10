@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
   QSurfaceFormat::setDefaultFormat(format);
 
   QApplication a(argc, argv);
-  a.setWindowIcon(QIcon(":/icons/olive64.png"));
+  a.setWindowIcon(QIcon(":/icons/olive64-eva01.png"));
 
   // start media icon service (uses QPixmaps which require a QGuiApplication to have been created)
   olive::media_icon_service = std::unique_ptr<MediaIconService>(new MediaIconService());
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
   // set app name data
   QCoreApplication::setOrganizationName("olivevideoeditor.org");
   QCoreApplication::setOrganizationDomain("olivevideoeditor.org");
-  QCoreApplication::setApplicationName("Olive");
+  QCoreApplication::setApplicationName("Olive EVA-01");
 
   QGuiApplication::setDesktopFileName("org.olivevideoeditor.Olive");
 

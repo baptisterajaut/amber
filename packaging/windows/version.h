@@ -8,13 +8,13 @@
 #define VER_PRODUCTVERSION_STR      "1.0\0"
 
 #define VER_COMPANYNAME_STR         "Olive Team"
-#define VER_FILEDESCRIPTION_STR     "Olive"
-#define VER_INTERNALNAME_STR        "Olive"
+#define VER_FILEDESCRIPTION_STR     "Olive EVA-01"
+#define VER_INTERNALNAME_STR        "Olive EVA-01"
 #define VER_LEGALCOPYRIGHT_STR      "Copyright © 2018-2026 Olive Team"
 #define VER_LEGALTRADEMARKS1_STR    "All Rights Reserved"
 #define VER_LEGALTRADEMARKS2_STR    VER_LEGALTRADEMARKS1_STR
 #define VER_ORIGINALFILENAME_STR    "Olive.exe"
-#define VER_PRODUCTNAME_STR         "Olive"
+#define VER_PRODUCTNAME_STR         "Olive EVA-01"
 
 #define VER_COMPANYDOMAIN_STR       "www.olivevideoeditor.org"
 

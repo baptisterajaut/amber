@@ -1,10 +1,10 @@
 ARG BASE_IMAGE=debian:12
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y \
-    cmake build-essential git dpkg-dev \
+    cmake build-essential \
     qt6-base-dev qt6-multimedia-dev qt6-tools-dev \
     libqt6opengl6-dev libqt6openglwidgets6 libqt6svg6-dev \
     libgl-dev \
@@ -13,9 +13,6 @@ RUN apt-get update && apt-get install -y \
     frei0r-plugins-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ARG VERSION=0.1.3
-ARG REVISION=1
-
 COPY . /src
 WORKDIR /src/build
 
@@ -23,7 +20,14 @@ RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && \
     make -j$(nproc) && \
     DESTDIR=/pkg make install
 
-# Build .deb manually
+# --- Packaging stage ---
+FROM build AS package
+
+ARG VERSION=0.1.3
+ARG REVISION=1
+
+RUN apt-get update && apt-get install -y dpkg-dev && rm -rf /var/lib/apt/lists/*
+
 RUN ARCH=$(dpkg --print-architecture) && \
     mkdir -p /pkg/DEBIAN /out && \
     echo "Package: olive-editor" > /pkg/DEBIAN/control && \

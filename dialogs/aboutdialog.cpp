@@ -37,19 +37,21 @@ AboutDialog::AboutDialog(QWidget *parent) :
   // Construct About text
   QLabel* label =
       new QLabel(QString("<html><head/><body>"
-                         "<p><img src=\":/icons/olive-splash.png\"/></p>"
-                         "<p><a href=\"https://www.olivevideoeditor.org/\">"
-                         "<span style=\" text-decoration: underline; color:#007af4;\">"
-                         "https://www.olivevideoeditor.org/"
-                         "</span></a></p>"
-                         "<p><b>%1</b></p>" // AppName (version identifier)
-                         "<p>%2</p>" // First statement
-                         "<p>%3</p>" // Second statement
+                         "<p><img src=\":/icons/olive-eva01-splash.png\"/></p>"
+                         "<p><b>%1</b></p>"
+                         "<p>%2</p>"
+                         "<p>%3</p>"
+                         "<p>%4</p>"
                          "</body></html>").arg(olive::AppName,
-                                               tr("Olive is a non-linear video editor. This software is free and "
-                                                  "protected by the GNU GPL."),
-                                               tr("Olive Team is obliged to inform users that Olive source code is "
-                                                  "available for download from its website.")), this);
+                                               tr("Community fork of Olive 0.1 — ported to Qt 6 and FFmpeg 7/8. "
+                                                  "AI-maintained. Original code by the Olive Team."),
+                                               tr("Olive is a free non-linear video editor protected by the GNU GPL."),
+                                               "<a href=\"https://github.com/baptisterajaut/olive\">"
+                                               "<span style=\" text-decoration: underline; color:#007af4;\">"
+                                               "github.com/baptisterajaut/olive</span></a>"
+                                               " | <a href=\"https://www.olivevideoeditor.org/\">"
+                                               "<span style=\" text-decoration: underline; color:#007af4;\">"
+                                               "olivevideoeditor.org</span></a>"), this);
 
   // Set text formatting
   label->setAlignment(Qt::AlignCenter);
