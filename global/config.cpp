@@ -90,159 +90,159 @@ void Config::load(QString path) {
     while (!stream.atEnd()) {
       stream.readNext();
       if (stream.isStartElement()) {
-        if (stream.name() == "ShowTrackLines") {
+        if (stream.name() == QLatin1String("ShowTrackLines")) {
           stream.readNext();
-          show_track_lines = (stream.text() == "1");
-        } else if (stream.name() == "ScrollZooms") {
+          show_track_lines = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("ScrollZooms")) {
           stream.readNext();
-          scroll_zooms = (stream.text() == "1");
-        } else if (stream.name() == "InvertTimelineScrollAxes") {
+          scroll_zooms = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("InvertTimelineScrollAxes")) {
           stream.readNext();
-          invert_timeline_scroll_axes = (stream.text() == "1");
-        } else if (stream.name() == "EditToolSelectsLinks") {
+          invert_timeline_scroll_axes = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("EditToolSelectsLinks")) {
           stream.readNext();
-          edit_tool_selects_links = (stream.text() == "1");
-        } else if (stream.name() == "EditToolAlsoSeeks") {
+          edit_tool_selects_links = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("EditToolAlsoSeeks")) {
           stream.readNext();
-          edit_tool_also_seeks = (stream.text() == "1");
-        } else if (stream.name() == "SelectAlsoSeeks") {
+          edit_tool_also_seeks = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("SelectAlsoSeeks")) {
           stream.readNext();
-          select_also_seeks = (stream.text() == "1");
-        } else if (stream.name() == "PasteSeeks") {
+          select_also_seeks = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("PasteSeeks")) {
           stream.readNext();
-          paste_seeks = (stream.text() == "1");
-        } else if (stream.name() == "ImageSequenceFormats") {
+          paste_seeks = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("ImageSequenceFormats")) {
           stream.readNext();
           img_seq_formats = stream.text().toString();
-        } else if (stream.name() == "RectifiedWaveforms") {
+        } else if (stream.name() == QLatin1String("RectifiedWaveforms")) {
           stream.readNext();
-          rectified_waveforms = (stream.text() == "1");
-        } else if (stream.name() == "DefaultTransitionLength") {
+          rectified_waveforms = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("DefaultTransitionLength")) {
           stream.readNext();
           default_transition_length = stream.text().toInt();
-        } else if (stream.name() == "TimecodeView") {
+        } else if (stream.name() == QLatin1String("TimecodeView")) {
           stream.readNext();
           timecode_view = stream.text().toInt();
-        } else if (stream.name() == "ShowTitleSafeArea") {
+        } else if (stream.name() == QLatin1String("ShowTitleSafeArea")) {
           stream.readNext();
-          show_title_safe_area = (stream.text() == "1");
-        } else if (stream.name() == "UseCustomTitleSafeRatio") {
+          show_title_safe_area = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("UseCustomTitleSafeRatio")) {
           stream.readNext();
-          use_custom_title_safe_ratio = (stream.text() == "1");
-        } else if (stream.name() == "CustomTitleSafeRatio") {
+          use_custom_title_safe_ratio = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("CustomTitleSafeRatio")) {
           stream.readNext();
           custom_title_safe_ratio = stream.text().toDouble();
-        } else if (stream.name() == "EnableDragFilesToTimeline") {
+        } else if (stream.name() == QLatin1String("EnableDragFilesToTimeline")) {
           stream.readNext();
-          enable_drag_files_to_timeline = (stream.text() == "1");;
-        } else if (stream.name() == "AutoscaleByDefault") {
+          enable_drag_files_to_timeline = (stream.text() == QLatin1String("1"));;
+        } else if (stream.name() == QLatin1String("AutoscaleByDefault")) {
           stream.readNext();
-          autoscale_by_default = (stream.text() == "1");
-        } else if (stream.name() == "RecordingMode") {
+          autoscale_by_default = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("RecordingMode")) {
           stream.readNext();
           recording_mode = stream.text().toInt();
-        } else if (stream.name() == "EnableSeekToImport") {
+        } else if (stream.name() == QLatin1String("EnableSeekToImport")) {
           stream.readNext();
-          enable_seek_to_import = (stream.text() == "1");
-        } else if (stream.name() == "AudioScrubbing") {
+          enable_seek_to_import = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("AudioScrubbing")) {
           stream.readNext();
-          enable_audio_scrubbing = (stream.text() == "1");
-        } else if (stream.name() == "DropFileOnMediaToReplace") {
+          enable_audio_scrubbing = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("DropFileOnMediaToReplace")) {
           stream.readNext();
-          drop_on_media_to_replace = (stream.text() == "1");
-        } else if (stream.name() == "Autoscroll") {
+          drop_on_media_to_replace = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("Autoscroll")) {
           stream.readNext();
           autoscroll = stream.text().toInt();
-        } else if (stream.name() == "AudioRate") {
+        } else if (stream.name() == QLatin1String("AudioRate")) {
           stream.readNext();
           audio_rate = stream.text().toInt();
-        } else if (stream.name() == "HoverFocus") {
+        } else if (stream.name() == QLatin1String("HoverFocus")) {
           stream.readNext();
-          hover_focus = (stream.text() == "1");
-        } else if (stream.name() == "ProjectViewType") {
+          hover_focus = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("ProjectViewType")) {
           stream.readNext();
           project_view_type = stream.text().toInt();
-        } else if (stream.name() == "SetNameWithMarker") {
+        } else if (stream.name() == QLatin1String("SetNameWithMarker")) {
           stream.readNext();
-          set_name_with_marker = (stream.text() == "1");
-        } else if (stream.name() == "ShowProjectToolbar") {
+          set_name_with_marker = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("ShowProjectToolbar")) {
           stream.readNext();
-          show_project_toolbar = (stream.text() == "1");
-        } else if (stream.name() == "PreviousFrameQueueSize") {
+          show_project_toolbar = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("PreviousFrameQueueSize")) {
           stream.readNext();
           previous_queue_size = stream.text().toDouble();
-        } else if (stream.name() == "PreviousFrameQueueType") {
+        } else if (stream.name() == QLatin1String("PreviousFrameQueueType")) {
           stream.readNext();
           previous_queue_type = stream.text().toInt();
-        } else if (stream.name() == "UpcomingFrameQueueSize") {
+        } else if (stream.name() == QLatin1String("UpcomingFrameQueueSize")) {
           stream.readNext();
           upcoming_queue_size = stream.text().toDouble();
-        } else if (stream.name() == "UpcomingFrameQueueType") {
+        } else if (stream.name() == QLatin1String("UpcomingFrameQueueType")) {
           stream.readNext();
           upcoming_queue_type = stream.text().toInt();
-        } else if (stream.name() == "Loop") {
+        } else if (stream.name() == QLatin1String("Loop")) {
           stream.readNext();
-          loop = (stream.text() == "1");
-        } else if (stream.name() == "SeekAlsoSelects") {
+          loop = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("SeekAlsoSelects")) {
           stream.readNext();
-          seek_also_selects = (stream.text() == "1");
-        } else if (stream.name() == "AutoSeekToBeginning") {
+          seek_also_selects = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("AutoSeekToBeginning")) {
           stream.readNext();
-          auto_seek_to_beginning = (stream.text() == "1");
-        } else if (stream.name() == "CSSPath") {
+          auto_seek_to_beginning = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("CSSPath")) {
           stream.readNext();
           css_path = stream.text().toString();
-        } else if (stream.name() == "EffectTextboxLines") {
+        } else if (stream.name() == QLatin1String("EffectTextboxLines")) {
           stream.readNext();
           effect_textbox_lines = stream.text().toInt();
-        } else if (stream.name() == "UseSoftwareFallback") {
+        } else if (stream.name() == QLatin1String("UseSoftwareFallback")) {
           stream.readNext();
-          use_software_fallback = (stream.text() == "1");
-        } else if (stream.name() == "CenterTimelineTimecodes") {
+          use_software_fallback = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("CenterTimelineTimecodes")) {
           stream.readNext();
-          center_timeline_timecodes =  (stream.text() == "1");
-        } else if (stream.name() == "PreferredAudioOutput") {
+          center_timeline_timecodes =  (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("PreferredAudioOutput")) {
           stream.readNext();
           preferred_audio_output = stream.text().toString();
-        } else if (stream.name() == "PreferredAudioInput") {
+        } else if (stream.name() == QLatin1String("PreferredAudioInput")) {
           stream.readNext();
           preferred_audio_input = stream.text().toString();
-        } else if (stream.name() == "LanguageFile") {
+        } else if (stream.name() == QLatin1String("LanguageFile")) {
           stream.readNext();
           language_file = stream.text().toString();
-        } else if (stream.name() == "ThumbnailResolution") {
+        } else if (stream.name() == QLatin1String("ThumbnailResolution")) {
           stream.readNext();
           thumbnail_resolution = stream.text().toInt();
-        } else if (stream.name() == "WaveformResolution") {
+        } else if (stream.name() == QLatin1String("WaveformResolution")) {
           stream.readNext();
           waveform_resolution = stream.text().toInt();
-        } else if (stream.name() == "AddDefaultEffectsToClips") {
+        } else if (stream.name() == QLatin1String("AddDefaultEffectsToClips")) {
           stream.readNext();
-          add_default_effects_to_clips = (stream.text() == "1");
-        } else if (stream.name() == "Style") {
+          add_default_effects_to_clips = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("Style")) {
           stream.readNext();
           style = static_cast<olive::styling::Style>(stream.text().toInt());
-        } else if (stream.name() == "NativeMenuStyling") {
+        } else if (stream.name() == QLatin1String("NativeMenuStyling")) {
           stream.readNext();
-          use_native_menu_styling = (stream.text() == "1");
-        } else if (stream.name() == "DefaultSequenceWidth") {
+          use_native_menu_styling = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("DefaultSequenceWidth")) {
           stream.readNext();
           default_sequence_width = stream.text().toInt();
-        } else if (stream.name() == "DefaultSequenceHeight") {
+        } else if (stream.name() == QLatin1String("DefaultSequenceHeight")) {
           stream.readNext();
           default_sequence_height = stream.text().toInt();
-        } else if (stream.name() == "DefaultSequenceFrameRate") {
+        } else if (stream.name() == QLatin1String("DefaultSequenceFrameRate")) {
           stream.readNext();
           default_sequence_framerate = stream.text().toDouble();
-        } else if (stream.name() == "DefaultSequenceAudioFrequency") {
+        } else if (stream.name() == QLatin1String("DefaultSequenceAudioFrequency")) {
           stream.readNext();
           default_sequence_audio_frequency = stream.text().toInt();
-        } else if (stream.name() == "DefaultSequenceAudioLayout") {
+        } else if (stream.name() == QLatin1String("DefaultSequenceAudioLayout")) {
           stream.readNext();
           default_sequence_audio_channel_layout = stream.text().toInt();
-        } else if (stream.name() == "LockedPanels") {
+        } else if (stream.name() == QLatin1String("LockedPanels")) {
           stream.readNext();
-          locked_panels = (stream.text() == "1");
+          locked_panels = (stream.text() == QLatin1String("1"));
         }
       }
     }

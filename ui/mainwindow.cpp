@@ -77,14 +77,14 @@ void MainWindow::setup_layout(bool reset) {
       while (!stream.atEnd()) {
         stream.readNext();
 
-        if (stream.name() == "panels" && stream.isStartElement()) {
+        if (stream.name() == QLatin1String("panels") && stream.isStartElement()) {
 
           // element contains MainWindow layout data to restore
           stream.readNext();
           restoreState(QByteArray::fromBase64(stream.text().toUtf8()), 0);
           reset = false;
 
-        } else if (stream.name() == "panel" && stream.isStartElement()) {
+        } else if (stream.name() == QLatin1String("panel") && stream.isStartElement()) {
 
           // element contains layout data specific to a panel, we'll find the panel and load it
 
@@ -93,7 +93,7 @@ void MainWindow::setup_layout(bool reset) {
           const QXmlStreamAttributes& attributes = stream.attributes();
           for (int i=0;i<attributes.size();i++) {
             const QXmlStreamAttribute& attr = attributes.at(i);
-            if (attr.name() == "name") {
+            if (attr.name() == QLatin1String("name")) {
               panel_name = attr.value().toString();
               break;
             }

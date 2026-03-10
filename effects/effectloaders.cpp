@@ -151,14 +151,14 @@ void load_shader_effects_worker(const QString& effects_path) {
 
         QXmlStreamReader reader(&file);
         while (!reader.atEnd()) {
-          if (reader.name() == "effect") {
+          if (reader.name() == QLatin1String("effect")) {
             QString effect_name = "";
             QString effect_cat = "";
             const QXmlStreamAttributes attr = reader.attributes();
             for (int j=0;j<attr.size();j++) {
-              if (attr.at(j).name() == "name") {
+              if (attr.at(j).name() == QLatin1String("name")) {
                 effect_name = attr.at(j).value().toString();
-              } else if (attr.at(j).name() == "category") {
+              } else if (attr.at(j).name() == QLatin1String("category")) {
                 effect_cat = attr.at(j).value().toString();
               }
             }

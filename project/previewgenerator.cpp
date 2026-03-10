@@ -375,7 +375,11 @@ void PreviewGenerator::generate_waveform() {
                         linesize);
 
               // is video interlaced?
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
               s->video_auto_interlacing = (temp_frame->flags & AV_FRAME_FLAG_INTERLACED) ? ((temp_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
+#else
+              s->video_auto_interlacing = temp_frame->interlaced_frame ? (temp_frame->top_field_first ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
+#endif
               s->video_interlacing = s->video_auto_interlacing;
 
               s->preview_done = true;

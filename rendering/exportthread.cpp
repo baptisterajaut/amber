@@ -255,11 +255,15 @@ bool ExportThread::SetupAudio() {
   acodec_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
   acodec_ctx->sample_rate = params_.audio_sampling_rate;
   av_channel_layout_from_mask(&acodec_ctx->ch_layout, AV_CH_LAYOUT_STEREO);  // change this to support surround/mono sound in the future (this is what the user sets the output audio to)
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
   const enum AVSampleFormat *sample_fmts = nullptr;
   int num_sample_fmts = 0;
   avcodec_get_supported_config(nullptr, acodec, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0,
                                (const void **)&sample_fmts, &num_sample_fmts);
   acodec_ctx->sample_fmt = (sample_fmts && num_sample_fmts > 0) ? sample_fmts[0] : AV_SAMPLE_FMT_S16;
+#else
+  acodec_ctx->sample_fmt = acodec->sample_fmts ? acodec->sample_fmts[0] : AV_SAMPLE_FMT_S16;
+#endif
   acodec_ctx->bit_rate = params_.audio_bitrate * 1000;
 
   acodec_ctx->time_base.num = 1;

@@ -55,10 +55,16 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
 
   // loop through available pixel formats for this codec
   const enum AVPixelFormat *pix_fmts = nullptr;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
   int num_pix_fmts = 0;
   if (avcodec_get_supported_config(nullptr, codec_info, AV_CODEC_CONFIG_PIX_FORMAT, 0,
                                    (const void **)&pix_fmts, &num_pix_fmts) == 0 && pix_fmts) {
     for (int i = 0; i < num_pix_fmts; i++) {
+#else
+  pix_fmts = codec_info->pix_fmts;
+  if (pix_fmts) {
+    for (int i = 0; pix_fmts[i] != AV_PIX_FMT_NONE; i++) {
+#endif
       // get the name of the pixel format and add it to the combobox (with the pixel format constant)
       pix_fmt_combo_->addItem(av_get_pix_fmt_name(pix_fmts[i]), pix_fmts[i]);
 

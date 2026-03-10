@@ -134,20 +134,20 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
         QXmlStreamReader reader(&effect_file);
 
         while (!reader.atEnd()) {
-          if (reader.name() == "row" && reader.isStartElement()) {
+          if (reader.name() == QLatin1String("row") && reader.isStartElement()) {
             QString row_name;
             const QXmlStreamAttributes& attributes = reader.attributes();
             for (int i=0;i<attributes.size();i++) {
               const QXmlStreamAttribute& attr = attributes.at(i);
-              if (attr.name() == "name") {
+              if (attr.name() == QLatin1String("name")) {
                 row_name = attr.value().toString();
               }
             }
             if (!row_name.isEmpty()) {
               EffectRow* row = new EffectRow(this, row_name);
-              while (!reader.atEnd() && !(reader.name() == "row" && reader.isEndElement())) {
+              while (!reader.atEnd() && !(reader.name() == QLatin1String("row") && reader.isEndElement())) {
                 reader.readNext();
-                if (reader.name() == "field" && reader.isStartElement()) {
+                if (reader.name() == QLatin1String("field") && reader.isStartElement()) {
                   int type = -1;
                   QString id;
 
@@ -155,7 +155,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                   const QXmlStreamAttributes& attributes = reader.attributes();
                   for (int i=0;i<attributes.size();i++) {
                     const QXmlStreamAttribute& attr = attributes.at(i);
-                    if (attr.name() == "type") {
+                    if (attr.name() == QLatin1String("type")) {
                       QString comp = attr.value().toString().toUpper();
                       if (comp == "DOUBLE") {
                         type = EffectField::EFFECT_FIELD_DOUBLE;
@@ -172,7 +172,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       } else if (comp == "FILE") {
                         type = EffectField::EFFECT_FIELD_FILE;
                       }
-                    } else if (attr.name() == "id") {
+                    } else if (attr.name() == QLatin1String("id")) {
                       id = attr.value().toString();
                     }
                   }
@@ -190,11 +190,11 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
 
                       for (int i=0;i<attributes.size();i++) {
                         const QXmlStreamAttribute& attr = attributes.at(i);
-                        if (attr.name() == "default") {
+                        if (attr.name() == QLatin1String("default")) {
                           double_field->SetDefault(attr.value().toDouble());
-                        } else if (attr.name() == "min") {
+                        } else if (attr.name() == QLatin1String("min")) {
                           double_field->SetMinimum(attr.value().toDouble());
-                        } else if (attr.name() == "max") {
+                        } else if (attr.name() == QLatin1String("max")) {
                           double_field->SetMaximum(attr.value().toDouble());
                         }
                       }
@@ -210,19 +210,19 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
 
                       for (int i=0;i<attributes.size();i++) {
                         const QXmlStreamAttribute& attr = attributes.at(i);
-                        if (attr.name() == "r") {
+                        if (attr.name() == QLatin1String("r")) {
                           color.setRed(attr.value().toInt());
-                        } else if (attr.name() == "g") {
+                        } else if (attr.name() == QLatin1String("g")) {
                           color.setGreen(attr.value().toInt());
-                        } else if (attr.name() == "b") {
+                        } else if (attr.name() == QLatin1String("b")) {
                           color.setBlue(attr.value().toInt());
-                        } else if (attr.name() == "rf") {
+                        } else if (attr.name() == QLatin1String("rf")) {
                           color.setRedF(attr.value().toDouble());
-                        } else if (attr.name() == "gf") {
+                        } else if (attr.name() == QLatin1String("gf")) {
                           color.setGreenF(attr.value().toDouble());
-                        } else if (attr.name() == "bf") {
+                        } else if (attr.name() == QLatin1String("bf")) {
                           color.setBlueF(attr.value().toDouble());
-                        } else if (attr.name() == "hex") {
+                        } else if (attr.name() == QLatin1String("hex")) {
                           color.setNamedColor(attr.value().toString());
                         }
                       }
@@ -234,7 +234,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       field = new StringField(row, id);
                       for (int i=0;i<attributes.size();i++) {
                         const QXmlStreamAttribute& attr = attributes.at(i);
-                        if (attr.name() == "default") {
+                        if (attr.name() == QLatin1String("default")) {
                           field->SetValueAt(0, attr.value().toString());
                         }
                       }
@@ -243,8 +243,8 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       field = new BoolField(row, id);
                       for (int i=0;i<attributes.size();i++) {
                         const QXmlStreamAttribute& attr = attributes.at(i);
-                        if (attr.name() == "default") {
-                          field->SetValueAt(0, attr.value() == "1");
+                        if (attr.name() == QLatin1String("default")) {
+                          field->SetValueAt(0, attr.value() == QLatin1String("1"));
                         }
                       }
                       break;
@@ -254,15 +254,15 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       int combo_default_index = 0;
                       for (int i=0;i<attributes.size();i++) {
                         const QXmlStreamAttribute& attr = attributes.at(i);
-                        if (attr.name() == "default") {
+                        if (attr.name() == QLatin1String("default")) {
                           combo_default_index = attr.value().toInt();
                           break;
                         }
                       }
                       int combo_item_count = 0;
-                      while (!reader.atEnd() && !(reader.name() == "field" && reader.isEndElement())) {
+                      while (!reader.atEnd() && !(reader.name() == QLatin1String("field") && reader.isEndElement())) {
                         reader.readNext();
-                        if (reader.name() == "option" && reader.isStartElement()) {
+                        if (reader.name() == QLatin1String("option") && reader.isStartElement()) {
                           reader.readNext();
                           combo_field->AddItem(reader.text().toString(), combo_item_count);
                           combo_item_count++;
@@ -276,7 +276,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       field = new FontField(row, id);
                       for (int i=0;i<attributes.size();i++) {
                         const QXmlStreamAttribute& attr = attributes.at(i);
-                        if (attr.name() == "default") {
+                        if (attr.name() == QLatin1String("default")) {
                           field->SetValueAt(0, attr.value().toString());
                         }
                       }
@@ -285,7 +285,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       field = new FileField(row, id);
                       for (int i=0;i<attributes.size();i++) {
                         const QXmlStreamAttribute& attr = attributes.at(i);
-                        if (attr.name() == "filename") {
+                        if (attr.name() == QLatin1String("filename")) {
                           field->SetValueAt(0, attr.value().toString());
                         }
                       }
@@ -295,25 +295,25 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                 }
               }
             }
-          } else if (reader.name() == "shader" && reader.isStartElement()) {
+          } else if (reader.name() == QLatin1String("shader") && reader.isStartElement()) {
             SetFlags(Flags() | ShaderFlag);
             const QXmlStreamAttributes& attributes = reader.attributes();
             for (int i=0;i<attributes.size();i++) {
               const QXmlStreamAttribute& attr = attributes.at(i);
-              if (attr.name() == "vert") {
+              if (attr.name() == QLatin1String("vert")) {
                 vertPath = attr.value().toString();
-              } else if (attr.name() == "frag") {
+              } else if (attr.name() == QLatin1String("frag")) {
                 fragPath = attr.value().toString();
-              } else if (attr.name() == "iterations") {
+              } else if (attr.name() == QLatin1String("iterations")) {
                 setIterations(attr.value().toInt());
               }
             }
-          }/* else if (reader.name() == "superimpose" && reader.isStartElement()) {
+          }/* else if (reader.name() == QLatin1String("superimpose") && reader.isStartElement()) {
             enable_superimpose = true;
             const QXmlStreamAttributes& attributes = reader.attributes();
             for (int i=0;i<attributes.size();i++) {
               const QXmlStreamAttribute& attr = attributes.at(i);
-              if (attr.name() == "script") {
+              if (attr.name() == QLatin1String("script")) {
                 QFile script_file(get_effects_dir() + "/" + attr.value().toString());
                 if (script_file.open(QFile::ReadOnly)) {
                   script = script_file.readAll();
@@ -529,21 +529,21 @@ void Effect::load(QXmlStreamReader& stream) {
 
   while (!stream.atEnd() && !(stream.name() == tag && stream.isEndElement())) {
     stream.readNext();
-    if (stream.name() == "row" && stream.isStartElement()) {
+    if (stream.name() == QLatin1String("row") && stream.isStartElement()) {
       if (row_count < rows.size()) {
         EffectRow* row = rows.at(row_count);
 
-        while (!stream.atEnd() && !(stream.name() == "row" && stream.isEndElement())) {
+        while (!stream.atEnd() && !(stream.name() == QLatin1String("row") && stream.isEndElement())) {
           stream.readNext();
 
           // read field
-          if (stream.name() == "field" && stream.isStartElement()) {
+          if (stream.name() == QLatin1String("field") && stream.isStartElement()) {
             int field_number = -1;
 
             // match field using ID
             for (int k=0;k<stream.attributes().size();k++) {
               const QXmlStreamAttribute& attr = stream.attributes().at(k);
-              if (attr.name() == "id") {
+              if (attr.name() == QLatin1String("id")) {
                 for (int l=0;l<row->FieldCount();l++) {
                   if (row->Field(l)->id() == attr.value()) {
                     field_number = l;
@@ -560,35 +560,35 @@ void Effect::load(QXmlStreamReader& stream) {
               // get current field value
               for (int k=0;k<stream.attributes().size();k++) {
                 const QXmlStreamAttribute& attr = stream.attributes().at(k);
-                if (attr.name() == "value") {
+                if (attr.name() == QLatin1String("value")) {
                   field->persistent_data_ = field->ConvertStringToValue(attr.value().toString());
                   break;
                 }
               }
 
-              while (!stream.atEnd() && !(stream.name() == "field" && stream.isEndElement())) {
+              while (!stream.atEnd() && !(stream.name() == QLatin1String("field") && stream.isEndElement())) {
                 stream.readNext();
 
                 // read keyframes
-                if (stream.name() == "key" && stream.isStartElement()) {
+                if (stream.name() == QLatin1String("key") && stream.isStartElement()) {
                   row->SetKeyframingInternal(true);
 
                   EffectKeyframe key;
                   for (int k=0;k<stream.attributes().size();k++) {
                     const QXmlStreamAttribute& attr = stream.attributes().at(k);
-                    if (attr.name() == "value") {
+                    if (attr.name() == QLatin1String("value")) {
                       key.data = field->ConvertStringToValue(attr.value().toString());
-                    } else if (attr.name() == "frame") {
+                    } else if (attr.name() == QLatin1String("frame")) {
                       key.time = attr.value().toLong();
-                    } else if (attr.name() == "type") {
+                    } else if (attr.name() == QLatin1String("type")) {
                       key.type = attr.value().toInt();
-                    } else if (attr.name() == "prehx") {
+                    } else if (attr.name() == QLatin1String("prehx")) {
                       key.pre_handle_x = attr.value().toDouble();
-                    } else if (attr.name() == "prehy") {
+                    } else if (attr.name() == QLatin1String("prehy")) {
                       key.pre_handle_y = attr.value().toDouble();
-                    } else if (attr.name() == "posthx") {
+                    } else if (attr.name() == QLatin1String("posthx")) {
                       key.post_handle_x = attr.value().toDouble();
-                    } else if (attr.name() == "posthy") {
+                    } else if (attr.name() == QLatin1String("posthy")) {
                       key.post_handle_y = attr.value().toDouble();
                     }
                   }
@@ -667,13 +667,13 @@ void Effect::load_from_string(const QByteArray &s) {
     stream.readNext();
 
     // find the effect opening tag
-    if (stream.name() == "effect" && stream.isStartElement()) {
+    if (stream.name() == QLatin1String("effect") && stream.isStartElement()) {
 
       // check the name to see if it matches this effect
       const QXmlStreamAttributes& attributes = stream.attributes();
       for (int i=0;i<attributes.size();i++) {
         const QXmlStreamAttribute& attr = attributes.at(i);
-        if (attr.name() == "name") {
+        if (attr.name() == QLatin1String("name")) {
           if (get_meta_from_name(attr.value().toString()) == meta) {
             // pass off to standard loading function
             load(stream);

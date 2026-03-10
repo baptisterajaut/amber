@@ -1,0 +1,31 @@
+pkgname=olive-editor
+pkgver=0.1.3
+pkgrel=1
+pkgdesc='Professional open-source non-linear video editor'
+arch=('x86_64')
+url='https://olivevideoeditor.org/'
+license=('GPL3')
+depends=(
+  'qt6-base'
+  'qt6-multimedia'
+  'qt6-svg'
+  'ffmpeg'
+  'frei0r-plugins'
+)
+makedepends=(
+  'cmake'
+  'qt6-tools'
+)
+source=("git+ssh://git@github.com/baptisterajaut/olive.git#branch=0.1.x")
+sha256sums=('SKIP')
+
+build() {
+  cmake -B build -S olive \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build -j$(nproc)
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

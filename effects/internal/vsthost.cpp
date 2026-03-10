@@ -311,7 +311,7 @@ void VSTHost::process_audio(double, double, quint8* samples, int nb_bytes, int) 
 }
 
 void VSTHost::custom_load(QXmlStreamReader &stream) {
-  if (stream.name() == "plugindata") {
+  if (stream.name() == QLatin1String("plugindata")) {
     stream.readNext();
     data_cache = QByteArray::fromBase64(stream.text().toUtf8());
     if (plugin != nullptr) {
