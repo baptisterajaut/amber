@@ -26,7 +26,7 @@ extern "C" {
 
 #include <QOpenGLFramebufferObject>
 #include <QApplication>
-#include <QDesktopWidget>
+#include <QScreen>
 #include <QDebug>
 
 #ifdef OLIVE_OCIO

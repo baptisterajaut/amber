@@ -229,8 +229,8 @@ void KeyframeView::resize_move(double d) {
 }
 
 void KeyframeView::mousePressEvent(QMouseEvent *event) {
-  rect_select_x = event->x();
-  rect_select_y = event->y();
+  rect_select_x = qRound(event->position().x());
+  rect_select_y = qRound(event->position().y());
   rect_select_w = 0;
   rect_select_h = 0;
 
@@ -241,8 +241,8 @@ void KeyframeView::mousePressEvent(QMouseEvent *event) {
 
   old_key_vals.clear();
 
-  int mouse_x = event->x() + x_scroll;
-  int mouse_y = event->y();
+  int mouse_x = qRound(event->position().x()) + x_scroll;
+  int mouse_y = qRound(event->position().y());
   int row_index = -1;
   int field_index = -1;
   int keyframe_index = -1;
@@ -329,12 +329,12 @@ void KeyframeView::mouseMoveEvent(QMouseEvent* event) {
     unsetCursor();
   }
   if (scroll_drag) {
-    panel_effect_controls->horizontalScrollBar->setValue(panel_effect_controls->horizontalScrollBar->value() + rect_select_x - event->pos().x());
-    panel_effect_controls->verticalScrollBar->setValue(panel_effect_controls->verticalScrollBar->value() + rect_select_y - event->pos().y());
-    rect_select_x = event->pos().x();
-    rect_select_y = event->pos().y();
+    panel_effect_controls->horizontalScrollBar->setValue(panel_effect_controls->horizontalScrollBar->value() + rect_select_x - event->position().toPoint().x());
+    panel_effect_controls->verticalScrollBar->setValue(panel_effect_controls->verticalScrollBar->value() + rect_select_y - event->position().toPoint().y());
+    rect_select_x = event->position().toPoint().x();
+    rect_select_y = event->position().toPoint().y();
   } else if (mousedown) {
-    int mouse_x = event->x() + x_scroll;
+    int mouse_x = qRound(event->position().x()) + x_scroll;
 
     long current_frame = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x);
     panel_effect_controls->scroll_to_frame(current_frame + visible_in);
@@ -344,11 +344,11 @@ void KeyframeView::mouseMoveEvent(QMouseEvent* event) {
       selected_fields.resize(rect_select_offset);
       selected_keyframes.resize(rect_select_offset);
 
-      rect_select_w = event->x() - rect_select_x;
-      rect_select_h = event->y() - rect_select_y;
+      rect_select_w = qRound(event->position().x()) - rect_select_x;
+      rect_select_h = qRound(event->position().y()) - rect_select_y;
 
-      int min_row = qMin(rect_select_y, event->y())-KEYFRAME_SIZE;
-      int max_row = qMax(rect_select_y, event->y())+KEYFRAME_SIZE;
+      int min_row = qMin(rect_select_y, qRound(event->position().y()))-KEYFRAME_SIZE;
+      int max_row = qMax(rect_select_y, qRound(event->position().y()))+KEYFRAME_SIZE;
 
       long frame_start = getFrameFromScreenPoint(panel_effect_controls->zoom, rect_select_x+x_scroll);
       long min_frame = qMin(frame_start, current_frame)-KEYFRAME_SIZE;

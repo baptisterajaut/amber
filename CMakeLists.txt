@@ -21,13 +21,14 @@ if(UNIX AND NOT APPLE AND NOT DEFINED OpenGL_GL_PREFERENCE)
 endif()
 find_package(OpenGL REQUIRED)
 
-find_package(Qt5 5.7 REQUIRED
+find_package(Qt6 REQUIRED
   COMPONENTS
   Core
   Gui
   Widgets
   Multimedia
   OpenGL
+  OpenGLWidgets
   Svg
   LinguistTools
 )
@@ -417,7 +418,7 @@ set(OLIVE_EFFECTS
   effects/shaders/wave.xml
 )
 
-qt5_add_translation(OLIVE_QM_FILES
+qt_add_translation(OLIVE_QM_FILES
   ts/olive_ar.ts
   ts/olive_bs.ts
   ts/olive_cs.ts
@@ -454,12 +455,13 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 target_link_libraries(${OLIVE_TARGET}
   PRIVATE
   OpenGL::GL
-  Qt5::Core
-  Qt5::Gui
-  Qt5::Widgets
-  Qt5::Multimedia
-  Qt5::OpenGL
-  Qt5::Svg
+  Qt6::Core
+  Qt6::Gui
+  Qt6::Widgets
+  Qt6::Multimedia
+  Qt6::OpenGL
+  Qt6::OpenGLWidgets
+  Qt6::Svg
   FFMPEG::avutil
   FFMPEG::avcodec
   FFMPEG::avformat

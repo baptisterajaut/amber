@@ -94,7 +94,7 @@ void ViewerWindow::keyPressEvent(QKeyEvent *e) {
 }
 
 void ViewerWindow::mousePressEvent(QMouseEvent *e) {
-  if (show_fullscreen_msg && fullscreen_msg_rect.contains(e->pos())) {
+  if (show_fullscreen_msg && fullscreen_msg_rect.contains(e->position().toPoint())) {
     hide();
   }
 }
@@ -172,7 +172,7 @@ void ViewerWindow::paintGL() {
     p.setPen(Qt::white);
     p.setBrush(QColor(0, 0, 0, 128));
 
-    int text_width = fm.width(fs_str);
+    int text_width = fm.horizontalAdvance(fs_str);
     int text_x = (width()/2)-(text_width/2);
     int text_y = fm.height()+fm.ascent();
 

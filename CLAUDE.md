@@ -4,23 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Olive Video Editor — free, open-source non-linear video editor (GPLv3). C++11, Qt 5, FFmpeg, OpenGL. This is the legacy `0.1.x` branch (ported to FFmpeg 7/8 API and Qt 5.15).
+Olive Video Editor — free, open-source non-linear video editor (GPLv3). C++11, Qt 6, FFmpeg, OpenGL. This is the legacy `0.1.x` branch (ported to FFmpeg 7/8 API and Qt 6).
 
 ## Build
 
 ```bash
-# CMake (recommended)
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc)
-
-# qmake (legacy)
-lrelease olive.pro
-qmake CONFIG+=release PREFIX=/usr
-make -j$(nproc)
 ```
 
-**Dependencies:** Qt 5.7+ (Core, Gui, Widgets, Multimedia, OpenGL, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample), OpenGL. Optional: Frei0r plugins (disable with `-DNOFREI0R`), OpenColorIO (Windows only).
+**Dependencies:** Qt 6 (Core, Gui, Widgets, Multimedia, OpenGL, OpenGLWidgets, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample), OpenGL. Optional: Frei0r plugins (disable with `-DNOFREI0R`), OpenColorIO (Windows only).
 
 No test suite exists in this branch.
 

@@ -25,7 +25,7 @@ extern "C" {
 }
 
 #include <QPainter>
-#include <QAudioOutput>
+#include <QAudioSink>
 #include <QOpenGLShaderProgram>
 #include <QtMath>
 #include <QOpenGLFramebufferObject>
@@ -35,7 +35,7 @@ extern "C" {
 #include <QOffscreenSurface>
 #include <QFileDialog>
 #include <QPolygon>
-#include <QDesktopWidget>
+#include <QRegularExpression>
 #include <QInputDialog>
 #include <QApplication>
 #include <QScreen>
@@ -160,7 +160,7 @@ void ViewerWidget::save_frame() {
 
   if (fd.exec()) {
     QString fn = fd.selectedFiles().at(0);
-    QString selected_ext = fd.selectedNameFilter().mid(fd.selectedNameFilter().indexOf(QRegExp("\\*.[a-z][a-z][a-z]")) + 1, 4);
+    QString selected_ext = fd.selectedNameFilter().mid(fd.selectedNameFilter().indexOf(QRegularExpression("\\*\\.[a-z][a-z][a-z]")) + 1, 4);
     if (!fn.endsWith(selected_ext,  Qt::CaseInsensitive)) {
       fn += selected_ext;
     }
@@ -297,32 +297,32 @@ void ViewerWidget::move_gizmos(QMouseEvent *event, bool done) {
   if (selected_gizmo != nullptr) {
     double multiplier = double(viewer->seq->width) / double(width());
 
-    int x_movement = qRound((event->pos().x() - drag_start_x)*multiplier);
-    int y_movement = qRound((event->pos().y() - drag_start_y)*multiplier);
+    int x_movement = qRound((event->position().toPoint().x() - drag_start_x)*multiplier);
+    int y_movement = qRound((event->position().toPoint().y() - drag_start_y)*multiplier);
 
     gizmos->gizmo_move(selected_gizmo, x_movement, y_movement, get_timecode(gizmos->parent_clip, gizmos->parent_clip->sequence->playhead), done);
 
     gizmo_x_mvmt += x_movement;
     gizmo_y_mvmt += y_movement;
 
-    drag_start_x = event->pos().x();
-    drag_start_y = event->pos().y();
+    drag_start_x = event->position().toPoint().x();
+    drag_start_y = event->position().toPoint().y();
   }
 }
 
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   if (waveform) {
-    seek_from_click(event->x());
+    seek_from_click(qRound(event->position().x()));
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-    container->dragScrollPress(event->pos()*container->zoom);
+    container->dragScrollPress(event->position().toPoint()*container->zoom);
   } else if (event->buttons() & Qt::LeftButton) {
-    drag_start_x = event->pos().x();
-    drag_start_y = event->pos().y();
+    drag_start_x = event->position().toPoint().x();
+    drag_start_y = event->position().toPoint().y();
 
     gizmo_x_mvmt = 0;
     gizmo_y_mvmt = 0;
 
-    selected_gizmo = get_gizmo_from_mouse(event->pos().x(), event->pos().y());
+    selected_gizmo = get_gizmo_from_mouse(event->position().toPoint().x(), event->position().toPoint().y());
   }
   dragging = true;
 }
@@ -334,9 +334,9 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
   }
   if (dragging) {
     if (waveform) {
-      seek_from_click(event->x());
+      seek_from_click(qRound(event->position().x()));
     } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-      container->dragScrollMove(event->pos()*container->zoom);
+      container->dragScrollMove(event->position().toPoint()*container->zoom);
     } else if (event->buttons() & Qt::LeftButton) {
       if (gizmos == nullptr) {
         viewer->initiate_drag(olive::timeline::kImportBoth);
@@ -346,7 +346,7 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
       }
     }
   } else {
-    EffectGizmo* g = get_gizmo_from_mouse(event->pos().x(), event->pos().y());
+    EffectGizmo* g = get_gizmo_from_mouse(event->position().toPoint().x(), event->position().toPoint().y());
     if (g != nullptr) {
       if (g->get_cursor() > -1) {
         setCursor(static_cast<enum Qt::CursorShape>(g->get_cursor()));
@@ -611,6 +611,7 @@ void ViewerWidget::paintGL() {
     if (renderer->did_texture_fail() && !viewer->playing) {
       doneCurrent();
       renderer->start_render(context(), viewer->seq.get(), viewer->get_playback_speed());
+      makeCurrent();
     }
   }
 }

@@ -164,12 +164,12 @@ void TimelineHeader::mousePressEvent(QMouseEvent* event) {
       bool clicked_on_marker = false;
       int playhead_x = getHeaderScreenPointFromFrame(viewer->seq->playhead);
 
-      if (event->pos().y() > get_marker_offset()
-          && (event->pos().x() < playhead_x-PLAYHEAD_SIZE
-              || event->pos().x() > playhead_x+PLAYHEAD_SIZE)) {
+      if (event->position().toPoint().y() > get_marker_offset()
+          && (event->position().toPoint().x() < playhead_x-PLAYHEAD_SIZE
+              || event->position().toPoint().x() > playhead_x+PLAYHEAD_SIZE)) {
         for (int i=0;i<viewer->marker_ref->size();i++) {
           int marker_pos = getHeaderScreenPointFromFrame(viewer->marker_ref->at(i).frame);
-          if (event->pos().x() > marker_pos - MARKER_SIZE && event->pos().x() < marker_pos + MARKER_SIZE) {
+          if (event->position().toPoint().x() > marker_pos - MARKER_SIZE && event->position().toPoint().x() < marker_pos + MARKER_SIZE) {
             bool found = false;
             for (int j=0;j<selected_markers.size();j++) {
               if (selected_markers.at(j) == i) {
@@ -198,14 +198,14 @@ void TimelineHeader::mousePressEvent(QMouseEvent* event) {
         for (int i=0;i<selected_markers.size();i++) {
           selected_marker_original_times[i] = viewer->marker_ref->at(selected_markers.at(i)).frame;
         }
-        drag_start = event->pos().x();
+        drag_start = event->position().toPoint().x();
         dragging_markers = true;
       } else {
         if (selected_markers.size() > 0 && !shift) {
           selected_markers.clear();
           update();
         }
-        set_playhead(event->pos().x());
+        set_playhead(event->position().toPoint().x());
       }
     }
     dragging = true;
@@ -216,7 +216,7 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
   if (viewer->seq != nullptr) {
     if (dragging) {
       if (resizing_workarea) {
-        long frame = getHeaderFrameFromScreenPoint(event->pos().x());
+        long frame = getHeaderFrameFromScreenPoint(event->position().toPoint().x());
         if (snapping) panel_timeline->snap_to_timeline(&frame, true, true, false);
 
         if (resizing_workarea_in) {
@@ -227,7 +227,7 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
 
         update_parents();
       } else if (dragging_markers) {
-        long frame_movement = getHeaderFrameFromScreenPoint(event->pos().x()) - getHeaderFrameFromScreenPoint(drag_start);
+        long frame_movement = getHeaderFrameFromScreenPoint(event->position().toPoint().x()) - getHeaderFrameFromScreenPoint(drag_start);
 
         // snap markers
         for (int i=0;i<selected_markers.size();i++) {
@@ -254,14 +254,14 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
 
         update_parents();
       } else {
-        set_playhead(event->pos().x());
+        set_playhead(event->position().toPoint().x());
       }
     } else {
       resizing_workarea = false;
       unsetCursor();
       if (viewer->seq != nullptr && viewer->seq->using_workarea) {
-        long min_frame = getHeaderFrameFromScreenPoint(event->pos().x() - CLICK_RANGE) - 1;
-        long max_frame = getHeaderFrameFromScreenPoint(event->pos().x() + CLICK_RANGE) + 1;
+        long min_frame = getHeaderFrameFromScreenPoint(event->position().toPoint().x() - CLICK_RANGE) - 1;
+        long max_frame = getHeaderFrameFromScreenPoint(event->position().toPoint().x() + CLICK_RANGE) + 1;
         if (viewer->seq->workarea_in > min_frame && viewer->seq->workarea_in < max_frame) {
           resizing_workarea = true;
           resizing_workarea_in = true;
@@ -391,7 +391,7 @@ void TimelineHeader::paintEvent(QPaintEvent*) {
       bool draw_text = false;
       if (text_enabled && lineX-textWidth > lastTextBoundary) {
         timecode = frame_to_timecode(frame + in_visible, olive::CurrentConfig.timecode_view, viewer->seq->frame_rate);
-        fullTextWidth = fm.width(timecode);
+        fullTextWidth = fm.horizontalAdvance(timecode);
         textWidth = fullTextWidth>>1;
 
         text_x = lineX;

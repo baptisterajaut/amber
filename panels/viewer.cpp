@@ -26,9 +26,10 @@ extern "C" {
 }
 
 #include <QtMath>
-#include <QAudioOutput>
+#include <QAudioSink>
 #include <QPainter>
 #include <QStringList>
+#include <QRegularExpression>
 #include <QTimer>
 #include <QHBoxLayout>
 #include <QPushButton>
@@ -146,7 +147,7 @@ void Viewer::reset_all_audio() {
 }
 
 long timecode_to_frame(const QString& s, int view, double frame_rate) {
-  QList<QString> list = s.split(QRegExp("[:;]"));
+  QList<QString> list = s.split(QRegularExpression("[:;]"));
 
   if (view == olive::kTimecodeFrames || (list.size() == 1 && view != olive::kTimecodeMilliseconds)) {
     return s.toLong();
@@ -647,7 +648,7 @@ void Viewer::setup_ui() {
 
   QVBoxLayout* layout = new QVBoxLayout(contents);
   layout->setSpacing(0);
-  layout->setMargin(0);
+  layout->setContentsMargins(0, 0, 0, 0);
 
   setWidget(contents);
 
@@ -666,7 +667,7 @@ void Viewer::setup_ui() {
   QWidget* lower_controls = new QWidget();
 
   QHBoxLayout* lower_control_layout = new QHBoxLayout(lower_controls);
-  lower_control_layout->setMargin(0);
+  lower_control_layout->setContentsMargins(0, 0, 0, 0);
 
   QSizePolicy timecode_container_policy(QSizePolicy::Minimum, QSizePolicy::Maximum);
   QSizePolicy lower_control_policy(QSizePolicy::Maximum, QSizePolicy::Maximum);
@@ -676,7 +677,7 @@ void Viewer::setup_ui() {
   current_timecode_container->setSizePolicy(timecode_container_policy);
   QHBoxLayout* current_timecode_container_layout = new QHBoxLayout(current_timecode_container);
   current_timecode_container_layout->setSpacing(0);
-  current_timecode_container_layout->setMargin(0);
+  current_timecode_container_layout->setContentsMargins(0, 0, 0, 0);
   current_timecode_slider = new LabelSlider();
   current_timecode_container_layout->addWidget(current_timecode_slider);
   lower_control_layout->addWidget(current_timecode_container);
@@ -692,7 +693,7 @@ void Viewer::setup_ui() {
 
   QHBoxLayout* playback_control_layout = new QHBoxLayout(playback_controls);
   playback_control_layout->setSpacing(0);
-  playback_control_layout->setMargin(0);
+  playback_control_layout->setContentsMargins(0, 0, 0, 0);
   playback_control_layout->addStretch();
 
   go_to_start_button = new QPushButton();
@@ -730,7 +731,7 @@ void Viewer::setup_ui() {
 
   QHBoxLayout* right_control_layout = new QHBoxLayout(right_controls);
   right_control_layout->setSpacing(0);
-  right_control_layout->setMargin(0);
+  right_control_layout->setContentsMargins(0, 0, 0, 0);
   right_control_layout->addStretch();
 
   video_only_button = new QPushButton();
@@ -757,7 +758,7 @@ void Viewer::setup_ui() {
 
   QHBoxLayout* end_timecode_layout = new QHBoxLayout(end_timecode_container);
   end_timecode_layout->setSpacing(0);
-  end_timecode_layout->setMargin(0);
+  end_timecode_layout->setContentsMargins(0, 0, 0, 0);
 
   end_timecode = new QLabel();
   end_timecode->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);

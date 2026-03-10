@@ -21,6 +21,7 @@
 #include "menuhelper.h"
 
 #include <QMessageBox>
+#include <QRegularExpression>
 #include <QInputDialog>
 #include <QPushButton>
 #include <QStyleFactory>
@@ -216,7 +217,7 @@ void MenuHelper::set_titlesafe_from_menu() {
         // set a custom title safe area
         QString input;
         bool invalid = false;
-        QRegExp arTest("[0-9.]+:[0-9.]+");
+        QRegularExpression arTest("^[0-9.]+:[0-9.]+$");
 
         do {
           if (invalid) {
@@ -224,7 +225,7 @@ void MenuHelper::set_titlesafe_from_menu() {
           }
 
           input = QInputDialog::getText(olive::MainWindow, tr("Enter custom aspect ratio"), tr("Enter the aspect ratio to use for the title/action safe area (e.g. 16:9):"));
-          invalid = !arTest.exactMatch(input) && !input.isEmpty();
+          invalid = !arTest.match(input).hasMatch() && !input.isEmpty();
         } while (invalid);
 
         if (!input.isEmpty()) {

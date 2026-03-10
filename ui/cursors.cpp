@@ -21,7 +21,8 @@
 #include "cursors.h"
 
 #include <QApplication>
-#include <QDesktopWidget>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QPixmap>
 #include <QSvgRenderer>
 #include <QPainter>
@@ -41,7 +42,7 @@ QCursor load_cursor(const QString& file, int hotX = -1, int hotY = -1, bool righ
   // load specified file into a pixmap
   QSvgRenderer renderer(file);
 
-  int cursor_size_dpiaware = cursor_size * QApplication::desktop()->devicePixelRatio();
+  int cursor_size_dpiaware = cursor_size * QGuiApplication::primaryScreen()->devicePixelRatio();
   QPixmap pixmap(cursor_size_dpiaware, cursor_size_dpiaware);
   pixmap.fill(Qt::transparent);
 

@@ -27,10 +27,11 @@
 #include <QCloseEvent>
 #include <QMovie>
 #include <QInputDialog>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QStatusBar>
 #include <QMenu>
 #include <QMenuBar>
+#include <QActionGroup>
 #include <QLayout>
 #include <QApplication>
 #include <QPushButton>
@@ -314,9 +315,9 @@ void kbd_shortcut_processor(QByteArray& file, QMenu* menu, bool save, bool first
           if (a->shortcut() != defks) {
             // custom shortcut
             if (!file.isEmpty()) file.append('\n');
-            file.append(a->property("id").toString());
+            file.append(a->property("id").toString().toUtf8());
             file.append('\t');
-            file.append(a->shortcut().toString());
+            file.append(a->shortcut().toString().toUtf8());
           }
         }
       } else {
@@ -330,7 +331,7 @@ void kbd_shortcut_processor(QByteArray& file, QMenu* menu, bool save, bool first
         }
         if (!a->property("id").isNull()) {
           QString comp_str = a->property("id").toString();
-          int shortcut_index = file.indexOf(comp_str);
+          int shortcut_index = file.indexOf(comp_str.toUtf8());
           if (shortcut_index == 0 || (shortcut_index > 0 && file.at(shortcut_index-1) == '\n')) {
             shortcut_index += comp_str.size() + 1;
             QString shortcut;

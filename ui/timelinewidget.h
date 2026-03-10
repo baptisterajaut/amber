@@ -26,7 +26,7 @@
 #include <QScrollBar>
 #include <QPainter>
 #include <QApplication>
-#include <QDesktopWidget>
+#include <QScreen>
 
 #include "timeline/sequence.h"
 #include "timeline/clip.h"

@@ -1950,7 +1950,7 @@ void Timeline::setup_ui() {
 
   QHBoxLayout* horizontalLayout = new QHBoxLayout(dockWidgetContents);
   horizontalLayout->setSpacing(0);
-  horizontalLayout->setMargin(0);
+  horizontalLayout->setContentsMargins(0, 0, 0, 0);
 
   setWidget(dockWidgetContents);
 
@@ -1960,7 +1960,7 @@ void Timeline::setup_ui() {
 
   FlowLayout* tool_buttons_layout = new FlowLayout(tool_button_widget);
   tool_buttons_layout->setSpacing(4);
-  tool_buttons_layout->setMargin(0);
+  tool_buttons_layout->setContentsMargins(0, 0, 0, 0);
 
   toolArrowButton = new QPushButton();
   toolArrowButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/arrow.svg")));
@@ -2148,7 +2148,7 @@ void Timeline::set_tool() {
 
 void olive::timeline::MultiplyTrackSizesByDPI()
 {
-  kTrackDefaultHeight *= QApplication::desktop()->devicePixelRatio();
-  kTrackMinHeight *= QApplication::desktop()->devicePixelRatio();
-  kTrackHeightIncrement *= QApplication::desktop()->devicePixelRatio();
+  kTrackDefaultHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();
+  kTrackMinHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();
+  kTrackHeightIncrement *= QGuiApplication::primaryScreen()->devicePixelRatio();
 }

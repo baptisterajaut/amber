@@ -53,17 +53,17 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent), row(nullptr) {
   QWidget* left_tool_widget = new QWidget();
   QHBoxLayout* left_tool_layout = new QHBoxLayout(left_tool_widget);
   left_tool_layout->setSpacing(0);
-  left_tool_layout->setMargin(0);
+  left_tool_layout->setContentsMargins(0, 0, 0, 0);
   tools->addWidget(left_tool_widget);
   QWidget* center_tool_widget = new QWidget();
   QHBoxLayout* center_tool_layout = new QHBoxLayout(center_tool_widget);
   center_tool_layout->setSpacing(0);
-  center_tool_layout->setMargin(0);
+  center_tool_layout->setContentsMargins(0, 0, 0, 0);
   tools->addWidget(center_tool_widget);
   QWidget* right_tool_widget = new QWidget();
   QHBoxLayout* right_tool_layout = new QHBoxLayout(right_tool_widget);
   right_tool_layout->setSpacing(0);
-  right_tool_layout->setMargin(0);
+  right_tool_layout->setContentsMargins(0, 0, 0, 0);
   tools->addWidget(right_tool_widget);
 
   keyframe_nav = new KeyframeNavigator(nullptr, false);
@@ -92,7 +92,7 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent), row(nullptr) {
   QWidget* central_widget = new QWidget();
   QVBoxLayout* central_layout = new QVBoxLayout(central_widget);
   central_layout->setSpacing(0);
-  central_layout->setMargin(0);
+  central_layout->setContentsMargins(0, 0, 0, 0);
   header = new TimelineHeader();
   header->viewer = panel_sequence_viewer;
   central_layout->addWidget(header);
@@ -108,7 +108,7 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent), row(nullptr) {
 
   QWidget* central_value_widget = new QWidget();
   value_layout = new QHBoxLayout(central_value_widget);
-  value_layout->setMargin(0);
+  value_layout->setContentsMargins(0, 0, 0, 0);
   value_layout->addWidget(new QLabel("")); // a spacer so the layout doesn't jump
   values->addWidget(central_value_widget);
 

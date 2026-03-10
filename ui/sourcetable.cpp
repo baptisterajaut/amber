@@ -93,5 +93,5 @@ void SourceTable::dragMoveEvent(QDragMoveEvent *event) {
 }
 
 void SourceTable::dropEvent(QDropEvent* event) {
-  commons_.dropEvent(this, event, indexAt(event->pos()), selectionModel()->selectedRows());
+  commons_.dropEvent(this, event, indexAt(event->position().toPoint()), selectionModel()->selectedRows());
 }

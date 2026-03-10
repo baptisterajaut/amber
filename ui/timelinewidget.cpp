@@ -320,7 +320,7 @@ void TimelineWidget::dragEnterEvent(QDragEnterEvent *event) {
       self_created_sequence = create_sequence_from_media(media_list);
       seq = self_created_sequence.get();
     } else {
-      entry_point = panel_timeline->getTimelineFrameFromScreenPoint(event->pos().x());
+      entry_point = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
       panel_timeline->drag_frame_start = entry_point + getFrameFromScreenPoint(panel_timeline->zoom, 50);
       panel_timeline->drag_track_start = (bottom_align) ? -1 : 0;
     }
@@ -336,8 +336,8 @@ void TimelineWidget::dragMoveEvent(QDragMoveEvent *event) {
     event->acceptProposedAction();
 
     if (olive::ActiveSequence != nullptr) {
-      QPoint pos = event->pos();
-      panel_timeline->scroll_to_frame(panel_timeline->getTimelineFrameFromScreenPoint(event->pos().x()));
+      QPoint pos = event->position().toPoint();
+      panel_timeline->scroll_to_frame(panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x()));
       update_ghosts(pos, event->keyboardModifiers() & Qt::ShiftModifier);
       panel_timeline->move_insert = ((event->keyboardModifiers() & Qt::ControlModifier) && (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing));
       update_ui(false);
@@ -630,8 +630,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event) {
     mouseMoveEvent(event);
 
     // store current cursor positions
-    panel_timeline->drag_x_start = event->pos().x();
-    panel_timeline->drag_y_start = event->pos().y();
+    panel_timeline->drag_x_start = event->position().toPoint().x();
+    panel_timeline->drag_y_start = event->position().toPoint().y();
 
     // store current frame/tracks as the values to start dragging from
     panel_timeline->drag_frame_start = panel_timeline->cursor_frame;
@@ -2048,8 +2048,8 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
     bool alt = (event->modifiers() & Qt::AltModifier);
 
     // store current frame/track corresponding to the cursor
-    panel_timeline->cursor_frame = panel_timeline->getTimelineFrameFromScreenPoint(event->pos().x());
-    panel_timeline->cursor_track = getTrackFromScreenPoint(event->pos().y());
+    panel_timeline->cursor_frame = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
+    panel_timeline->cursor_track = getTrackFromScreenPoint(event->position().toPoint().y());
 
     // if holding the mouse button down, let's scroll to that location
     if (event->buttons() != 0 && panel_timeline->tool != TIMELINE_TOOL_HAND) {
@@ -2157,23 +2157,23 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
 
       // the scrollbars trigger repaints when they scroll, which is unnecessary here so we block them
       panel_timeline->block_repaints = true;
-      panel_timeline->horizontalScrollBar->setValue(panel_timeline->horizontalScrollBar->value() + panel_timeline->drag_x_start - event->pos().x());
-      scrollBar->setValue(scrollBar->value() + panel_timeline->drag_y_start - event->pos().y());
+      panel_timeline->horizontalScrollBar->setValue(panel_timeline->horizontalScrollBar->value() + panel_timeline->drag_x_start - event->position().toPoint().x());
+      scrollBar->setValue(scrollBar->value() + panel_timeline->drag_y_start - event->position().toPoint().y());
       panel_timeline->block_repaints = false;
 
       // finally repaint
       panel_timeline->repaint_timeline();
 
       // store current cursor position for next hand move event
-      panel_timeline->drag_x_start = event->pos().x();
-      panel_timeline->drag_y_start = event->pos().y();
+      panel_timeline->drag_x_start = event->position().toPoint().x();
+      panel_timeline->drag_y_start = event->position().toPoint().y();
 
     } else if (panel_timeline->moving_init) {
 
       if (track_resizing) {
 
         // get cursor movement
-        int diff = (event->pos().y() - panel_timeline->drag_y_start);
+        int diff = (event->position().toPoint().y() - panel_timeline->drag_y_start);
 
         // add it to the current track height
         int new_height = panel_timeline->GetTrackHeight(track_target);
@@ -2190,13 +2190,13 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
         panel_timeline->SetTrackHeight(track_target, new_height);
 
         // store current cursor position for next track resize event
-        panel_timeline->drag_y_start = event->pos().y();
+        panel_timeline->drag_y_start = event->position().toPoint().y();
 
         update();
       } else if (panel_timeline->moving_proc) {
 
         // we're currently dragging ghosts
-        update_ghosts(event->pos(), event->modifiers() & Qt::ShiftModifier);
+        update_ghosts(event->position().toPoint(), event->modifiers() & Qt::ShiftModifier);
 
       } else {
 
@@ -2443,12 +2443,12 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
 
         // set the right/bottom coords to the current mouse position
         // (left/top were set to the starting drag position earlier)
-        panel_timeline->rect_select_rect.setRight(event->pos().x());
+        panel_timeline->rect_select_rect.setRight(event->position().toPoint().x());
 
         if (bottom_align) {
-          panel_timeline->rect_select_rect.setBottom(event->pos().y() - height());
+          panel_timeline->rect_select_rect.setBottom(event->position().toPoint().y() - height());
         } else {
-          panel_timeline->rect_select_rect.setBottom(event->pos().y());
+          panel_timeline->rect_select_rect.setBottom(event->position().toPoint().y());
         }
 
         long frame_min = qMin(panel_timeline->drag_frame_start, panel_timeline->cursor_frame);
@@ -2512,13 +2512,13 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
       } else {
 
         // set up rectangle selecting
-        panel_timeline->rect_select_rect.setX(event->pos().x());
+        panel_timeline->rect_select_rect.setX(event->position().toPoint().x());
 
         if (bottom_align) {
           // bottom aligned widgets start with 0 at the bottom and go down to a negative number
-          panel_timeline->rect_select_rect.setY(event->pos().y() - height());
+          panel_timeline->rect_select_rect.setY(event->position().toPoint().y() - height());
         } else {
-          panel_timeline->rect_select_rect.setY(event->pos().y());
+          panel_timeline->rect_select_rect.setY(event->position().toPoint().y());
         }
 
         panel_timeline->rect_select_rect.setWidth(0);
@@ -2540,7 +2540,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
       QToolTip::hideText();
 
       // cache cursor position
-      QPoint pos = event->pos();
+      QPoint pos = event->position().toPoint();
 
       //
       // check to see if the cursor is on a clip edge
@@ -2719,7 +2719,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
 
         // check to see if we're resizing a track height
         int test_range = 5;
-        int mouse_pos = event->pos().y();
+        int mouse_pos = event->position().toPoint().y();
         int hover_track = getTrackFromScreenPoint(mouse_pos);
         int track_y_edge = getScreenPointFromTrack(hover_track);
 
@@ -2758,7 +2758,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
         if (panel_timeline->transition_tool_proc) {
 
           // ghosts have been set up, so just run update
-          update_ghosts(event->pos(), event->modifiers() & Qt::ShiftModifier);
+          update_ghosts(event->position().toPoint(), event->modifiers() & Qt::ShiftModifier);
 
         } else {
 
@@ -3163,7 +3163,7 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
             }
             if (clip->linked.size() > 0) {
               int underline_y = olive::timeline::kClipTextPadding + p.fontMetrics().height() + clip_rect.top();
-                int underline_width = qMin(text_rect.width() - 1, p.fontMetrics().width(clip->name()));
+                int underline_width = qMin(text_rect.width() - 1, p.fontMetrics().horizontalAdvance(clip->name()));
               p.drawLine(text_rect.x(), underline_y, text_rect.x() + underline_width, underline_y);
             }
             QString name = clip->name();

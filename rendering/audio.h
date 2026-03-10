@@ -26,7 +26,7 @@
 #include <QWaitCondition>
 #include <QMutex>
 #include <QIODevice>
-#include <QAudioOutput>
+#include <QAudioSink>
 #include <QComboBox>
 
 #include "timeline/sequence.h"
@@ -49,7 +49,7 @@ private:
 
 double log_volume(double linear);
 
-extern QAudioOutput* audio_output;
+extern QAudioSink* audio_output;
 extern QIODevice* audio_io_device;
 extern AudioSenderThread* audio_thread;
 extern QMutex audio_write_lock;

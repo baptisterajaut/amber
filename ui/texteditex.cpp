@@ -32,7 +32,7 @@ TextEditEx::TextEditEx(QWidget *parent, bool enable_rich_text) :
   enable_rich_text_(enable_rich_text)
 {
   QVBoxLayout* layout = new QVBoxLayout(this);
-  layout->setMargin(0);
+  layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
 
   text_editor_ = new QTextEdit();

@@ -55,7 +55,7 @@ void ResizableScrollBar::mousePressEvent(QMouseEvent *e) {
                                        QStyle::SC_ScrollBarSlider, this);
 
     resize_proc = true;
-    resize_start = e->pos().x();
+    resize_start = e->position().toPoint().x();
 
     resize_start_max = maximum();
     resize_start_width = sr.width();
@@ -74,17 +74,17 @@ void ResizableScrollBar::mouseMoveEvent(QMouseEvent *e) {
                                      QStyle::SC_ScrollBarGroove, this);
 
   if (resize_proc) {
-    int diff = (e->pos().x() - resize_start);
+    int diff = (e->position().toPoint().x() - resize_start);
     if (resize_top) diff = -diff;
     double scale = double(sr.width())/double(sr.width()+diff);
     if (!qIsInf(scale) && !qIsNull(scale)) {
       emit resize_move(scale);
-      resize_start = e->pos().x();
+      resize_start = e->position().toPoint().x();
 
       if (resize_top) {
         int slider_min = gr.x();
         int slider_max = gr.right() - (sr.width()+diff);
-        int val = QStyle::sliderValueFromPosition(minimum(), maximum(), e->pos().x() - slider_min, slider_max - slider_min, opt.upsideDown);
+        int val = QStyle::sliderValueFromPosition(minimum(), maximum(), e->position().toPoint().x() - slider_min, slider_max - slider_min, opt.upsideDown);
 
         setValue(val);
       } else {
@@ -94,12 +94,12 @@ void ResizableScrollBar::mouseMoveEvent(QMouseEvent *e) {
   } else {
     bool new_resize_init = false;
 
-    if ((orientation() == Qt::Horizontal && e->pos().x() > sr.left()-RESIZE_HANDLE_SIZE && e->pos().x() < sr.left()+RESIZE_HANDLE_SIZE)
-        || (orientation() == Qt::Vertical && e->pos().y() > sr.top()-RESIZE_HANDLE_SIZE && e->pos().y() < sr.top()+RESIZE_HANDLE_SIZE)) {
+    if ((orientation() == Qt::Horizontal && e->position().toPoint().x() > sr.left()-RESIZE_HANDLE_SIZE && e->position().toPoint().x() < sr.left()+RESIZE_HANDLE_SIZE)
+        || (orientation() == Qt::Vertical && e->position().toPoint().y() > sr.top()-RESIZE_HANDLE_SIZE && e->position().toPoint().y() < sr.top()+RESIZE_HANDLE_SIZE)) {
       new_resize_init = true;
       resize_top = true;
-    } else if ((orientation() == Qt::Horizontal && e->pos().x() > sr.right()-RESIZE_HANDLE_SIZE && e->pos().x() < sr.right()+RESIZE_HANDLE_SIZE)
-               || (orientation() == Qt::Vertical && e->pos().y() > sr.bottom()-RESIZE_HANDLE_SIZE && e->pos().y() < sr.bottom()+RESIZE_HANDLE_SIZE)) {
+    } else if ((orientation() == Qt::Horizontal && e->position().toPoint().x() > sr.right()-RESIZE_HANDLE_SIZE && e->position().toPoint().x() < sr.right()+RESIZE_HANDLE_SIZE)
+               || (orientation() == Qt::Vertical && e->position().toPoint().y() > sr.bottom()-RESIZE_HANDLE_SIZE && e->position().toPoint().y() < sr.bottom()+RESIZE_HANDLE_SIZE)) {
       new_resize_init = true;
       resize_top = false;
     }

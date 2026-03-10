@@ -28,7 +28,7 @@
 
 EmbeddedFileChooser::EmbeddedFileChooser(QWidget* parent) : QWidget(parent) {
   QHBoxLayout* layout = new QHBoxLayout(this);
-  layout->setMargin(0);
+  layout->setContentsMargins(0, 0, 0, 0);
   file_label = new QLabel(this);
   update_label();
   layout->addWidget(file_label);

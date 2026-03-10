@@ -333,7 +333,7 @@ void EffectControls::setup_ui() {
 
   QHBoxLayout* hlayout = new QHBoxLayout(contents);
   hlayout->setSpacing(0);
-  hlayout->setMargin(0);
+  hlayout->setContentsMargins(0, 0, 0, 0);
 
   splitter = new QSplitter();
   splitter->setOrientation(Qt::Horizontal);
@@ -351,7 +351,7 @@ void EffectControls::setup_ui() {
 
   QHBoxLayout* scrollAreaLayout = new QHBoxLayout(scrollAreaWidgetContents);
   scrollAreaLayout->setSpacing(0);
-  scrollAreaLayout->setMargin(0);
+  scrollAreaLayout->setContentsMargins(0, 0, 0, 0);
 
   effects_area = new EffectsArea();
   effects_area->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -359,12 +359,12 @@ void EffectControls::setup_ui() {
 
   QVBoxLayout* effects_area_layout = new QVBoxLayout(effects_area);
   effects_area_layout->setSpacing(0);
-  effects_area_layout->setMargin(0);
+  effects_area_layout->setContentsMargins(0, 0, 0, 0);
 
   vcontainer = new QWidget();
   QVBoxLayout* vcontainerLayout = new QVBoxLayout(vcontainer);
   vcontainerLayout->setSpacing(0);
-  vcontainerLayout->setMargin(0);
+  vcontainerLayout->setContentsMargins(0, 0, 0, 0);
 
   QWidget* veHeader = new QWidget();
   veHeader->setObjectName(QStringLiteral("veHeader"));
@@ -372,7 +372,7 @@ void EffectControls::setup_ui() {
 
   QHBoxLayout* veHeaderLayout = new QHBoxLayout(veHeader);
   veHeaderLayout->setSpacing(0);
-  veHeaderLayout->setMargin(0);
+  veHeaderLayout->setContentsMargins(0, 0, 0, 0);
 
   QIcon add_effect_icon = olive::icon::CreateIconFromSVG(":/icons/add-effect.svg", false);
   QIcon add_transition_icon = olive::icon::CreateIconFromSVG(":/icons/add-transition.svg", false);
@@ -403,7 +403,7 @@ void EffectControls::setup_ui() {
   video_effect_area = new QWidget();
   video_effect_layout = new QVBoxLayout(video_effect_area);
   video_effect_layout->setSpacing(0);
-  video_effect_layout->setMargin(0);
+  video_effect_layout->setContentsMargins(0, 0, 0, 0);
 
   vcontainerLayout->addWidget(video_effect_area);
 
@@ -412,14 +412,14 @@ void EffectControls::setup_ui() {
   acontainer = new QWidget();
   QVBoxLayout* acontainerLayout = new QVBoxLayout(acontainer);
   acontainerLayout->setSpacing(0);
-  acontainerLayout->setMargin(0);
+  acontainerLayout->setContentsMargins(0, 0, 0, 0);
   QWidget* aeHeader = new QWidget();
   aeHeader->setObjectName(QStringLiteral("aeHeader"));
   aeHeader->setStyleSheet(QLatin1String("#aeHeader { background: rgba(0, 0, 0, 0.25); }"));
 
   QHBoxLayout* aeHeaderLayout = new QHBoxLayout(aeHeader);
   aeHeaderLayout->setSpacing(0);
-  aeHeaderLayout->setMargin(0);
+  aeHeaderLayout->setContentsMargins(0, 0, 0, 0);
 
   btnAddAudioEffect = new QPushButton();
   btnAddAudioEffect->setIcon(add_effect_icon);
@@ -445,7 +445,7 @@ void EffectControls::setup_ui() {
   audio_effect_area = new QWidget();
   audio_effect_layout = new QVBoxLayout(audio_effect_area);
   audio_effect_layout->setSpacing(0);
-  audio_effect_layout->setMargin(0);
+  audio_effect_layout->setContentsMargins(0, 0, 0, 0);
 
   acontainerLayout->addWidget(audio_effect_area);
 
@@ -468,7 +468,7 @@ void EffectControls::setup_ui() {
 
   QVBoxLayout* keyframeAreaLayout = new QVBoxLayout(keyframeArea);
   keyframeAreaLayout->setSpacing(0);
-  keyframeAreaLayout->setMargin(0);
+  keyframeAreaLayout->setContentsMargins(0, 0, 0, 0);
 
   headers = new TimelineHeader();
   keyframeAreaLayout->addWidget(headers);
@@ -477,7 +477,7 @@ void EffectControls::setup_ui() {
 
   QHBoxLayout* keyframeCenterLayout = new QHBoxLayout(keyframeCenterWidget);
   keyframeCenterLayout->setSpacing(0);
-  keyframeCenterLayout->setMargin(0);
+  keyframeCenterLayout->setContentsMargins(0, 0, 0, 0);
 
   keyframeView = new KeyframeView();
 

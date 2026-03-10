@@ -37,14 +37,14 @@ CollapsibleWidget::CollapsibleWidget(QWidget* parent) : QWidget(parent) {
   selected = false;
 
   layout = new QVBoxLayout(this);
-  layout->setMargin(0);
+  layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
 
   title_bar = new CollapsibleWidgetHeader(this);
   title_bar->setFocusPolicy(Qt::ClickFocus);
   title_bar->setAutoFillBackground(true);
   title_bar_layout = new QHBoxLayout(title_bar);
-  title_bar_layout->setMargin(5);
+  title_bar_layout->setContentsMargins(5, 5, 5, 5);
   enabled_check = new QCheckBox(title_bar);
   enabled_check->setChecked(true);
   header = new QLabel(title_bar);
@@ -70,7 +70,7 @@ void CollapsibleWidget::header_click(bool s, bool deselect) {
   title_bar->selected = s;
   if (s) {
     QPalette p = title_bar->palette();
-    p.setColor(QPalette::Background, QColor(255, 255, 255, 64));
+    p.setColor(QPalette::Window, QColor(255, 255, 255, 64));
     title_bar->setPalette(p);
   } else {
     title_bar->setPalette(palette());

@@ -32,7 +32,7 @@ DemoNotice::DemoNotice(QWidget *parent) :
   QVBoxLayout* vlayout = new QVBoxLayout(this);
 
   QHBoxLayout* layout = new QHBoxLayout();
-  layout->setMargin(10);
+  layout->setContentsMargins(10, 10, 10, 10);
   layout->setSpacing(20);
 
   QLabel* icon = new QLabel("<html><head/><body>"

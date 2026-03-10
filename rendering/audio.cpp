@@ -32,8 +32,11 @@
 #include "global/debug.h"
 
 #include <QApplication>
-#include <QAudioOutput>
-#include <QAudioInput>
+#include <QAudioSink>
+#include <QAudioSource>
+#include <QMediaDevices>
+#include <QAudioDevice>
+#include <QTimer>
 #include <QtMath>
 #include <QFile>
 #include <QDir>
@@ -43,12 +46,13 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
-QAudioOutput* audio_output;
+QAudioSink* audio_output;
 QIODevice* audio_io_device;
 bool audio_device_set = false;
 bool audio_scrub = false;
 QMutex audio_write_lock;
-QAudioInput* audio_input = nullptr;
+QAudioSource* audio_input = nullptr;
+QTimer* audio_notify_timer = nullptr;
 QFile output_recording;
 bool recording = false;
 
@@ -66,22 +70,22 @@ bool is_audio_device_set() {
   return audio_device_set;
 }
 
-QAudioDeviceInfo get_audio_device(QAudio::Mode mode) {
-  QList<QAudioDeviceInfo> devs = QAudioDeviceInfo::availableDevices(mode);
+QAudioDevice get_audio_device(bool output) {
+  QList<QAudioDevice> devs = output ? QMediaDevices::audioOutputs() : QMediaDevices::audioInputs();
 
   // try to retrieve preferred device from config
-  QString preferred_device = (mode == QAudio::AudioOutput) ? olive::CurrentConfig.preferred_audio_output : olive::CurrentConfig.preferred_audio_input;
+  QString preferred_device = output ? olive::CurrentConfig.preferred_audio_output : olive::CurrentConfig.preferred_audio_input;
   if (!preferred_device.isEmpty()) {
     for (int i=0;i<devs.size();i++) {
       // try to match available devices with preferred device
-      if (devs.at(i).deviceName() == preferred_device) {
+      if (devs.at(i).description() == preferred_device) {
         return devs.at(i);
       }
     }
   }
 
   // if no preferred output is set, try to get the default device
-  QAudioDeviceInfo default_device = (mode == QAudio::AudioOutput) ? QAudioDeviceInfo::defaultOutputDevice() : QAudioDeviceInfo::defaultInputDevice();
+  QAudioDevice default_device = output ? QMediaDevices::defaultAudioOutput() : QMediaDevices::defaultAudioInput();
   if (!default_device.isNull()) {
     return default_device;
   }
@@ -92,7 +96,7 @@ QAudioDeviceInfo get_audio_device(QAudio::Mode mode) {
   }
 
   // couldn't find any audio devices, return null device
-  return QAudioDeviceInfo();
+  return QAudioDevice();
 }
 
 void init_audio() {
@@ -101,22 +105,12 @@ void init_audio() {
   QAudioFormat audio_format;
   audio_format.setSampleRate(olive::CurrentConfig.audio_rate);
   audio_format.setChannelCount(2);
-  audio_format.setSampleSize(16);
-  audio_format.setCodec("audio/pcm");
-  audio_format.setByteOrder(QAudioFormat::LittleEndian);
-  audio_format.setSampleType(QAudioFormat::SignedInt);
+  audio_format.setSampleFormat(QAudioFormat::Int16);
 
-  QAudioDeviceInfo info = get_audio_device(QAudio::AudioOutput);
+  QAudioDevice info = get_audio_device(true);
 
-  // see if desired format can be used by the device, use nearest if not
-  if (!info.isFormatSupported(audio_format)) {
-    qWarning() << "Audio format is not supported by backend, using nearest";
-    audio_format = info.nearestFormat(audio_format);
-  }
-
-  audio_output = new QAudioOutput(info, audio_format);
+  audio_output = new QAudioSink(info, audio_format);
   audio_output->moveToThread(QApplication::instance()->thread());
-  audio_output->setNotifyInterval(5);
 
   // connect
   audio_io_device = audio_output->start();
@@ -127,7 +121,13 @@ void init_audio() {
 
     // start sender thread
     audio_thread = new AudioSenderThread();
-    QObject::connect(audio_output, SIGNAL(notify()), audio_thread, SLOT(notifyReceiver()));
+
+    // QAudioSink has no notify() signal, use a QTimer instead
+    audio_notify_timer = new QTimer();
+    audio_notify_timer->setInterval(5);
+    QObject::connect(audio_notify_timer, SIGNAL(timeout()), audio_thread, SLOT(notifyReceiver()));
+    audio_notify_timer->start();
+
     audio_thread->start(QThread::TimeCriticalPriority);
 
     clear_audio_ibuffer();
@@ -136,6 +136,12 @@ void init_audio() {
 
 void stop_audio() {
   if (audio_device_set) {
+    if (audio_notify_timer != nullptr) {
+      audio_notify_timer->stop();
+      delete audio_notify_timer;
+      audio_notify_timer = nullptr;
+    }
+
     audio_thread->stop();
 
     audio_output->stop();
@@ -285,17 +291,17 @@ void write_wave_header(QFile& f, const QAudioFormat& format) {
   f.write(arr, 4);
 
   // 4 byte integer for bytes per second
-  int32bit = (format.sampleRate() * format.sampleSize() * format.channelCount()) / 8;
+  int32bit = (format.sampleRate() * (format.bytesPerSample() * 8) * format.channelCount()) / 8;
   int32_to_char_array(int32bit, arr);
   f.write(arr, 4);
 
   // 2 byte integer for bytes per sample per channel
-  int32bit = (format.sampleSize() * format.channelCount()) / 8;
+  int32bit = ((format.bytesPerSample() * 8) * format.channelCount()) / 8;
   int32_to_char_array(int32bit, arr);
   f.write(arr, 2);
 
   // 2 byte integer for bits per sample (16)
-  int32bit = format.sampleSize();
+  int32bit = (format.bytesPerSample() * 8);
   int32_to_char_array(int32bit, arr);
   f.write(arr, 2);
 
@@ -360,14 +366,10 @@ bool start_recording() {
     audio_format.setChannelCount(olive::CurrentConfig.recording_mode);
   }
 
-  QAudioDeviceInfo info = get_audio_device(QAudio::AudioInput);
+  QAudioDevice info = get_audio_device(false);
 
-  if (!info.isFormatSupported(audio_format)) {
-    qWarning() << "Default format not supported, using nearest";
-    audio_format = info.nearestFormat(audio_format);
-  }
   write_wave_header(output_recording, audio_format);
-  audio_input = new QAudioInput(info, audio_format);
+  audio_input = new QAudioSource(info, audio_format);
   audio_input->start(&output_recording);
   recording = true;
 

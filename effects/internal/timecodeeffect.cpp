@@ -118,7 +118,7 @@ void TimecodeEffect::redraw(double timecode) {
 
   int text_x, text_y, rect_y, offset_x, offset_y;
   int text_height = fm.height();
-  int text_width = fm.width(display_timecode);
+  int text_width = fm.horizontalAdvance(display_timecode);
   QColor background_color = color_bg_val->GetColorAt(timecode);
   int alpha_val = qCeil(bg_alpha->GetDoubleAt(timecode)*2.55);
   background_color.setAlpha(alpha_val);

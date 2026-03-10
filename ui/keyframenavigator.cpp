@@ -23,7 +23,7 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QApplication>
-#include <QDesktopWidget>
+#include <QScreen>
 #include <QDebug>
 
 #include "ui/icons.h"
@@ -33,7 +33,7 @@ KeyframeNavigator::KeyframeNavigator(QWidget *parent, bool addLeftPad) : QWidget
 
   key_controls = new QHBoxLayout(this);
   key_controls->setSpacing(0);
-  key_controls->setMargin(0);
+  key_controls->setContentsMargins(0, 0, 0, 0);
 
   if (addLeftPad) {
     key_controls->addStretch();

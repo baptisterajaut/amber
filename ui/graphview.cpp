@@ -176,7 +176,7 @@ void GraphView::set_view_to_rect(int x1, double y1, int x2, double y2) {
 void GraphView::draw_line_text(QPainter &p, bool vert, int line_no, int line_pos, int next_line_pos) {
   // draws last line's text
   QString str = QString::number(line_no*kGraphSize);
-  int text_sz = vert ? fontMetrics().height() : fontMetrics().width(str);
+  int text_sz = vert ? fontMetrics().height() : fontMetrics().horizontalAdvance(str);
   if (text_sz < (next_line_pos - line_pos)) {
     QRect text_rect = vert ? QRect(0, line_pos-50, 50, 50) : QRect(line_pos, height()-50, 50, 50);
     p.drawText(text_rect, Qt::AlignBottom | Qt::AlignLeft, str);
@@ -364,8 +364,8 @@ void GraphView::paintEvent(QPaintEvent *) {
 void GraphView::mousePressEvent(QMouseEvent *event) {
   if (row != nullptr) {
     mousedown = true;
-    start_x = event->pos().x();
-    start_y = event->pos().y();
+    start_x = event->position().toPoint().x();
+    start_y = event->position().toPoint().y();
 
     // selecting
     int sel_key = -1;
@@ -377,8 +377,8 @@ void GraphView::mousePressEvent(QMouseEvent *event) {
       selected_keys_fields.clear();
 
       EffectKeyframe key;
-      key.time = get_value_x(event->pos().x());
-      key.data = get_value_y(event->pos().y());
+      key.time = get_value_x(event->position().toPoint().x());
+      key.data = get_value_y(event->position().toPoint().y());
       key.type = click_add_type;
       click_add_key = click_add_field->keyframes.size();
       click_add_field->keyframes.append(key);
@@ -392,10 +392,10 @@ void GraphView::mousePressEvent(QMouseEvent *event) {
             const EffectKeyframe& key = field->keyframes.at(j);
             int key_x = get_screen_x(key.time);
             int key_y = get_screen_y(key.data.toDouble());
-            if (event->pos().x() > key_x-KEYFRAME_SIZE
-                && event->pos().x() < key_x+KEYFRAME_SIZE
-                && event->pos().y() > key_y-KEYFRAME_SIZE
-                && event->pos().y() < key_y+KEYFRAME_SIZE) {
+            if (event->position().toPoint().x() > key_x-KEYFRAME_SIZE
+                && event->position().toPoint().x() < key_x+KEYFRAME_SIZE
+                && event->position().toPoint().y() > key_y-KEYFRAME_SIZE
+                && event->position().toPoint().y() < key_y+KEYFRAME_SIZE) {
               sel_key = j;
               sel_key_field = i;
               break;
@@ -403,15 +403,15 @@ void GraphView::mousePressEvent(QMouseEvent *event) {
               // selecting a handle
               QPointF pre_point(key_x + key.pre_handle_x*x_zoom, key_y - key.pre_handle_y*y_zoom);
               QPointF post_point(key_x + key.post_handle_x*x_zoom, key_y - key.post_handle_y*y_zoom);
-              if (event->pos().x() > pre_point.x()-kBezierHandleSize
-                  && event->pos().x() < pre_point.x()+kBezierHandleSize
-                  && event->pos().y() > pre_point.y()-kBezierHandleSize
-                  && event->pos().y() < pre_point.y()+kBezierHandleSize) {
+              if (event->position().toPoint().x() > pre_point.x()-kBezierHandleSize
+                  && event->position().toPoint().x() < pre_point.x()+kBezierHandleSize
+                  && event->position().toPoint().y() > pre_point.y()-kBezierHandleSize
+                  && event->position().toPoint().y() < pre_point.y()+kBezierHandleSize) {
                 current_handle = kBezierHandlePre;
-              } else if (event->pos().x() > post_point.x()-kBezierHandleSize
-                         && event->pos().x() < post_point.x()+kBezierHandleSize
-                         && event->pos().y() > post_point.y()-kBezierHandleSize
-                         && event->pos().y() < post_point.y()+kBezierHandleSize) {
+              } else if (event->position().toPoint().x() > post_point.x()-kBezierHandleSize
+                         && event->position().toPoint().x() < post_point.x()+kBezierHandleSize
+                         && event->position().toPoint().y() > post_point.y()-kBezierHandleSize
+                         && event->position().toPoint().y() < post_point.y()+kBezierHandleSize) {
                 current_handle = kBezierHandlePost;
               }
 
@@ -455,8 +455,8 @@ void GraphView::mousePressEvent(QMouseEvent *event) {
           selected_keys_fields.append(sel_key_field);
         } else {
           rect_select = true;
-          rect_select_x = event->pos().x();
-          rect_select_y = event->pos().y();
+          rect_select_x = event->position().toPoint().x();
+          rect_select_y = event->position().toPoint().y();
           rect_select_w = 0;
           rect_select_h = 0;
           rect_select_offset = selected_keys.size();
@@ -472,18 +472,18 @@ void GraphView::mouseMoveEvent(QMouseEvent *event) {
   if (!mousedown || !click_add) unsetCursor();
   if (mousedown) {
     if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-      set_scroll_x(x_scroll + start_x - event->pos().x());
-      set_scroll_y(y_scroll + event->pos().y() - start_y);
-      start_x = event->pos().x();
-      start_y = event->pos().y();
+      set_scroll_x(x_scroll + start_x - event->position().toPoint().x());
+      set_scroll_y(y_scroll + event->position().toPoint().y() - start_y);
+      start_x = event->position().toPoint().x();
+      start_y = event->position().toPoint().y();
       update();
     } else if (click_add_proc) {
-      click_add_field->keyframes[click_add_key].time = get_value_x(event->pos().x());
-      click_add_field->keyframes[click_add_key].data = get_value_y(event->pos().y());
+      click_add_field->keyframes[click_add_key].time = get_value_x(event->position().toPoint().x());
+      click_add_field->keyframes[click_add_key].data = get_value_y(event->position().toPoint().y());
       update_ui(false);
     } else if (rect_select) {
-      rect_select_w = event->pos().x() - rect_select_x;
-      rect_select_h = event->pos().y() - rect_select_y;
+      rect_select_w = event->position().toPoint().x() - rect_select_x;
+      rect_select_h = event->position().toPoint().y() - rect_select_y;
 
       selected_keys.resize(rect_select_offset);
       selected_keys_fields.resize(rect_select_offset);
@@ -514,11 +514,11 @@ void GraphView::mouseMoveEvent(QMouseEvent *event) {
       switch (current_handle) {
       case kBezierHandleNone:
         for (int i=0;i<selected_keys.size();i++) {
-          row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].time = qRound(selected_keys_old_vals.at(i) + (double(event->pos().x() - start_x)/x_zoom));
+          row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].time = qRound(selected_keys_old_vals.at(i) + (double(event->position().toPoint().x() - start_x)/x_zoom));
           if (event->modifiers() & Qt::ShiftModifier) {
             row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].data = selected_keys_old_doubles.at(i);
           } else {
-            row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].data = qRound(selected_keys_old_doubles.at(i) + (double(start_y - event->pos().y())/y_zoom));
+            row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].data = qRound(selected_keys_old_doubles.at(i) + (double(start_y - event->position().toPoint().y())/y_zoom));
           }
         }
         moved_keys = true;
@@ -532,8 +532,8 @@ void GraphView::mouseMoveEvent(QMouseEvent *event) {
         double new_post_handle_x = old_post_handle_x;
         double new_post_handle_y = old_post_handle_y;
 
-        double x_diff = double(event->pos().x() - start_x)/x_zoom;
-        double y_diff = double(start_y - event->pos().y())/y_zoom;
+        double x_diff = double(event->position().toPoint().x() - start_x)/x_zoom;
+        double y_diff = double(start_y - event->position().toPoint().y())/y_zoom;
 
         if (current_handle == kBezierHandlePre) {
           new_pre_handle_x += x_diff;
@@ -593,9 +593,9 @@ void GraphView::mouseMoveEvent(QMouseEvent *event) {
               kBezierHandleSize+kBezierHandleSize
               );
 
-        if (test_rect.contains(event->pos())
-            || pre_rect.contains(event->pos())
-            || post_rect.contains(event->pos())) {
+        if (test_rect.contains(event->position().toPoint())
+            || pre_rect.contains(event->position().toPoint())
+            || post_rect.contains(event->position().toPoint())) {
           hovering_key = true;
           break;
         }
@@ -609,18 +609,18 @@ void GraphView::mouseMoveEvent(QMouseEvent *event) {
           QVector<int> sorted_keys = sort_keys_from_field(f);
 
           if (!sorted_keys.isEmpty()) {
-            if (event->pos().x() <= get_screen_x(f->keyframes.at(sorted_keys.first()).time)) {
+            if (event->position().toPoint().x() <= get_screen_x(f->keyframes.at(sorted_keys.first()).time)) {
               int y_comp = get_screen_y(f->keyframes.at(sorted_keys.first()).data.toDouble());
-              if (event->pos().y() >= y_comp-kBezierLineSize
-                  && event->pos().y() <= y_comp+kBezierLineSize) {
+              if (event->position().toPoint().y() >= y_comp-kBezierLineSize
+                  && event->position().toPoint().y() <= y_comp+kBezierLineSize) {
                 //            dout << "make an EARLY key on field" << i;
                 click_add = true;
                 click_add_type = f->keyframes.at(sorted_keys.first()).type;
               }
-            } else if (event->pos().x() >= get_screen_x(f->keyframes.at(sorted_keys.last()).time)) {
+            } else if (event->position().toPoint().x() >= get_screen_x(f->keyframes.at(sorted_keys.last()).time)) {
               int y_comp = get_screen_y(f->keyframes.at(sorted_keys.last()).data.toDouble());
-              if (event->pos().y() >= y_comp-kBezierLineSize
-                  && event->pos().y() <= y_comp+kBezierLineSize) {
+              if (event->position().toPoint().y() >= y_comp-kBezierLineSize
+                  && event->position().toPoint().y() <= y_comp+kBezierLineSize) {
                 //            dout << "make an LATE key on field" << i;
                 click_add = true;
                 click_add_type = f->keyframes.at(sorted_keys.last()).type;
@@ -637,14 +637,14 @@ void GraphView::mouseMoveEvent(QMouseEvent *event) {
 
                 click_add_type = last_key.type;
 
-                if (event->pos().x() >= last_key_x
-                    && event->pos().x() <= key_x) {
-                  QRect mouse_rect(event->pos().x()-kBezierLineSize, event->pos().y()-kBezierLineSize, kBezierLineSize+kBezierLineSize, kBezierLineSize+kBezierLineSize);
+                if (event->position().toPoint().x() >= last_key_x
+                    && event->position().toPoint().x() <= key_x) {
+                  QRect mouse_rect(event->position().toPoint().x()-kBezierLineSize, event->position().toPoint().y()-kBezierLineSize, kBezierLineSize+kBezierLineSize, kBezierLineSize+kBezierLineSize);
                   // NOTE: FILTHY copy/paste from paintEvent
                   if (last_key.type == EFFECT_KEYFRAME_HOLD) {
                     // hold
-                    if (event->pos().y() >= last_key_y-kBezierLineSize
-                        && event->pos().y() <= last_key_y+kBezierLineSize) {
+                    if (event->position().toPoint().y() >= last_key_y-kBezierLineSize
+                        && event->position().toPoint().y() <= last_key_y+kBezierLineSize) {
                       //                  dout << "make an HOLD key on field" << i << "after key" << j;
                       click_add = true;
                     }

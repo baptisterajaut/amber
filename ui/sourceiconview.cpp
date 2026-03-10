@@ -53,7 +53,7 @@ void SourceIconView::item_click(const QModelIndex& index) {
 
 void SourceIconView::mousePressEvent(QMouseEvent* event) {
   commons_.mousePressEvent(event);
-  if (!indexAt(event->pos()).isValid()) selectionModel()->clear();
+  if (!indexAt(event->position().toPoint()).isValid()) selectionModel()->clear();
   QListView::mousePressEvent(event);
 }
 
@@ -74,7 +74,7 @@ void SourceIconView::dragMoveEvent(QDragMoveEvent *event) {
 }
 
 void SourceIconView::dropEvent(QDropEvent* event) {
-  QModelIndex drop_item = indexAt(event->pos());
+  QModelIndex drop_item = indexAt(event->position().toPoint());
   if (!drop_item.isValid()) drop_item = rootIndex();
   commons_.dropEvent(this, event, drop_item, selectedIndexes());
 }
@@ -140,7 +140,7 @@ void SourceIconDelegate::paint(QPainter *painter, const QStyleOptionViewItem &op
       painter->setPen(text_fgcolor);
 
       QString duration_str = index.data(Qt::UserRole).toString();
-      int timecode_width = fm.width(duration_str);
+      int timecode_width = fm.horizontalAdvance(duration_str);
       int max_name_width = option.rect.width();
 
       if (timecode_width < option.rect.width() / 2) {

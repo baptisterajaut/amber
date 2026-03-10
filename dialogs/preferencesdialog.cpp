@@ -39,7 +39,8 @@
 #include <QDoubleSpinBox>
 #include <QFileDialog>
 #include <QMessageBox>
-#include <QAudioDeviceInfo>
+#include <QMediaDevices>
+#include <QAudioDevice>
 #include <QApplication>
 #include <QProcess>
 #include <QDebug>
@@ -137,8 +138,8 @@ void PreferencesDialog::delete_previews(char type) {
 
       // find identifier char
       while (identifier_char_index >= 0
-             && preview_file_str.at(identifier_char_index) >= 48
-             && preview_file_str.at(identifier_char_index) <= 57) {
+             && preview_file_str.at(identifier_char_index).unicode() >= 48
+             && preview_file_str.at(identifier_char_index).unicode() <= 57) {
         identifier_char_index--;
       }
 
@@ -418,7 +419,7 @@ void PreferencesDialog::load_shortcut_file() {
       QByteArray ba = f.readAll();
       f.close();
       for (int i=0;i<key_shortcut_fields.size();i++) {
-        int index = ba.indexOf(key_shortcut_fields.at(i)->action_name());
+        int index = ba.indexOf(key_shortcut_fields.at(i)->action_name().toUtf8());
         if (index == 0 || (index > 0 && ba.at(index-1) == '\n')) {
           while (index < ba.size() && ba.at(index) != '\t') index++;
           QString ks;
@@ -756,12 +757,12 @@ void PreferencesDialog::setup_ui() {
   audio_output_devices->addItem(tr("Default"), "");
 
   // list all available audio output devices
-  QList<QAudioDeviceInfo> devs = QAudioDeviceInfo::availableDevices(QAudio::AudioOutput);
+  QList<QAudioDevice> devs = QMediaDevices::audioOutputs();
   bool found_preferred_device = false;
   for (int i=0;i<devs.size();i++) {
-    audio_output_devices->addItem(devs.at(i).deviceName(), devs.at(i).deviceName());
+    audio_output_devices->addItem(devs.at(i).description(), devs.at(i).description());
     if (!found_preferred_device
-        && devs.at(i).deviceName() == olive::CurrentConfig.preferred_audio_output) {
+        && devs.at(i).description() == olive::CurrentConfig.preferred_audio_output) {
       audio_output_devices->setCurrentIndex(audio_output_devices->count()-1);
       found_preferred_device = true;
     }
@@ -779,12 +780,12 @@ void PreferencesDialog::setup_ui() {
   audio_input_devices->addItem(tr("Default"), "");
 
   // list all available audio input devices
-  devs = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
+  devs = QMediaDevices::audioInputs();
   found_preferred_device = false;
   for (int i=0;i<devs.size();i++) {
-    audio_input_devices->addItem(devs.at(i).deviceName(), devs.at(i).deviceName());
+    audio_input_devices->addItem(devs.at(i).description(), devs.at(i).description());
     if (!found_preferred_device
-        && devs.at(i).deviceName() == olive::CurrentConfig.preferred_audio_input) {
+        && devs.at(i).description() == olive::CurrentConfig.preferred_audio_input) {
       audio_input_devices->setCurrentIndex(audio_input_devices->count()-1);
       found_preferred_device = true;
     }

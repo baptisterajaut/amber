@@ -29,7 +29,7 @@ extern "C" {
 #include <QFileDialog>
 #include <QString>
 #include <QVariant>
-#include <QCharRef>
+
 #include <QMessageBox>
 #include <QDropEvent>
 #include <QMimeData>
@@ -78,7 +78,7 @@ Project::Project(QWidget *parent) :
   QWidget* dockWidgetContents = new QWidget(this);
 
   QVBoxLayout* verticalLayout = new QVBoxLayout(dockWidgetContents);
-  verticalLayout->setMargin(0);
+  verticalLayout->setContentsMargins(0, 0, 0, 0);
   verticalLayout->setSpacing(0);
 
   setWidget(dockWidgetContents);
@@ -91,7 +91,7 @@ Project::Project(QWidget *parent) :
   toolbar_widget->setObjectName("project_toolbar");
 
   QHBoxLayout* toolbar = new QHBoxLayout(toolbar_widget);
-  toolbar->setMargin(0);
+  toolbar->setContentsMargins(0, 0, 0, 0);
   toolbar->setSpacing(0);
 
   QPushButton* toolbar_new = new QPushButton();
@@ -165,11 +165,11 @@ Project::Project(QWidget *parent) :
   icon_view_container = new QWidget();
 
   QVBoxLayout* icon_view_container_layout = new QVBoxLayout(icon_view_container);
-  icon_view_container_layout->setMargin(0);
+  icon_view_container_layout->setContentsMargins(0, 0, 0, 0);
   icon_view_container_layout->setSpacing(0);
 
   QHBoxLayout* icon_view_controls = new QHBoxLayout();
-  icon_view_controls->setMargin(0);
+  icon_view_controls->setContentsMargins(0, 0, 0, 0);
   icon_view_controls->setSpacing(0);
 
   directory_up = new QPushButton();

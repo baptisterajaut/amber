@@ -30,7 +30,7 @@
 
 #include <QOpenGLFramebufferObject>
 #include <QtMath>
-#include <QAudioOutput>
+#include <QAudioSink>
 #include <QStatusBar>
 #include <math.h>
 

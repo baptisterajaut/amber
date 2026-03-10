@@ -99,20 +99,11 @@ int main(int argc, char *argv[]) {
     qInstallMessageHandler(debug_message_handler);
   }
 
-  // Initialize ffmpeg subsystem
-  // (these have been deprecated in FFmpeg 4, but are still necessary for FFmpeg 3)
-#if LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58, 9, 100)
-  av_register_all();
-#endif
-
-#if LIBAVFILTER_VERSION_INT < AV_VERSION_INT(7, 14, 100)
-  avfilter_register_all();
-#endif
-
   QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
   QSurfaceFormat format;
   format.setDepthBufferSize(24);
+  format.setProfile(QSurfaceFormat::CompatibilityProfile);
   QSurfaceFormat::setDefaultFormat(format);
 
   QApplication a(argc, argv);
@@ -126,9 +117,7 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setOrganizationDomain("olivevideoeditor.org");
   QCoreApplication::setApplicationName("Olive");
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 7, 0))
   QGuiApplication::setDesktopFileName("org.olivevideoeditor.Olive");
-#endif
 
   MainWindow w(nullptr);
 
