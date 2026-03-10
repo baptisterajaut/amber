@@ -101,10 +101,6 @@ int main(int argc, char *argv[]) {
 
   QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
-  // Force X11 backend — Qt6's QOpenGLWidget compositing is broken on Wayland
-  // (FBO content not presented to compositor, causing hall-of-mirrors effect)
-  qputenv("QT_QPA_PLATFORM", "xcb");
-
   QSurfaceFormat format;
   format.setDepthBufferSize(24);
   format.setProfile(QSurfaceFormat::CompatibilityProfile);

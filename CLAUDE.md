@@ -18,6 +18,16 @@ make -j$(nproc)
 
 No test suite exists in this branch.
 
+## Packaging
+
+Linux packages are built via Docker (`.deb`) and makepkg (Arch). Dockerfiles and PKGBUILD in `packaging/linux/`. AppImage built with linuxdeploy. All packages at https://github.com/baptisterajaut/olive/releases/tag/v0.1.3-nightly
+
+## Known issues
+
+- **Wayland compositing (fixed)**: Qt6's `QOpenGLWidget` FBO had alpha < 1.0 pixels, causing transparent areas on Wayland (hall-of-mirrors). Fixed by forcing alpha=1.0 via masked `glClear` at the end of `paintGL()` in both `ViewerWidget` and `ViewerWindow`. Same approach as FreeCAD PR #19499.
+- **FFmpeg compat**: `#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)` guards needed for `avcodec_get_supported_config()` (replaces `codec->pix_fmts`/`codec->sample_fmts`). `#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)` for `AV_FRAME_FLAG_INTERLACED`.
+- **Qt 6.4 compat**: `QStringView == "literal"` doesn't compile on Qt 6.4 (Debian/Ubuntu). All `stream.name()`, `attr.name()`, `attr.value()`, `reader.name()` comparisons must use `QLatin1String()` wrapper.
+
 ## Code style
 
 clang-format with `.clang-format` in repo root (Google-based, 2-space indent, 120-col limit, attached braces, left pointer alignment). Run `clang-format -i <file>` to format.

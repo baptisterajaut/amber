@@ -546,7 +546,7 @@ void ViewerWidget::paintGL() {
     tex_lock->lock();
 
     // clear to solid black
-    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // set color multipler to straight white
@@ -614,4 +614,10 @@ void ViewerWidget::paintGL() {
       makeCurrent();
     }
   }
+
+  // Force alpha to 1.0 so Wayland compositing doesn't show through transparent pixels
+  glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+  glClearColor(0, 0, 0, 1);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 }

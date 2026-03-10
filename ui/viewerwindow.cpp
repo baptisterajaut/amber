@@ -111,7 +111,7 @@ void ViewerWindow::paintGL() {
   if (texture > 0) {
     if (mutex != nullptr) mutex->lock();
 
-    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
     glEnable(GL_TEXTURE_2D);
@@ -187,6 +187,12 @@ void ViewerWindow::paintGL() {
 
     p.drawText(text_x, text_y, fs_str);
   }
+
+  // Force alpha to 1.0 so Wayland compositing doesn't show through transparent pixels
+  glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
+  glClearColor(0, 0, 0, 1);
+  glClear(GL_COLOR_BUFFER_BIT);
+  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 }
 
 void ViewerWindow::fullscreen_msg_timeout() {
