@@ -184,11 +184,11 @@ void TextEffect::redraw(double timecode) {
   if (word_wrap_field->GetBoolAt(timecode)) {
     for (int i=0;i<lines.size();i++) {
       QString s(lines.at(i));
-      if (fm.width(s) > width) {
+      if (fm.horizontalAdvance(s) > width) {
         int last_space_index = 0;
         for (int j=0;j<s.length();j++) {
           if (s.at(j) == ' ') {
-            if (fm.width(s.left(j)) > width) {
+            if (fm.horizontalAdvance(s.left(j)) > width) {
               break;
             } else {
               last_space_index = j;
@@ -212,11 +212,11 @@ void TextEffect::redraw(double timecode) {
 
     switch (halign_field->GetValueAt(timecode).toInt()) {
     case Qt::AlignLeft: text_x = 0; break;
-    case Qt::AlignRight: text_x = width - fm.width(lines.at(i)); break;
+    case Qt::AlignRight: text_x = width - fm.horizontalAdvance(lines.at(i)); break;
     case Qt::AlignJustify:
       // add spaces until the string is too big
       text_x = 0;
-      while (fm.width(lines.at(i)) < width) {
+      while (fm.horizontalAdvance(lines.at(i)) < width) {
         bool space = false;
         QString spaced(lines.at(i));
         for (int i=0;i<spaced.length();i++) {
@@ -229,7 +229,7 @@ void TextEffect::redraw(double timecode) {
             while (i < spaced.length() && spaced.at(i) == ' ') i++;
           }
         }
-        if (fm.width(spaced) > width || !space) {
+        if (fm.horizontalAdvance(spaced) > width || !space) {
           break;
         } else {
           lines[i] = spaced;
@@ -238,7 +238,7 @@ void TextEffect::redraw(double timecode) {
       break;
     case Qt::AlignHCenter:
     default:
-      text_x = (width/2) - (fm.width(lines.at(i))/2);
+      text_x = (width/2) - (fm.horizontalAdvance(lines.at(i))/2);
       break;
     }
 

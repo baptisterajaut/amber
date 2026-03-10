@@ -55,7 +55,7 @@ double bytes_to_seconds(int nb_bytes, int nb_channels, int sample_rate) {
 void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int nb_bytes, QVector<Clip*> nests) {
   // perform all audio effects
   double timecode_end;
-  timecode_end = timecode_start + bytes_to_seconds(nb_bytes, frame->channels, frame->sample_rate);
+  timecode_end = timecode_start + bytes_to_seconds(nb_bytes, frame->ch_layout.nb_channels, frame->sample_rate);
 
   for (int j=0;j<clip->effects.size();j++) {
     Effect* e = clip->effects.at(j).get();
@@ -160,11 +160,11 @@ void Cacher::CacheAudioWorker() {
 
     if (clip->media() == nullptr) {
       frame = frame_;
-      nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->channels;
+      nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->ch_layout.nb_channels;
       while ((frame_sample_index_ == -1 || frame_sample_index_ >= nb_bytes) && nb_bytes > 0) {
         // create "new frame"
         memset(frame_->data[0], 0, nb_bytes);
-        apply_audio_effects(clip, bytes_to_seconds(frame->pts, frame->channels, frame->sample_rate), frame, nb_bytes, nests_);
+        apply_audio_effects(clip, bytes_to_seconds(frame->pts, frame->ch_layout.nb_channels, frame->sample_rate), frame, nb_bytes, nests_);
         frame_->pts += nb_bytes;
         frame_sample_index_ = 0;
         if (audio_buffer_write == 0) {
@@ -254,17 +254,17 @@ void Cacher::CacheAudioWorker() {
                     dout << "starting rev_frame";
 #endif
                     rev_frame->nb_samples = 0;
-                    rev_frame->pts = frame_->pkt_pts;
+                    rev_frame->pts = frame_->pts;
                   }
-                  int offset = rev_frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format)) * rev_frame->channels;
+                  int offset = rev_frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format)) * rev_frame->ch_layout.nb_channels;
 #ifdef AUDIOWARNINGS
                   dout << "offset 1:" << offset;
-                  dout << "retrieved samples:" << frame->nb_samples << "size:" << (frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->channels);
+                  dout << "retrieved samples:" << frame->nb_samples << "size:" << (frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->ch_layout.nb_channels);
 #endif
                   memcpy(
                         rev_frame->data[0]+offset,
                       frame->data[0],
-                      (frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->channels)
+                      (frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->ch_layout.nb_channels)
                       );
 #ifdef AUDIOWARNINGS
                   dout << "pts:" << frame_->pts << "dur:" << frame_->pkt_duration << "rev_target:" << reverse_target << "offset:" << offset << "limit:" << rev_frame->linesize[0];
@@ -297,10 +297,10 @@ void Cacher::CacheAudioWorker() {
                   dout << "post cutoff deets::" << rev_frame->nb_samples;
 #endif
 
-                  int frame_size = rev_frame->nb_samples * rev_frame->channels * av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format));
+                  int frame_size = rev_frame->nb_samples * rev_frame->ch_layout.nb_channels * av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format));
                   int half_frame_size = frame_size >> 1;
 
-                  int sample_size = rev_frame->channels*av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format));
+                  int sample_size = rev_frame->ch_layout.nb_channels*av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format));
                   char* temp_chars = new char[sample_size];
                   for (int i=0;i<half_frame_size;i+=sample_size) {
                     memcpy(temp_chars, &rev_frame->data[0][i], sample_size);
@@ -340,7 +340,7 @@ void Cacher::CacheAudioWorker() {
           frame_sample_index_ -= nb_bytes;
         }
 
-        nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->channels;
+        nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->ch_layout.nb_channels;
 
         if (audio_just_reset) {
           // get precise sample offset for the elected clip_in from this audio frame
@@ -392,7 +392,7 @@ void Cacher::CacheAudioWorker() {
 #endif
 
       // apply any audio effects to the data
-      if (nb_bytes == INT_MAX) nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->channels;
+      if (nb_bytes == INT_MAX) nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) * frame->ch_layout.nb_channels;
       if (new_frame) {
         apply_audio_effects(clip, bytes_to_seconds(audio_buffer_write, 2, current_audio_freq()) + audio_ibuffer_timecode + ((double)clip->clip_in(true)/clip->sequence->frame_rate) - ((double)timeline_in/last_fr), frame, nb_bytes, nests_);
       }
@@ -412,7 +412,7 @@ void Cacher::CacheAudioWorker() {
       while (frame_sample_index_ < nb_bytes
              && audio_buffer_write < audio_ibuffer_read+(audio_ibuffer_size>>1)
              && audio_buffer_write < buffer_timeline_out) {
-        for (int i=0;i<frame->channels;i++) {
+        for (int i=0;i<frame->ch_layout.nb_channels;i++) {
           int upper_byte_index = (audio_buffer_write+1)%audio_ibuffer_size;
           int lower_byte_index = (audio_buffer_write)%audio_ibuffer_size;
           qint16 old_sample = static_cast<qint16>((audio_ibuffer[upper_byte_index] & 0xFF) << 8 | (audio_ibuffer[lower_byte_index] & 0xFF));
@@ -832,12 +832,12 @@ void Cacher::Reset() {
 
 void Cacher::SetRetrievedFrame(AVFrame *f)
 {
+  retrieve_lock_.lock();
   if (retrieved_frame == nullptr) {
-    retrieve_lock_.lock();
     retrieved_frame = f;
     retrieve_wait_.wakeAll();
-    retrieve_lock_.unlock();
   }
+  retrieve_lock_.unlock();
 }
 
 void Cacher::WakeMainThread()
@@ -873,8 +873,7 @@ void Cacher::OpenWorker() {
     if (clip->track() >= 0) {
       frame_ = av_frame_alloc();
       frame_->format = kDestSampleFmt;
-      frame_->channel_layout = clip->sequence->audio_layout;
-      frame_->channels = av_get_channel_layout_nb_channels(frame_->channel_layout);
+      av_channel_layout_from_mask(&frame_->ch_layout, clip->sequence->audio_layout);
       frame_->sample_rate = current_audio_freq();
       frame_->nb_samples = 2048;
       av_frame_make_writable(frame_);
@@ -915,6 +914,7 @@ void Cacher::OpenWorker() {
           nullptr,
           &format_opts
           );
+    av_dict_free(&format_opts);
     if (errCode != 0) {
       char err[1024];
       av_strerror(errCode, err, 1024);
@@ -953,7 +953,10 @@ void Cacher::OpenWorker() {
     // Open codec
     if (avcodec_open2(codecCtx, codec, &opts) < 0) {
       qCritical() << "Could not open codec";
+      av_dict_free(&opts);
+      return;
     }
+    av_dict_free(&opts);
 
     // allocate filtergraph
     filter_graph = avfilter_graph_alloc();
@@ -1001,7 +1004,7 @@ void Cacher::OpenWorker() {
       avfilter_graph_config(filter_graph, nullptr);
 
     } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-      if (codecCtx->channel_layout == 0) codecCtx->channel_layout = av_get_default_channel_layout(stream->codecpar->channels);
+      if (codecCtx->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC) av_channel_layout_default(&codecCtx->ch_layout, stream->codecpar->ch_layout.nb_channels);
 
       // set up cache
       queue_.append(av_frame_alloc());
@@ -1011,20 +1014,23 @@ void Cacher::OpenWorker() {
 
         reverse_frame->format = kDestSampleFmt;
         reverse_frame->nb_samples = current_audio_freq()*10;
-        reverse_frame->channel_layout = clip->sequence->audio_layout;
-        reverse_frame->channels = av_get_channel_layout_nb_channels(clip->sequence->audio_layout);
+        av_channel_layout_from_mask(&reverse_frame->ch_layout, clip->sequence->audio_layout);
         av_frame_get_buffer(reverse_frame, 0);
 
         queue_.append(reverse_frame);
       }
 
-      snprintf(filter_args, sizeof(filter_args), "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=0x%" PRIx64,
-               stream->time_base.num,
-               stream->time_base.den,
-               stream->codecpar->sample_rate,
-               av_get_sample_fmt_name(codecCtx->sample_fmt),
-               codecCtx->channel_layout
-               );
+      {
+        char ch_layout_str[64];
+        av_channel_layout_describe(&codecCtx->ch_layout, ch_layout_str, sizeof(ch_layout_str));
+        snprintf(filter_args, sizeof(filter_args), "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
+                 stream->time_base.num,
+                 stream->time_base.den,
+                 stream->codecpar->sample_rate,
+                 av_get_sample_fmt_name(codecCtx->sample_fmt),
+                 ch_layout_str
+                 );
+      }
 
       avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("abuffer"), "in", filter_args, nullptr, filter_graph);
       avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out", nullptr, nullptr, filter_graph);
@@ -1034,9 +1040,8 @@ void Cacher::OpenWorker() {
         qCritical() << "Could not set output sample format";
       }
 
-      int64_t channel_layouts[] = { AV_CH_LAYOUT_STEREO, static_cast<AVSampleFormat>(-1) };
-      if (av_opt_set_int_list(buffersink_ctx, "channel_layouts", channel_layouts, -1, AV_OPT_SEARCH_CHILDREN) < 0) {
-        qCritical() << "Could not set output sample format";
+      if (av_opt_set(buffersink_ctx, "ch_layouts", "stereo", AV_OPT_SEARCH_CHILDREN) < 0) {
+        qCritical() << "Could not set output channel layout";
       }
 
       int target_sample_rate = current_audio_freq();
@@ -1130,7 +1135,6 @@ void Cacher::CloseWorker() {
     }
 
     if (codecCtx != nullptr) {
-      avcodec_close(codecCtx);
       avcodec_free_context(&codecCtx);
       codecCtx = nullptr;
     }
@@ -1320,16 +1324,19 @@ void Cacher::ResetAudio()
 
 int Cacher::media_width()
 {
+  if (stream == nullptr) return 0;
   return stream->codecpar->width;
 }
 
 int Cacher::media_height()
 {
+  if (stream == nullptr) return 0;
   return stream->codecpar->height;
 }
 
 AVRational Cacher::media_time_base()
 {
+  if (stream == nullptr) return {0, 1};
   return stream->time_base;
 }
 

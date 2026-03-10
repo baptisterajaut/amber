@@ -796,7 +796,7 @@ void GraphView::wheelEvent(QWheelEvent *event) {
     new_y_zoom = y_zoom + (zoom_diff * (delta_v / 120.0));
 
     // Center zoom around the mouse cursor vertically
-    int true_mouse_y = height()-event->pos().y();
+    int true_mouse_y = height()-event->position().y();
     set_scroll_y(qRound((double(y_scroll + true_mouse_y) / y_zoom) * new_y_zoom) - true_mouse_y);
 
     redraw = true;
@@ -808,7 +808,7 @@ void GraphView::wheelEvent(QWheelEvent *event) {
     new_x_zoom = x_zoom + (zoom_diff * (delta_h / 120.0));
 
     // Center zoom around the mouse cursor horizontally
-    set_scroll_x(qRound((double(x_scroll + event->pos().x()) / x_zoom) * new_x_zoom) - event->pos().x());
+    set_scroll_x(qRound((double(x_scroll + event->position().x()) / x_zoom) * new_x_zoom) - event->position().x());
 
     redraw = true;
   }

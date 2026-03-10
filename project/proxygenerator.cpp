@@ -91,10 +91,10 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
     out_stream->id = in_stream->id;
 
     // find decoder for this codec
-    AVCodec* dec_codec = avcodec_find_decoder(in_stream->codecpar->codec_id);
+    const AVCodec* dec_codec = avcodec_find_decoder(in_stream->codecpar->codec_id);
 
     // find encoder for chosen proxy type
-    AVCodec* enc_codec = avcodec_find_encoder(temp_enc_codec);
+    const AVCodec* enc_codec = avcodec_find_encoder(temp_enc_codec);
 
     // we only transcode video streams, others we just passthrough
     if (in_stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && dec_codec != nullptr) {
@@ -167,7 +167,12 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   }
 
   // write video header
-  avformat_write_header(output_fmt_ctx, nullptr);
+  int error_code = avformat_write_header(output_fmt_ctx, nullptr);
+  if (error_code < 0) {
+    qWarning() << "Failed to write video header";
+    cancelled = true;
+    skip = true;
+  }
 
   // packet that av_read_frame will dump file packets into
   AVPacket packet;
@@ -303,11 +308,9 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
       sws_freeContext(sws_contexts[i]);
 
       // free input decoding context
-      avcodec_close(input_streams[i]);
       avcodec_free_context(&input_streams[i]);
 
       // free output encoding context
-      avcodec_close(output_streams[i]);
       avcodec_free_context(&output_streams[i]);
     }
   }
@@ -373,6 +376,8 @@ void ProxyGenerator::run() {
 
 // called to add footage to generate proxies for
 void ProxyGenerator::queue(const ProxyInfo &info) {
+  mutex.lock();
+
   // remove any queued proxies with the same footage
   if (!proxy_queue.isEmpty()
       && proxy_queue.first().media == info.media) {
@@ -392,6 +397,8 @@ void ProxyGenerator::queue(const ProxyInfo &info) {
   // add proxy info to queue
   proxy_queue.append(info);
 
+  mutex.unlock();
+
   // wake proxy thread loop if sleeping
   waitCond.wakeAll();
 }
@@ -410,7 +417,7 @@ void ProxyGenerator::cancel() {
 }
 
 double ProxyGenerator::get_proxy_progress(Media* m) {
-  if (proxy_queue.first().media == m) {
+  if (!proxy_queue.isEmpty() && proxy_queue.first().media == m) {
     return current_progress;
   }
   return 0.0;

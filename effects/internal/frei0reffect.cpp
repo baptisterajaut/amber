@@ -58,12 +58,22 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
   }
 
   f0rInitFunc init = reinterpret_cast<f0rInitFunc>(handle.resolve("f0r_init"));
+  if (init == nullptr) {
+    QMessageBox::critical(nullptr, tr("Error loading Frei0r plugin"),
+                          tr("Symbol f0r_init not found in \"%1\"").arg(dll_fn));
+    return;
+  }
   init();
 
   construct_module();
 
   f0r_plugin_info_t info;
   f0rGetPluginInfo info_func = reinterpret_cast<f0rGetPluginInfo>(handle.resolve("f0r_get_plugin_info"));
+  if (info_func == nullptr) {
+    QMessageBox::critical(nullptr, tr("Error loading Frei0r plugin"),
+                          tr("Symbol f0r_get_plugin_info not found in \"%1\"").arg(dll_fn));
+    return;
+  }
   info_func(&info);
 
   param_count = info.num_params;
@@ -110,7 +120,7 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
 Frei0rEffect::~Frei0rEffect() {
   if (handle.isLoaded()) {
     f0rDeinitFunc deinit = reinterpret_cast<f0rDeinitFunc>(handle.resolve("f0r_deinit"));
-    deinit();
+    if (deinit != nullptr) deinit();
 
     handle.unload();
   }
@@ -118,6 +128,10 @@ Frei0rEffect::~Frei0rEffect() {
 
 void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *output, int) {
   f0rUpdateFunc update_func = reinterpret_cast<f0rUpdateFunc>(handle.resolve("f0r_update"));
+  if (update_func == nullptr) return;
+
+  f0rSetParamValue set_param = reinterpret_cast<f0rSetParamValue>(handle.resolve("f0r_set_param_value"));
+  if (set_param == nullptr) return;
 
   for (int i=0;i<param_count;i++) {
     EffectRow* param_row = row(i);
@@ -125,11 +139,10 @@ void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *outpu
     f0r_param_info_t param_info;
     get_param_info(&param_info, i);
 
-    f0rSetParamValue set_param = reinterpret_cast<f0rSetParamValue>(handle.resolve("f0r_set_param_value"));
     switch (param_info.type) {
     case F0R_PARAM_BOOL:
     {
-      double b = param_row->Field(0)->GetValueAt(timecode).toBool();
+      double b = param_row->Field(0)->GetValueAt(timecode).toBool() ? 1.0 : 0.0;
       set_param(instance, &b, i);
     }
       break;

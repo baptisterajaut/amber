@@ -34,6 +34,7 @@ extern "C" {
 #include <libavfilter/buffersink.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
+#include <libavutil/channel_layout.h>
 }
 
 #include <memory>
@@ -415,7 +416,7 @@ private:
   /**
    * @brief FFmpeg codec reference
    */
-  AVCodec* codec;
+  const AVCodec* codec;
 
   /**
    * @brief Options set by the cacher for FFmpeg's decoders (settings like multithreading or other optimizations)

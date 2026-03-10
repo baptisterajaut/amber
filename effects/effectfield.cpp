@@ -371,9 +371,13 @@ void EffectField::GetKeyframeData(double timecode, int &before, int &after, doub
   } else if (before_keyframe_index > -1) {
     before = before_keyframe_index;
     after = before_keyframe_index;
-  } else {
+  } else if (after_keyframe_index > -1) {
     before = after_keyframe_index;
     after = after_keyframe_index;
+  } else {
+    // no keyframes found — caller should check before != -1
+    before = 0;
+    after = 0;
   }
 }
 

@@ -23,6 +23,7 @@
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavutil/channel_layout.h>
 }
 
 #include <QCoreApplication>
@@ -55,7 +56,14 @@ QString get_channel_layout_name(int channels, uint64_t layout) {
   case 2: return QCoreApplication::translate("ChannelLayoutName", "Stereo");
   default: {
     char buf[50];
-    av_get_channel_layout_string(buf, sizeof(buf), channels, layout);
+    AVChannelLayout ch_layout = {};
+    if (layout != 0) {
+      av_channel_layout_from_mask(&ch_layout, layout);
+    } else {
+      av_channel_layout_default(&ch_layout, channels);
+    }
+    av_channel_layout_describe(&ch_layout, buf, sizeof(buf));
+    av_channel_layout_uninit(&ch_layout);
     return QString(buf);
   }
   }
@@ -198,7 +206,13 @@ void Media::update_tooltip(const QString& error) {
           QString::number(s->height),
           QString::number(s->frame_rate),
           QString::number(s->audio_frequency),
-          get_channel_layout_name(av_get_channel_layout_nb_channels(s->audio_layout), s->audio_layout)
+          [&]() -> QString {
+            AVChannelLayout tmp = {};
+            av_channel_layout_from_mask(&tmp, s->audio_layout);
+            int nb = tmp.nb_channels;
+            av_channel_layout_uninit(&tmp);
+            return get_channel_layout_name(nb, s->audio_layout);
+          }()
           );
   }
     break;

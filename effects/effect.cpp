@@ -799,6 +799,7 @@ void Effect::startEffect() {
   }
   if (olive::CurrentRuntimeConfig.shaders_are_enabled
       && (Flags() & Effect::ShaderFlag)
+      && glslProgram != nullptr
       && glslProgram->isLinked()) {
     bound = glslProgram->bind();
   }

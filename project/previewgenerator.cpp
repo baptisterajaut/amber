@@ -109,8 +109,20 @@ void PreviewGenerator::parse_media() {
 
         append = true;
       } else if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-        ms.audio_channels = fmt_ctx_->streams[i]->codecpar->channels;
-        ms.audio_layout = int(fmt_ctx_->streams[i]->codecpar->channel_layout);
+        ms.audio_channels = fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels;
+        {
+          uint64_t mask = 0;
+          // Try to extract a channel mask; if ch_layout isn't mask-based, fall back to default
+          if (fmt_ctx_->streams[i]->codecpar->ch_layout.order == AV_CHANNEL_ORDER_NATIVE) {
+            mask = fmt_ctx_->streams[i]->codecpar->ch_layout.u.mask;
+          } else {
+            AVChannelLayout temp = {};
+            av_channel_layout_default(&temp, ms.audio_channels);
+            if (temp.order == AV_CHANNEL_ORDER_NATIVE) mask = temp.u.mask;
+            av_channel_layout_uninit(&temp);
+          }
+          ms.audio_layout = int(mask);
+        }
         ms.audio_frequency = fmt_ctx_->streams[i]->codecpar->sample_rate;
 
         append = true;
@@ -260,7 +272,7 @@ void PreviewGenerator::generate_waveform() {
     // and only if the thumbnail and waveform sizes are > 0
     if ((fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && olive::CurrentConfig.thumbnail_resolution > 0)
         || (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO && olive::CurrentConfig.waveform_resolution > 0)) {
-      AVCodec* codec = avcodec_find_decoder(fmt_ctx_->streams[i]->codecpar->codec_id);
+      const AVCodec* codec = avcodec_find_decoder(fmt_ctx_->streams[i]->codecpar->codec_id);
       if (codec != nullptr) {
 
         // alloc the context and load the params into it
@@ -274,16 +286,16 @@ void PreviewGenerator::generate_waveform() {
         if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
 
           // allocate sample cache for this stream
-          waveform_cache_data[i] = new qint16* [fmt_ctx_->streams[i]->codecpar->channels];
+          waveform_cache_data[i] = new qint16* [fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels];
 
           // each channel gets a min and a max value so we allocate two ints for each one
-          for (int j=0;j<fmt_ctx_->streams[i]->codecpar->channels;j++) {
+          for (int j=0;j<fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels;j++) {
             waveform_cache_data[i][j] = new qint16[2];
           }
 
           // if codec context has no defined channel layout, guess it from the channel count
-          if (codec_ctx[i]->channel_layout == 0) {
-            codec_ctx[i]->channel_layout = av_get_default_channel_layout(fmt_ctx_->streams[i]->codecpar->channels);
+          if (codec_ctx[i]->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC) {
+            av_channel_layout_default(&codec_ctx[i]->ch_layout, fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels);
           }
 
         }
@@ -363,7 +375,7 @@ void PreviewGenerator::generate_waveform() {
                         linesize);
 
               // is video interlaced?
-              s->video_auto_interlacing = (temp_frame->interlaced_frame) ? ((temp_frame->top_field_first) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
+              s->video_auto_interlacing = (temp_frame->flags & AV_FRAME_FLAG_INTERLACED) ? ((temp_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
               s->video_interlacing = s->video_auto_interlacing;
 
               s->preview_done = true;
@@ -371,23 +383,24 @@ void PreviewGenerator::generate_waveform() {
               sws_freeContext(sws_ctx);
 
               if (!retrieve_duration_) {
-                avcodec_close(codec_ctx[packet->stream_index]);
+                avcodec_free_context(&codec_ctx[packet->stream_index]);
                 codec_ctx[packet->stream_index] = nullptr;
               }
             }
             media_lengths[packet->stream_index]++;
           } else if (fmt_ctx_->streams[packet->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
             AVFrame* swr_frame = av_frame_alloc();
-            swr_frame->channel_layout = temp_frame->channel_layout;
+            av_channel_layout_copy(&swr_frame->ch_layout, &temp_frame->ch_layout);
             swr_frame->sample_rate = temp_frame->sample_rate;
             swr_frame->format = AV_SAMPLE_FMT_S16P;
 
-            swr_ctx = swr_alloc_set_opts(
-                  nullptr,
-                  temp_frame->channel_layout,
+            swr_ctx = nullptr;
+            swr_alloc_set_opts2(
+                  &swr_ctx,
+                  &temp_frame->ch_layout,
                   static_cast<AVSampleFormat>(swr_frame->format),
                   temp_frame->sample_rate,
-                  temp_frame->channel_layout,
+                  &temp_frame->ch_layout,
                   static_cast<AVSampleFormat>(temp_frame->format),
                   temp_frame->sample_rate,
                   0,
@@ -417,7 +430,7 @@ void PreviewGenerator::generate_waveform() {
 
                 // if so, we dump our cached values into the preview and reset them
                 // for the next interval
-                for (int j=0;j<swr_frame->channels;j++) {
+                for (int j=0;j<swr_frame->ch_layout.nb_channels;j++) {
                   qint16& min = waveform_cache_data[packet->stream_index][j][0];
                   qint16& max = waveform_cache_data[packet->stream_index][j][1];
 
@@ -429,7 +442,7 @@ void PreviewGenerator::generate_waveform() {
               }
 
               // standard processing for each channel of information
-              for (int j=0;j<swr_frame->channels;j++) {
+              for (int j=0;j<swr_frame->ch_layout.nb_channels;j++) {
                 qint16& min = waveform_cache_data[packet->stream_index][j][0];
                 qint16& max = waveform_cache_data[packet->stream_index][j][1];
 
@@ -487,14 +500,13 @@ void PreviewGenerator::generate_waveform() {
 
     for (unsigned int i=0;i<fmt_ctx_->nb_streams;i++) {
       if (waveform_cache_data[i] != nullptr) {
-        for (int j=0;j<codec_ctx[i]->channels;j++) {
+        for (int j=0;j<codec_ctx[i]->ch_layout.nb_channels;j++) {
           delete [] waveform_cache_data[i][j];
         }
         delete [] waveform_cache_data[i];
       }
 
       if (codec_ctx[i] != nullptr) {
-        avcodec_close(codec_ctx[i]);
         avcodec_free_context(&codec_ctx[i]);
       }
     }

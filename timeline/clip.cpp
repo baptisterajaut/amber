@@ -87,6 +87,8 @@ ClipPtr Clip::copy(Sequence* s) {
 
 bool Clip::IsActiveAt(long timecode)
 {
+  if (this->sequence == nullptr) return false;
+
   // these buffers allow clips to be opened and prepared well before they're displayed
   // as well as closed a little after they're not needed anymore
   int open_buffer = qCeil(this->sequence->frame_rate*2);
@@ -405,7 +407,7 @@ long Clip::media_length() {
 }
 
 int Clip::media_width() {
-  if (media_ == nullptr && sequence != nullptr) return sequence->width;
+  if (media_ == nullptr) return (sequence != nullptr) ? sequence->width : 0;
   switch (media_->get_type()) {
   case MEDIA_TYPE_FOOTAGE:
   {
@@ -424,7 +426,7 @@ int Clip::media_width() {
 }
 
 int Clip::media_height() {
-  if (media_ == nullptr && sequence != nullptr) return sequence->height;
+  if (media_ == nullptr) return (sequence != nullptr) ? sequence->height : 0;
   switch (media_->get_type()) {
   case MEDIA_TYPE_FOOTAGE:
   {

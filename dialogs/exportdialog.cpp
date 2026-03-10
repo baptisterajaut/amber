@@ -121,7 +121,7 @@ ExportDialog::ExportDialog(QWidget *parent) :
 void ExportDialog::add_codec_to_combobox(QComboBox* box, enum AVCodecID codec) {
   QString codec_name;
 
-  AVCodec* codec_info = avcodec_find_encoder(codec);
+  const AVCodec* codec_info = avcodec_find_encoder(codec);
 
   if (codec_info == nullptr) {
     codec_name = tr("Unknown codec name %1").arg(static_cast<int>(codec));
@@ -630,7 +630,7 @@ void ExportDialog::vcodec_changed(int index) {
     }
 
     // set default pix_fmt for this codec
-    AVCodec* codec_info = avcodec_find_encoder(static_cast<AVCodecID>(vcodecCombobox->itemData(index).toInt()));
+    const AVCodec* codec_info = avcodec_find_encoder(static_cast<AVCodecID>(vcodecCombobox->itemData(index).toInt()));
     if (codec_info == nullptr) {
       QMessageBox::critical(this,
                             tr("Invalid Codec"),

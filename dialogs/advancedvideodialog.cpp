@@ -44,7 +44,7 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
   int row = 0;
 
   // get encoder information for this codec from FFmpeg
-  AVCodec* codec_info = avcodec_find_encoder(static_cast<AVCodecID>(encoding_codec));
+  const AVCodec* codec_info = avcodec_find_encoder(static_cast<AVCodecID>(encoding_codec));
 
   // set up grid layout for dialog
   QGridLayout* layout = new QGridLayout(this);

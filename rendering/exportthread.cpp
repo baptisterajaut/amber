@@ -23,6 +23,7 @@
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
+#include <libavutil/channel_layout.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
@@ -175,6 +176,7 @@ bool ExportThread::SetupVideo() {
 
   // Open video encoder
   ret = avcodec_open2(vcodec_ctx, vcodec, &opts);
+  av_dict_free(&opts);
   if (ret < 0) {
     qCritical() << "Could not open output video encoder." << ret;
     export_error = tr("could not open output video encoder (%1)").arg(QString::number(ret));
@@ -254,8 +256,7 @@ bool ExportThread::SetupAudio() {
   acodec_ctx->codec_id = static_cast<AVCodecID>(params_.audio_codec);
   acodec_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
   acodec_ctx->sample_rate = params_.audio_sampling_rate;
-  acodec_ctx->channel_layout = AV_CH_LAYOUT_STEREO;  // change this to support surround/mono sound in the future (this is what the user sets the output audio to)
-  acodec_ctx->channels = av_get_channel_layout_nb_channels(acodec_ctx->channel_layout);
+  av_channel_layout_from_mask(&acodec_ctx->ch_layout, AV_CH_LAYOUT_STEREO);  // change this to support surround/mono sound in the future (this is what the user sets the output audio to)
   acodec_ctx->sample_fmt = acodec->sample_fmts[0];
   acodec_ctx->bit_rate = params_.audio_bitrate * 1000;
 
@@ -284,17 +285,22 @@ bool ExportThread::SetupAudio() {
   }
 
   // init audio resampler context
-  swr_ctx = swr_alloc_set_opts(
-        nullptr,
-        acodec_ctx->channel_layout,
-        acodec_ctx->sample_fmt,
-        acodec_ctx->sample_rate,
-        olive::ActiveSequence->audio_layout,
-        AV_SAMPLE_FMT_S16,
-        acodec_ctx->sample_rate,
-        0,
-        nullptr
-        );
+  {
+    AVChannelLayout in_ch_layout = {};
+    av_channel_layout_from_mask(&in_ch_layout, olive::ActiveSequence->audio_layout);
+    swr_alloc_set_opts2(
+          &swr_ctx,
+          &acodec_ctx->ch_layout,
+          acodec_ctx->sample_fmt,
+          acodec_ctx->sample_rate,
+          &in_ch_layout,
+          AV_SAMPLE_FMT_S16,
+          acodec_ctx->sample_rate,
+          0,
+          nullptr
+          );
+    av_channel_layout_uninit(&in_ch_layout);
+  }
   swr_init(swr_ctx);
 
   // initialize raw audio frame
@@ -308,10 +314,9 @@ bool ExportThread::SetupAudio() {
   }
 
   // TODO change this to support surround/mono sound in the future (this is whatever format they're held in the internal buffer)
-  audio_frame->channel_layout = AV_CH_LAYOUT_STEREO;
+  av_channel_layout_from_mask(&audio_frame->ch_layout, AV_CH_LAYOUT_STEREO);
 
   audio_frame->format = AV_SAMPLE_FMT_S16;
-  audio_frame->channels = av_get_channel_layout_nb_channels(audio_frame->channel_layout);
   av_frame_make_writable(audio_frame);
   ret = av_frame_get_buffer(audio_frame, 0);
   if (ret < 0) {
@@ -319,14 +324,13 @@ bool ExportThread::SetupAudio() {
     export_error = tr("could not allocate audio buffer (%1)").arg(QString::number(ret));
     return false;
   }
-  aframe_bytes = av_samples_get_buffer_size(nullptr, audio_frame->channels, audio_frame->nb_samples, static_cast<AVSampleFormat>(audio_frame->format), 0);
+  aframe_bytes = av_samples_get_buffer_size(nullptr, audio_frame->ch_layout.nb_channels, audio_frame->nb_samples, static_cast<AVSampleFormat>(audio_frame->format), 0);
 
   av_init_packet(&audio_pkt);
 
   // init converted audio frame
   swr_frame = av_frame_alloc();
-  swr_frame->channel_layout = acodec_ctx->channel_layout;
-  swr_frame->channels = acodec_ctx->channels;
+  av_channel_layout_copy(&swr_frame->ch_layout, &acodec_ctx->ch_layout);
   swr_frame->sample_rate = acodec_ctx->sample_rate;
   swr_frame->format = acodec_ctx->sample_fmt;
   swr_frame->nb_samples = acodec_ctx->frame_size;
@@ -612,7 +616,6 @@ void ExportThread::Cleanup()
   }
 
   if (acodec_ctx != nullptr) {
-    avcodec_close(acodec_ctx);
     avcodec_free_context(&acodec_ctx);
   }
 
@@ -625,7 +628,6 @@ void ExportThread::Cleanup()
   }
 
   if (vcodec_ctx != nullptr) {
-    avcodec_close(vcodec_ctx);
     avcodec_free_context(&vcodec_ctx);
   }
 
@@ -659,6 +661,14 @@ void ExportThread::Cleanup()
 void ExportThread::run() {
   // Ensure sequence isn't currently playing
   panel_sequence_viewer->pause();
+
+  // Set audio rendering rate BEFORE seeking, because seek() can trigger
+  // compose_audio() which opens clips and configures audio filter graphs
+  // using current_audio_freq(). Without this, the first export uses
+  // audio_rendering_rate=0, causing accelerated/pitched audio.
+  if (params_.audio_enabled) {
+    audio_rendering_rate = params_.audio_sampling_rate;
+  }
 
   // Seek to the first frame we're exporting
   panel_sequence_viewer->seek(params_.start_frame);

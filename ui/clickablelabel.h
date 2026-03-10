@@ -31,8 +31,8 @@
 class ClickableLabel : public QLabel {
 	Q_OBJECT
 public:
-	ClickableLabel(QWidget * parent = 0, Qt::WindowFlags f = 0);
-	ClickableLabel(const QString & text, QWidget * parent = 0, Qt::WindowFlags f = 0);
+	ClickableLabel(QWidget * parent = 0, Qt::WindowFlags f = Qt::Widget);
+	ClickableLabel(const QString & text, QWidget * parent = 0, Qt::WindowFlags f = Qt::Widget);
 	void mousePressEvent(QMouseEvent *ev);
 signals:
 	void clicked();

@@ -587,6 +587,7 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event) {
       int clip_index = getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track);
       if (clip_index >= 0) {
         ClipPtr clip = olive::ActiveSequence->clips.at(clip_index);
+        if (clip == nullptr) return;
         if (!(event->modifiers() & Qt::ShiftModifier)) olive::ActiveSequence->selections.clear();
         Selection s;
         s.in = clip->timeline_in();
@@ -599,7 +600,7 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event) {
       int clip_index = getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track);
       if (clip_index >= 0) {
         ClipPtr c = olive::ActiveSequence->clips.at(clip_index);
-        if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
+        if (c != nullptr && c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
           olive::Global->set_sequence(c->media()->to_sequence());
         }
       }

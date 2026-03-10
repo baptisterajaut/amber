@@ -101,13 +101,13 @@ private:
 
   AVFormatContext* fmt_ctx;
   AVStream* video_stream;
-  AVCodec* vcodec;
+  const AVCodec* vcodec;
   AVCodecContext* vcodec_ctx;
   AVFrame* video_frame;
   AVFrame* sws_frame;
   SwsContext* sws_ctx;
   AVStream* audio_stream;
-  AVCodec* acodec;
+  const AVCodec* acodec;
   AVFrame* audio_frame;
   AVFrame* swr_frame;
   AVCodecContext* acodec_ctx;
