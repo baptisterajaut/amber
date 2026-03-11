@@ -1,3 +1,6 @@
+ARG VERSION=0.1.3
+ARG REVISION=1
+
 FROM ubuntu:24.04 AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -21,26 +24,21 @@ RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && \
 # --- .deb (Ubuntu 24.04) ---
 FROM build AS deb
 
-ARG VERSION=0.1.3
-ARG REVISION=1
+ARG VERSION
+ARG REVISION
 
-RUN apt-get update && apt-get install -y dpkg-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y dpkg-dev gettext-base && rm -rf /var/lib/apt/lists/*
 
 RUN DESTDIR=/pkg make install && \
-    ARCH=$(dpkg --print-architecture) && \
+    export ARCH=$(dpkg --print-architecture) && \
     mkdir -p /pkg/DEBIAN /out && \
-    echo "Package: olive-editor" > /pkg/DEBIAN/control && \
-    echo "Version: ${VERSION}-${REVISION}" >> /pkg/DEBIAN/control && \
-    echo "Section: video" >> /pkg/DEBIAN/control && \
-    echo "Priority: optional" >> /pkg/DEBIAN/control && \
-    echo "Architecture: ${ARCH}" >> /pkg/DEBIAN/control && \
-    echo "Depends: libqt6multimedia6, libqt6openglwidgets6, libqt6svg6, libavformat60 | libavformat61, libavcodec60 | libavcodec61, libavutil58 | libavutil59, libswscale7 | libswscale8, libswresample4 | libswresample5, libavfilter9 | libavfilter10, libgl1" >> /pkg/DEBIAN/control && \
-    echo "Maintainer: Olive Team <itsmattkc@gmail.com>" >> /pkg/DEBIAN/control && \
-    echo "Description: Professional open-source non-linear video editor" >> /pkg/DEBIAN/control && \
+    envsubst < /src/packaging/linux/control.in > /pkg/DEBIAN/control && \
     dpkg-deb --build /pkg "/out/olive-editor_${VERSION}-${REVISION}_ubuntu2404_${ARCH}.deb"
 
 # --- AppImage ---
 FROM build AS appimage
+
+ARG VERSION
 
 RUN apt-get update && apt-get install -y curl file libfuse2 && rm -rf /var/lib/apt/lists/*
 
@@ -58,7 +56,7 @@ RUN curl -L -o /tmp/linuxdeploy.AppImage \
     ln -s /opt/linuxdeploy-plugin-qt/AppRun /usr/local/bin/linuxdeploy-plugin-qt
 
 RUN DESTDIR=/tmp/AppDir make install && \
-    VERSION="${VERSION:-0.1.3}" \
+    VERSION="${VERSION}" \
     linuxdeploy \
     --appdir /tmp/AppDir \
     --plugin qt \
@@ -67,3 +65,8 @@ RUN DESTDIR=/tmp/AppDir make install && \
     --icon-file /tmp/AppDir/usr/share/icons/hicolor/256x256/apps/org.olivevideoeditor.Olive.png
 
 RUN mkdir -p /out && mv /src/build/Olive*.AppImage /out/ 2>/dev/null || mv /src/build/*.AppImage /out/ 2>/dev/null || true
+
+# --- Both (.deb + AppImage) ---
+FROM scratch AS both
+COPY --from=deb /out/ /
+COPY --from=appimage /out/ /

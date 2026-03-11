@@ -1,0 +1,138 @@
+name: Build packages
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published, edited]
+
+permissions:
+  contents: write
+
+env:
+  VERSION: "0.1.3"
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build .deb + AppImage
+        run: |
+          docker build \
+            -f packaging/linux/ubuntu.dockerfile \
+            --build-arg VERSION=${{ env.VERSION }} \
+            --target both \
+            --output type=local,dest=./out \
+            .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-packages
+          path: out/
+
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build NSIS installer
+        run: |
+          docker build \
+            -f packaging/windows/cross-compile.dockerfile \
+            --build-arg VERSION=${{ env.VERSION }} \
+            --target package \
+            -t olive-win64 \
+            .
+
+      - name: Extract installer
+        run: docker run --rm olive-win64 cat /out/olive-setup.exe > olive-setup.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: olive-setup.exe
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install qt@6 ffmpeg cmake
+
+      - name: Build
+        run: |
+          export PATH="$(brew --prefix qt@6)/bin:$PATH"
+          export CMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix ffmpeg)"
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
+                ..
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Create .app bundle
+        run: |
+          cd build
+          mkdir -p Olive.app/Contents/MacOS
+          mkdir -p Olive.app/Contents/Resources
+          cp Olive Olive.app/Contents/MacOS/
+          cat > Olive.app/Contents/Info.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>Olive</string>
+            <key>CFBundleName</key>
+            <string>Olive</string>
+            <key>CFBundleIdentifier</key>
+            <string>org.olivevideoeditor.Olive</string>
+            <key>CFBundleVersion</key>
+            <string>${VERSION}</string>
+            <key>CFBundleShortVersionString</key>
+            <string>${VERSION}</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+          </dict>
+          </plist>
+          PLIST
+          $(brew --prefix qt@6)/bin/macdeployqt Olive.app
+
+      - name: Create .dmg
+        run: |
+          cd build
+          hdiutil create -volname "Olive" -srcfolder Olive.app -ov -format UDZO \
+            "Olive-${{ env.VERSION }}-arm64.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package
+          path: build/Olive-*.dmg
+
+  release:
+    needs: [ubuntu, windows, macos]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lhR
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          prerelease: ${{ github.event.release.prerelease }}
+          files: |
+            olive-editor_*.deb
+            Olive-*.AppImage
+            olive-setup.exe
+            Olive-*.dmg

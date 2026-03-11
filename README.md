@@ -31,17 +31,35 @@ make -j$(nproc)
 ## Build (Docker)
 
 ```bash
-# NSIS installer
-docker build -f packaging/windows/cross-compile.dockerfile --target package -t olive-win64 .
+# Ubuntu 24.04 .deb + AppImage
+docker buildx build -f packaging/linux/ubuntu.dockerfile --target both --output type=local,dest=./out .
 
 # Debian 12 .deb
-docker build -f packaging/linux/debian.dockerfile --target package -t olive-debian .
+docker buildx build -f packaging/linux/debian.dockerfile --target package --output type=local,dest=./out .
 
-# Ubuntu 24.04 .deb
-docker build -f packaging/linux/ubuntu.dockerfile --target deb -t olive-ubuntu-deb .
+# Windows NSIS installer (cross-compiled from Fedora)
+docker build -f packaging/windows/cross-compile.dockerfile --target package -t olive-win64 .
+docker run --rm olive-win64 cat /out/olive-setup.exe > olive-setup.exe
+```
 
-# AppImage
-docker build -f packaging/linux/ubuntu.dockerfile --target appimage -t olive-appimage .
+## Build (macOS)
+
+```bash
+brew install qt@6 ffmpeg cmake
+export PATH="$(brew --prefix qt@6)/bin:$PATH"
+export CMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix ffmpeg)"
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" ..
+make -j$(sysctl -n hw.ncpu)
+```
+
+To create an app bundle: `macdeployqt build/Olive.app`
+
+## Build (Arch Linux)
+
+```bash
+cd packaging/linux
+makepkg -si
 ```
 
 ## Packages
@@ -55,6 +73,7 @@ Pre-built packages available at [v0.1.3-nightly](https://github.com/baptisteraja
 | Debian 12 | `olive-editor_0.1.3-1_debian12_amd64.deb` |
 | Ubuntu 24.04 | `olive-editor_0.1.3-1_ubuntu2404_amd64.deb` |
 | Arch Linux | `olive-editor-0.1.3-1-x86_64.pkg.tar.zst` |
+| macOS (arm64) | `Olive-0.1.3-arm64.dmg` |
 
 Tested on Arch Linux only. Other builds are best-effort.
 
