@@ -38,6 +38,7 @@ extern "C" {
 #include <libavutil/channel_layout.h>
 }
 
+#include <atomic>
 #include <memory>
 #include <QThread>
 #include <QVector>
@@ -310,7 +311,7 @@ private:
    *
    * Deprecated. CacheAudioWorker() is functional but probably should be rewritten.
    */
-  bool reached_end;
+  std::atomic<bool> reached_end;
 
   /**
    * @brief Current Sequence playhead set by Cache()
@@ -342,7 +343,7 @@ private:
    * Used if Cache() is called and interrupts the cacher while it's already running so that the cacher will restart
    * itself automatically rather than wait for the next cache signal.
    */
-  bool queued_;
+  std::atomic<bool> queued_;
 
   /**
    * @brief Interrupt the current cache cycle
@@ -351,7 +352,7 @@ private:
    * cycle can be interrupted if it needs to abruptly start caching somewhere else. Best used in tandem with
    * queued_ to automatically start the next cache cycle.
    */
-  bool interrupt_;
+  std::atomic<bool> interrupt_;
 
   // ffmpeg media handling
   /**
@@ -470,14 +471,14 @@ private:
    * Open() sets this to **TRUE**, Close() sets this to **FALSE**. If it's false, the main loop in run() will exit and
    * the thread will exit cleanly. It's not recommended to set this variable directly, use Open() and Close() instead.
    */
-  bool caching_;
+  std::atomic<bool> caching_;
 
   /**
    * @brief Internal variable for whether the current Cacher state is valid or not
    *
    * If there was an error opening the Cacher for any reason, this will be false.
    */
-  bool is_valid_state_;
+  std::atomic<bool> is_valid_state_;
 
   /**
    * @brief Internal function for opening the file handles and decoder

@@ -114,6 +114,7 @@ void DeleteClipAction::doRedo() {
           linkClipIndex.append(i);
           linkLinkIndex.append(j);
           c->linked.removeAt(j);
+          j--;
         }
       }
     }

@@ -35,8 +35,11 @@ RippleAction::RippleAction(Sequence *is, long ipoint, long ilength, const QVecto
 }
 
 void RippleAction::doUndo() {
-  ca->undo();
-  delete ca;
+  if (ca != nullptr) {
+    ca->undo();
+    delete ca;
+    ca = nullptr;
+  }
 }
 
 void RippleAction::doRedo() {
@@ -179,7 +182,7 @@ void AddMarkerAction::doUndo() {
   if (index == -1) {
     active_array->removeLast();
   } else {
-    active_array[0][index].name = old_name;
+    (*active_array)[index].name = old_name;
   }
 }
 
@@ -200,7 +203,7 @@ void AddMarkerAction::doRedo() {
     active_array->append(m);
   } else {
     old_name = active_array->at(index).name;
-    active_array[0][index].name = name;
+    (*active_array)[index].name = name;
   }
 }
 

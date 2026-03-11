@@ -21,6 +21,7 @@
 #ifndef EXPORTTHREAD_H
 #define EXPORTTHREAD_H
 
+#include <atomic>
 #include <QThread>
 #include <QOffscreenSurface>
 #include <QMutex>
@@ -93,7 +94,7 @@ private:
   void Cleanup();
 
   QOffscreenSurface surface;
-  bool interrupt_;
+  std::atomic<bool> interrupt_;
 
   // params imported from dialogs
   ExportParams params_;

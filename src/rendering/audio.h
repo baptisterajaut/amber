@@ -21,6 +21,7 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
+#include <atomic>
 #include <QVector>
 #include <QThread>
 #include <QWaitCondition>
@@ -59,7 +60,7 @@ extern qint8 audio_ibuffer[audio_ibuffer_size];
 extern qint64 audio_ibuffer_read;
 extern long audio_ibuffer_frame;
 extern double audio_ibuffer_timecode;
-extern bool audio_scrub;
+extern std::atomic<bool> audio_scrub;
 extern bool recording;
 extern bool audio_rendering;
 extern int audio_rendering_rate;

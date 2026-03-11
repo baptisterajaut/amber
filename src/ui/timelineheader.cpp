@@ -249,7 +249,7 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
 
         // move markers
         for (int i=0;i<selected_markers.size();i++) {
-          viewer->marker_ref[0][selected_markers.at(i)].frame = selected_marker_original_times.at(i) + frame_movement;
+          (*viewer->marker_ref)[selected_markers.at(i)].frame = selected_marker_original_times.at(i) + frame_movement;
         }
 
         update_parents();
@@ -288,7 +288,7 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
       bool moved = false;
       ComboAction* ca = new ComboAction();
       for (int i=0;i<selected_markers.size();i++) {
-        Marker* m = &viewer->marker_ref[0][selected_markers.at(i)];
+        Marker* m = &(*viewer->marker_ref)[selected_markers.at(i)];
         if (selected_marker_original_times.at(i) != m->frame) {
           ca->append(new MoveMarkerAction(m, selected_marker_original_times.at(i), m->frame));
           moved = true;

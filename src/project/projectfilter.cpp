@@ -35,13 +35,25 @@ bool ProjectFilter::get_show_sequences() {
 }
 
 void ProjectFilter::set_show_sequences(bool b) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+  beginFilterChange();
   show_sequences = b;
-    invalidateFilter();
+  endFilterChange();
+#else
+  show_sequences = b;
+  invalidateFilter();
+#endif
 }
 
 void ProjectFilter::update_search_filter(const QString &s) {
-    search_filter = s;
-    invalidateFilter();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+  beginFilterChange();
+  search_filter = s;
+  endFilterChange();
+#else
+  search_filter = s;
+  invalidateFilter();
+#endif
 }
 
 bool ProjectFilter::filterAcceptsRow(int source_row, const QModelIndex &source_parent) const {

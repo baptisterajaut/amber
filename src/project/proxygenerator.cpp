@@ -55,17 +55,36 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
 
   // open input file
   AVFormatContext* input_fmt_ctx = nullptr;
-  avformat_open_input(&input_fmt_ctx, footage->url.toUtf8(), nullptr, &format_opts);
+  if (avformat_open_input(&input_fmt_ctx, footage->url.toUtf8(), nullptr, &format_opts) < 0) {
+    qCritical() << "Proxy: could not open input" << footage->url;
+    return;
+  }
 
   // open output file
   AVFormatContext* output_fmt_ctx = nullptr;
   avformat_alloc_output_context2(&output_fmt_ctx, nullptr, nullptr, info.path.toUtf8());
+  if (output_fmt_ctx == nullptr) {
+    qCritical() << "Proxy: could not allocate output context";
+    avformat_close_input(&input_fmt_ctx);
+    return;
+  }
 
   // open output file writing handle
-  avio_open(&output_fmt_ctx->pb, info.path.toUtf8(), AVIO_FLAG_WRITE);
+  if (avio_open(&output_fmt_ctx->pb, info.path.toUtf8(), AVIO_FLAG_WRITE) < 0) {
+    qCritical() << "Proxy: could not open output" << info.path;
+    avformat_close_input(&input_fmt_ctx);
+    avformat_free_context(output_fmt_ctx);
+    return;
+  }
 
   // get stream info from input file
-  avformat_find_stream_info(input_fmt_ctx, nullptr);
+  if (avformat_find_stream_info(input_fmt_ctx, nullptr) < 0) {
+    qCritical() << "Proxy: could not find stream info" << footage->url;
+    avio_closep(&output_fmt_ctx->pb);
+    avformat_close_input(&input_fmt_ctx);
+    avformat_free_context(output_fmt_ctx);
+    return;
+  }
 
   // create array of input decoders
   QVector<AVCodecContext*> input_streams;
@@ -101,12 +120,20 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
 
       // allocate decoding context for this stream
       AVCodecContext* dec_ctx = avcodec_alloc_context3(dec_codec);
+      if (dec_ctx == nullptr) {
+        qCritical() << "Proxy: could not allocate decoder context";
+        continue;
+      }
 
       // copy parameters from stream to decoding context
       avcodec_parameters_to_context(dec_ctx, in_stream->codecpar);
 
       // open decoder
-      avcodec_open2(dec_ctx, dec_codec, nullptr);
+      if (avcodec_open2(dec_ctx, dec_codec, nullptr) < 0) {
+        qCritical() << "Proxy: could not open decoder";
+        avcodec_free_context(&dec_ctx);
+        continue;
+      }
 
       // store decoding context in array
       input_streams[i] = dec_ctx;
@@ -116,6 +143,11 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
 
       // allocate encoding context for this stream
       AVCodecContext* enc_ctx = avcodec_alloc_context3(enc_codec);
+      if (enc_ctx == nullptr) {
+        qCritical() << "Proxy: could not allocate encoder context";
+        avcodec_free_context(&dec_ctx);
+        continue;
+      }
 
       // copy properties from decoding context to encoding context
       enc_ctx->codec_id = temp_enc_codec;
@@ -146,7 +178,14 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
       av_dict_set(&opts, "threads", "auto", 0);
 
       // open encoder
-      avcodec_open2(enc_ctx, enc_codec, &opts);
+      if (avcodec_open2(enc_ctx, enc_codec, &opts) < 0) {
+        qCritical() << "Proxy: could not open encoder";
+        av_dict_free(&opts);
+        avcodec_free_context(&enc_ctx);
+        avcodec_free_context(&dec_ctx);
+        input_streams[i] = nullptr;
+        continue;
+      }
 
       // copy parameters from encoding context to stream
       avcodec_parameters_from_context(out_stream->codecpar, enc_ctx);

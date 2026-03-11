@@ -177,15 +177,16 @@ bool PreviewGenerator::retrieve_preview(const QString& hash) {
     QFile f(waveform_path);
     if (f.exists()) {
       //dout << "loaded wave" << ms->file_index << "from" << waveform_path;
-      f.open(QFile::ReadOnly);
-      QByteArray data = f.readAll();
-      ms.audio_preview.resize(data.size());
-      for (int j=0;j<data.size();j++) {
-        // faster way?
-        ms.audio_preview[j] = data.at(j);
+      if (f.open(QFile::ReadOnly)) {
+        QByteArray data = f.readAll();
+        ms.audio_preview.resize(data.size());
+        for (int j=0;j<data.size();j++) {
+          // faster way?
+          ms.audio_preview[j] = data.at(j);
+        }
+        ms.preview_done = true;
+        f.close();
       }
-      ms.preview_done = true;
-      f.close();
     } else {
       found = false;
       break;
@@ -603,9 +604,10 @@ void PreviewGenerator::run() {
             for (int i=0;i<footage_->audio_tracks.size();i++) {
               FootageStream& ms = footage_->audio_tracks[i];
               QFile f(get_waveform_path(hash, ms));
-              f.open(QFile::WriteOnly);
-              f.write(ms.audio_preview.constData(), ms.audio_preview.size());
-              f.close();
+              if (f.open(QFile::WriteOnly)) {
+                f.write(ms.audio_preview.constData(), ms.audio_preview.size());
+                f.close();
+              }
               //dout << "saved" << ms->file_index << "waveform to" << get_waveform_path(hash, ms);
             }
           }

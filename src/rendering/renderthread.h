@@ -21,6 +21,7 @@
 #ifndef RENDERTHREAD_H
 #define RENDERTHREAD_H
 
+#include <atomic>
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
@@ -82,7 +83,7 @@ private:
   FramebufferObject front_buffer_2;
   QMutex front_mutex2;
 
-  bool front_buffer_switcher;
+  std::atomic<bool> front_buffer_switcher;
 
   QWaitCondition wait_cond_;
   QMutex wait_lock_;

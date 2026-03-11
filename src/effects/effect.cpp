@@ -350,6 +350,10 @@ Effect::~Effect() {
       }
     }
   }
+
+  for (int i = 0; i < gizmo_dragging_actions_.size(); i++) {
+    delete gizmo_dragging_actions_.at(i);
+  }
 }
 
 void Effect::AddRow(EffectRow *row)

@@ -33,7 +33,7 @@ private:
   long point;
   long length;
   QVector<int> ignore;
-  ComboAction* ca;
+  ComboAction* ca = nullptr;
 };
 
 class ChangeSequenceAction : public OliveAction {

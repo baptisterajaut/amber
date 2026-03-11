@@ -6,6 +6,9 @@ ComboAction::~ComboAction() {
     for (int i=0;i<commands.size();i++) {
         delete commands.at(i);
     }
+    for (int i=0;i<post_commands.size();i++) {
+        delete post_commands.at(i);
+    }
 }
 
 void ComboAction::undo() {

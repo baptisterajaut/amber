@@ -31,7 +31,6 @@
 #include <QOpenGLFramebufferObject>
 #include <QtMath>
 #include <QAudioSink>
-#include <QStatusBar>
 #include <math.h>
 
 #include "project/projectelements.h"
@@ -134,7 +133,6 @@ void Cacher::OpenWorker() {
       char err[1024];
       av_strerror(errCode, err, 1024);
       qCritical() << "Could not open" << filename << "-" << err;
-      olive::MainWindow->statusBar()->showMessage(tr("Could not open %1 - %2").arg(filename, err));
       return;
     }
 
@@ -143,7 +141,6 @@ void Cacher::OpenWorker() {
       char err[1024];
       av_strerror(errCode, err, 1024);
       qCritical() << "Could not open" << filename << "-" << err;
-      olive::MainWindow->statusBar()->showMessage(tr("Could not open %1 - %2").arg(filename, err));
       return;
     }
 
@@ -152,6 +149,10 @@ void Cacher::OpenWorker() {
     stream = formatCtx->streams[ms->file_index];
     codec = avcodec_find_decoder(stream->codecpar->codec_id);
     codecCtx = avcodec_alloc_context3(codec);
+    if (codecCtx == nullptr) {
+      qCritical() << "Could not allocate codec context";
+      return;
+    }
     avcodec_parameters_to_context(codecCtx, stream->codecpar);
 
     opts = nullptr;
@@ -482,10 +483,15 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   }
 
   if (clip->media_stream() != nullptr
-      && queue_.size() > 0
       && clip->media_stream()->infinite_length) {
-    retrieved_frame = queue_.at(0);
-    return;
+    queue_.lock();
+    if (queue_.size() > 0) {
+      retrieved_frame = queue_.at(0);
+    }
+    queue_.unlock();
+    if (retrieved_frame != nullptr) {
+      return;
+    }
   }
 
   playhead_ = playhead;
@@ -554,15 +560,14 @@ AVFrame *Cacher::Retrieve()
 
   // check if there's a frame ready to be shown by the cacher
 
-  if (retrieved_frame == nullptr) {
-    // wait for cacher to finish caching
-
+  while (retrieved_frame == nullptr) {
 
     if (clip->cache_lock.tryLock()) {
 
       // If the queue could lock, the cacher isn't running which means no frame is coming. This is an error.
       qCritical() << "Cacher frame was null while the cacher wasn't running on clip" << clip->name();
       clip->cache_lock.unlock();
+      break;
 
     } else {
 

@@ -49,7 +49,7 @@ extern "C" {
 QAudioSink* audio_output;
 QIODevice* audio_io_device;
 bool audio_device_set = false;
-bool audio_scrub = false;
+std::atomic<bool> audio_scrub{false};
 QMutex audio_write_lock;
 QAudioSource* audio_input = nullptr;
 QTimer* audio_notify_timer = nullptr;
