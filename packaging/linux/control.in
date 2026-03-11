@@ -4,5 +4,5 @@ Section: video
 Priority: optional
 Architecture: ${ARCH}
 Depends: libqt6multimedia6, libqt6openglwidgets6, libqt6svg6, libavformat59 | libavformat60 | libavformat61, libavcodec59 | libavcodec60 | libavcodec61, libavutil57 | libavutil58 | libavutil59, libswscale6 | libswscale7 | libswscale8, libswresample4 | libswresample5, libavfilter8 | libavfilter9 | libavfilter10, libgl1
-Maintainer: Olive Team <itsmattkc@gmail.com>
+Maintainer: Baptiste Rajaut <https://github.com/baptisterajaut>
 Description: Professional open-source non-linear video editor

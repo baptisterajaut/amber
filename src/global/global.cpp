@@ -44,7 +44,6 @@
 #include "timeline/sequence.h"
 #include "ui/mediaiconservice.h"
 #include "ui/mainwindow.h"
-#include "ui/updatenotification.h"
 #include "undo/undostack.h"
 
 std::unique_ptr<OliveGlobal> olive::Global;
@@ -333,8 +332,6 @@ void OliveGlobal::finished_initialize() {
 #endif
   }
 
-  // Check for updates
-  olive::update_notifier.check();
 }
 
 void OliveGlobal::save_autorecovery_file() {

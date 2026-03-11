@@ -3,7 +3,7 @@ pkgver=1.0
 pkgrel=1
 pkgdesc='Professional open-source non-linear video editor'
 arch=('x86_64')
-url='https://github.com/baptisterajaut/olive'
+url='https://github.com/baptisterajaut/amber'
 license=('GPL3')
 depends=(
   'qt6-base'

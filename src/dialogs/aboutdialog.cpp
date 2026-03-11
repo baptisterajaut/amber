@@ -40,14 +40,19 @@ AboutDialog::AboutDialog(QWidget *parent) :
 
   // Logo (rendered from SVG at screen-appropriate size)
   QLabel* logo = new QLabel(this);
-  int logo_size = qMin(QGuiApplication::primaryScreen()->availableSize().width(),
-                        QGuiApplication::primaryScreen()->availableSize().height()) / 6;
-  if (logo_size < 128) logo_size = 128;
+  int logo_size = 128;
+  qreal dpr = 1.0;
+  if (QScreen* screen = QGuiApplication::primaryScreen()) {
+    logo_size = qMin(screen->availableSize().width(), screen->availableSize().height()) / 6;
+    if (logo_size < 128) logo_size = 128;
+    dpr = screen->devicePixelRatio();
+  }
   QSvgRenderer renderer(QStringLiteral(":/icons/amber-logo.svg"));
-  QPixmap pix(logo_size, logo_size);
+  QPixmap pix(logo_size * dpr, logo_size * dpr);
+  pix.setDevicePixelRatio(dpr);
   pix.fill(Qt::transparent);
   QPainter painter(&pix);
-  renderer.render(&painter);
+  renderer.render(&painter, QRectF(0, 0, logo_size, logo_size));
   logo->setPixmap(pix);
   logo->setAlignment(Qt::AlignCenter);
   layout->addWidget(logo);

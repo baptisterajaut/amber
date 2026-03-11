@@ -332,8 +332,6 @@ set(OLIVE_SOURCES
   ui/timelinetools.h
   ui/timelinewidget.cpp
   ui/timelinewidget.h
-  ui/updatenotification.cpp
-  ui/updatenotification.h
   ui/viewercontainer.cpp
   ui/viewercontainer.h
   ui/viewerwidget.cpp
@@ -439,7 +437,7 @@ qt_add_translation(OLIVE_QM_FILES
 
 set(OLIVE_TARGET "amber-editor")
 if(APPLE)
-  set(OLIVE_TARGET "Olive")
+  set(OLIVE_TARGET "Amber")
 endif()
 
 add_executable(${OLIVE_TARGET}
@@ -476,7 +474,7 @@ if(WIN32 AND OPENCOLORIO_FOUND)
 endif()
 
 if(DOXYGEN_FOUND AND BUILD_DOXYGEN)
-  set(DOXYGEN_PROJECT_NAME "Olive")
+  set(DOXYGEN_PROJECT_NAME "Amber")
   set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/docs")
   set(DOXYGEN_EXTRACT_ALL "YES")
   set(DOXYGEN_EXTRACT_PRIVATE "YES")
@@ -488,7 +486,7 @@ if(UNIX AND NOT APPLE)
   install(FILES ${OLIVE_EFFECTS} DESTINATION share/amber-editor/effects)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.desktop DESTINATION share/applications)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.appdata.xml DESTINATION share/metainfo)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.olivevideoeditor.Olive.xml DESTINATION share/mime/packages)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.xml DESTINATION share/mime/packages)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/16x16/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/16x16/apps)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/32x32/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/32x32/apps)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/48x48/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/48x48/apps)

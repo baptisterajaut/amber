@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <mime-info xmlns='http://www.freedesktop.org/standards/shared-mime-info'>
   <mime-type type="application/vnd.olive-project">
-    <comment>Olive project</comment>
+    <comment>Amber project</comment>
     <glob pattern="*.ove"/>
   </mime-type>
 </mime-info>

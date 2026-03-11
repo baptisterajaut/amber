@@ -65,10 +65,10 @@ RUN DESTDIR=/tmp/AppDir make install && \
     --appdir /tmp/AppDir \
     --plugin qt \
     --output appimage \
-    --desktop-file /tmp/AppDir/usr/share/applications/org.olivevideoeditor.Olive.desktop \
-    --icon-file /tmp/AppDir/usr/share/icons/hicolor/256x256/apps/org.olivevideoeditor.Olive.png
+    --desktop-file /tmp/AppDir/usr/share/applications/org.ambervideoeditor.Amber.desktop \
+    --icon-file /tmp/AppDir/usr/share/icons/hicolor/256x256/apps/org.ambervideoeditor.Amber.png
 
-RUN mkdir -p /out && mv /src/build/Olive*.AppImage /out/ 2>/dev/null || mv /src/build/*.AppImage /out/ 2>/dev/null || true
+RUN mkdir -p /out && mv /src/build/Amber*.AppImage /out/ 2>/dev/null || mv /src/build/*.AppImage /out/ 2>/dev/null || true
 
 # --- Both (.deb + AppImage) ---
 FROM scratch AS both

@@ -40,14 +40,19 @@ DemoNotice::DemoNotice(QWidget *parent) :
   layout->setSpacing(20);
 
   QLabel* icon = new QLabel(this);
-  int logo_size = qMin(QGuiApplication::primaryScreen()->availableSize().width(),
-                        QGuiApplication::primaryScreen()->availableSize().height()) / 6;
-  if (logo_size < 128) logo_size = 128;
+  int logo_size = 128;
+  qreal dpr = 1.0;
+  if (QScreen* screen = QGuiApplication::primaryScreen()) {
+    logo_size = qMin(screen->availableSize().width(), screen->availableSize().height()) / 6;
+    if (logo_size < 128) logo_size = 128;
+    dpr = screen->devicePixelRatio();
+  }
   QSvgRenderer renderer(QStringLiteral(":/icons/amber-logo.svg"));
-  QPixmap pix(logo_size, logo_size);
+  QPixmap pix(logo_size * dpr, logo_size * dpr);
+  pix.setDevicePixelRatio(dpr);
   pix.fill(Qt::transparent);
   QPainter painter(&pix);
-  renderer.render(&painter);
+  renderer.render(&painter, QRectF(0, 0, logo_size, logo_size));
   icon->setPixmap(pix);
   icon->setAlignment(Qt::AlignCenter);
   layout->addWidget(icon);
@@ -63,7 +68,7 @@ DemoNotice::DemoNotice(QWidget *parent) :
                                  "In my experience it works quite well, plus I squashed a lot of bugs already. "
                                  "Please report any issue on GitHub if you encounter one: %1").arg("<a href=\"https://github.com/baptisterajaut/amber\"><span style=\" text-decoration: underline; color:#007af4;\">github.com/baptisterajaut/amber</span></a>")
                             + "</p><p>"
-                            + tr("Olive is free open-source software released under the GNU GPL.")
+                            + tr("Amber is free open-source software released under the GNU GPL.")
                             + "</p></body></html>", this);
   text->setWordWrap(true);
   layout->addWidget(text);
