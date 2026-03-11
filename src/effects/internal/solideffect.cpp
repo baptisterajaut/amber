@@ -61,7 +61,7 @@ SolidEffect::SolidEffect(Clip* c, const EffectMeta* em) :
   checkerboard_size_field->SetMinimum(1);
   checkerboard_size_field->SetDefault(10);
 
-  connect(solid_type, SIGNAL(DataChanged(const QVariant&)), this, SLOT(ui_update(const QVariant&)));
+  connect(solid_type, &ComboField::DataChanged, this, &SolidEffect::ui_update);
 
   // Set default UI
   solid_type->SetValueAt(0, SOLID_TYPE_COLOR);

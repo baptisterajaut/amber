@@ -25,8 +25,8 @@
 
 #include <effects/transition.h>
 
-#define CLIPBOARD_TYPE_CLIP 0
-#define CLIPBOARD_TYPE_EFFECT 1
+constexpr int CLIPBOARD_TYPE_CLIP = 0;
+constexpr int CLIPBOARD_TYPE_EFFECT = 1;
 
 using VoidPtr = std::shared_ptr<void>;
 

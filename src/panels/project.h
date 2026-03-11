@@ -124,10 +124,12 @@ private:
   SourcesCommon sources_common;
 private slots:
   void update_view_type();
+  void clear_recent_projects();
+
+public slots:
   void set_icon_view();
   void set_list_view();
   void set_tree_view();
-  void clear_recent_projects();
   void set_icon_view_size(int);
   void set_up_dir_enabled();
   void go_up_dir();

@@ -84,5 +84,5 @@ AboutDialog::AboutDialog(QWidget *parent) :
   buttons->setCenterButtons(true);
   layout->addWidget(buttons);
 
-  connect(buttons, SIGNAL(accepted()), this, SLOT(accept()));
+  connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
 }

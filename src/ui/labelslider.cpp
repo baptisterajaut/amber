@@ -51,7 +51,7 @@ LabelSlider::LabelSlider(QWidget* parent) : QLabel(parent) {
   SetDefault(0);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(this, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(ShowContextMenu(const QPoint&)));
+  connect(this, &LabelSlider::customContextMenuRequested, this, &LabelSlider::ShowContextMenu);
 }
 
 void LabelSlider::SetFrameRate(double d) {
@@ -268,11 +268,11 @@ void LabelSlider::ShowContextMenu(const QPoint &pos)
 {
   Menu menu(this);
 
-  menu.addAction(tr("&Edit"), this, SLOT(ShowDialog()));
+  menu.addAction(tr("&Edit"), this, &LabelSlider::ShowDialog);
 
   menu.addSeparator();
 
-  menu.addAction(tr("&Reset to Default"), this, SLOT(ResetToDefault()));
+  menu.addAction(tr("&Reset to Default"), this, &LabelSlider::ResetToDefault);
 
   menu.exec(mapToGlobal(pos));
 }

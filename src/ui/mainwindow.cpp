@@ -1204,7 +1204,7 @@ void MainWindow::fileMenu_About_To_Be_Shown() {
       QAction* action = open_recent->addAction(recent_projects.at(i));
       action->setProperty("keyignore", true);
       action->setData(i);
-      connect(action, SIGNAL(triggered()), &olive::MenuHelper, SLOT(open_recent_from_menu()));
+      connect(action, &QAction::triggered, &olive::MenuHelper, &MenuHelper::open_recent_from_menu);
     }
     open_recent->addSeparator();
 

@@ -48,19 +48,19 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
     italic_button = new QPushButton();
     italic_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/italic.svg", false));
     italic_button->setCheckable(true);
-    connect(italic_button, SIGNAL(clicked(bool)), textEdit, SLOT(setFontItalic(bool)));
+    connect(italic_button, &QPushButton::clicked, textEdit, &QTextEdit::setFontItalic);
     toolbar->addWidget(italic_button);
 
     // Underline Button
     underline_button = new QPushButton();
     underline_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/underline.svg", false));
     underline_button->setCheckable(true);
-    connect(underline_button, SIGNAL(clicked(bool)), textEdit, SLOT(setFontUnderline(bool)));
+    connect(underline_button, &QPushButton::clicked, textEdit, &QTextEdit::setFontUnderline);
     toolbar->addWidget(underline_button);
 
     // Font Name
     font_list = new QFontComboBox();
-    connect(font_list, SIGNAL(currentTextChanged(const QString&)), textEdit, SLOT(setFontFamily(const QString&)));
+    connect(font_list, &QFontComboBox::currentTextChanged, textEdit, &QTextEdit::setFontFamily);
     toolbar->addWidget(font_list);
 
     // Font Weight
@@ -74,17 +74,17 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
     font_weight->addItem(tr("Bold"), QFont::Bold);
     font_weight->addItem(tr("Extra Bold"), QFont::ExtraBold);
     font_weight->addItem(tr("Black"), QFont::Black);
-    connect(font_weight, SIGNAL(currentIndexChanged(int)), this, SLOT(SetFontWeight(int)));
+    connect(font_weight, qOverload<int>(&QComboBox::currentIndexChanged), this, &TextEditDialog::SetFontWeight);
     toolbar->addWidget(font_weight);
 
     // Font Size
     font_size = new LabelSlider();
-    connect(font_size, SIGNAL(valueChanged(double)), textEdit, SLOT(setFontPointSize(qreal)));
+    connect(font_size, &LabelSlider::valueChanged, textEdit, &QTextEdit::setFontPointSize);
     toolbar->addWidget(font_size);
 
     // Font Color
     font_color = new ColorButton();
-    connect(font_color, SIGNAL(color_changed(const QColor&)), textEdit, SLOT(setTextColor(const QColor &)));
+    connect(font_color, &ColorButton::color_changed, textEdit, &QTextEdit::setTextColor);
     toolbar->addWidget(font_color);
 
     toolbar->addStretch();
@@ -94,7 +94,7 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
     left_align_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/align-left.svg", false));
     left_align_button->setCheckable(true);
     left_align_button->setProperty("a", Qt::AlignLeft);
-    connect(left_align_button, SIGNAL(clicked(bool)), this, SLOT(SetAlignmentFromProperty()));
+    connect(left_align_button, &QPushButton::clicked, this, &TextEditDialog::SetAlignmentFromProperty);
     toolbar->addWidget(left_align_button);
 
     // Center Align
@@ -102,7 +102,7 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
     center_align_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/align-center.svg", false));
     center_align_button->setCheckable(true);
     center_align_button->setProperty("a", Qt::AlignCenter);
-    connect(center_align_button, SIGNAL(clicked(bool)), this, SLOT(SetAlignmentFromProperty()));
+    connect(center_align_button, &QPushButton::clicked, this, &TextEditDialog::SetAlignmentFromProperty);
     toolbar->addWidget(center_align_button);
 
     // Right Align
@@ -110,7 +110,7 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
     right_align_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/align-right.svg", false));
     right_align_button->setCheckable(true);
     right_align_button->setProperty("a", Qt::AlignRight);
-    connect(right_align_button, SIGNAL(clicked(bool)), this, SLOT(SetAlignmentFromProperty()));
+    connect(right_align_button, &QPushButton::clicked, this, &TextEditDialog::SetAlignmentFromProperty);
     toolbar->addWidget(right_align_button);
 
     // Justify Align
@@ -118,7 +118,7 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
     justify_align_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/justify-center.svg", false));
     justify_align_button->setCheckable(true);
     justify_align_button->setProperty("a", Qt::AlignJustify);
-    connect(justify_align_button, SIGNAL(clicked(bool)), this, SLOT(SetAlignmentFromProperty()));
+    connect(justify_align_button, &QPushButton::clicked, this, &TextEditDialog::SetAlignmentFromProperty);
     toolbar->addWidget(justify_align_button);
 
     layout->addLayout(toolbar);
@@ -147,12 +147,12 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
   QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
   buttons->setCenterButtons(true);
   layout->addWidget(buttons);
-  connect(buttons, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(buttons, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(buttons, &QDialogButtonBox::accepted, this, &TextEditDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
   // Connect the cursor position changing to the rich text toolbar buttons updating (so for example, when italic text
   // is selected, the italic button will be pressed)
-  connect(textEdit, SIGNAL(cursorPositionChanged()), this, SLOT(UpdateUIFromTextCursor()));
+  connect(textEdit, &QTextEdit::cursorPositionChanged, this, &TextEditDialog::UpdateUIFromTextCursor);
 
   // Set the widget's text based on the rich text mode
   if (rich_text_) {

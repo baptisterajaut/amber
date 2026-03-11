@@ -35,7 +35,7 @@ EmbeddedFileChooser::EmbeddedFileChooser(QWidget* parent) : QWidget(parent) {
   QPushButton* browse_button = new QPushButton("...", this);
   browse_button->setFixedWidth(25);
   layout->addWidget(browse_button);
-  connect(browse_button, SIGNAL(clicked(bool)), this, SLOT(browse()));
+  connect(browse_button, &QPushButton::clicked, this, &EmbeddedFileChooser::browse);
 }
 
 const QString &EmbeddedFileChooser::getFilename() {

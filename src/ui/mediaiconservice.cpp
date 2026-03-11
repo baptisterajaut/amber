@@ -31,7 +31,7 @@ std::unique_ptr<MediaIconService> olive::media_icon_service;
 MediaIconService::MediaIconService() {
   // set up animation timer
   throbber_animator_.setInterval(20);
-  connect(&throbber_animator_, SIGNAL(timeout()), this, SLOT(AnimationUpdate()));
+  connect(&throbber_animator_, &QTimer::timeout, this, &MediaIconService::AnimationUpdate);
 
   // set up pixmap
   throbber_pixmap_ = QPixmap(":/icons/throbber.png");

@@ -23,7 +23,7 @@ QWidget *LabelField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(this, SIGNAL(EnabledChanged(bool)), label, SLOT(setEnabled(bool)));
+  connect(this, &EffectField::EnabledChanged, label, &QWidget::setEnabled);
 
   return label;
 }

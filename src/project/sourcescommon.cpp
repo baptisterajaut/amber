@@ -53,7 +53,7 @@ SourcesCommon::SourcesCommon(Project* parent, ProjectFilter &sort_filter) :
   sort_filter_(sort_filter)
 {
   rename_timer.setInterval(1000);
-  connect(&rename_timer, SIGNAL(timeout()), this, SLOT(rename_interval()));
+  connect(&rename_timer, &QTimer::timeout, this, &SourcesCommon::rename_interval);
 }
 
 void SourcesCommon::create_seq_from_selected() {
@@ -81,7 +81,7 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
   selected_items = items;
 
   QAction* import_action = menu.addAction(tr("Import..."));
-  QObject::connect(import_action, SIGNAL(triggered(bool)), project_parent, SLOT(import_dialog()));
+  QObject::connect(import_action, &QAction::triggered, project_parent, &Project::import_dialog);
 
   Menu* new_menu = new Menu(tr("New"));
   menu.addMenu(new_menu);
@@ -91,20 +91,20 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
   menu.addMenu(view_menu);
 
   QAction* tree_view_action = view_menu->addAction(tr("Tree View"));
-  connect(tree_view_action, SIGNAL(triggered(bool)), project_parent, SLOT(set_tree_view()));
+  connect(tree_view_action, &QAction::triggered, project_parent, &Project::set_tree_view);
 
   QAction* icon_view_action = view_menu->addAction(tr("Icon View"));
-  connect(icon_view_action, SIGNAL(triggered(bool)), project_parent, SLOT(set_icon_view()));
+  connect(icon_view_action, &QAction::triggered, project_parent, &Project::set_icon_view);
 
   QAction* toolbar_action = view_menu->addAction(tr("Show Toolbar"));
   toolbar_action->setCheckable(true);
   toolbar_action->setChecked(project_parent->IsToolbarVisible());
-  connect(toolbar_action, SIGNAL(triggered(bool)), project_parent, SLOT(SetToolbarVisible(bool)));
+  connect(toolbar_action, &QAction::triggered, project_parent, &Project::SetToolbarVisible);
 
   QAction* show_sequences = view_menu->addAction(tr("Show Sequences"));
   show_sequences->setCheckable(true);
   show_sequences->setChecked(sort_filter_.get_show_sequences());
-  connect(show_sequences, SIGNAL(triggered(bool)), &sort_filter_, SLOT(set_show_sequences(bool)));
+  connect(show_sequences, &QAction::triggered, &sort_filter_, &ProjectFilter::set_show_sequences);
 
   if (items.size() > 0) {
     if (items.size() == 1) {
@@ -114,7 +114,7 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
       int type = first_media->get_type();
       if (type == MEDIA_TYPE_FOOTAGE) {
         QAction* replace_action = menu.addAction(tr("Replace/Relink Media"));
-        QObject::connect(replace_action, SIGNAL(triggered(bool)), project_parent, SLOT(replace_selected_file()));
+        QObject::connect(replace_action, &QAction::triggered, project_parent, &Project::replace_selected_file);
 
 #if defined(Q_OS_WIN)
         QAction* reveal_in_explorer = menu.addAction(tr("Reveal in Explorer"));
@@ -123,11 +123,11 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
 #else
         QAction* reveal_in_explorer = menu.addAction(tr("Reveal in File Manager"));
 #endif
-        QObject::connect(reveal_in_explorer, SIGNAL(triggered(bool)), this, SLOT(reveal_in_browser()));
+        QObject::connect(reveal_in_explorer, &QAction::triggered, this, &SourcesCommon::reveal_in_browser);
       }
       if (type != MEDIA_TYPE_FOLDER) {
         QAction* replace_clip_media = menu.addAction(tr("Replace Clips Using This Media"));
-        QObject::connect(replace_clip_media, SIGNAL(triggered(bool)), project_parent, SLOT(replace_clip_media()));
+        QObject::connect(replace_clip_media, &QAction::triggered, project_parent, &Project::replace_clip_media);
       }
     }
 
@@ -150,19 +150,19 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
 
     // create sequence from
     QAction* create_seq_from = menu.addAction(tr("Create Sequence With This Media"));
-    QObject::connect(create_seq_from, SIGNAL(triggered(bool)), this, SLOT(create_seq_from_selected()));
+    QObject::connect(create_seq_from, &QAction::triggered, this, &SourcesCommon::create_seq_from_selected);
 
     // ONLY sequences are selected
     if (all_sequences) {
       // ONLY sequences are selected
       QAction* duplicate_action = menu.addAction(tr("Duplicate"));
-      QObject::connect(duplicate_action, SIGNAL(triggered(bool)), project_parent, SLOT(duplicate_selected()));
+      QObject::connect(duplicate_action, &QAction::triggered, project_parent, &Project::duplicate_selected);
     }
 
     // ONLY footage is selected
     if (all_footage) {
       QAction* delete_footage_from_sequences = menu.addAction(tr("Delete All Clips Using This Media"));
-      QObject::connect(delete_footage_from_sequences, SIGNAL(triggered(bool)), project_parent, SLOT(delete_clips_using_selected_media()));
+      QObject::connect(delete_footage_from_sequences, &QAction::triggered, project_parent, &Project::delete_clips_using_selected_media);
 
       Menu* proxies = new Menu(tr("Proxy"));
       menu.addMenu(proxies);
@@ -201,7 +201,7 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
             create_proxy_text = tr("Create Proxy");
           }
 
-          proxies->addAction(create_proxy_text, this, SLOT(open_create_proxy_dialog()));
+          proxies->addAction(create_proxy_text, this, &SourcesCommon::open_create_proxy_dialog);
         }
 
         // if footage was selected WITH proxies
@@ -209,17 +209,17 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
 
           if (!footage_without_proxies_exists) {
             // if all the footage has proxies, we didn't make a "Create/Modify" above, so we create one here (but only "modify")
-            proxies->addAction(tr("Modify Proxy"), this, SLOT(open_create_proxy_dialog()));
+            proxies->addAction(tr("Modify Proxy"), this, &SourcesCommon::open_create_proxy_dialog);
           }
 
-          proxies->addAction(tr("Restore Original"), this, SLOT(clear_proxies_from_selected()));
+          proxies->addAction(tr("Restore Original"), this, &SourcesCommon::clear_proxies_from_selected);
         }
       }
     }
 
     // delete media
     QAction* delete_action = menu.addAction(tr("Delete"));
-    QObject::connect(delete_action, SIGNAL(triggered(bool)), project_parent, SLOT(delete_selected_media()));
+    QObject::connect(delete_action, &QAction::triggered, project_parent, &Project::delete_selected_media);
 
     if (items.size() == 1) {
       Media* media_item = project_parent->item_to_media(items.at(0));
@@ -227,12 +227,12 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
       if (media_item->get_type() != MEDIA_TYPE_FOLDER) {
         QAction* preview_in_media_viewer_action = menu.addAction(tr("Preview in Media Viewer"),
                                                                  this,
-                                                                 SLOT(OpenSelectedMediaInMediaViewerFromAction()));
+                                                                 &SourcesCommon::OpenSelectedMediaInMediaViewerFromAction);
         preview_in_media_viewer_action->setData(reinterpret_cast<quintptr>(media_item));
       }
 
       QAction* properties_action = menu.addAction(tr("Properties..."));
-      QObject::connect(properties_action, SIGNAL(triggered(bool)), project_parent, SLOT(open_properties()));
+      QObject::connect(properties_action, &QAction::triggered, project_parent, &Project::open_properties);
     }
   }
 

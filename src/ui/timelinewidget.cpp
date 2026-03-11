@@ -73,10 +73,10 @@ TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent) {
   setAcceptDrops(true);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(this, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(show_context_menu(const QPoint&)));
+  connect(this, &TimelineWidget::customContextMenuRequested, this, &TimelineWidget::show_context_menu);
 
   tooltip_timer.setInterval(500);
-  connect(&tooltip_timer, SIGNAL(timeout()), this, SLOT(tooltip_timer_timeout()));
+  connect(&tooltip_timer, &QTimer::timeout, this, &TimelineWidget::tooltip_timer_timeout);
 }
 
 void TimelineWidget::show_context_menu(const QPoint& pos) {
@@ -89,8 +89,8 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 
     QAction* undoAction = menu.addAction(tr("&Undo"));
     QAction* redoAction = menu.addAction(tr("&Redo"));
-    connect(undoAction, SIGNAL(triggered(bool)), olive::Global.get(), SLOT(undo()));
-    connect(redoAction, SIGNAL(triggered(bool)), olive::Global.get(), SLOT(redo()));
+    connect(undoAction, &QAction::triggered, olive::Global.get(), &OliveGlobal::undo);
+    connect(redoAction, &QAction::triggered, olive::Global.get(), &OliveGlobal::redo);
     undoAction->setEnabled(olive::UndoStack.canUndo());
     redoAction->setEnabled(olive::UndoStack.canRedo());
     menu.addSeparator();
@@ -109,11 +109,11 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 
       if (panel_timeline->can_ripple_empty_space(panel_timeline->cursor_frame, panel_timeline->cursor_track)) {
         QAction* ripple_delete_action = menu.addAction(tr("R&ipple Delete Empty Space"));
-        connect(ripple_delete_action, SIGNAL(triggered(bool)), panel_timeline, SLOT(ripple_delete_empty_space()));
+        connect(ripple_delete_action, &QAction::triggered, panel_timeline, &Timeline::ripple_delete_empty_space);
       }
 
       QAction* seq_settings = menu.addAction(tr("Sequence Settings"));
-      connect(seq_settings, SIGNAL(triggered(bool)), this, SLOT(open_sequence_properties()));
+      connect(seq_settings, &QAction::triggered, this, &TimelineWidget::open_sequence_properties);
     }
 
     if (!selected_clips.isEmpty()) {
@@ -131,13 +131,13 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 
       menu.addSeparator();
 
-      menu.addAction(tr("&Speed/Duration"), olive::Global.get(), SLOT(open_speed_dialog()));
+      menu.addAction(tr("&Speed/Duration"), olive::Global.get(), &OliveGlobal::open_speed_dialog);
 
       if (audio_clips_are_selected) {
-        menu.addAction(tr("Auto-Cut Silence"), olive::Global.get(), SLOT(open_autocut_silence_dialog()));
+        menu.addAction(tr("Auto-Cut Silence"), olive::Global.get(), &OliveGlobal::open_autocut_silence_dialog);
       }
 
-      QAction* autoscaleAction = menu.addAction(tr("Auto-S&cale"), this, SLOT(toggle_autoscale()));
+      QAction* autoscaleAction = menu.addAction(tr("Auto-S&cale"), this, &TimelineWidget::toggle_autoscale);
       autoscaleAction->setCheckable(true);
       // set autoscale to the first selected clip
       autoscaleAction->setChecked(selected_clips.at(0)->autoscaled());
@@ -173,10 +173,10 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 
       if (same_media) {
         QAction* revealInProjectAction = menu.addAction(tr("&Reveal in Project"));
-        connect(revealInProjectAction, SIGNAL(triggered(bool)), this, SLOT(reveal_media()));
+        connect(revealInProjectAction, &QAction::triggered, this, &TimelineWidget::reveal_media);
       }
 
-      menu.addAction(tr("Properties"), this, SLOT(show_clip_properties()));
+      menu.addAction(tr("Properties"), this, &TimelineWidget::show_clip_properties);
     }
 
     menu.exec(mapToGlobal(pos));
@@ -338,8 +338,8 @@ void TimelineWidget::dragMoveEvent(QDragMoveEvent *event) {
     if (olive::ActiveSequence != nullptr) {
       QPoint pos = event->position().toPoint();
       panel_timeline->scroll_to_frame(panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x()));
-      update_ghosts(pos, event->keyboardModifiers() & Qt::ShiftModifier);
-      panel_timeline->move_insert = ((event->keyboardModifiers() & Qt::ControlModifier) && (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing));
+      update_ghosts(pos, event->modifiers() & Qt::ShiftModifier);
+      panel_timeline->move_insert = ((event->modifiers() & Qt::ControlModifier) && (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing));
       update_ui(false);
     }
   }
@@ -563,7 +563,7 @@ void TimelineWidget::dropEvent(QDropEvent* event) {
       panel_project->create_sequence_internal(ca, self_created_sequence, true, nullptr);
       self_created_sequence = nullptr;
 
-    } else if (event->keyboardModifiers() & Qt::ControlModifier) {
+    } else if (event->modifiers() & Qt::ControlModifier) {
       insert_clips(ca);
     } else {
       delete_area_under_ghosts(ca);

@@ -26,9 +26,9 @@ QWidget *BoolField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(cb, SIGNAL(toggled(bool)), this, SLOT(UpdateFromWidget(bool)));
-  connect(this, SIGNAL(EnabledChanged(bool)), cb, SLOT(setEnabled(bool)));
-  connect(cb, SIGNAL(toggled(bool)), this, SIGNAL(Toggled(bool)));
+  connect(cb, &QCheckBox::toggled, this, &BoolField::UpdateFromWidget);
+  connect(this, &EffectField::EnabledChanged, cb, &QWidget::setEnabled);
+  connect(cb, &QCheckBox::toggled, this, &BoolField::Toggled);
 
   return cb;
 }

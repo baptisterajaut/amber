@@ -53,7 +53,7 @@ Transition::Transition(Clip *c, Clip *s, const EffectMeta* em) :
   length_field->SetFrameRate(parent_clip->sequence == nullptr ?
                                parent_clip->cached_frame_rate() : parent_clip->sequence->frame_rate);
 
-  connect(length_field, SIGNAL(Changed()), this, SLOT(UpdateMaximumLength()));
+  connect(length_field, &DoubleField::Changed, this, &Transition::UpdateMaximumLength);
 }
 
 TransitionPtr Transition::copy(Clip *c, Clip *s) {

@@ -98,8 +98,8 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
   // buttons
   QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
   buttons->setCenterButtons(true);
-  connect(buttons, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(buttons, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(buttons, &QDialogButtonBox::accepted, this, &AdvancedVideoDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
   layout->addWidget(buttons, row, 0, 1, 2);
 }
 

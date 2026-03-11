@@ -53,8 +53,8 @@ SourceTable::SourceTable(SourcesCommon& commons) : commons_(commons) {
   setEditTriggers(QAbstractItemView::NoEditTriggers);
   setDragDropMode(QAbstractItemView::DragDrop);
   setSelectionMode(QAbstractItemView::ExtendedSelection);
-  connect(this, SIGNAL(clicked(const QModelIndex&)), this, SLOT(item_click(const QModelIndex&)));
-  connect(this, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(show_context_menu()));
+  connect(this, &SourceTable::clicked, this, &SourceTable::item_click);
+  connect(this, &SourceTable::customContextMenuRequested, this, &SourceTable::show_context_menu);
 }
 
 void SourceTable::show_context_menu() {

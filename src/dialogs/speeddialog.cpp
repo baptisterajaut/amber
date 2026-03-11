@@ -77,12 +77,12 @@ SpeedDialog::SpeedDialog(QWidget *parent, QVector<Clip*> clips) : QDialog(parent
   QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
   buttonBox->setCenterButtons(true);
   main_layout->addWidget(buttonBox);
-  connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
-  connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
+  connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+  connect(buttonBox, &QDialogButtonBox::accepted, this, &SpeedDialog::accept);
 
-  connect(percent, SIGNAL(valueChanged(double)), this, SLOT(percent_update()));
-  connect(frame_rate, SIGNAL(valueChanged(double)), this, SLOT(frame_rate_update()));
-  connect(duration, SIGNAL(valueChanged(double)), this, SLOT(duration_update()));
+  connect(percent, &LabelSlider::valueChanged, this, &SpeedDialog::percent_update);
+  connect(frame_rate, &LabelSlider::valueChanged, this, &SpeedDialog::frame_rate_update);
+  connect(duration, &LabelSlider::valueChanged, this, &SpeedDialog::duration_update);
 }
 
 int SpeedDialog::exec() {

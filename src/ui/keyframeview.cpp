@@ -59,7 +59,7 @@ KeyframeView::KeyframeView(QWidget *parent) :
   setMouseTracking(true);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(this, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(show_context_menu(const QPoint&)));
+  connect(this, &KeyframeView::customContextMenuRequested, this, &KeyframeView::show_context_menu);
 }
 
 void KeyframeView::SetEffects(const QVector<EffectUI *> &open_effects)
@@ -80,7 +80,7 @@ void KeyframeView::show_context_menu(const QPoint& pos) {
     menu.addSeparator();
     menu.addAction("Graph Editor");
 
-    connect(&menu, SIGNAL(triggered(QAction*)), this, SLOT(menu_set_key_type(QAction*)));
+    connect(&menu, &QMenu::triggered, this, &KeyframeView::menu_set_key_type);
     menu.exec(mapToGlobal(pos));
   }
 }

@@ -420,8 +420,8 @@ void ExportThread::Export()
   RenderThread* renderer = panel_sequence_viewer->viewer_widget->get_renderer();
 
   // Override connection from RenderThread
-  disconnect(renderer, SIGNAL(ready()), panel_sequence_viewer->viewer_widget, SLOT(queue_repaint()));
-  connect(renderer, SIGNAL(ready()), this, SLOT(wake()));
+  disconnect(renderer, &RenderThread::ready, panel_sequence_viewer->viewer_widget, &ViewerWidget::queue_repaint);
+  connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
   // Loop from now (set to the beginning frame earlier) to the end of the frame
   while (olive::ActiveSequence->playhead <= params_.end_frame && !interrupt_) {
@@ -560,8 +560,8 @@ void ExportThread::Export()
   }
 
   // Restore original connection from RenderThread
-  disconnect(renderer, SIGNAL(ready()), this, SLOT(wake()));
-  connect(renderer, SIGNAL(ready()), panel_sequence_viewer->viewer_widget, SLOT(queue_repaint()));
+  disconnect(renderer, &RenderThread::ready, this, &ExportThread::wake);
+  connect(renderer, &RenderThread::ready, panel_sequence_viewer->viewer_widget, &ViewerWidget::queue_repaint);
 
   if (interrupt_) {
     return;

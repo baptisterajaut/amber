@@ -268,7 +268,7 @@ void MenuHelper::open_recent_from_menu() {
 
 void MenuHelper::create_effect_paste_action(QMenu *menu)
 {
-  QAction* paste_action = menu->addAction(tr("&Paste"), panel_timeline, SLOT(paste(bool)));
+  QAction* paste_action = menu->addAction(tr("&Paste"), panel_timeline, &Timeline::paste);
   paste_action->setEnabled(clipboard.size() > 0 && clipboard_type == CLIPBOARD_TYPE_EFFECT);
 }
 

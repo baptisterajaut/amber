@@ -57,13 +57,13 @@ ActionSearch::ActionSearch(QWidget *parent) :
   entry_field->setPlaceholderText(tr("Search for action..."));
 
   // Connect signals/slots
-  connect(entry_field, SIGNAL(textChanged(const QString&)), this, SLOT(search_update(const QString &)));
-  connect(entry_field, SIGNAL(returnPressed()), this, SLOT(perform_action()));
+  connect(entry_field, &QLineEdit::textChanged, this, [this](const QString& s){ search_update(s); });
+  connect(entry_field, &QLineEdit::returnPressed, this, &ActionSearch::perform_action);
 
   // moveSelectionUp() and moveSelectionDown() are emitted when the user pressed up or down on the text field.
   // We override it here to select the upper or lower item in the list.
-  connect(entry_field, SIGNAL(moveSelectionUp()), this, SLOT(move_selection_up()));
-  connect(entry_field, SIGNAL(moveSelectionDown()), this, SLOT(move_selection_down()));
+  connect(entry_field, &ActionSearchEntry::moveSelectionUp, this, &ActionSearch::move_selection_up);
+  connect(entry_field, &ActionSearchEntry::moveSelectionDown, this, &ActionSearch::move_selection_down);
   layout->addWidget(entry_field);
 
   // Construct list of actions
@@ -76,7 +76,7 @@ ActionSearch::ActionSearch(QWidget *parent) :
 
   layout->addWidget(list_widget);
 
-  connect(list_widget, SIGNAL(dbl_click()), this, SLOT(perform_action()));
+  connect(list_widget, &ActionSearchList::dbl_click, this, &ActionSearch::perform_action);
 
   // Instantly focus on the entry field to allow for fully keyboard operation (if this popup was initiated by keyboard
   // shortcut for example).

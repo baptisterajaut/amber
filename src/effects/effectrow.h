@@ -209,7 +209,7 @@ signals:
    * True if keyframing was enabled, false if keyframing was disabled.
    */
   void KeyframingSetChanged(bool);
-private slots:
+public slots:
   /**
    * @brief Set keyframing enabled state
    *

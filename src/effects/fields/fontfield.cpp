@@ -38,8 +38,8 @@ QWidget *FontField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(fcb, SIGNAL(currentTextChanged(const QString &)), this, SLOT(UpdateFromWidget(const QString &)));
-  connect(this, SIGNAL(EnabledChanged(bool)), fcb, SLOT(setEnabled(bool)));
+  connect(fcb, &QComboBox::currentTextChanged, this, &FontField::UpdateFromWidget);
+  connect(this, &EffectField::EnabledChanged, fcb, &QWidget::setEnabled);
 
   return fcb;
 }

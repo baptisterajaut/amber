@@ -56,7 +56,7 @@ PreviewGenerator::PreviewGenerator(Media* i) :
     data_dir_.mkpath(".");
   }
 
-  connect(this, SIGNAL(finished()), this, SLOT(deleteLater()));
+  connect(this, &QThread::finished, this, &QObject::deleteLater);
 
   // set up throbber animation
   olive::media_icon_service->SetMediaIcon(media_, ICON_TYPE_LOADING);

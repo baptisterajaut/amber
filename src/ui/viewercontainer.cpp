@@ -49,8 +49,8 @@ ViewerContainer::ViewerContainer(QWidget *parent) :
   child = new ViewerWidget(this);
   child->container = this;
 
-  connect(horizontal_scrollbar, SIGNAL(valueChanged(int)), this, SLOT(scroll_changed()));
-  connect(vertical_scrollbar, SIGNAL(valueChanged(int)), this, SLOT(scroll_changed()));
+  connect(horizontal_scrollbar, &QScrollBar::valueChanged, this, &ViewerContainer::scroll_changed);
+  connect(vertical_scrollbar, &QScrollBar::valueChanged, this, &ViewerContainer::scroll_changed);
 }
 
 ViewerContainer::~ViewerContainer() {}

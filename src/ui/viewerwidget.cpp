@@ -75,12 +75,12 @@ ViewerWidget::ViewerWidget(QWidget *parent) :
   setFocusPolicy(Qt::ClickFocus);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(this, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(show_context_menu()));
+  connect(this, &ViewerWidget::customContextMenuRequested, this, &ViewerWidget::show_context_menu);
 
   renderer = new RenderThread();
   renderer->start(QThread::HighestPriority);
-  connect(renderer, SIGNAL(ready()), this, SLOT(queue_repaint()));
-  connect(renderer, SIGNAL(finished()), renderer, SLOT(deleteLater()));
+  connect(renderer, &RenderThread::ready, this, &ViewerWidget::queue_repaint);
+  connect(renderer, &RenderThread::finished, renderer, &RenderThread::deleteLater);
 
   window = new ViewerWindow(this);
 }
@@ -111,7 +111,7 @@ void ViewerWidget::show_context_menu() {
   Menu menu(this);
 
   QAction* save_frame_as_image = menu.addAction(tr("Save Frame as Image..."));
-  connect(save_frame_as_image, SIGNAL(triggered(bool)), this, SLOT(save_frame()));
+  connect(save_frame_as_image, &QAction::triggered, this, &ViewerWidget::save_frame);
 
   Menu* fullscreen_menu = new Menu(tr("Show Fullscreen"));
   menu.addMenu(fullscreen_menu);
@@ -126,11 +126,11 @@ void ViewerWidget::show_context_menu() {
                                                           QString::number(screens.at(i)->size().height())));
     screen_action->setData(i);
   }
-  connect(fullscreen_menu, SIGNAL(triggered(QAction*)), this, SLOT(fullscreen_menu_action(QAction*)));
+  connect(fullscreen_menu, &QMenu::triggered, this, &ViewerWidget::fullscreen_menu_action);
 
   Menu zoom_menu(tr("Zoom"));
   QAction* fit_zoom = zoom_menu.addAction(tr("Fit"));
-  connect(fit_zoom, SIGNAL(triggered(bool)), this, SLOT(set_fit_zoom()));
+  connect(fit_zoom, &QAction::triggered, this, &ViewerWidget::set_fit_zoom);
   zoom_menu.addAction("10%")->setData(0.1);
   zoom_menu.addAction("25%")->setData(0.25);
   zoom_menu.addAction("50%")->setData(0.5);
@@ -140,12 +140,12 @@ void ViewerWidget::show_context_menu() {
   zoom_menu.addAction("200%")->setData(2.0);
   zoom_menu.addAction("400%")->setData(4.0);
   QAction* custom_zoom = zoom_menu.addAction(tr("Custom"));
-  connect(custom_zoom, SIGNAL(triggered(bool)), this, SLOT(set_custom_zoom()));
-  connect(&zoom_menu, SIGNAL(triggered(QAction*)), this, SLOT(set_menu_zoom(QAction*)));
+  connect(custom_zoom, &QAction::triggered, this, &ViewerWidget::set_custom_zoom);
+  connect(&zoom_menu, &QMenu::triggered, this, &ViewerWidget::set_menu_zoom);
   menu.addMenu(&zoom_menu);
 
   if (!viewer->is_main_sequence()) {
-    menu.addAction(tr("Close Media"), viewer, SLOT(close_media()));
+    menu.addAction(tr("Close Media"), viewer, &Viewer::close_media);
   }
 
   menu.exec(QCursor::pos());
@@ -215,7 +215,7 @@ void ViewerWidget::retry() {
 void ViewerWidget::initializeGL() {
   initializeOpenGLFunctions();
 
-  connect(context(), SIGNAL(aboutToBeDestroyed()), this, SLOT(context_destroy()), Qt::DirectConnection);
+  connect(context(), &QOpenGLContext::aboutToBeDestroyed, this, &ViewerWidget::context_destroy, Qt::DirectConnection);
 }
 
 void ViewerWidget::frame_update() {

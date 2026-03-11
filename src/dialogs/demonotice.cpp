@@ -77,6 +77,6 @@ DemoNotice::DemoNotice(QWidget *parent) :
 
   QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok, this);
   buttons->setCenterButtons(true);
-  connect(buttons, SIGNAL(accepted()), this, SLOT(accept()));
+  connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
   vlayout->addWidget(buttons);
 }

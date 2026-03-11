@@ -58,7 +58,7 @@ CollapsibleWidget::CollapsibleWidget(QWidget* parent) : QWidget(parent) {
   title_bar_layout->addStretch();
   layout->addWidget(title_bar);
 
-  connect(title_bar, SIGNAL(select(bool, bool)), this, SLOT(header_click(bool, bool)));
+  connect(title_bar, &CollapsibleWidgetHeader::select, this, &CollapsibleWidget::header_click);
 
   set_button_icon(true);
 
@@ -108,8 +108,8 @@ void CollapsibleWidget::SetContents(QWidget* c) {
   contents = c;
   if (!existing) {
     layout->addWidget(contents);
-    connect(enabled_check, SIGNAL(toggled(bool)), contents, SLOT(setEnabled(bool)));
-    connect(collapse_button, SIGNAL(clicked()), this, SLOT(on_visible_change()));
+    connect(enabled_check, &QCheckBox::toggled, contents, &QWidget::setEnabled);
+    connect(collapse_button, &QPushButton::clicked, this, &CollapsibleWidget::on_visible_change);
   }
 }
 

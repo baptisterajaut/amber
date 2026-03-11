@@ -91,12 +91,14 @@ private:
   ViewerWindow* window;
   double x_scroll;
   double y_scroll;
+public slots:
+  void queue_repaint();
+
 private slots:
   void context_destroy();
   void retry();
   void show_context_menu();
   void save_frame();
-  void queue_repaint();
   void fullscreen_menu_action(QAction* action);
   void set_fit_zoom();
   void set_custom_zoom();

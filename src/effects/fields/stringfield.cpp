@@ -41,8 +41,8 @@ QWidget *StringField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(text_edit, SIGNAL(textModified(const QString&)), this, SLOT(UpdateFromWidget(const QString&)));
-  connect(this, SIGNAL(EnabledChanged(bool)), text_edit, SLOT(setEnabled(bool)));
+  connect(text_edit, &TextEditEx::textModified, this, &StringField::UpdateFromWidget);
+  connect(this, &EffectField::EnabledChanged, text_edit, &QWidget::setEnabled);
 
   return text_edit;
 }

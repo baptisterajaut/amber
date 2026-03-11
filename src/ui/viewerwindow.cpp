@@ -42,7 +42,7 @@ ViewerWindow::ViewerWindow(QWidget *parent) :
   setMouseTracking(true);
 
   fullscreen_msg_timer.setInterval(2000);
-  connect(&fullscreen_msg_timer, SIGNAL(timeout()), this, SLOT(fullscreen_msg_timeout()));
+  connect(&fullscreen_msg_timer, &QTimer::timeout, this, &ViewerWindow::fullscreen_msg_timeout);
 }
 
 void ViewerWindow::set_texture(GLuint t, double iar, QMutex* imutex) {
@@ -60,7 +60,7 @@ void ViewerWindow::shortcut_copier(QVector<QShortcut*>& shortcuts, QMenu* menu) 
     } else if (!menu_action.at(i)->isSeparator() && !menu_action.at(i)->shortcut().isEmpty()) {
       QShortcut* sc = new QShortcut(this);
       sc->setKey(menu_action.at(i)->shortcut());
-      connect(sc, SIGNAL(activated()), menu_action.at(i), SLOT(trigger()));
+      connect(sc, &QShortcut::activated, menu_action.at(i), &QAction::trigger);
       shortcuts.append(sc);
     }
   }

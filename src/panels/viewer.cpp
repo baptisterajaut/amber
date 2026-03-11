@@ -86,15 +86,15 @@ Viewer::Viewer(QWidget *parent) :
   current_timecode_slider->SetDefault(qSNaN());
   current_timecode_slider->SetValue(0);
   current_timecode_slider->SetDisplayType(LabelSlider::FrameNumber);
-  connect(current_timecode_slider, SIGNAL(valueChanged(double)), this, SLOT(update_playhead()));
+  connect(current_timecode_slider, &LabelSlider::valueChanged, this, &Viewer::update_playhead);
 
   recording_flasher.setInterval(500);
 
-  connect(&playback_updater, SIGNAL(timeout()), this, SLOT(timer_update()));
-  connect(&recording_flasher, SIGNAL(timeout()), this, SLOT(recording_flasher_update()));
-  connect(horizontal_bar, SIGNAL(valueChanged(int)), headers, SLOT(set_scroll(int)));
-  connect(horizontal_bar, SIGNAL(valueChanged(int)), viewer_widget, SLOT(set_waveform_scroll(int)));
-  connect(horizontal_bar, SIGNAL(resize_move(double)), this, SLOT(resize_move(double)));
+  connect(&playback_updater, &QTimer::timeout, this, &Viewer::timer_update);
+  connect(&recording_flasher, &QTimer::timeout, this, &Viewer::recording_flasher_update);
+  connect(horizontal_bar, &ResizableScrollBar::valueChanged, headers, &TimelineHeader::set_scroll);
+  connect(horizontal_bar, &ResizableScrollBar::valueChanged, viewer_widget, &ViewerWidget::set_waveform_scroll);
+  connect(horizontal_bar, &ResizableScrollBar::resize_move, this, &Viewer::resize_move);
 
   update_playhead_timecode(0);
   update_end_timecode();
@@ -698,27 +698,27 @@ void Viewer::setup_ui() {
 
   go_to_start_button = new QPushButton();
   go_to_start_button->setIcon(olive::icon::ViewerGoToStart);
-  connect(go_to_start_button, SIGNAL(clicked(bool)), this, SLOT(go_to_in()));
+  connect(go_to_start_button, &QPushButton::clicked, this, &Viewer::go_to_in);
   playback_control_layout->addWidget(go_to_start_button);
 
   prev_frame_button = new QPushButton();
   prev_frame_button->setIcon(olive::icon::ViewerPrevFrame);
-  connect(prev_frame_button, SIGNAL(clicked(bool)), this, SLOT(previous_frame()));
+  connect(prev_frame_button, &QPushButton::clicked, this, &Viewer::previous_frame);
   playback_control_layout->addWidget(prev_frame_button);
 
   play_button = new QPushButton();
   play_button->setIcon(olive::icon::ViewerPlay);
-  connect(play_button, SIGNAL(clicked(bool)), this, SLOT(toggle_play()));
+  connect(play_button, &QPushButton::clicked, this, &Viewer::toggle_play);
   playback_control_layout->addWidget(play_button);
 
   next_frame_button = new QPushButton();
   next_frame_button->setIcon(olive::icon::ViewerNextFrame);
-  connect(next_frame_button, SIGNAL(clicked(bool)), this, SLOT(next_frame()));
+  connect(next_frame_button, &QPushButton::clicked, this, &Viewer::next_frame);
   playback_control_layout->addWidget(next_frame_button);
 
   go_to_end_frame = new QPushButton();
   go_to_end_frame->setIcon(olive::icon::ViewerGoToEnd);
-  connect(go_to_end_frame, SIGNAL(clicked(bool)), this, SLOT(go_to_out()));
+  connect(go_to_end_frame, &QPushButton::clicked, this, &Viewer::go_to_out);
   playback_control_layout->addWidget(go_to_end_frame);
 
   playback_control_layout->addStretch();
@@ -739,14 +739,14 @@ void Viewer::setup_ui() {
   video_only_button->setIcon(olive::icon::MediaVideo);
   video_only_button->setVisible(false);
   right_control_layout->addWidget(video_only_button);
-  connect(video_only_button, SIGNAL(pressed()), this, SLOT(drag_video_only()));
+  connect(video_only_button, &QPushButton::pressed, this, &Viewer::drag_video_only);
 
   audio_only_button = new QPushButton();
   audio_only_button->setToolTip(tr("Drag audio only"));
   audio_only_button->setIcon(olive::icon::MediaAudio);
   audio_only_button->setVisible(false);
   right_control_layout->addWidget(audio_only_button);
-  connect(audio_only_button, SIGNAL(pressed()), this, SLOT(drag_audio_only()));
+  connect(audio_only_button, &QPushButton::pressed, this, &Viewer::drag_audio_only);
 
   right_control_layout->addStretch();
 

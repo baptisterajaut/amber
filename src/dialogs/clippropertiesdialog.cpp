@@ -44,8 +44,8 @@ ClipPropertiesDialog::ClipPropertiesDialog(QWidget *parent, QVector<Clip *> clip
   buttons->setCenterButtons(true);
   layout->addWidget(buttons, row, 0, 1, 2);
 
-  connect(buttons, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(buttons, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(buttons, &QDialogButtonBox::accepted, this, &ClipPropertiesDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
   // analyze list of clips for default values
 

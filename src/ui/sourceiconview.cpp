@@ -37,8 +37,8 @@ SourceIconView::SourceIconView(SourcesCommon &commons) :
   setResizeMode(QListView::Adjust);
   setContextMenuPolicy(Qt::CustomContextMenu);
   setItemDelegate(&delegate_);
-  connect(this, SIGNAL(clicked(const QModelIndex&)), this, SLOT(item_click(const QModelIndex&)));
-  connect(this, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(show_context_menu()));
+  connect(this, &SourceIconView::clicked, this, &SourceIconView::item_click);
+  connect(this, &SourceIconView::customContextMenuRequested, this, &SourceIconView::show_context_menu);
 }
 
 void SourceIconView::show_context_menu() {

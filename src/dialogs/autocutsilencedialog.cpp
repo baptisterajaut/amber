@@ -66,8 +66,8 @@ AutoCutSilenceDialog::AutoCutSilenceDialog(QWidget *parent, QVector<int> clips) 
   QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
   buttonBox->setCenterButtons(true);
   main_layout->addWidget(buttonBox);
-  connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
-  connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
+  connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
+  connect(buttonBox, &QDialogButtonBox::accepted, this, &AutoCutSilenceDialog::accept);
 
 }
 

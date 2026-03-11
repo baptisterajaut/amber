@@ -108,10 +108,10 @@ Timeline::Timeline(QWidget *parent) :
 
   toolArrowButton->click();
 
-  connect(horizontalScrollBar, SIGNAL(valueChanged(int)), this, SLOT(setScroll(int)));
-  connect(videoScrollbar, SIGNAL(valueChanged(int)), video_area, SLOT(setScroll(int)));
-  connect(audioScrollbar, SIGNAL(valueChanged(int)), audio_area, SLOT(setScroll(int)));
-  connect(horizontalScrollBar, SIGNAL(resize_move(double)), this, SLOT(resize_move(double)));
+  connect(horizontalScrollBar, &ResizableScrollBar::valueChanged, this, &Timeline::setScroll);
+  connect(videoScrollbar, &QScrollBar::valueChanged, video_area, &TimelineWidget::setScroll);
+  connect(audioScrollbar, &QScrollBar::valueChanged, audio_area, &TimelineWidget::setScroll);
+  connect(horizontalScrollBar, &ResizableScrollBar::resize_move, this, &Timeline::resize_move);
 
   update_sequence();
 
@@ -1849,7 +1849,7 @@ void Timeline::add_btn_click() {
   noiseMenuItem->setData(ADD_OBJ_NOISE);
   add_menu.addAction(noiseMenuItem);
 
-  connect(&add_menu, SIGNAL(triggered(QAction*)), this, SLOT(add_menu_item(QAction*)));
+  connect(&add_menu, &QMenu::triggered, this, &Timeline::add_menu_item);
 
   add_menu.exec(QCursor::pos());
 }
@@ -1905,7 +1905,7 @@ void Timeline::transition_tool_click() {
     }
   }
 
-  connect(&transition_menu, SIGNAL(triggered(QAction*)), this, SLOT(transition_menu_select(QAction*)));
+  connect(&transition_menu, &QMenu::triggered, this, &Timeline::transition_menu_select);
 
   toolTransitionButton->setChecked(false);
 
@@ -1966,42 +1966,42 @@ void Timeline::setup_ui() {
   toolArrowButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/arrow.svg")));
   toolArrowButton->setCheckable(true);
   toolArrowButton->setProperty("tool", TIMELINE_TOOL_POINTER);
-  connect(toolArrowButton, SIGNAL(clicked(bool)), this, SLOT(set_tool()));
+  connect(toolArrowButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolArrowButton);
 
   toolEditButton = new QPushButton();
   toolEditButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/beam.svg")));
   toolEditButton->setCheckable(true);
   toolEditButton->setProperty("tool", TIMELINE_TOOL_EDIT);
-  connect(toolEditButton, SIGNAL(clicked(bool)), this, SLOT(set_tool()));
+  connect(toolEditButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolEditButton);
 
   toolRippleButton = new QPushButton();
   toolRippleButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/ripple.svg")));
   toolRippleButton->setCheckable(true);
   toolRippleButton->setProperty("tool", TIMELINE_TOOL_RIPPLE);
-  connect(toolRippleButton, SIGNAL(clicked(bool)), this, SLOT(set_tool()));
+  connect(toolRippleButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolRippleButton);
 
   toolRazorButton = new QPushButton();
   toolRazorButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/razor.svg")));
   toolRazorButton->setCheckable(true);
   toolRazorButton->setProperty("tool", TIMELINE_TOOL_RAZOR);
-  connect(toolRazorButton, SIGNAL(clicked(bool)), this, SLOT(set_tool()));
+  connect(toolRazorButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolRazorButton);
 
   toolSlipButton = new QPushButton();
   toolSlipButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/slip.svg")));
   toolSlipButton->setCheckable(true);
   toolSlipButton->setProperty("tool", TIMELINE_TOOL_SLIP);
-  connect(toolSlipButton, SIGNAL(clicked(bool)), this, SLOT(set_tool()));
+  connect(toolSlipButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolSlipButton);
 
   toolSlideButton = new QPushButton();
   toolSlideButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/slide.svg")));
   toolSlideButton->setCheckable(true);
   toolSlideButton->setProperty("tool", TIMELINE_TOOL_SLIDE);
-  connect(toolSlideButton, SIGNAL(clicked(bool)), this, SLOT(set_tool()));
+  connect(toolSlideButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolSlideButton);
 
   toolHandButton = new QPushButton();
@@ -2009,39 +2009,39 @@ void Timeline::setup_ui() {
   toolHandButton->setCheckable(true);
 
   toolHandButton->setProperty("tool", TIMELINE_TOOL_HAND);
-  connect(toolHandButton, SIGNAL(clicked(bool)), this, SLOT(set_tool()));
+  connect(toolHandButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolHandButton);
   toolTransitionButton = new QPushButton();
   toolTransitionButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/transition-tool.svg")));
   toolTransitionButton->setCheckable(true);
-  connect(toolTransitionButton, SIGNAL(clicked(bool)), this, SLOT(transition_tool_click()));
+  connect(toolTransitionButton, &QPushButton::clicked, this, &Timeline::transition_tool_click);
   tool_buttons_layout->addWidget(toolTransitionButton);
 
   snappingButton = new QPushButton();
   snappingButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/magnet.svg")));
   snappingButton->setCheckable(true);
   snappingButton->setChecked(true);
-  connect(snappingButton, SIGNAL(toggled(bool)), this, SLOT(snapping_clicked(bool)));
+  connect(snappingButton, &QPushButton::toggled, this, &Timeline::snapping_clicked);
   tool_buttons_layout->addWidget(snappingButton);
 
   zoomInButton = new QPushButton();
   zoomInButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/zoomin.svg")));
-  connect(zoomInButton, SIGNAL(clicked(bool)), this, SLOT(zoom_in()));
+  connect(zoomInButton, &QPushButton::clicked, this, &Timeline::zoom_in);
   tool_buttons_layout->addWidget(zoomInButton);
 
   zoomOutButton = new QPushButton();
   zoomOutButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/zoomout.svg")));
-  connect(zoomOutButton, SIGNAL(clicked(bool)), this, SLOT(zoom_out()));
+  connect(zoomOutButton, &QPushButton::clicked, this, &Timeline::zoom_out);
   tool_buttons_layout->addWidget(zoomOutButton);
 
   recordButton = new QPushButton();
   recordButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/record.svg")));
-  connect(recordButton, SIGNAL(clicked(bool)), this, SLOT(record_btn_click()));
+  connect(recordButton, &QPushButton::clicked, this, &Timeline::record_btn_click);
   tool_buttons_layout->addWidget(recordButton);
 
   addButton = new QPushButton();
   addButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/add-button.svg")));
-  connect(addButton, SIGNAL(clicked()), this, SLOT(add_btn_click()));
+  connect(addButton, &QPushButton::clicked, this, &Timeline::add_btn_click);
   tool_buttons_layout->addWidget(addButton);
 
   horizontalLayout->addWidget(tool_button_widget);

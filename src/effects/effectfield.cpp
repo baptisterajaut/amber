@@ -56,7 +56,7 @@ EffectField::EffectField(EffectRow* parent, const QString &i, EffectFieldType t)
   SetValueAt(0, 0);
 
   // Connect this field to the effect's changed function
-  connect(this, SIGNAL(Changed()), parent->GetParentEffect(), SLOT(FieldChanged()));
+  connect(this, &EffectField::Changed, parent->GetParentEffect(), &Effect::FieldChanged);
 }
 
 EffectRow *EffectField::GetParentRow()

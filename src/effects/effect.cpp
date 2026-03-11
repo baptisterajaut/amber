@@ -223,7 +223,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                         } else if (attr.name() == QLatin1String("bf")) {
                           color.setBlueF(attr.value().toDouble());
                         } else if (attr.name() == QLatin1String("hex")) {
-                          color.setNamedColor(attr.value().toString());
+                          color = QColor::fromString(attr.value().toString());
                         }
                       }
 

@@ -20,8 +20,8 @@ QWidget *FileField::CreateWidget(QWidget *existing)
 {
   EmbeddedFileChooser* efc = (existing != nullptr) ? static_cast<EmbeddedFileChooser*>(existing) : new EmbeddedFileChooser();
 
-  connect(efc, SIGNAL(changed(const QString&)), this, SLOT(UpdateFromWidget(const QString&)));
-  connect(this, SIGNAL(EnabledChanged(bool)), efc, SLOT(setEnabled(bool)));
+  connect(efc, &EmbeddedFileChooser::changed, this, &FileField::UpdateFromWidget);
+  connect(this, &EffectField::EnabledChanged, efc, &QWidget::setEnabled);
 
   return efc;
 }

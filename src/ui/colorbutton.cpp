@@ -25,7 +25,7 @@
 ColorButton::ColorButton(QWidget *parent)
   : QPushButton(parent), color(Qt::white) {
   set_button_color();
-  connect(this, SIGNAL(clicked(bool)), this, SLOT(open_dialog()));
+  connect(this, &ColorButton::clicked, this, &ColorButton::open_dialog);
 }
 
 QColor ColorButton::get_color() {

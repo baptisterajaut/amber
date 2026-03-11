@@ -42,7 +42,7 @@ AudioMonitor::AudioMonitor(QWidget *parent) :
   QWidget(parent)
 {
   clear_timer.setInterval(500);
-  connect(&clear_timer, SIGNAL(timeout()), this, SLOT(clear()));
+  connect(&clear_timer, &QTimer::timeout, this, &AudioMonitor::clear);
 }
 
 void AudioMonitor::set_value(const QVector<double> &ivalues) {

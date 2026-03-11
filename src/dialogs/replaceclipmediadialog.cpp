@@ -55,11 +55,11 @@ ReplaceClipMediaDialog::ReplaceClipMediaDialog(QWidget *parent, Media* old_media
   buttons->addStretch();
 
   QPushButton* replace_button = new QPushButton(tr("Replace"), this);
-  connect(replace_button, SIGNAL(clicked(bool)), this, SLOT(accept()));
+  connect(replace_button, &QPushButton::clicked, this, &ReplaceClipMediaDialog::accept);
   buttons->addWidget(replace_button);
 
   QPushButton* cancel_button = new QPushButton(tr("Cancel"), this);
-  connect(cancel_button, SIGNAL(clicked(bool)), this, SLOT(reject()));
+  connect(cancel_button, &QPushButton::clicked, this, &QDialog::reject);
   buttons->addWidget(cancel_button);
 
   buttons->addStretch();

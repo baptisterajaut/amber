@@ -42,17 +42,13 @@ LoadThread::LoadThread(const QString& filename, bool autorecovery) :
   autorecovery_(autorecovery),
   cancelled_(false)
 {
-  connect(this, SIGNAL(finished()), this, SLOT(deleteLater()));
+  connect(this, &QThread::finished, this, &QObject::deleteLater);
 
-  connect(this, SIGNAL(success()), this, SLOT(success_func()), Qt::QueuedConnection);
+  connect(this, &LoadThread::success, this, &LoadThread::success_func, Qt::QueuedConnection);
 
-  connect(this, SIGNAL(error()), this, SLOT(error_func()), Qt::QueuedConnection);
+  connect(this, &LoadThread::error, this, &LoadThread::error_func, Qt::QueuedConnection);
 
-  connect(this,
-          SIGNAL(start_question(const QString&, const QString &, int)),
-          this,
-          SLOT(question_func(const QString &, const QString &, int)),
-          Qt::QueuedConnection);
+  connect(this, &LoadThread::start_question, this, &LoadThread::question_func, Qt::QueuedConnection);
 }
 
 void LoadThread::load_effect(QXmlStreamReader& stream, Clip* c) {

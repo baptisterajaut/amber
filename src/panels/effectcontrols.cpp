@@ -71,13 +71,13 @@ EffectControls::EffectControls(QWidget *parent) :
   effects_area->header = headers;
   keyframeView->header = headers;
 
-  connect(keyframeView, SIGNAL(wheel_event_signal(QWheelEvent*)), effects_area, SLOT(receive_wheel_event(QWheelEvent*)));
-  connect(horizontalScrollBar, SIGNAL(valueChanged(int)), headers, SLOT(set_scroll(int)));
-  connect(horizontalScrollBar, SIGNAL(resize_move(double)), keyframeView, SLOT(resize_move(double)));
-  connect(horizontalScrollBar, SIGNAL(valueChanged(int)), keyframeView, SLOT(set_x_scroll(int)));
-  connect(verticalScrollBar, SIGNAL(valueChanged(int)), keyframeView, SLOT(set_y_scroll(int)));
-  connect(verticalScrollBar, SIGNAL(valueChanged(int)), scrollArea->verticalScrollBar(), SLOT(setValue(int)));
-  connect(scrollArea->verticalScrollBar(), SIGNAL(valueChanged(int)), verticalScrollBar, SLOT(setValue(int)));
+  connect(keyframeView, &KeyframeView::wheel_event_signal, effects_area, &EffectsArea::receive_wheel_event);
+  connect(horizontalScrollBar, &ResizableScrollBar::valueChanged, headers, &TimelineHeader::set_scroll);
+  connect(horizontalScrollBar, &ResizableScrollBar::resize_move, keyframeView, &KeyframeView::resize_move);
+  connect(horizontalScrollBar, &ResizableScrollBar::valueChanged, keyframeView, &KeyframeView::set_x_scroll);
+  connect(verticalScrollBar, &QScrollBar::valueChanged, keyframeView, &KeyframeView::set_y_scroll);
+  connect(verticalScrollBar, &QScrollBar::valueChanged, scrollArea->verticalScrollBar(), &QScrollBar::setValue);
+  connect(scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, verticalScrollBar, &QScrollBar::setValue);
 }
 
 EffectControls::~EffectControls()
@@ -259,7 +259,7 @@ void EffectControls::show_effect_menu(int type, int subtype) {
 
   effects_loaded.unlock();
 
-  connect(&effects_menu, SIGNAL(triggered(QAction*)), this, SLOT(menu_select(QAction*)));
+  connect(&effects_menu, &QMenu::triggered, this, &EffectControls::menu_select);
   effects_menu.exec(QCursor::pos());
 }
 
@@ -311,9 +311,9 @@ void EffectControls::deselect_all_effects(QWidget* sender) {
 void EffectControls::open_effect(QVBoxLayout* layout, Effect* e) {
   EffectUI* container = new EffectUI(e);
 
-  connect(container, SIGNAL(CutRequested()), this, SLOT(cut()));
-  connect(container, SIGNAL(CopyRequested()), this, SLOT(copy()));
-  connect(container, SIGNAL(deselect_others(QWidget*)), this, SLOT(deselect_all_effects(QWidget*)));
+  connect(container, &EffectUI::CutRequested, this, &EffectControls::cut);
+  connect(container, &EffectUI::CopyRequested, this, [this]() { copy(); });
+  connect(container, &EffectUI::deselect_others, this, &EffectControls::deselect_all_effects);
 
   open_effects_.append(container);
 
@@ -355,7 +355,7 @@ void EffectControls::setup_ui() {
 
   effects_area = new EffectsArea();
   effects_area->setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(effects_area, SIGNAL(customContextMenuRequested(const QPoint &)), this, SLOT(effects_area_context_menu()));
+  connect(effects_area, &QWidget::customContextMenuRequested, this, &EffectControls::effects_area_context_menu);
 
   QVBoxLayout* effects_area_layout = new QVBoxLayout(effects_area);
   effects_area_layout->setSpacing(0);
@@ -380,7 +380,7 @@ void EffectControls::setup_ui() {
   btnAddVideoEffect = new QPushButton();
   btnAddVideoEffect->setIcon(add_effect_icon);
   veHeaderLayout->addWidget(btnAddVideoEffect);
-  connect(btnAddVideoEffect, SIGNAL(clicked(bool)), this, SLOT(video_effect_click()));
+  connect(btnAddVideoEffect, &QPushButton::clicked, this, &EffectControls::video_effect_click);
 
   veHeaderLayout->addStretch();
 
@@ -395,7 +395,7 @@ void EffectControls::setup_ui() {
 
   btnAddVideoTransition = new QPushButton();
   btnAddVideoTransition->setIcon(add_transition_icon);
-  connect(btnAddVideoTransition, SIGNAL(clicked(bool)), this, SLOT(video_transition_click()));
+  connect(btnAddVideoTransition, &QPushButton::clicked, this, &EffectControls::video_transition_click);
   veHeaderLayout->addWidget(btnAddVideoTransition);
 
   vcontainerLayout->addWidget(veHeader);
@@ -423,7 +423,7 @@ void EffectControls::setup_ui() {
 
   btnAddAudioEffect = new QPushButton();
   btnAddAudioEffect->setIcon(add_effect_icon);
-  connect(btnAddAudioEffect, SIGNAL(clicked(bool)), this, SLOT(audio_effect_click()));
+  connect(btnAddAudioEffect, &QPushButton::clicked, this, &EffectControls::audio_effect_click);
   aeHeaderLayout->addWidget(btnAddAudioEffect);
 
   aeHeaderLayout->addStretch();
@@ -437,7 +437,7 @@ void EffectControls::setup_ui() {
 
   btnAddAudioTransition = new QPushButton();
   btnAddAudioTransition->setIcon(add_transition_icon);
-  connect(btnAddAudioTransition, SIGNAL(clicked(bool)), this, SLOT(audio_transition_click()));
+  connect(btnAddAudioTransition, &QPushButton::clicked, this, &EffectControls::audio_transition_click);
   aeHeaderLayout->addWidget(btnAddAudioTransition);
 
   acontainerLayout->addWidget(aeHeader);
@@ -694,7 +694,7 @@ void EffectControls::Load() {
 
     headers->setVisible(true);
 
-    QTimer::singleShot(50, this, SLOT(queue_post_update()));
+    QTimer::singleShot(50, this, &EffectControls::queue_post_update);
   }
 
   // If the graph editor's currently active row is not part of the current effects, clear it

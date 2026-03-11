@@ -569,7 +569,7 @@ void PreferencesDialog::setup_ui() {
 
   QPushButton* delete_preview_btn = new QPushButton(tr("Delete Previews"));
   general_layout->addWidget(delete_preview_btn, row, 4);
-  connect(delete_preview_btn, SIGNAL(clicked(bool)), this, SLOT(delete_all_previews()));
+  connect(delete_preview_btn, &QPushButton::clicked, this, &PreferencesDialog::delete_all_previews);
 
   row++;
 
@@ -590,7 +590,7 @@ void PreferencesDialog::setup_ui() {
 
   // General -> Default Sequence Settings
   QPushButton* default_sequence_settings = new QPushButton(tr("Default Sequence Settings"));
-  connect(default_sequence_settings, SIGNAL(clicked(bool)), this, SLOT(edit_default_sequence_settings()));
+  connect(default_sequence_settings, &QPushButton::clicked, this, &PreferencesDialog::edit_default_sequence_settings);
   general_layout->addWidget(default_sequence_settings);
 
   tabWidget->addTab(general_tab, tr("General"));
@@ -705,7 +705,7 @@ void PreferencesDialog::setup_ui() {
   appearance_layout->addWidget(custom_css_fn, row, 1);
 
   QPushButton* custom_css_browse = new QPushButton(tr("Browse"), general_tab);
-  connect(custom_css_browse, SIGNAL(clicked(bool)), this, SLOT(browse_css_file()));
+  connect(custom_css_browse, &QPushButton::clicked, this, &PreferencesDialog::browse_css_file);
   appearance_layout->addWidget(custom_css_browse, row, 2);
 
   row++;
@@ -840,7 +840,7 @@ void PreferencesDialog::setup_ui() {
 
   QLineEdit* key_search_line = new QLineEdit(shortcut_tab);
   key_search_line->setPlaceholderText(tr("Search for action or shortcut"));
-  connect(key_search_line, SIGNAL(textChanged(const QString &)), this, SLOT(refine_shortcut_list(const QString &)));
+  connect(key_search_line, &QLineEdit::textChanged, this, [this](const QString& s){ refine_shortcut_list(s); });
 
   shortcut_layout->addWidget(key_search_line);
 
@@ -854,21 +854,21 @@ void PreferencesDialog::setup_ui() {
 
   QPushButton* import_shortcut_button = new QPushButton(tr("Import"), shortcut_tab);
   reset_shortcut_layout->addWidget(import_shortcut_button);
-  connect(import_shortcut_button, SIGNAL(clicked(bool)), this, SLOT(load_shortcut_file()));
+  connect(import_shortcut_button, &QPushButton::clicked, this, &PreferencesDialog::load_shortcut_file);
 
   QPushButton* export_shortcut_button = new QPushButton(tr("Export"), shortcut_tab);
   reset_shortcut_layout->addWidget(export_shortcut_button);
-  connect(export_shortcut_button, SIGNAL(clicked(bool)), this, SLOT(save_shortcut_file()));
+  connect(export_shortcut_button, &QPushButton::clicked, this, &PreferencesDialog::save_shortcut_file);
 
   reset_shortcut_layout->addStretch();
 
   QPushButton* reset_selected_shortcut_button = new QPushButton(tr("Reset Selected"), shortcut_tab);
   reset_shortcut_layout->addWidget(reset_selected_shortcut_button);
-  connect(reset_selected_shortcut_button, SIGNAL(clicked(bool)), this, SLOT(reset_default_shortcut()));
+  connect(reset_selected_shortcut_button, &QPushButton::clicked, this, &PreferencesDialog::reset_default_shortcut);
 
   QPushButton* reset_all_shortcut_button = new QPushButton(tr("Reset All"), shortcut_tab);
   reset_shortcut_layout->addWidget(reset_all_shortcut_button);
-  connect(reset_all_shortcut_button, SIGNAL(clicked(bool)), this, SLOT(reset_all_shortcuts()));
+  connect(reset_all_shortcut_button, &QPushButton::clicked, this, &PreferencesDialog::reset_all_shortcuts);
 
   shortcut_layout->addLayout(reset_shortcut_layout);
 
@@ -882,6 +882,6 @@ void PreferencesDialog::setup_ui() {
 
   verticalLayout->addWidget(buttonBox);
 
-  connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(buttonBox, &QDialogButtonBox::accepted, this, &PreferencesDialog::accept);
+  connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }

@@ -34,8 +34,8 @@ QWidget *ComboField::CreateWidget(QWidget *existing)
     cb = static_cast<ComboBoxEx*>(existing);
   }
 
-  connect(cb, SIGNAL(activated(int)), this, SLOT(UpdateFromWidget(int)));
-  connect(this, SIGNAL(EnabledChanged(bool)), cb, SLOT(setEnabled(bool)));
+  connect(cb, qOverload<int>(&QComboBox::activated), this, &ComboField::UpdateFromWidget);
+  connect(this, &EffectField::EnabledChanged, cb, &QWidget::setEnabled);
 
   return cb;
 }

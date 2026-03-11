@@ -41,13 +41,13 @@
 #include "global/debug.h"
 #include "undo/undostack.h"
 
-#define CLICK_RANGE 5
-#define PLAYHEAD_SIZE 6
-#define LINE_MIN_PADDING 50
-#define SUBLINE_MIN_PADDING 50 // TODO play with this
+constexpr int CLICK_RANGE = 5;
+constexpr int PLAYHEAD_SIZE = 6;
+constexpr int LINE_MIN_PADDING = 50;
+constexpr int SUBLINE_MIN_PADDING = 50; // TODO play with this
 
 // used only if center_timeline_timecodes is FALSE
-#define TEXT_PADDING_FROM_LINE 4
+constexpr int TEXT_PADDING_FROM_LINE = 4;
 
 bool center_scroll_to_playhead(QScrollBar* bar, double zoom, long playhead) {
   // returns true is the scroll was changed, false if not
@@ -77,7 +77,7 @@ TimelineHeader::TimelineHeader(QWidget *parent) :
   show_text(true);
 
   setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(this, SIGNAL(customContextMenuRequested(const QPoint &)), this, SLOT(show_context_menu(const QPoint &)));
+  connect(this, &TimelineHeader::customContextMenuRequested, this, &TimelineHeader::show_context_menu);
 }
 
 void TimelineHeader::set_scroll(int s) {
@@ -484,7 +484,7 @@ void TimelineHeader::show_context_menu(const QPoint &pos) {
 
   menu.addSeparator();
 
-  QAction* center_timecodes = menu.addAction(tr("Center Timecodes"), &olive::MenuHelper, SLOT(toggle_bool_action()));
+  QAction* center_timecodes = menu.addAction(tr("Center Timecodes"), &olive::MenuHelper, &MenuHelper::toggle_bool_action);
   center_timecodes->setCheckable(true);
   center_timecodes->setChecked(olive::CurrentConfig.center_timeline_timecodes);
   center_timecodes->setData(reinterpret_cast<quintptr>(&olive::CurrentConfig.center_timeline_timecodes));

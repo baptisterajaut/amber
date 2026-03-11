@@ -17,8 +17,8 @@ QWidget *ColorField::CreateWidget(QWidget *existing)
 {
   ColorButton* cb = (existing != nullptr) ? static_cast<ColorButton*>(existing) : new ColorButton();
 
-  connect(cb, SIGNAL(color_changed(const QColor &)), this, SLOT(UpdateFromWidget(const QColor &)));
-  connect(this, SIGNAL(EnabledChanged(bool)), cb, SLOT(setEnabled(bool)));
+  connect(cb, &ColorButton::color_changed, this, &ColorField::UpdateFromWidget);
+  connect(this, &EffectField::EnabledChanged, cb, &QWidget::setEnabled);
 
   return cb;
 }

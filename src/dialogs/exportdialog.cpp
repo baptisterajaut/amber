@@ -359,7 +359,7 @@ void ExportDialog::export_thread_finished() {
   update_ui(false);
 
   // Disconnect cancel button from export thread
-  disconnect(renderCancel, SIGNAL(clicked(bool)), export_thread_, SLOT(Interrupt()));
+  disconnect(renderCancel, &QPushButton::clicked, export_thread_, &ExportThread::Interrupt);
 
   // Free the export thread
   export_thread_->deleteLater();
@@ -566,9 +566,9 @@ void ExportDialog::StartExport() {
     export_thread_ = new ExportThread(params, vcodec_params, this);
 
     // Connect export thread signals/slots
-    connect(export_thread_, SIGNAL(finished()), this, SLOT(export_thread_finished()));
-    connect(export_thread_, SIGNAL(ProgressChanged(int, qint64)), this, SLOT(update_progress_bar(int, qint64)));
-    connect(renderCancel, SIGNAL(clicked(bool)), export_thread_, SLOT(Interrupt()));
+    connect(export_thread_, &QThread::finished, this, &ExportDialog::export_thread_finished);
+    connect(export_thread_, &ExportThread::ProgressChanged, this, &ExportDialog::update_progress_bar);
+    connect(renderCancel, &QPushButton::clicked, export_thread_, &ExportThread::Interrupt);
 
     // Close all effects in effect controls (prevents UI threading issues)
     panel_effect_controls->Clear();
@@ -749,7 +749,7 @@ void ExportDialog::setup_ui() {
   videoGridLayout->addWidget(videobitrateSpinbox, 5, 1, 1, 1);
 
   QPushButton* advanced_video_button = new QPushButton(tr("Advanced"));
-  connect(advanced_video_button, SIGNAL(clicked(bool)), this, SLOT(open_advanced_video_dialog()));
+  connect(advanced_video_button, &QPushButton::clicked, this, &ExportDialog::open_advanced_video_dialog);
   videoGridLayout->addWidget(advanced_video_button, 6, 1);
 
   verticalLayout->addWidget(videoGroupbox);
@@ -797,13 +797,13 @@ void ExportDialog::setup_ui() {
 
   export_button = new QPushButton(this);
   export_button->setText("Export");
-  connect(export_button, SIGNAL(clicked(bool)), this, SLOT(StartExport()));
+  connect(export_button, &QPushButton::clicked, this, &ExportDialog::StartExport);
 
   buttonLayout->addWidget(export_button);
 
   cancel_button = new QPushButton(this);
   cancel_button->setText("Cancel");
-  connect(cancel_button, SIGNAL(clicked(bool)), this, SLOT(reject()));
+  connect(cancel_button, &QPushButton::clicked, this, &QDialog::reject);
 
   buttonLayout->addWidget(cancel_button);
 
@@ -811,7 +811,7 @@ void ExportDialog::setup_ui() {
 
   verticalLayout->addLayout(buttonLayout);
 
-  connect(formatCombobox, SIGNAL(currentIndexChanged(int)), this, SLOT(format_changed(int)));
-  connect(compressionTypeCombobox, SIGNAL(currentIndexChanged(int)), this, SLOT(comp_type_changed(int)));
-  connect(vcodecCombobox, SIGNAL(currentIndexChanged(int)), this, SLOT(vcodec_changed(int)));
+  connect(formatCombobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ExportDialog::format_changed);
+  connect(compressionTypeCombobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ExportDialog::comp_type_changed);
+  connect(vcodecCombobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ExportDialog::vcodec_changed);
 }

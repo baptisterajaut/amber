@@ -27,7 +27,7 @@ FontCombobox::FontCombobox(QWidget* parent) : QComboBox(parent) {
 
   value = currentText();
 
-  connect(this, SIGNAL(currentTextChanged(QString)), this, SLOT(updateInternals()));
+  connect(this, &FontCombobox::currentTextChanged, this, &FontCombobox::updateInternals);
 }
 
 void FontCombobox::updateInternals() {

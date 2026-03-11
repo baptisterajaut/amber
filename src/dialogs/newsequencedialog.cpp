@@ -317,7 +317,7 @@ void NewSequenceDialog::setup_ui() {
 
   verticalLayout->addWidget(buttonBox);
 
-  connect(preset_combobox, SIGNAL(currentIndexChanged(int)), this, SLOT(preset_changed(int)));
-  connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(preset_combobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &NewSequenceDialog::preset_changed);
+  connect(buttonBox, &QDialogButtonBox::accepted, this, &NewSequenceDialog::accept);
+  connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }

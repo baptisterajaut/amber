@@ -12,7 +12,7 @@ DoubleField::DoubleField(EffectRow* parent, const QString& id) :
   value_set_(false),
   kdc_(nullptr)
 {
-  connect(this, SIGNAL(Changed()), this, SLOT(ValueHasBeenSet()), Qt::DirectConnection);
+  connect(this, &DoubleField::Changed, this, &DoubleField::ValueHasBeenSet, Qt::DirectConnection);
 }
 
 double DoubleField::GetDoubleAt(double timecode)
@@ -87,11 +87,11 @@ QWidget *DoubleField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(ls, SIGNAL(valueChanged(double)), this, SLOT(UpdateFromWidget(double)));
-  connect(ls, SIGNAL(clicked()), this, SIGNAL(Clicked()));
-  connect(this, SIGNAL(EnabledChanged(bool)), ls, SLOT(setEnabled(bool)));
-  connect(this, SIGNAL(MaximumChanged(double)), ls, SLOT(SetMaximum(double)));
-  connect(this, SIGNAL(MinimumChanged(double)), ls, SLOT(SetMinimum(double)));
+  connect(ls, &LabelSlider::valueChanged, this, &DoubleField::UpdateFromWidget);
+  connect(ls, &LabelSlider::clicked, this, &EffectField::Clicked);
+  connect(this, &EffectField::EnabledChanged, ls, &QWidget::setEnabled);
+  connect(this, &DoubleField::MaximumChanged, ls, &LabelSlider::SetMaximum);
+  connect(this, &DoubleField::MinimumChanged, ls, &LabelSlider::SetMinimum);
 
   return ls;
 }

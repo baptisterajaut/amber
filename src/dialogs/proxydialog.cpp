@@ -74,7 +74,7 @@ ProxyDialog::ProxyDialog(QWidget *parent, const QVector<Media*> &media) :
   location_combobox = new QComboBox(this);
   location_combobox->addItem(tr("Same as Source (in \"%1\" folder)").arg(proxy_folder_name));
   location_combobox->addItem("");
-  connect(location_combobox, SIGNAL(currentIndexChanged(int)), this, SLOT(location_changed(int)));
+  connect(location_combobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ProxyDialog::location_changed);
   layout->addWidget(location_combobox, 2, 1);
 
   // location_changed will set the default "location" items
@@ -84,8 +84,8 @@ ProxyDialog::ProxyDialog(QWidget *parent, const QVector<Media*> &media) :
   QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
   buttons->setCenterButtons(true);
   layout->addWidget(buttons, 3, 0, 1, 2);
-  connect(buttons, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(buttons, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(buttons, &QDialogButtonBox::accepted, this, &ProxyDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }
 
 void ProxyDialog::accept() {

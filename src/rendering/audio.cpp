@@ -125,7 +125,7 @@ void init_audio() {
     // QAudioSink has no notify() signal, use a QTimer instead
     audio_notify_timer = new QTimer();
     audio_notify_timer->setInterval(5);
-    QObject::connect(audio_notify_timer, SIGNAL(timeout()), audio_thread, SLOT(notifyReceiver()));
+    QObject::connect(audio_notify_timer, &QTimer::timeout, audio_thread, &AudioSenderThread::notifyReceiver);
     audio_notify_timer->start();
 
     audio_thread->start(QThread::TimeCriticalPriority);
@@ -174,7 +174,7 @@ qint64 get_buffer_offset_from_frame(double framerate, long frame) {
 }
 
 AudioSenderThread::AudioSenderThread() : close(false) {
-  connect(this, SIGNAL(finished()), this, SLOT(deleteLater()));
+  connect(this, &QThread::finished, this, &QObject::deleteLater);
 }
 
 void AudioSenderThread::stop() {

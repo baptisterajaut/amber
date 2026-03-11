@@ -72,7 +72,7 @@ GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   setMouseTracking(true);
   setFocusPolicy(Qt::ClickFocus);
   setContextMenuPolicy(Qt::CustomContextMenu);
-  connect(this, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(show_context_menu(const QPoint&)));
+  connect(this, &GraphView::customContextMenuRequested, this, &GraphView::show_context_menu);
 }
 
 void GraphView::show_context_menu(const QPoint& pos) {
@@ -82,14 +82,14 @@ void GraphView::show_context_menu(const QPoint& pos) {
   if (selected_keys.size() == 0 || row == nullptr) {
     zoom_to_selection->setEnabled(false);
   } else {
-    connect(zoom_to_selection, SIGNAL(triggered(bool)), this, SLOT(set_view_to_selection()));
+    connect(zoom_to_selection, &QAction::triggered, this, &GraphView::set_view_to_selection);
   }
 
   QAction* zoom_to_all = menu.addAction(tr("Zoom to Show All"));
   if (row == nullptr) {
     zoom_to_all->setEnabled(false);
   } else {
-    connect(zoom_to_all, SIGNAL(triggered(bool)), this, SLOT(set_view_to_all()));
+    connect(zoom_to_all, &QAction::triggered, this, &GraphView::set_view_to_all);
   }
 
   menu.addSeparator();
@@ -98,7 +98,7 @@ void GraphView::show_context_menu(const QPoint& pos) {
   if (row == nullptr) {
     reset_action->setEnabled(false);
   } else {
-    connect(reset_action, SIGNAL(triggered(bool)), this, SLOT(reset_view()));
+    connect(reset_action, &QAction::triggered, this, &GraphView::reset_view);
   }
 
   menu.exec(mapToGlobal(pos));

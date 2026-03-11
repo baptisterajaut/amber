@@ -70,15 +70,15 @@ EffectUI::EffectUI(Effect* e) :
   SetContents(ui);
 
   SetExpanded(e->IsExpanded());
-  connect(this, SIGNAL(visibleChanged(bool)), e, SLOT(SetExpanded(bool)));
+  connect(this, &EffectUI::visibleChanged, e, &Effect::SetExpanded);
 
   layout_ = new QGridLayout(ui);
   layout_->setSpacing(4);
 
   connect(title_bar,
-          SIGNAL(customContextMenuRequested(const QPoint&)),
+          &QWidget::customContextMenuRequested,
           this,
-          SLOT(show_context_menu(const QPoint&)));
+          &EffectUI::show_context_menu);
 
   int maximum_column = 0;
 
@@ -88,7 +88,7 @@ EffectUI::EffectUI(Effect* e) :
     EffectRow* row = e->row(i);
 
     ClickableLabel* row_label = new ClickableLabel(row->name());
-    connect(row_label, SIGNAL(clicked()), row, SLOT(FocusRow()));
+    connect(row_label, &ClickableLabel::clicked, row, &EffectRow::FocusRow);
 
     labels_.append(row_label);
 
@@ -144,8 +144,8 @@ EffectUI::EffectUI(Effect* e) :
   }
 
   enabled_check->setChecked(e->IsEnabled());
-  connect(enabled_check, SIGNAL(toggled(bool)), e, SLOT(SetEnabled(bool)));
-  connect(enabled_check, SIGNAL(toggled(bool)), e, SLOT(FieldChanged()));
+  connect(enabled_check, &QCheckBox::toggled, e, &Effect::SetEnabled);
+  connect(enabled_check, &QCheckBox::toggled, e, &Effect::FieldChanged);
 }
 
 void EffectUI::AddAdditionalEffect(Effect *e)
@@ -267,12 +267,12 @@ void EffectUI::AttachKeyframeNavigationToRow(EffectRow *row, KeyframeNavigator *
     return;
   }
 
-  connect(nav, SIGNAL(goto_previous_key()), row, SLOT(GoToPreviousKeyframe()));
-  connect(nav, SIGNAL(toggle_key()), row, SLOT(ToggleKeyframe()));
-  connect(nav, SIGNAL(goto_next_key()), row, SLOT(GoToNextKeyframe()));
-  connect(nav, SIGNAL(keyframe_enabled_changed(bool)), row, SLOT(SetKeyframingEnabled(bool)));
-  connect(nav, SIGNAL(clicked()), row, SLOT(FocusRow()));
-  connect(row, SIGNAL(KeyframingSetChanged(bool)), nav, SLOT(enable_keyframes(bool)));
+  connect(nav, &KeyframeNavigator::goto_previous_key, row, &EffectRow::GoToPreviousKeyframe);
+  connect(nav, &KeyframeNavigator::toggle_key, row, &EffectRow::ToggleKeyframe);
+  connect(nav, &KeyframeNavigator::goto_next_key, row, &EffectRow::GoToNextKeyframe);
+  connect(nav, &KeyframeNavigator::keyframe_enabled_changed, row, &EffectRow::SetKeyframingEnabled);
+  connect(nav, &KeyframeNavigator::clicked, row, &EffectRow::FocusRow);
+  connect(row, &EffectRow::KeyframingSetChanged, nav, &KeyframeNavigator::enable_keyframes);
 }
 
 void EffectUI::show_context_menu(const QPoint& pos) {
@@ -284,10 +284,10 @@ void EffectUI::show_context_menu(const QPoint& pos) {
     int index = c->IndexOfEffect(effect_);
 
     QAction* cut_action = menu.addAction(tr("Cu&t"));
-    connect(cut_action, SIGNAL(triggered(bool)), this, SIGNAL(CutRequested()));
+    connect(cut_action, &QAction::triggered, this, &EffectUI::CutRequested);
 
     QAction* copy_action = menu.addAction(tr("&Copy"));
-    connect(copy_action, SIGNAL(triggered(bool)), this, SIGNAL(CopyRequested()));
+    connect(copy_action, &QAction::triggered, this, &EffectUI::CopyRequested);
 
     olive::MenuHelper.create_effect_paste_action(&menu);
 
@@ -297,35 +297,35 @@ void EffectUI::show_context_menu(const QPoint& pos) {
     QAction* move_down_action = nullptr;
 
     if (index > 0) {
-      move_up_action = menu.addAction(tr("Move &Up"), GetEffect(), SLOT(move_up()));
+      move_up_action = menu.addAction(tr("Move &Up"), GetEffect(), &Effect::move_up);
     }
 
     if (index < c->effects.size() - 1) {
-      move_down_action = menu.addAction(tr("Move &Down"), GetEffect(), SLOT(move_down()));
+      move_down_action = menu.addAction(tr("Move &Down"), GetEffect(), &Effect::move_down);
     }
 
     menu.addSeparator();
 
-    QAction* delete_action = menu.addAction(tr("D&elete"), GetEffect(), SLOT(delete_self()));
+    QAction* delete_action = menu.addAction(tr("D&elete"), GetEffect(), &Effect::delete_self);
 
     // Loop through additional effects and link these too
     for (int i=0;i<additional_effects_.size();i++) {
       if (move_up_action != nullptr) {
-        connect(move_up_action, SIGNAL(triggered(bool)), additional_effects_.at(i), SLOT(move_up()));
+        connect(move_up_action, &QAction::triggered, additional_effects_.at(i), &Effect::move_up);
       }
 
       if (move_down_action != nullptr) {
-        connect(move_down_action, SIGNAL(triggered(bool)), additional_effects_.at(i), SLOT(move_down()));
+        connect(move_down_action, &QAction::triggered, additional_effects_.at(i), &Effect::move_down);
       }
 
-      connect(delete_action, SIGNAL(triggered(bool)), additional_effects_.at(i), SLOT(delete_self()));
+      connect(delete_action, &QAction::triggered, additional_effects_.at(i), &Effect::delete_self);
     }
 
     menu.addSeparator();
 
-    menu.addAction(tr("Load Settings From File"), GetEffect(), SLOT(load_from_file()));
+    menu.addAction(tr("Load Settings From File"), GetEffect(), &Effect::load_from_file);
 
-    menu.addAction(tr("Save Settings to File"), GetEffect(), SLOT(save_to_file()));
+    menu.addAction(tr("Save Settings to File"), GetEffect(), &Effect::save_to_file);
 
     menu.exec(title_bar->mapToGlobal(pos));
   }

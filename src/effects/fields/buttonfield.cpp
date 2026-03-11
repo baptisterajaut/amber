@@ -36,11 +36,11 @@ QWidget *ButtonField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(this, SIGNAL(CheckedChanged(bool)), button, SLOT(setChecked(bool)));
-  connect(this, SIGNAL(EnabledChanged(bool)), button, SLOT(setEnabled(bool)));
-  connect(button, SIGNAL(clicked(bool)), this, SIGNAL(Clicked()));
-  connect(button, SIGNAL(toggled(bool)), this, SLOT(SetChecked(bool)));
-  connect(button, SIGNAL(toggled(bool)), this, SIGNAL(Toggled(bool)));
+  connect(this, &ButtonField::CheckedChanged, button, &QPushButton::setChecked);
+  connect(this, &EffectField::EnabledChanged, button, &QWidget::setEnabled);
+  connect(button, &QPushButton::clicked, this, &EffectField::Clicked);
+  connect(button, &QPushButton::toggled, this, &ButtonField::SetChecked);
+  connect(button, &QPushButton::toggled, this, &ButtonField::Toggled);
 
   return button;
 }

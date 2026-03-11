@@ -139,8 +139,8 @@ MediaPropertiesDialog::MediaPropertiesDialog(QWidget *parent, Media *i) :
   buttons->setCenterButtons(true);
   grid->addWidget(buttons, row, 0, 1, 2);
 
-  connect(buttons, SIGNAL(accepted()), this, SLOT(accept()));
-  connect(buttons, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(buttons, &QDialogButtonBox::accepted, this, &MediaPropertiesDialog::accept);
+  connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
 }
 
 void MediaPropertiesDialog::accept() {

@@ -102,7 +102,7 @@ void OliveGlobal::check_for_autorecovery_file() {
       }
     }
     autorecovery_timer.setInterval(60000);
-    QObject::connect(&autorecovery_timer, SIGNAL(timeout()), this, SLOT(save_autorecovery_file()));
+    QObject::connect(&autorecovery_timer, &QTimer::timeout, this, &OliveGlobal::save_autorecovery_file);
     autorecovery_timer.start();
   }
 }
@@ -184,11 +184,11 @@ void OliveGlobal::LoadProject(const QString &fn, bool autorecovery)
   ld.open();
 
   LoadThread* lt = new LoadThread(fn, autorecovery);
-  connect(&ld, SIGNAL(cancel()), lt, SLOT(cancel()));
-  connect(lt, SIGNAL(success()), &ld, SLOT(accept()));
-  connect(lt, SIGNAL(error()), &ld, SLOT(reject()));
-  connect(lt, SIGNAL(error()), this, SLOT(new_project()));
-  connect(lt, SIGNAL(report_progress(int)), &ld, SLOT(setValue(int)));
+  connect(&ld, &LoadDialog::cancel, lt, &LoadThread::cancel);
+  connect(lt, &LoadThread::success, &ld, &QDialog::accept);
+  connect(lt, &LoadThread::error, &ld, &QDialog::reject);
+  connect(lt, &LoadThread::error, this, &OliveGlobal::new_project);
+  connect(lt, &LoadThread::report_progress, &ld, &LoadDialog::setValue);
   lt->start();
 
   panel_project->ConnectFilterToModel();
@@ -327,7 +327,7 @@ void OliveGlobal::finished_initialize() {
     // if we are not loading a project on launch and are running a release build, open the demo notice dialog
 #ifndef QT_DEBUG
     DemoNotice* d = new DemoNotice(olive::MainWindow);
-    connect(d, SIGNAL(finished(int)), d, SLOT(deleteLater()));
+    connect(d, &QDialog::finished, d, &QObject::deleteLater);
     d->open();
 #endif
   }

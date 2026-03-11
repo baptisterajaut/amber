@@ -120,13 +120,13 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent), row(nullptr) {
   current_row_desc->setAlignment(Qt::AlignCenter);
   layout->addWidget(current_row_desc);
 
-  connect(view, SIGNAL(zoom_changed(double, double)), header, SLOT(update_zoom(double)));
-  connect(view, SIGNAL(x_scroll_changed(int)), header, SLOT(set_scroll(int)));
-  connect(view, SIGNAL(selection_changed(bool, int)), this, SLOT(set_key_button_enabled(bool, int)));
+  connect(view, &GraphView::zoom_changed, header, [this](double z, double) { header->update_zoom(z); });
+  connect(view, &GraphView::x_scroll_changed, header, &TimelineHeader::set_scroll);
+  connect(view, &GraphView::selection_changed, this, &GraphEditor::set_key_button_enabled);
 
-  connect(linear_button, SIGNAL(clicked(bool)), this, SLOT(set_keyframe_type()));
-  connect(bezier_button, SIGNAL(clicked(bool)), this, SLOT(set_keyframe_type()));
-  connect(hold_button, SIGNAL(clicked(bool)), this, SLOT(set_keyframe_type()));
+  connect(linear_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
+  connect(bezier_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
+  connect(hold_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
 
   Retranslate();
 }
@@ -171,9 +171,9 @@ void GraphEditor::set_row(EffectRow *r) {
 
   if (row != nullptr) {
     // clear old row connections
-    disconnect(keyframe_nav, SIGNAL(goto_previous_key()), row, SLOT(GoToPreviousKeyframe()));
-    disconnect(keyframe_nav, SIGNAL(toggle_key()), row, SLOT(ToggleKeyframe()));
-    disconnect(keyframe_nav, SIGNAL(goto_next_key()), row, SLOT(GoToNextKeyframe()));
+    disconnect(keyframe_nav, &KeyframeNavigator::goto_previous_key, row, &EffectRow::GoToPreviousKeyframe);
+    disconnect(keyframe_nav, &KeyframeNavigator::toggle_key, row, &EffectRow::ToggleKeyframe);
+    disconnect(keyframe_nav, &KeyframeNavigator::goto_next_key, row, &EffectRow::GoToNextKeyframe);
   }
 
   bool found_vals = false;
@@ -188,7 +188,7 @@ void GraphEditor::set_row(EffectRow *r) {
         slider_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/record.svg", false));
         slider_button->setProperty("field", i);
         slider_button->setIconSize(slider_button->iconSize()*0.5);
-        connect(slider_button, SIGNAL(toggled(bool)), this, SLOT(set_field_visibility(bool)));
+        connect(slider_button, &QPushButton::toggled, this, &GraphEditor::set_field_visibility);
         field_enable_buttons.append(slider_button);
         value_layout->addWidget(slider_button);
 
@@ -209,9 +209,9 @@ void GraphEditor::set_row(EffectRow *r) {
                               + " :: " + row->name());
     header->set_visible_in(r->GetParentEffect()->parent_clip->timeline_in());
 
-    connect(keyframe_nav, SIGNAL(goto_previous_key()), row, SLOT(GoToPreviousKeyframe()));
-    connect(keyframe_nav, SIGNAL(toggle_key()), row, SLOT(ToggleKeyframe()));
-    connect(keyframe_nav, SIGNAL(goto_next_key()), row, SLOT(GoToNextKeyframe()));
+    connect(keyframe_nav, &KeyframeNavigator::goto_previous_key, row, &EffectRow::GoToPreviousKeyframe);
+    connect(keyframe_nav, &KeyframeNavigator::toggle_key, row, &EffectRow::ToggleKeyframe);
+    connect(keyframe_nav, &KeyframeNavigator::goto_next_key, row, &EffectRow::GoToNextKeyframe);
   } else {
     row = nullptr;
     current_row_desc->setText(nullptr);

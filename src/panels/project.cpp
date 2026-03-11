@@ -65,7 +65,7 @@ extern "C" {
 #include "global/debug.h"
 #include "ui/menu.h"
 
-#define MAXIMUM_RECENT_PROJECTS 10 // FIXME: should be configurable
+constexpr int MAXIMUM_RECENT_PROJECTS = 10; // FIXME: should be configurable
 
 QString autorecovery_filename;
 QStringList recent_projects;
@@ -97,54 +97,54 @@ Project::Project(QWidget *parent) :
   QPushButton* toolbar_new = new QPushButton();
   toolbar_new->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/add-button.svg")));
   toolbar_new->setToolTip(tr("New"));
-  connect(toolbar_new, SIGNAL(clicked(bool)), this, SLOT(make_new_menu()));
+  connect(toolbar_new, &QPushButton::clicked, this, &Project::make_new_menu);
   toolbar->addWidget(toolbar_new);
 
   QPushButton* toolbar_open = new QPushButton();
   toolbar_open->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/open.svg")));
   toolbar_open->setToolTip(tr("Open Project"));
-  connect(toolbar_open, SIGNAL(clicked(bool)), olive::Global.get(), SLOT(OpenProject()));
+  connect(toolbar_open, &QPushButton::clicked, olive::Global.get(), &OliveGlobal::OpenProject);
   toolbar->addWidget(toolbar_open);
 
   QPushButton* toolbar_save = new QPushButton();
   toolbar_save->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/save.svg")));
   toolbar_save->setToolTip(tr("Save Project"));
-  connect(toolbar_save, SIGNAL(clicked(bool)), olive::Global.get(), SLOT(save_project()));
+  connect(toolbar_save, &QPushButton::clicked, olive::Global.get(), &OliveGlobal::save_project);
   toolbar->addWidget(toolbar_save);
 
   QPushButton* toolbar_undo = new QPushButton();
   toolbar_undo->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/undo.svg")));
   toolbar_undo->setToolTip(tr("Undo"));
-  connect(toolbar_undo, SIGNAL(clicked(bool)), olive::Global.get(), SLOT(undo()));
+  connect(toolbar_undo, &QPushButton::clicked, olive::Global.get(), &OliveGlobal::undo);
   toolbar->addWidget(toolbar_undo);
 
   QPushButton* toolbar_redo = new QPushButton();
   toolbar_redo->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/redo.svg")));
   toolbar_redo->setToolTip(tr("Redo"));
-  connect(toolbar_redo, SIGNAL(clicked(bool)), olive::Global.get(), SLOT(redo()));
+  connect(toolbar_redo, &QPushButton::clicked, olive::Global.get(), &OliveGlobal::redo);
   toolbar->addWidget(toolbar_redo);
 
   toolbar_search = new QLineEdit();
   toolbar_search->setClearButtonEnabled(true);
-  connect(toolbar_search, SIGNAL(textChanged(QString)), &sorter, SLOT(update_search_filter(const QString&)));
+  connect(toolbar_search, &QLineEdit::textChanged, &sorter, &ProjectFilter::update_search_filter);
   toolbar->addWidget(toolbar_search);
 
   QPushButton* toolbar_tree_view = new QPushButton();
   toolbar_tree_view->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/treeview.svg")));
   toolbar_tree_view->setToolTip(tr("Tree View"));
-  connect(toolbar_tree_view, SIGNAL(clicked(bool)), this, SLOT(set_tree_view()));
+  connect(toolbar_tree_view, &QPushButton::clicked, this, &Project::set_tree_view);
   toolbar->addWidget(toolbar_tree_view);
 
   QPushButton* toolbar_icon_view = new QPushButton();
   toolbar_icon_view->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/iconview.svg")));
   toolbar_icon_view->setToolTip(tr("Icon View"));
-  connect(toolbar_icon_view, SIGNAL(clicked(bool)), this, SLOT(set_icon_view()));
+  connect(toolbar_icon_view, &QPushButton::clicked, this, &Project::set_icon_view);
   toolbar->addWidget(toolbar_icon_view);
 
   QPushButton* toolbar_list_view = new QPushButton();
   toolbar_list_view->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/listview.svg")));
   toolbar_list_view->setToolTip(tr("List View"));
-  connect(toolbar_list_view, SIGNAL(clicked(bool)), this, SLOT(set_list_view()));
+  connect(toolbar_list_view, &QPushButton::clicked, this, &Project::set_list_view);
   toolbar->addWidget(toolbar_list_view);
 
   verticalLayout->addWidget(toolbar_widget);
@@ -183,7 +183,7 @@ Project::Project(QWidget *parent) :
   icon_size_slider->setMinimum(16);
   icon_size_slider->setMaximum(256);
   icon_view_controls->addWidget(icon_size_slider);
-  connect(icon_size_slider, SIGNAL(valueChanged(int)), this, SLOT(set_icon_view_size(int)));
+  connect(icon_size_slider, &QSlider::valueChanged, this, &Project::set_icon_view_size);
 
   icon_view_container_layout->addLayout(icon_view_controls);
 
@@ -199,11 +199,11 @@ Project::Project(QWidget *parent) :
 
   verticalLayout->addWidget(icon_view_container);
 
-  connect(directory_up, SIGNAL(clicked(bool)), this, SLOT(go_up_dir()));
-  connect(icon_view, SIGNAL(changed_root()), this, SLOT(set_up_dir_enabled()));
+  connect(directory_up, &QPushButton::clicked, this, &Project::go_up_dir);
+  connect(icon_view, &SourceIconView::changed_root, this, &Project::set_up_dir_enabled);
 
-  connect(olive::media_icon_service.get(), SIGNAL(IconChanged()), icon_view->viewport(), SLOT(update()));
-  connect(olive::media_icon_service.get(), SIGNAL(IconChanged()), tree_view->viewport(), SLOT(update()));
+  connect(olive::media_icon_service.get(), &MediaIconService::IconChanged, icon_view->viewport(), qOverload<>(&QWidget::update));
+  connect(olive::media_icon_service.get(), &MediaIconService::IconChanged, tree_view->viewport(), qOverload<>(&QWidget::update));
 
   update_view_type();
 

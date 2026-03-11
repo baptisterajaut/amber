@@ -218,7 +218,7 @@ public slots:
   void SetExpanded(bool e);
 signals:
   void EnabledChanged(bool);
-private slots:
+public slots:
   void delete_self();
   void move_up();
   void move_down();

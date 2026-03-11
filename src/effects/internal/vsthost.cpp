@@ -229,7 +229,7 @@ void VSTHost::CreateDialogIfNull()
     dialog->setWindowTitle(tr("VST Plugin"));
     dialog->setAttribute(Qt::WA_NativeWindow, true);
     dialog->setWindowFlags(dialog->windowFlags() | Qt::MSWindowsFixedSizeDialogHint);
-    connect(dialog, SIGNAL(finished(int)), this, SLOT(uncheck_show_button()));
+    connect(dialog, &QDialog::finished, this, &VSTHost::uncheck_show_button);
   }
 }
 
@@ -254,14 +254,14 @@ VSTHost::VSTHost(Clip* c, const EffectMeta *em) :
 
   EffectRow* file_row = new EffectRow(this, tr("Plugin"), true, false);
   file_field = new FileField(file_row, "filename");
-  connect(file_field, SIGNAL(Changed()), this, SLOT(change_plugin()), Qt::QueuedConnection);
+  connect(file_field, &FileField::Changed, this, &VSTHost::change_plugin, Qt::QueuedConnection);
 
   EffectRow* interface_row = new EffectRow(this, tr("Interface"), false, false);
 
   show_interface_btn = new ButtonField(interface_row, tr("Show"));
   show_interface_btn->SetCheckable(true);
   show_interface_btn->SetEnabled(false);
-  connect(show_interface_btn, SIGNAL(Toggled(bool)), this, SLOT(show_interface(bool)));
+  connect(show_interface_btn, &ButtonField::Toggled, this, &VSTHost::show_interface);
 }
 
 VSTHost::~VSTHost() {

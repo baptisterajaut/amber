@@ -54,7 +54,7 @@ extern QIODevice* audio_io_device;
 extern AudioSenderThread* audio_thread;
 extern QMutex audio_write_lock;
 
-#define audio_ibuffer_size 192000
+constexpr int audio_ibuffer_size = 192000;
 extern qint8 audio_ibuffer[audio_ibuffer_size];
 extern qint64 audio_ibuffer_read;
 extern long audio_ibuffer_frame;

@@ -46,7 +46,7 @@ LoadDialog::LoadDialog(QWidget *parent) :
   layout->addWidget(bar);
 
   QPushButton* cancel_button = new QPushButton(tr("Cancel"), this);
-  connect(cancel_button, SIGNAL(clicked(bool)), this, SIGNAL(cancel()));
+  connect(cancel_button, &QPushButton::clicked, this, &LoadDialog::cancel);
 
   // Wrap cancel button in a horizontal layout so it can be centered
   QHBoxLayout* hboxLayout = new QHBoxLayout();

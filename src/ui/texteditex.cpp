@@ -37,12 +37,12 @@ TextEditEx::TextEditEx(QWidget *parent, bool enable_rich_text) :
 
   text_editor_ = new QTextEdit();
   text_editor_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
-  connect(text_editor_, SIGNAL(textChanged()), this, SLOT(queue_text_modified()));
+  connect(text_editor_, &QTextEdit::textChanged, this, &TextEditEx::queue_text_modified);
   layout->addWidget(text_editor_);
 
   QPushButton* edit_button = new QPushButton(tr("Edit Text"));
   layout->addWidget(edit_button);
-  connect(edit_button, SIGNAL(clicked(bool)), this, SLOT(open_text_edit()));
+  connect(edit_button, &QPushButton::clicked, this, &TextEditEx::open_text_edit);
 
   /*
   text_editor_->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -88,7 +88,7 @@ void TextEditEx::setPlainText(const QString &text)
 void TextEditEx::text_edit_menu() {
   Menu menu;
 
-  menu.addAction(tr("&Edit Text"), this, SLOT(open_text_edit()));
+  menu.addAction(tr("&Edit Text"), this, &TextEditEx::open_text_edit);
 
   menu.exec(QCursor::pos());
 }
