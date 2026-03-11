@@ -115,7 +115,7 @@ TransitionPtr Transition::CreateFromMeta(Clip* c, Clip* s, const EffectMeta* em)
     qCritical() << "Invalid transition data";
     QMessageBox::critical(olive::MainWindow,
                           QCoreApplication::translate("transition", "Invalid transition"),
-                          QCoreApplication::translate("transition", "No candidate for transition '%1'. This transition may be corrupt. Try reinstalling it or Olive.").arg(em->name)
+                          QCoreApplication::translate("transition", "No candidate for transition '%1'. This transition may be corrupt. Try reinstalling it or Amber.").arg(em->name)
                           );
   }
   return nullptr;

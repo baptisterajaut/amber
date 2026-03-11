@@ -6,7 +6,7 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x`, por
 >
 > The original Olive 0.1 codebase is hand-written (circa 2019, well before ChatGPT was a thing). This fork is vibe-coded: porting, bug fixes, and new features are all done with AI assistance (Claude Code). I don't have the C++ chops to maintain this myself, and no one else was picking it up, so here we are.
 
-![screen](https://www.olivevideoeditor.org/img/screenshot.jpg)
+![screen](.github/amber.jpg)
 
 ## What changed from Olive 0.1
 

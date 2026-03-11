@@ -98,7 +98,7 @@ EffectPtr Effect::Create(Clip* c, const EffectMeta* em) {
     qCritical() << "Invalid effect data";
     QMessageBox::critical(olive::MainWindow,
                           QCoreApplication::translate("Effect", "Invalid effect"),
-                          QCoreApplication::translate("Effect", "No candidate for effect '%1'. This effect may be corrupt. Try reinstalling it or Olive.").arg(em->name));
+                          QCoreApplication::translate("Effect", "No candidate for effect '%1'. This effect may be corrupt. Try reinstalling it or Amber.").arg(em->name));
   }
   return nullptr;
 }
