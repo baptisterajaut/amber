@@ -63,14 +63,13 @@ RUN curl -L -o /tmp/linuxdeploy.AppImage \
     ln -s /opt/linuxdeploy-plugin-qt/AppRun /usr/local/bin/linuxdeploy-plugin-qt
 
 RUN DESTDIR=/tmp/AppDir make install && \
-    cp /tmp/AppDir/usr/share/icons/hicolor/256x256/apps/org.ambervideoeditor.Amber.png /tmp/AppDir/ && \
     VERSION="${VERSION}" \
     linuxdeploy \
     --appdir /tmp/AppDir \
     --plugin qt \
     --output appimage \
     --desktop-file /tmp/AppDir/usr/share/applications/org.ambervideoeditor.Amber.desktop \
-    --icon-file /tmp/AppDir/org.ambervideoeditor.Amber.png
+    --icon-file /tmp/AppDir/usr/share/icons/hicolor/256x256/apps/org.ambervideoeditor.Amber.png
 
 RUN mkdir -p /out && mv /src/build/Amber*.AppImage /out/ 2>/dev/null || mv /src/build/*.AppImage /out/ 2>/dev/null || true
 
