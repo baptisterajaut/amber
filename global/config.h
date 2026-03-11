@@ -167,6 +167,14 @@ struct Config {
   bool show_track_lines;
 
   /**
+   * @brief Use hardware-accelerated video decoding
+   *
+   * **TRUE** if Olive should attempt to use hardware decoding (VAAPI on Linux, D3D11VA on Windows,
+   * VideoToolbox on macOS). Falls back to software decoding if unavailable.
+   */
+  bool hardware_decoding;
+
+  /**
    * @brief The scroll wheel zooms rather than scrolls
    *
    * **TRUE** if the scroll wheel should zoom in and out rather than scroll up and down.

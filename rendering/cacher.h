@@ -34,6 +34,7 @@ extern "C" {
 #include <libavfilter/buffersink.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
+#include <libavutil/hwcontext.h>
 #include <libavutil/channel_layout.h>
 }
 
@@ -362,6 +363,11 @@ private:
    * @brief FFmpeg decoder context - used for media decoding
    */
   AVCodecContext* codecCtx;
+
+  /**
+   * @brief FFmpeg hardware device context for GPU-accelerated decoding (nullptr if software)
+   */
+  AVBufferRef* hw_device_ctx;
 
   /**
    * @brief FFmpeg stream - used for media decoding

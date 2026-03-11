@@ -940,6 +940,7 @@ void Cacher::OpenWorker() {
     avcodec_parameters_to_context(codecCtx, stream->codecpar);
 
     opts = nullptr;
+    hw_device_ctx = nullptr;
 
     // enable multithreading on decoding
     av_dict_set(&opts, "threads", "auto", 0);
@@ -948,6 +949,33 @@ void Cacher::OpenWorker() {
     if (stream->codecpar->codec_id == AV_CODEC_ID_H264) {
       av_dict_set(&opts, "tune", "fastdecode", 0);
       av_dict_set(&opts, "tune", "zerolatency", 0);
+    }
+
+    // Try hardware-accelerated decoding if enabled and this is a video stream
+    if (olive::CurrentConfig.hardware_decoding
+        && stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+      static const AVHWDeviceType hw_types[] = {
+#if defined(__linux__)
+        AV_HWDEVICE_TYPE_VAAPI,
+#elif defined(_WIN32)
+        AV_HWDEVICE_TYPE_D3D11VA,
+#elif defined(__APPLE__)
+        AV_HWDEVICE_TYPE_VIDEOTOOLBOX,
+#endif
+        AV_HWDEVICE_TYPE_NONE
+      };
+
+      for (int i = 0; hw_types[i] != AV_HWDEVICE_TYPE_NONE; i++) {
+        if (av_hwdevice_ctx_create(&hw_device_ctx, hw_types[i], nullptr, nullptr, 0) == 0) {
+          codecCtx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+          qInfo() << "Hardware decoding enabled:"
+                  << av_hwdevice_get_type_name(hw_types[i]);
+          break;
+        }
+      }
+      if (hw_device_ctx == nullptr) {
+        qInfo() << "Hardware decoding unavailable, falling back to software";
+      }
     }
 
     // Open codec
@@ -1137,6 +1165,11 @@ void Cacher::CloseWorker() {
     if (codecCtx != nullptr) {
       avcodec_free_context(&codecCtx);
       codecCtx = nullptr;
+    }
+
+    if (hw_device_ctx != nullptr) {
+      av_buffer_unref(&hw_device_ctx);
+      hw_device_ctx = nullptr;
     }
 
     if (opts != nullptr) {
@@ -1382,6 +1415,21 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
   if (receive_ret < 0) {
     if (receive_ret != AVERROR_EOF) qCritical() << "Failed to receive packet from decoder." << receive_ret;
     result = receive_ret;
+  }
+
+  // If the frame is in hardware format, transfer to software
+  if (result >= 0 && hw_device_ctx != nullptr && f->format != AV_PIX_FMT_NONE
+      && av_pix_fmt_desc_get(static_cast<AVPixelFormat>(f->format))->flags & AV_PIX_FMT_FLAG_HWACCEL) {
+    AVFrame* sw_frame = av_frame_alloc();
+    if (av_hwframe_transfer_data(sw_frame, f, 0) < 0) {
+      qWarning() << "Failed to transfer hw frame to software, disabling hwaccel for this clip";
+      av_frame_free(&sw_frame);
+    } else {
+      av_frame_copy_props(sw_frame, f);
+      av_frame_unref(f);
+      av_frame_move_ref(f, sw_frame);
+      av_frame_free(&sw_frame);
+    }
   }
 
   return result;

@@ -34,6 +34,7 @@ RuntimeConfig olive::CurrentRuntimeConfig;
 
 Config::Config()
   : show_track_lines(true),
+    hardware_decoding(false),
     scroll_zooms(false),
     edit_tool_selects_links(false),
     edit_tool_also_seeks(false),
@@ -90,7 +91,10 @@ void Config::load(QString path) {
     while (!stream.atEnd()) {
       stream.readNext();
       if (stream.isStartElement()) {
-        if (stream.name() == QLatin1String("ShowTrackLines")) {
+        if (stream.name() == QLatin1String("HardwareDecoding")) {
+          stream.readNext();
+          hardware_decoding = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("ShowTrackLines")) {
           stream.readNext();
           show_track_lines = (stream.text() == QLatin1String("1"));
         } else if (stream.name() == QLatin1String("ScrollZooms")) {
@@ -267,6 +271,7 @@ void Config::save(QString path) {
   stream.writeStartElement("Configuration"); // configuration
 
   stream.writeTextElement("Version", QString::number(olive::kSaveVersion));
+  stream.writeTextElement("HardwareDecoding", QString::number(hardware_decoding));
   stream.writeTextElement("ShowTrackLines", QString::number(show_track_lines));
   stream.writeTextElement("ScrollZooms", QString::number(scroll_zooms));
   stream.writeTextElement("InvertTimelineScrollAxes", QString::number(invert_timeline_scroll_axes));

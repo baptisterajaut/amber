@@ -580,6 +580,14 @@ void PreferencesDialog::setup_ui() {
 
   row++;
 
+  // General -> Hardware Decoding
+  QCheckBox* hardware_decoding_checkbox = new QCheckBox(tr("Hardware Decoding (VAAPI/D3D11VA/VideoToolbox)"));
+  hardware_decoding_checkbox->setToolTip(tr("Use GPU-accelerated video decoding when available. Falls back to software if unsupported. Requires restart."));
+  AddBoolPair(hardware_decoding_checkbox, &olive::CurrentConfig.hardware_decoding, true);
+  general_layout->addWidget(hardware_decoding_checkbox, row, 0, 1, 4);
+
+  row++;
+
   // General -> Default Sequence Settings
   QPushButton* default_sequence_settings = new QPushButton(tr("Default Sequence Settings"));
   connect(default_sequence_settings, SIGNAL(clicked(bool)), this, SLOT(edit_default_sequence_settings()));
