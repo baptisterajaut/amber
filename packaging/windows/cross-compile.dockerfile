@@ -26,10 +26,13 @@ RUN dnf install -y unzip curl && \
     cp /tmp/${FFMPEG_ARCHIVE}/bin/*.dll "${SYSROOT}/bin/" && \
     rm -rf /tmp/ffmpeg*
 
+ARG GIT_HASH
+
 COPY src/ /src
 WORKDIR /src/build
 
-RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release .. && \
+RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release \
+      ${GIT_HASH:+-DGIT_HASH=${GIT_HASH}} .. && \
     make -j$(nproc)
 
 # --- Packaging stage ---
@@ -37,7 +40,7 @@ FROM build AS package
 
 RUN dnf install -y curl mingw64-nsis mingw-nsis-base && dnf clean all
 
-COPY packaging/ /src/packaging/
+COPY packaging/ /packaging/
 
 # Collect everything into /out
 RUN SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \
@@ -56,7 +59,7 @@ RUN cd /usr/share/nsis/Stubs && \
     ln -sf amd64-unicode /usr/share/nsis/Plugins/x86-unicode
 
 # Build NSIS installer
-RUN cd /src/packaging/windows/nsis && \
+RUN cd /packaging/windows/nsis && \
     cp -r /out amber && \
     curl -sL -o LICENSE "https://www.gnu.org/licenses/gpl-3.0.txt" && \
     makensis -DX64 amber.nsi && \

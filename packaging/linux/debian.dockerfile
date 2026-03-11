@@ -16,10 +16,13 @@ RUN apt-get update && apt-get install -y \
     frei0r-plugins-dev \
     && rm -rf /var/lib/apt/lists/*
 
+ARG GIT_HASH
+
 COPY src/ /src
 WORKDIR /src/build
 
-RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && \
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+      ${GIT_HASH:+-DGIT_HASH=${GIT_HASH}} .. && \
     make -j$(nproc)
 
 # --- Packaging stage ---

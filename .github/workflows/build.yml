@@ -15,19 +15,20 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build .deb + AppImage
         run: |
           docker build \
             -f packaging/linux/ubuntu.dockerfile \
             --build-arg VERSION=${{ env.VERSION }} \
+            --build-arg GIT_HASH=$(git rev-parse --short HEAD) \
             --target both \
             --output type=local,dest=./out \
             .
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ubuntu-packages
           path: out/
@@ -35,19 +36,20 @@ jobs:
   windows:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build NSIS installer
         run: |
           docker build \
             -f packaging/windows/cross-compile.dockerfile \
             --build-arg VERSION=${{ env.VERSION }} \
+            --build-arg GIT_HASH=$(git rev-parse --short HEAD) \
             --target installer \
             --output type=local,dest=. \
             .
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-package
           path: amber-setup.exe
@@ -55,7 +57,7 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install dependencies
         run: brew install qt@6 ffmpeg cmake
@@ -64,7 +66,8 @@ jobs:
         run: |
           export CMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix ffmpeg)"
           cmake -S src -B build -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+                -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
+                -DGIT_HASH=$(git rev-parse --short HEAD)
           cmake --build build -j$(sysctl -n hw.ncpu)
 
       - name: Create .app bundle
@@ -102,7 +105,7 @@ jobs:
             "Amber-${{ env.VERSION }}-arm64.dmg"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-package
           path: build/Amber-*.dmg
@@ -113,7 +116,7 @@ jobs:
     if: github.event_name == 'release'
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
 
