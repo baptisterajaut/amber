@@ -378,8 +378,7 @@ void ExportThread::Export()
 {
   // Copy filename from QString to const char
   QByteArray ba = params_.filename.toUtf8();
-  c_filename = new char[ba.size()+1];
-  strcpy(c_filename, ba.data());
+  c_filename = qstrdup(ba.constData());
 
   // Set up file container
   if (!SetupContainer()) {

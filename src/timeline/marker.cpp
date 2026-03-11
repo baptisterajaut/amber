@@ -78,7 +78,7 @@ void set_marker_internal(Sequence* seq, const QVector<int>& clips) {
     if (clips.size() > 0) {
 
       // add a marker action for each clip
-      foreach (int i, clips) {
+      for (int i : clips) {
         ClipPtr c = seq->clips.at(i);
         ca->append(new AddMarkerAction(&c->get_markers(),
                                        seq->playhead - c->timeline_in() + c->clip_in(),

@@ -84,7 +84,8 @@ intptr_t hostCallback(AEffect* effect, int32_t opcode, int32_t index, intptr_t v
     // process level happens to be 0
     break;
   case audioMasterGetProductString:
-    strcpy(static_cast<char*>(ptr), "OLIVETEAM");
+    strncpy(static_cast<char*>(ptr), "AMBERTEAM", 63);
+    static_cast<char*>(ptr)[63] = '\0';
     break;
   case audioMasterBeginEdit:
     // we don't really care about this

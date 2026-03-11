@@ -555,8 +555,7 @@ void PreviewGenerator::run() {
 
   const QString url = footage_->url;
   QByteArray ba = url.toUtf8();
-  char* filename = new char[ba.size()+1];
-  strcpy(filename, ba.data());
+  char* filename = qstrdup(ba.constData());
 
   QString errorStr;
   bool error = false;
