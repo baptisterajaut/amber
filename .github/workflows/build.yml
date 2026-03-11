@@ -42,12 +42,9 @@ jobs:
           docker build \
             -f packaging/windows/cross-compile.dockerfile \
             --build-arg VERSION=${{ env.VERSION }} \
-            --target package \
-            -t amber-win64 \
+            --target installer \
+            --output type=local,dest=. \
             .
-
-      - name: Extract installer
-        run: docker run --rm amber-win64 cat /out/amber-setup.exe > amber-setup.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -56,7 +53,7 @@ jobs:
           path: amber-setup.exe
 
   macos:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 

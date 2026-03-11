@@ -61,3 +61,7 @@ RUN cd /src/packaging/windows/nsis && \
     curl -sL -o LICENSE "https://www.gnu.org/licenses/gpl-3.0.txt" && \
     makensis -DX64 amber.nsi && \
     cp *.exe /out/amber-setup.exe
+
+# --- Output stage (for --output) ---
+FROM scratch AS installer
+COPY --from=package /out/amber-setup.exe /amber-setup.exe

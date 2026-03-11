@@ -18,6 +18,12 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x`, por
 - GPU YUV→RGB conversion via OpenGL shader (bypasses CPU format conversion for YUV420P/NV12 frames)
 - Various bug fixes (first-export audio corruption, race conditions, null pointers, memory leaks, Frei0r init, phantom audio on silent tracks, …)
 
+## Packages
+
+Pre-built packages for Windows, Linux (AppImage, Ubuntu .deb) and macOS are available on the [Releases](https://github.com/baptisterajaut/amber/releases) page. Arch Linux users: see the AUR. Tested on Arch Linux only; other builds are best-effort.
+
+Build scripts in `packaging/linux/` (Dockerfiles, PKGBUILD) and `packaging/windows/` (cross-compile Dockerfile, NSIS).
+
 ## Build (Linux)
 
 ```bash
@@ -58,23 +64,6 @@ To create an app bundle: `macdeployqt build/Amber.app`
 cd packaging/linux
 makepkg -si
 ```
-
-## Packages
-
-Pre-built packages available at [Releases](https://github.com/baptisterajaut/amber/releases):
-
-| Platform | File |
-|----------|------|
-| Windows (installer) | `amber-setup.exe` |
-| Linux (AppImage) | `Amber-1.0-x86_64.AppImage` |
-| Debian 12 | `amber-editor_1.0-1_debian12_amd64.deb` |
-| Ubuntu 24.04 | `amber-editor_1.0-1_ubuntu2404_amd64.deb` |
-| Arch Linux | `amber-editor-1.0-1-x86_64.pkg.tar.zst` |
-| macOS (arm64) | `Amber-1.0-arm64.dmg` |
-
-Tested on Arch Linux only. Other builds are best-effort.
-
-Build scripts in `packaging/linux/` (Dockerfiles, PKGBUILD) and `packaging/windows/` (cross-compile Dockerfile, NSIS).
 
 ## Upstream
 
