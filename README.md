@@ -4,7 +4,7 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x` — 
 
 > **DISCLAIMER: AI-MAINTAINED CODE**
 >
-> The original Olive 0.1 codebase is hand-written (circa 2019 — well before ChatGPT was a thing). This fork, however, is vibe-coded: I just wanted Olive 0.1 to work on a modern stack and had very little knowledge of the codebase itself. All porting work (Qt 5 to 6, FFmpeg API updates, Wayland fixes, Windows cross-compilation) was done with AI assistance. No new features, no refactoring ambitions — just making it build and run.
+> The original Olive 0.1 codebase is hand-written (circa 2019 — well before ChatGPT was a thing). This fork is vibe-coded: porting, bug fixes, and new features are all done with AI assistance (Claude Code).
 
 ![screen](https://www.olivevideoeditor.org/img/screenshot.jpg)
 
@@ -16,8 +16,7 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x` — 
 - Windows cross-compilation via Fedora mingw64
 - Hardware-accelerated video decoding (VAAPI on Linux, D3D11VA on Windows, VideoToolbox on macOS)
 - GPU YUV→RGB conversion via OpenGL shader (bypasses CPU format conversion for YUV420P/NV12 frames)
-- Frei0r plugin lazy reconstruction (handles dimension changes between project load and playback)
-- Graceful audio filter graph failure handling (no more phantom audio on silent tracks)
+- Various bug fixes (first-export audio corruption, race conditions, null pointers, memory leaks, Frei0r init, phantom audio on silent tracks, …)
 
 ## Build (Linux)
 
@@ -63,4 +62,4 @@ Build scripts in `packaging/linux/` (Dockerfiles, PKGBUILD) and `packaging/windo
 
 ## Upstream
 
-Based on [olive-editor/olive](https://github.com/olive-editor/olive) by Matt Konecny and the Olive Team. Licensed under GPLv3.
+Based on [olive-editor/olive](https://github.com/olive-editor/olive) by [MattKC](https://github.com/itsmattkc) and the Olive Team. Licensed under GPLv3.
