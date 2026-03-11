@@ -20,6 +20,7 @@
 
 #include "demonotice.h"
 
+#include <QCheckBox>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -27,6 +28,8 @@
 #include <QPainter>
 #include <QScreen>
 #include <QSvgRenderer>
+
+#include "global/config.h"
 
 DemoNotice::DemoNotice(QWidget *parent) :
   QDialog(parent)
@@ -57,26 +60,41 @@ DemoNotice::DemoNotice(QWidget *parent) :
   icon->setAlignment(Qt::AlignCenter);
   layout->addWidget(icon);
 
-  QLabel* text = new QLabel("<html><head/><body><p>"
-                            "<span style=\" font-size:14pt;\">"
+  QLabel* text = new QLabel("<html><head/><body>"
+                            "<p><span style=\" font-size:14pt;\">"
                             + tr("Welcome to Amber!")
                             + "</span></p><p>"
-                            + tr("Amber is a fork of Olive 0.1, ported to Qt 6 and FFmpeg 7/8. "
-                                 "Original code by the Olive Team.")
+                            + tr("Amber is a fork of Olive 0.1 ported to Qt 6 and modern FFmpeg. "
+                                 "The original codebase was considered alpha-quality, but it has proven "
+                                 "to be quite reliable in practice. Many bugs from the original code have "
+                                 "been fixed along the way.")
                             + "</p><p>"
-                            + tr("Amber is based on Olive 0.1, which was self-proclaimed alpha software. "
-                                 "In my experience it works quite well, plus I squashed a lot of bugs already. "
-                                 "Please report any issue on GitHub if you encounter one: %1").arg("<a href=\"https://github.com/baptisterajaut/amber\"><span style=\" text-decoration: underline; color:#007af4;\">github.com/baptisterajaut/amber</span></a>")
+                            + tr("The original struck a rare balance between power and simplicity: "
+                                 "a video editor where every feature you need is right where you expect it. "
+                                 "I never found anything quite like it since, so I brought it back.")
                             + "</p><p>"
-                            + tr("Amber is free open-source software released under the GNU GPL.")
+                            + tr("If you run into any issues, please report them on GitHub: %1")
+                                .arg("<a href=\"https://github.com/baptisterajaut/amber\">"
+                                     "<span style=\" text-decoration: underline; color:#007af4;\">"
+                                     "github.com/baptisterajaut/amber</span></a>")
                             + "</p></body></html>", this);
   text->setWordWrap(true);
   layout->addWidget(text);
 
   vlayout->addLayout(layout);
 
+  dont_show_again_ = new QCheckBox(tr("Don't show this message again"), this);
+  vlayout->addWidget(dont_show_again_);
+
   QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok, this);
   buttons->setCenterButtons(true);
   connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
   vlayout->addWidget(buttons);
+}
+
+void DemoNotice::accept() {
+  if (dont_show_again_->isChecked()) {
+    olive::CurrentConfig.show_welcome_dialog = false;
+  }
+  QDialog::accept();
 }

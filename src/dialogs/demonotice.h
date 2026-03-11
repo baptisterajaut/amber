@@ -23,25 +23,19 @@
 
 #include <QDialog>
 
-/**
- * @brief The DemoNotice class
- *
- * Simple dialog shown on startup to introduce Olive as alpha software (in release builds). Can be run from anywhere,
- * but there should be no reason to create it outside of the application launch.
- *
- * To be phased out as Olive gains maturity.
- */
+class QCheckBox;
+
 class DemoNotice : public QDialog
 {
   Q_OBJECT
 public:
-  /**
-   * @brief DemoNotice Constructor
-   * @param parent
-   *
-   * QWidget parent. Usually MainWindow.
-   */
   explicit DemoNotice(QWidget *parent = nullptr);
+
+protected:
+  void accept() override;
+
+private:
+  QCheckBox* dont_show_again_;
 };
 
 #endif // DEMONOTICE_H

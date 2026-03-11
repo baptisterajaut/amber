@@ -58,20 +58,23 @@ AboutDialog::AboutDialog(QWidget *parent) :
   layout->addWidget(logo);
 
   // Construct About text
+  QString link = QStringLiteral("<a href=\"%1\"><span style=\" text-decoration: underline; color:#007af4;\">%2</span></a>");
   QLabel* label =
       new QLabel(QString("<html><head/><body>"
                          "<p><b>%1</b></p>"
                          "<p>%2</p>"
                          "<p>%3</p>"
                          "<p>%4</p>"
-                         "</body></html>").arg(olive::AppName,
-                                               tr("Fork of Olive 0.1 — ported to Qt 6 and FFmpeg 7/8. "
-                                                  "Original code by the Olive Team."),
-                                               tr("Amber is a free non-linear video editor protected by the GNU GPL."),
-                                               "<a href=\"https://github.com/baptisterajaut/amber\">"
-                                               "<span style=\" text-decoration: underline; color:#007af4;\">"
-                                               "github.com/baptisterajaut/amber</span></a>"
-), this);
+                         "</body></html>")
+                     .arg(olive::AppName,
+                          tr("A fork of Olive 0.1 ported to Qt 6 and modern FFmpeg, "
+                             "with many bugs from the original codebase fixed along the way."),
+                          tr("Free open-source software released under the GNU GPL. "
+                             "Original code by the %1.")
+                              .arg(link.arg("https://www.olivevideoeditor.org", tr("Olive Team"))),
+                          link.arg("https://github.com/baptisterajaut/amber",
+                                   "github.com/baptisterajaut/amber")),
+                 this);
 
   // Set text formatting
   label->setAlignment(Qt::AlignCenter);

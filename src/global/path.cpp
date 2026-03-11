@@ -105,7 +105,10 @@ QList<QString> get_language_paths() {
   // get current app working directory
   QDir app_dir = get_app_dir();
 
-  // subfolder in program folder - best for Windows (or compiling+running from source dir)
+  // program folder itself - for running from the build directory
+  language_paths.append(app_dir.absolutePath());
+
+  // subfolder in program folder - best for Windows
   language_paths.append(app_dir.filePath("ts"));
 
   // folder one level above the program's directory - best for Mac

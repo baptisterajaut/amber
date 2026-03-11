@@ -572,6 +572,13 @@ struct Config {
   bool locked_panels;
 
   /**
+   * @brief Show the welcome dialog on startup
+   *
+   * **TRUE** if the welcome dialog should be shown on startup (release builds only).
+   */
+  bool show_welcome_dialog;
+
+  /**
    * @brief Load config from file
    *
    * Load configuration parameters from file

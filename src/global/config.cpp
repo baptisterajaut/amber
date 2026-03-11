@@ -80,7 +80,8 @@ Config::Config()
     default_sequence_framerate(29.97),
     default_sequence_audio_frequency(48000),
     default_sequence_audio_channel_layout(3),
-    locked_panels(false)
+    locked_panels(false),
+    show_welcome_dialog(true)
 {}
 
 void Config::load(QString path) {
@@ -247,6 +248,9 @@ void Config::load(QString path) {
         } else if (stream.name() == QLatin1String("LockedPanels")) {
           stream.readNext();
           locked_panels = (stream.text() == QLatin1String("1"));
+        } else if (stream.name() == QLatin1String("ShowWelcomeDialog")) {
+          stream.readNext();
+          show_welcome_dialog = (stream.text() == QLatin1String("1"));
         }
       }
     }
@@ -323,6 +327,7 @@ void Config::save(QString path) {
   stream.writeTextElement("DefaultSequenceAudioFrequency", QString::number(default_sequence_audio_frequency));
   stream.writeTextElement("DefaultSequenceAudioLayout", QString::number(default_sequence_audio_channel_layout));
   stream.writeTextElement("LockedPanels", QString::number(locked_panels));
+  stream.writeTextElement("ShowWelcomeDialog", QString::number(show_welcome_dialog));
 
   stream.writeEndElement(); // configuration
   stream.writeEndDocument(); // doc
