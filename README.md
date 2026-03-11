@@ -14,6 +14,10 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x` — 
 - FFmpeg 3.x → FFmpeg 7/8 API (deprecated calls replaced, compat guards for 3.4–8)
 - `QLatin1String` wrappers for Qt 6.4 compatibility (Debian/Ubuntu)
 - Windows cross-compilation via Fedora mingw64
+- Hardware-accelerated video decoding (VAAPI on Linux, D3D11VA on Windows, VideoToolbox on macOS)
+- GPU YUV→RGB conversion via OpenGL shader (bypasses CPU format conversion for YUV420P/NV12 frames)
+- Frei0r plugin lazy reconstruction (handles dimension changes between project load and playback)
+- Graceful audio filter graph failure handling (no more phantom audio on silent tracks)
 
 ## Build (Linux)
 
