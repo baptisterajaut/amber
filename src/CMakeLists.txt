@@ -331,6 +331,9 @@ set(OLIVE_SOURCES
   ui/timelineheader.h
   ui/timelinetools.h
   ui/timelinewidget.cpp
+  ui/timelinewidget_ghosts.cpp
+  ui/timelinewidget_menu.cpp
+  ui/timelinewidget_paint.cpp
   ui/timelinewidget.h
   ui/viewercontainer.cpp
   ui/viewercontainer.h
