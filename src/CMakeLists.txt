@@ -218,6 +218,9 @@ set(OLIVE_SOURCES
   panels/project.cpp
   panels/project.h
   panels/timeline.cpp
+  panels/timeline_clipboard.cpp
+  panels/timeline_splitting.cpp
+  panels/timeline_ui.cpp
   panels/timeline.h
   panels/viewer.cpp
   panels/viewer.h
