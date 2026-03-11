@@ -177,6 +177,11 @@ void Cacher::CacheAudioWorker() {
         }
       }
     } else if (clip->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
+      // skip audio processing if filter graph failed to initialize
+      if (filter_graph == nullptr) {
+        break;
+      }
+
       double timebase = av_q2d(stream->time_base);
 
       frame = queue_.at(0);
@@ -1061,63 +1066,90 @@ void Cacher::OpenWorker() {
                  );
       }
 
-      avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("abuffer"), "in", filter_args, nullptr, filter_graph);
-      avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out", nullptr, nullptr, filter_graph);
+      bool audio_filter_ok = true;
 
-      enum AVSampleFormat sample_fmts[] = { kDestSampleFmt,  static_cast<AVSampleFormat>(-1) };
-      if (av_opt_set_int_list(buffersink_ctx, "sample_fmts", sample_fmts, -1, AV_OPT_SEARCH_CHILDREN) < 0) {
-        qCritical() << "Could not set output sample format";
+      if (avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("abuffer"), "in", filter_args, nullptr, filter_graph) < 0) {
+        qCritical() << "Could not create audio buffer source";
+        audio_filter_ok = false;
+      }
+      if (audio_filter_ok && avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out", nullptr, nullptr, filter_graph) < 0) {
+        qCritical() << "Could not create audio buffer sink";
+        audio_filter_ok = false;
       }
 
-      if (av_opt_set(buffersink_ctx, "ch_layouts", "stereo", AV_OPT_SEARCH_CHILDREN) < 0) {
-        qCritical() << "Could not set output channel layout";
+      if (audio_filter_ok) {
+        enum AVSampleFormat sample_fmts[] = { kDestSampleFmt,  static_cast<AVSampleFormat>(-1) };
+        if (av_opt_set_int_list(buffersink_ctx, "sample_fmts", sample_fmts, -1, AV_OPT_SEARCH_CHILDREN) < 0) {
+          qCritical() << "Could not set output sample format";
+          audio_filter_ok = false;
+        }
       }
 
-      int target_sample_rate = current_audio_freq();
+      if (audio_filter_ok) {
+        if (av_opt_set(buffersink_ctx, "ch_layouts", "stereo", AV_OPT_SEARCH_CHILDREN) < 0) {
+          qCritical() << "Could not set output channel layout";
+          audio_filter_ok = false;
+        }
+      }
 
-      double playback_speed_ = clip->speed().value * m->speed;
+      if (audio_filter_ok) {
+        int target_sample_rate = current_audio_freq();
 
-      if (qFuzzyCompare(playback_speed_, 1.0)) {
-        avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
-      } else if (clip->speed().maintain_audio_pitch) {
-        AVFilterContext* previous_filter = buffersrc_ctx;
-        AVFilterContext* last_filter = buffersrc_ctx;
+        double playback_speed_ = clip->speed().value * m->speed;
 
-        char speed_param[10];
+        if (qFuzzyCompare(playback_speed_, 1.0)) {
+          avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
+        } else if (clip->speed().maintain_audio_pitch) {
+          AVFilterContext* previous_filter = buffersrc_ctx;
+          AVFilterContext* last_filter = buffersrc_ctx;
 
-        double base = (playback_speed_ > 1.0) ? 2.0 : 0.5;
+          char speed_param[10];
 
-        double speedlog = log(playback_speed_) / log(base);
-        int whole2 = qFloor(speedlog);
-        speedlog -= whole2;
+          double base = (playback_speed_ > 1.0) ? 2.0 : 0.5;
 
-        if (whole2 > 0) {
-          snprintf(speed_param, sizeof(speed_param), "%f", base);
-          for (int i=0;i<whole2;i++) {
-            AVFilterContext* tempo_filter = nullptr;
-            avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr, filter_graph);
-            avfilter_link(previous_filter, 0, tempo_filter, 0);
-            previous_filter = tempo_filter;
+          double speedlog = log(playback_speed_) / log(base);
+          int whole2 = qFloor(speedlog);
+          speedlog -= whole2;
+
+          if (whole2 > 0) {
+            snprintf(speed_param, sizeof(speed_param), "%f", base);
+            for (int i=0;i<whole2;i++) {
+              AVFilterContext* tempo_filter = nullptr;
+              avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr, filter_graph);
+              avfilter_link(previous_filter, 0, tempo_filter, 0);
+              previous_filter = tempo_filter;
+            }
           }
+
+          snprintf(speed_param, sizeof(speed_param), "%f", qPow(base, speedlog));
+          last_filter = nullptr;
+          avfilter_graph_create_filter(&last_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr, filter_graph);
+          avfilter_link(previous_filter, 0, last_filter, 0);
+
+          avfilter_link(last_filter, 0, buffersink_ctx, 0);
+        } else {
+          target_sample_rate = qRound64(target_sample_rate / playback_speed_);
+          avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
         }
 
-        snprintf(speed_param, sizeof(speed_param), "%f", qPow(base, speedlog));
-        last_filter = nullptr;
-        avfilter_graph_create_filter(&last_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr, filter_graph);
-        avfilter_link(previous_filter, 0, last_filter, 0);
-
-        avfilter_link(last_filter, 0, buffersink_ctx, 0);
-      } else {
-        target_sample_rate = qRound64(target_sample_rate / playback_speed_);
-        avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
+        int sample_rates[] = { target_sample_rate, 0 };
+        if (av_opt_set_int_list(buffersink_ctx, "sample_rates", sample_rates, 0, AV_OPT_SEARCH_CHILDREN) < 0) {
+          qCritical() << "Could not set output sample rates";
+          audio_filter_ok = false;
+        }
       }
 
-      int sample_rates[] = { target_sample_rate, 0 };
-      if (av_opt_set_int_list(buffersink_ctx, "sample_rates", sample_rates, 0, AV_OPT_SEARCH_CHILDREN) < 0) {
-        qCritical() << "Could not set output sample rates";
+      if (audio_filter_ok && avfilter_graph_config(filter_graph, nullptr) < 0) {
+        qCritical() << "Could not configure audio filter graph";
+        audio_filter_ok = false;
       }
 
-      avfilter_graph_config(filter_graph, nullptr);
+      if (!audio_filter_ok) {
+        avfilter_graph_free(&filter_graph);
+        filter_graph = nullptr;
+        buffersrc_ctx = nullptr;
+        buffersink_ctx = nullptr;
+      }
 
       audio_reset_ = true;
     }
