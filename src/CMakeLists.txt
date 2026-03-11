@@ -467,6 +467,10 @@ add_executable(${OLIVE_TARGET}
 
 target_compile_definitions(${OLIVE_TARGET} PRIVATE ${OLIVE_DEFINITIONS})
 
+if(APPLE)
+  target_compile_definitions(${OLIVE_TARGET} PRIVATE GL_SILENCE_DEPRECATION)
+endif()
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 target_link_libraries(${OLIVE_TARGET}

@@ -23,7 +23,7 @@
 #include <QFontDatabase>
 
 FontCombobox::FontCombobox(QWidget* parent) : QComboBox(parent) {
-  addItems(QFontDatabase().families());
+  addItems(QFontDatabase::families());
 
   value = currentText();
 

@@ -29,12 +29,12 @@ ARG REVISION
 
 RUN apt-get update && apt-get install -y dpkg-dev gettext-base && rm -rf /var/lib/apt/lists/*
 
-COPY packaging/ /src/packaging/
+COPY packaging/ /packaging/
 
 RUN DESTDIR=/pkg make install && \
     export ARCH=$(dpkg --print-architecture) && \
     mkdir -p /pkg/DEBIAN /out && \
-    envsubst < /src/packaging/linux/control.in > /pkg/DEBIAN/control && \
+    envsubst < /packaging/linux/control.in > /pkg/DEBIAN/control && \
     dpkg-deb --build /pkg "/out/amber-editor_${VERSION}-${REVISION}_ubuntu2404_${ARCH}.deb"
 
 # --- AppImage ---
@@ -44,7 +44,7 @@ ARG VERSION
 
 RUN apt-get update && apt-get install -y curl file libfuse2 && rm -rf /var/lib/apt/lists/*
 
-COPY packaging/ /src/packaging/
+COPY packaging/ /packaging/
 
 RUN curl -L -o /tmp/linuxdeploy.AppImage \
     https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage && \

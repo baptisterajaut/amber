@@ -20,8 +20,7 @@ COPY src/ /src
 WORKDIR /src/build
 
 RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && \
-    make -j$(nproc) && \
-    DESTDIR=/pkg make install
+    make -j$(nproc)
 
 # --- Packaging stage ---
 FROM build AS package
@@ -31,9 +30,10 @@ ARG REVISION
 
 RUN apt-get update && apt-get install -y dpkg-dev gettext-base && rm -rf /var/lib/apt/lists/*
 
-COPY packaging/ /src/packaging/
+COPY packaging/ /packaging/
 
-RUN export ARCH=$(dpkg --print-architecture) && \
+RUN DESTDIR=/pkg make install && \
+    export ARCH=$(dpkg --print-architecture) && \
     mkdir -p /pkg/DEBIAN /out && \
-    envsubst < /src/packaging/linux/control.in > /pkg/DEBIAN/control && \
+    envsubst < /packaging/linux/control.in > /pkg/DEBIAN/control && \
     dpkg-deb --build /pkg "/out/amber-editor_${VERSION}-${REVISION}_debian12_${ARCH}.deb"

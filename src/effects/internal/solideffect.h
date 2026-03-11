@@ -35,7 +35,7 @@ public:
   };
 
   SolidEffect(Clip* c, const EffectMeta *em);
-  virtual void redraw(double timecode);
+  void redraw(double timecode) override;
 
   void SetType(SolidType type);
 private slots:
