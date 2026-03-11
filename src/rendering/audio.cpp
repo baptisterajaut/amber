@@ -166,7 +166,7 @@ int current_audio_freq() {
 qint64 get_buffer_offset_from_frame(double framerate, long frame) {
   if (frame >= audio_ibuffer_frame) {
     int multiplier = av_get_bytes_per_sample(AV_SAMPLE_FMT_S16)*2; // 2 channels for stereo
-    return qFloor((double(frame - audio_ibuffer_frame)/framerate)*current_audio_freq())*multiplier;
+    return static_cast<qint64>(qFloor((double(frame - audio_ibuffer_frame)/framerate)*current_audio_freq()))*multiplier;
   } else {
     qWarning() << "Invalid values passed to get_buffer_offset_from_frame" << frame << "<" << audio_ibuffer_frame;
     return 0;

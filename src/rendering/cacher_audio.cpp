@@ -30,7 +30,7 @@
 // Enable verbose audio messages - good for debugging reversed audio
 //#define AUDIOWARNINGS
 
-double bytes_to_seconds(int nb_bytes, int nb_channels, int sample_rate) {
+double bytes_to_seconds(qint64 nb_bytes, int nb_channels, int sample_rate) {
   return (double(nb_bytes >> 1) / nb_channels / sample_rate);
 }
 
