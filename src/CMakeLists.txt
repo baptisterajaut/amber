@@ -246,6 +246,8 @@ set(OLIVE_SOURCES
   rendering/audio.cpp
   rendering/audio.h
   rendering/cacher.cpp
+  rendering/cacher_audio.cpp
+  rendering/cacher_video.cpp
   rendering/cacher.h
   rendering/clipqueue.cpp
   rendering/clipqueue.h
