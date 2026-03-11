@@ -23,6 +23,20 @@
 #include "panels/panels.h"
 #include "panels/effectcontrols.h"
 
+SetEffectEnabled::SetEffectEnabled(Effect *e, bool enabled) :
+  effect_(e),
+  old_val_(e->IsEnabled()),
+  new_val_(enabled)
+{}
+
+void SetEffectEnabled::doUndo() {
+  effect_->SetEnabled(old_val_);
+}
+
+void SetEffectEnabled::doRedo() {
+  effect_->SetEnabled(new_val_);
+}
+
 AddEffectCommand::AddEffectCommand(Clip* c, EffectPtr e, const EffectMeta *m, int insert_pos) {
   clip = c;
   ref = e;

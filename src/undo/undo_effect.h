@@ -23,6 +23,17 @@
 
 #include "undoactions.h"
 
+class SetEffectEnabled : public OliveAction {
+public:
+  SetEffectEnabled(Effect* e, bool enabled);
+  virtual void doUndo() override;
+  virtual void doRedo() override;
+private:
+  Effect* effect_;
+  bool old_val_;
+  bool new_val_;
+};
+
 class AddEffectCommand : public OliveAction {
 public:
   AddEffectCommand(Clip* c, EffectPtr e, const EffectMeta* m, int insert_pos = -1);

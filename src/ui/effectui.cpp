@@ -8,6 +8,8 @@
 #include "ui/clickablelabel.h"
 #include "ui/menu.h"
 #include "panels/panels.h"
+#include "undo/undo_effect.h"
+#include "global/global.h"
 
 EffectUI::EffectUI(Effect* e) :
   effect_(e)
@@ -144,8 +146,16 @@ EffectUI::EffectUI(Effect* e) :
   }
 
   enabled_check->setChecked(e->IsEnabled());
-  connect(enabled_check, &QCheckBox::toggled, e, &Effect::SetEnabled);
-  connect(enabled_check, &QCheckBox::toggled, e, &Effect::FieldChanged);
+  QCheckBox* chk = enabled_check;
+  connect(e, &Effect::EnabledChanged, chk, [chk](bool b) {
+    chk->blockSignals(true);
+    chk->setChecked(b);
+    chk->blockSignals(false);
+  });
+  connect(chk, &QCheckBox::toggled, this, [e](bool checked) {
+    olive::UndoStack.push(new SetEffectEnabled(e, checked));
+    update_ui(false);
+  });
 }
 
 void EffectUI::AddAdditionalEffect(Effect *e)
