@@ -5,15 +5,15 @@ Target amd64-unicode
 !define MUI_ICON "install icon.ico"
 !define MUI_UNICON "uninstall icon.ico"
 
-!define APP_NAME "Olive"
-!define APP_TARGET "olive-editor"
+!define APP_NAME "Amber"
+!define APP_TARGET "amber-editor"
 
-!define MUI_FINISHPAGE_RUN "$INSTDIR\olive-editor.exe"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\amber-editor.exe"
 
 SetCompressor lzma
 
 Name ${APP_NAME}
-OutFile "olive-setup.exe"
+OutFile "amber-setup.exe"
 
 !ifdef X64
 InstallDir "$PROGRAMFILES64\${APP_NAME}"
@@ -29,18 +29,18 @@ InstallDir "$PROGRAMFILES32\${APP_NAME}"
 
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 !define MUI_FINISHPAGE_RUN_TEXT "Run ${APP_NAME}"
-!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchOlive"
+!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchAmber"
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
 
-Section "Olive (required)"
+Section "Amber (required)"
 
 	SectionIn RO
 
 	SetOutPath $INSTDIR
 
-	File /r olive\*
+	File /r amber\*
 
 	WriteUninstaller "$INSTDIR\uninstall.exe"
 
@@ -56,12 +56,12 @@ Section "Create Start Menu shortcut"
 	CreateShortCut "$SMPROGRAMS\${APP_NAME}\Uninstall ${APP_NAME}.lnk" "$INSTDIR\uninstall.exe"
 SectionEnd
 
-Section "Associate *.ove files with Olive"
-	WriteRegStr HKCR ".ove" "" "OliveEditor.OVEFile"
+Section "Associate *.ove files with Amber"
+	WriteRegStr HKCR ".ove" "" "AmberEditor.OVEFile"
 	WriteRegStr HKCR ".ove" "Content Type" "application/vnd.olive-project"
-	WriteRegStr HKCR "OliveEditor.OVEFile" "" "Olive project file"
-	WriteRegStr HKCR "OliveEditor.OVEFile\DefaultIcon" "" "$INSTDIR\olive-editor.exe,1"
-	WriteRegStr HKCR "OliveEditor.OVEFile\shell\open\command" "" "$\"$INSTDIR\olive-editor.exe$\" $\"%1$\""
+	WriteRegStr HKCR "AmberEditor.OVEFile" "" "Amber project file"
+	WriteRegStr HKCR "AmberEditor.OVEFile\DefaultIcon" "" "$INSTDIR\amber-editor.exe,1"
+	WriteRegStr HKCR "AmberEditor.OVEFile\shell\open\command" "" "$\"$INSTDIR\amber-editor.exe$\" $\"%1$\""
 	System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (0x08000000, 0, 0, 0)'
 SectionEnd
 
@@ -76,12 +76,12 @@ Section "uninstall"
 	rmdir /r "$SMPROGRAMS\${APP_NAME}"
 
 	DeleteRegKey HKCR ".ove"
-	DeleteRegKey HKCR "OliveEditor.OVEFile"
-	DeleteRegKey HKCR "OliveEditor.OVEFile\DefaultIcon" ""
-	DeleteRegKey HKCR "OliveEditor.OVEFile\shell\open\command" ""
+	DeleteRegKey HKCR "AmberEditor.OVEFile"
+	DeleteRegKey HKCR "AmberEditor.OVEFile\DefaultIcon" ""
+	DeleteRegKey HKCR "AmberEditor.OVEFile\shell\open\command" ""
 	System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (0x08000000, 0, 0, 0)'
 SectionEnd
 
-Function LaunchOlive
+Function LaunchAmber
 	ExecShell "" "$INSTDIR\${APP_TARGET}.exe"
 FunctionEnd

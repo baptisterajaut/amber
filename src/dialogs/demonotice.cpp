@@ -20,14 +20,18 @@
 
 #include "demonotice.h"
 
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QDialogButtonBox>
+#include <QPainter>
+#include <QScreen>
+#include <QSvgRenderer>
 
 DemoNotice::DemoNotice(QWidget *parent) :
   QDialog(parent)
 {
-  setWindowTitle(tr("Welcome to Olive EVA-01!"));
+  setWindowTitle(tr("Welcome to Amber!"));
 
   QVBoxLayout* vlayout = new QVBoxLayout(this);
 
@@ -35,19 +39,29 @@ DemoNotice::DemoNotice(QWidget *parent) :
   layout->setContentsMargins(10, 10, 10, 10);
   layout->setSpacing(20);
 
-  QLabel* icon = new QLabel("<html><head/><body>"
-                            "<p><img src=\":/icons/olive-eva01-splash.png\"/></p>"
-                            "</body></html>", this);
+  QLabel* icon = new QLabel(this);
+  int logo_size = qMin(QGuiApplication::primaryScreen()->availableSize().width(),
+                        QGuiApplication::primaryScreen()->availableSize().height()) / 6;
+  if (logo_size < 128) logo_size = 128;
+  QSvgRenderer renderer(QStringLiteral(":/icons/amber-logo.svg"));
+  QPixmap pix(logo_size, logo_size);
+  pix.fill(Qt::transparent);
+  QPainter painter(&pix);
+  renderer.render(&painter);
+  icon->setPixmap(pix);
+  icon->setAlignment(Qt::AlignCenter);
   layout->addWidget(icon);
 
   QLabel* text = new QLabel("<html><head/><body><p>"
                             "<span style=\" font-size:14pt;\">"
-                            + tr("Welcome to Olive EVA-01!")
+                            + tr("Welcome to Amber!")
                             + "</span></p><p>"
-                            + tr("This is a community fork of Olive 0.1, ported to Qt 6 and FFmpeg 7/8. "
-                                 "The original code is by the Olive Team — this fork is AI-maintained.")
+                            + tr("Amber is a fork of Olive 0.1, ported to Qt 6 and FFmpeg 7/8. "
+                                 "Original code by the Olive Team.")
                             + "</p><p>"
-                            + tr("This software is currently in ALPHA which means it is unstable and very likely to crash, have bugs, and have missing features. We offer no warranty so use at your own risk. Please report any bugs or feature requests at %1").arg("<a href=\"https://github.com/baptisterajaut/olive\"><span style=\" text-decoration: underline; color:#007af4;\">github.com/baptisterajaut/olive</span></a>")
+                            + tr("Amber is based on Olive 0.1, which was self-proclaimed alpha software. "
+                                 "In my experience it works quite well, plus I squashed a lot of bugs already. "
+                                 "Please report any issue on GitHub if you encounter one: %1").arg("<a href=\"https://github.com/baptisterajaut/amber\"><span style=\" text-decoration: underline; color:#007af4;\">github.com/baptisterajaut/amber</span></a>")
                             + "</p><p>"
                             + tr("Olive is free open-source software released under the GNU GPL.")
                             + "</p></body></html>", this);

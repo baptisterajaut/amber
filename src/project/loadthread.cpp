@@ -244,7 +244,7 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
         if (proj_version < olive::kMinimumSaveVersion || proj_version > olive::kSaveVersion) {
           show_message(
                   tr("Version Mismatch"),
-                  tr("This project was saved in a different version of Olive and may not be fully compatible with this version. Would you like to attempt loading it anyway?"),
+                  tr("This project was saved in a different version of Amber and may not be fully compatible with this version. Would you like to attempt loading it anyway?"),
                   QMessageBox::Yes | QMessageBox::No
                 );
           if (question_btn == QMessageBox::No) {

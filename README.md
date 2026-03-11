@@ -1,4 +1,4 @@
-# Olive EVA-01
+# Amber Video Editor
 
 Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x` — ported to **Qt 6** and **FFmpeg 7/8**.
 
@@ -8,7 +8,7 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x` — 
 
 ![screen](https://www.olivevideoeditor.org/img/screenshot.jpg)
 
-## What changed
+## What changed from Olive 0.1
 
 - Qt 5 → Qt 6 (including Wayland compositing fix)
 - FFmpeg 3.x → FFmpeg 7/8 API (deprecated calls replaced, compat guards for 3.4–8)
@@ -37,8 +37,8 @@ docker buildx build -f packaging/linux/ubuntu.dockerfile --target both --output 
 docker buildx build -f packaging/linux/debian.dockerfile --target package --output type=local,dest=./out .
 
 # Windows NSIS installer (cross-compiled from Fedora)
-docker build -f packaging/windows/cross-compile.dockerfile --target package -t olive-win64 .
-docker run --rm olive-win64 cat /out/olive-setup.exe > olive-setup.exe
+docker build -f packaging/windows/cross-compile.dockerfile --target package -t amber-win64 .
+docker run --rm amber-win64 cat /out/amber-setup.exe > amber-setup.exe
 ```
 
 ## Build (macOS)
@@ -50,7 +50,7 @@ cmake -S src -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$CMAKE_PRE
 cmake --build build -j$(sysctl -n hw.ncpu)
 ```
 
-To create an app bundle: `macdeployqt build/Olive.app`
+To create an app bundle: `macdeployqt build/Amber.app`
 
 ## Build (Arch Linux)
 
@@ -61,16 +61,16 @@ makepkg -si
 
 ## Packages
 
-Pre-built packages available at [v0.1.3-nightly](https://github.com/baptisterajaut/olive/releases/tag/v0.1.3-nightly):
+Pre-built packages available at [Releases](https://github.com/baptisterajaut/amber/releases):
 
 | Platform | File |
 |----------|------|
-| Windows (installer) | `olive-setup.exe` |
-| Linux (AppImage) | `Olive-0.1.3-x86_64.AppImage` |
-| Debian 12 | `olive-editor_0.1.3-1_debian12_amd64.deb` |
-| Ubuntu 24.04 | `olive-editor_0.1.3-1_ubuntu2404_amd64.deb` |
-| Arch Linux | `olive-editor-0.1.3-1-x86_64.pkg.tar.zst` |
-| macOS (arm64) | `Olive-0.1.3-arm64.dmg` |
+| Windows (installer) | `amber-setup.exe` |
+| Linux (AppImage) | `Amber-1.0-x86_64.AppImage` |
+| Debian 12 | `amber-editor_1.0-1_debian12_amd64.deb` |
+| Ubuntu 24.04 | `amber-editor_1.0-1_ubuntu2404_amd64.deb` |
+| Arch Linux | `amber-editor-1.0-1-x86_64.pkg.tar.zst` |
+| macOS (arm64) | `Amber-1.0-arm64.dmg` |
 
 Tested on Arch Linux only. Other builds are best-effort.
 

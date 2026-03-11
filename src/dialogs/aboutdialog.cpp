@@ -20,8 +20,12 @@
 
 #include "aboutdialog.h"
 
-#include <QVBoxLayout>
+#include <QGuiApplication>
 #include <QLabel>
+#include <QScreen>
+#include <QPainter>
+#include <QSvgRenderer>
+#include <QVBoxLayout>
 #include <QDialogButtonBox>
 
 #include "global/global.h"
@@ -29,29 +33,40 @@
 AboutDialog::AboutDialog(QWidget *parent) :
   QDialog(parent)
 {
-  setWindowTitle("About Olive");
+  setWindowTitle("About Amber");
 
   QVBoxLayout* layout = new QVBoxLayout(this);
   layout->setSpacing(20);
 
+  // Logo (rendered from SVG at screen-appropriate size)
+  QLabel* logo = new QLabel(this);
+  int logo_size = qMin(QGuiApplication::primaryScreen()->availableSize().width(),
+                        QGuiApplication::primaryScreen()->availableSize().height()) / 6;
+  if (logo_size < 128) logo_size = 128;
+  QSvgRenderer renderer(QStringLiteral(":/icons/amber-logo.svg"));
+  QPixmap pix(logo_size, logo_size);
+  pix.fill(Qt::transparent);
+  QPainter painter(&pix);
+  renderer.render(&painter);
+  logo->setPixmap(pix);
+  logo->setAlignment(Qt::AlignCenter);
+  layout->addWidget(logo);
+
   // Construct About text
   QLabel* label =
       new QLabel(QString("<html><head/><body>"
-                         "<p><img src=\":/icons/olive-eva01-splash.png\"/></p>"
                          "<p><b>%1</b></p>"
                          "<p>%2</p>"
                          "<p>%3</p>"
                          "<p>%4</p>"
                          "</body></html>").arg(olive::AppName,
-                                               tr("Community fork of Olive 0.1 — ported to Qt 6 and FFmpeg 7/8. "
-                                                  "AI-maintained. Original code by the Olive Team."),
-                                               tr("Olive is a free non-linear video editor protected by the GNU GPL."),
-                                               "<a href=\"https://github.com/baptisterajaut/olive\">"
+                                               tr("Fork of Olive 0.1 — ported to Qt 6 and FFmpeg 7/8. "
+                                                  "Original code by the Olive Team."),
+                                               tr("Amber is a free non-linear video editor protected by the GNU GPL."),
+                                               "<a href=\"https://github.com/baptisterajaut/amber\">"
                                                "<span style=\" text-decoration: underline; color:#007af4;\">"
-                                               "github.com/baptisterajaut/olive</span></a>"
-                                               " | <a href=\"https://www.olivevideoeditor.org/\">"
-                                               "<span style=\" text-decoration: underline; color:#007af4;\">"
-                                               "olivevideoeditor.org</span></a>"), this);
+                                               "github.com/baptisterajaut/amber</span></a>"
+), this);
 
   // Set text formatting
   label->setAlignment(Qt::AlignCenter);

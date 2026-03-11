@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  VERSION: "0.1.3"
+  VERSION: "1.0"
 
 jobs:
   ubuntu:
@@ -43,17 +43,17 @@ jobs:
             -f packaging/windows/cross-compile.dockerfile \
             --build-arg VERSION=${{ env.VERSION }} \
             --target package \
-            -t olive-win64 \
+            -t amber-win64 \
             .
 
       - name: Extract installer
-        run: docker run --rm olive-win64 cat /out/olive-setup.exe > olive-setup.exe
+        run: docker run --rm amber-win64 cat /out/amber-setup.exe > amber-setup.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-package
-          path: olive-setup.exe
+          path: amber-setup.exe
 
   macos:
     runs-on: macos-14
@@ -73,20 +73,20 @@ jobs:
       - name: Create .app bundle
         run: |
           cd build
-          mkdir -p Olive.app/Contents/MacOS
-          mkdir -p Olive.app/Contents/Resources
-          cp Olive Olive.app/Contents/MacOS/
-          cat > Olive.app/Contents/Info.plist <<PLIST
+          mkdir -p Amber.app/Contents/MacOS
+          mkdir -p Amber.app/Contents/Resources
+          cp Olive Amber.app/Contents/MacOS/Amber
+          cat > Amber.app/Contents/Info.plist <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
             <key>CFBundleExecutable</key>
-            <string>Olive</string>
+            <string>Amber</string>
             <key>CFBundleName</key>
-            <string>Olive</string>
+            <string>Amber</string>
             <key>CFBundleIdentifier</key>
-            <string>org.olivevideoeditor.Olive</string>
+            <string>org.ambervideoeditor.Amber</string>
             <key>CFBundleVersion</key>
             <string>${VERSION}</string>
             <key>CFBundleShortVersionString</key>
@@ -96,19 +96,19 @@ jobs:
           </dict>
           </plist>
           PLIST
-          $(brew --prefix qt@6)/bin/macdeployqt Olive.app
+          $(brew --prefix qt@6)/bin/macdeployqt Amber.app
 
       - name: Create .dmg
         run: |
           cd build
-          hdiutil create -volname "Olive" -srcfolder Olive.app -ov -format UDZO \
-            "Olive-${{ env.VERSION }}-arm64.dmg"
+          hdiutil create -volname "Amber" -srcfolder Amber.app -ov -format UDZO \
+            "Amber-${{ env.VERSION }}-arm64.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-package
-          path: build/Olive-*.dmg
+          path: build/Amber-*.dmg
 
   release:
     needs: [ubuntu, windows, macos]
@@ -129,7 +129,7 @@ jobs:
           tag_name: ${{ github.event.release.tag_name }}
           prerelease: ${{ github.event.release.prerelease }}
           files: |
-            olive-editor_*.deb
-            Olive-*.AppImage
-            olive-setup.exe
-            Olive-*.dmg
+            amber-editor_*.deb
+            Amber-*.AppImage
+            amber-setup.exe
+            Amber-*.dmg

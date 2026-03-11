@@ -1,10 +1,9 @@
 <RCC>
     <qresource prefix="/icons">
         <file>throbber.png</file>
-        <file>olive-splash.png</file>
-        <file>olive-eva01-splash.png</file>
-        <file>olive64.png</file>
-        <file>olive64-eva01.png</file>
+        <file>amber64.png</file>
+        <file>amber-splash.png</file>
+        <file>amber-logo.svg</file>
         <file>add-button.svg</file>
         <file>add-effect.svg</file>
         <file>add-transition.svg</file>

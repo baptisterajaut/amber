@@ -1,9 +1,9 @@
-pkgname=olive-editor
-pkgver=0.1.3
+pkgname=amber-editor
+pkgver=1.0
 pkgrel=1
 pkgdesc='Professional open-source non-linear video editor'
 arch=('x86_64')
-url='https://olivevideoeditor.org/'
+url='https://github.com/baptisterajaut/olive'
 license=('GPL3')
 depends=(
   'qt6-base'
@@ -16,11 +16,11 @@ makedepends=(
   'cmake'
   'qt6-tools'
 )
-source=("git+ssh://git@github.com/baptisterajaut/olive.git#branch=0.1.x")
+source=("git+ssh://git@github.com/baptisterajaut/amber.git#branch=0.1.x")
 sha256sums=('SKIP')
 
 build() {
-  cmake -B build -S olive/src \
+  cmake -B build -S amber/src \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr
   cmake --build build -j$(nproc)

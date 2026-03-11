@@ -42,7 +42,7 @@ COPY packaging/ /src/packaging/
 # Collect everything into /out
 RUN SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \
     mkdir -p /out/platforms /out/imageformats /out/multimedia /out/effects /out/ts && \
-    cp olive-editor.exe /out/ && \
+    cp amber-editor.exe /out/ && \
     cp "${SYSROOT}/bin/"*.dll /out/ && \
     cp "${SYSROOT}/lib/qt6/plugins/platforms/qwindows.dll" /out/platforms/ && \
     cp "${SYSROOT}/lib/qt6/plugins/imageformats/"*.dll /out/imageformats/ 2>/dev/null || true && \
@@ -57,7 +57,7 @@ RUN cd /usr/share/nsis/Stubs && \
 
 # Build NSIS installer
 RUN cd /src/packaging/windows/nsis && \
-    cp -r /out olive && \
+    cp -r /out amber && \
     curl -sL -o LICENSE "https://www.gnu.org/licenses/gpl-3.0.txt" && \
-    makensis -DX64 olive.nsi && \
-    cp *.exe /out/olive-setup.exe
+    makensis -DX64 amber.nsi && \
+    cp *.exe /out/amber-setup.exe

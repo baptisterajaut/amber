@@ -20,7 +20,7 @@ void UpdateNotification::check()
   connect(manager, SIGNAL(finished(QNetworkReply *)), this, SLOT(finished_slot(QNetworkReply *)));
   connect(manager, SIGNAL(finished(QNetworkReply *)), manager, SLOT(deleteLater()));
 
-  QString update_url = QString("http://olivevideoeditor.org/update.php?version=0&hash=%1");
+  QString update_url = QString("https://github.com/baptisterajaut/amber/releases?version=0&hash=%1");
 
   QNetworkRequest request(QUrl(update_url.arg(GITHASH)));
   manager->get(request);
@@ -32,7 +32,7 @@ void UpdateNotification::finished_slot(QNetworkReply *reply)
   QString response = QString::fromUtf8(reply->readAll());
 
   if (response == "1") {
-    olive::MainWindow->statusBar()->showMessage(tr("An update is available from the Olive website. "
-                                                   "Visit www.olivevideoeditor.org to download it."));
+    olive::MainWindow->statusBar()->showMessage(tr("An update is available. "
+                                                   "Visit github.com/baptisterajaut/amber to download it."));
   }
 }

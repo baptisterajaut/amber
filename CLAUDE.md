@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Olive Video Editor — free, open-source non-linear video editor (GPLv3). C++11, Qt 6, FFmpeg, OpenGL. This is the legacy `0.1.x` branch (ported to FFmpeg 7/8 API and Qt 6).
+Amber Video Editor — fork of Olive 0.1.x, free open-source non-linear video editor (GPLv3). C++11, Qt 6, FFmpeg, OpenGL.
 
 ## Build
 
@@ -19,7 +19,7 @@ No test suite exists in this branch.
 
 ## Packaging
 
-All packages at https://github.com/baptisterajaut/olive/releases/tag/v0.1.3-nightly
+All packages at https://github.com/baptisterajaut/amber/releases
 
 Docker multi-stage builds (build stage compiles, package stage produces artifact):
 - `packaging/linux/debian.dockerfile` — Debian 12 `.deb` (`--target package`)
@@ -59,7 +59,7 @@ clang-format with `.clang-format` in repo root (Google-based, 2-space indent, 12
 
 **Effect system:** Shader effects are discovered at runtime from `effects/shaders/*.xml`. Each XML declares parameters (fields) and references a `.frag` shader. The `effectloaders.cpp` file handles discovery and registration.
 
-**Project file format:** Custom XML-based `.ov` format. Save version `190219` (YYMMDD). Loading handled by `LoadThread`, saving by `OliveGlobal::save_project()`.
+**Project file format:** Custom XML-based `.ov` format (backward compatible with Olive 0.1). Save version `190219` (YYMMDD). Loading handled by `LoadThread`, saving by `OliveGlobal::save_project()`.
 
 **Video decode pipeline:** `Cacher` (background thread) decodes frames via FFmpeg. Two paths based on `Clip::NeedsCpuRgba()`:
 - **GPU path** (default): AVFilter outputs YUV420P or NV12 → `Clip::Retrieve()` uploads Y/U/V planes to GL textures → `yuv2rgb.frag` shader converts to RGBA in an FBO → `cached_texture_id` points to FBO texture.

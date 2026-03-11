@@ -62,10 +62,10 @@ OliveGlobal::OliveGlobal() :
   version_id = QString(" | %1").arg(GITHASH);
 #endif
 
-  olive::AppName = QString("Olive EVA-01 (March 2026 | Alpha%1)").arg(version_id);
+  olive::AppName = QString("Amber (%1%2)").arg(APPVERSION, version_id);
 
   // set the file filter used in all file dialogs pertaining to Olive project files.
-  project_file_filter = tr("Olive Project %1").arg("(*.ove)");
+  project_file_filter = tr("Amber Project %1").arg("(*.ove)");
 
   // set default value
   enable_load_project_on_init = false;
@@ -94,7 +94,7 @@ void OliveGlobal::check_for_autorecovery_file() {
     if (QFile::exists(autorecovery_filename)) {
       if (QMessageBox::question(nullptr,
                                 tr("Auto-recovery"),
-                                tr("Olive didn't close properly and an autorecovery file "
+                                tr("Amber didn't close properly and an autorecovery file "
                                    "was detected. Would you like to open it?"),
                                 QMessageBox::Yes,
                                 QMessageBox::No) == QMessageBox::Yes) {

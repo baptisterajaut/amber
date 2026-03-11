@@ -1,4 +1,4 @@
-Package: olive-editor
+Package: amber-editor
 Version: ${VERSION}-${REVISION}
 Section: video
 Priority: optional

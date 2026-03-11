@@ -678,8 +678,8 @@ void PreferencesDialog::setup_ui() {
   appearance_layout->addWidget(new QLabel(tr("Theme")), row, 0);
 
   ui_style = new QComboBox();
-  ui_style->addItem(tr("Olive Dark (Default)"), olive::styling::kOliveDefaultDark);
-  ui_style->addItem(tr("Olive Light"), olive::styling::kOliveDefaultLight);
+  ui_style->addItem(tr("Amber Dark (Default)"), olive::styling::kOliveDefaultDark);
+  ui_style->addItem(tr("Amber Light"), olive::styling::kOliveDefaultLight);
   ui_style->addItem(tr("Native"), olive::styling::kNativeDarkIcons);
   ui_style->addItem(tr("Native (Light Icons)"), olive::styling::kNativeLightIcons);
   ui_style->setCurrentIndex(olive::CurrentConfig.style);

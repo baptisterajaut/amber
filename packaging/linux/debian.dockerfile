@@ -36,4 +36,4 @@ COPY packaging/ /src/packaging/
 RUN export ARCH=$(dpkg --print-architecture) && \
     mkdir -p /pkg/DEBIAN /out && \
     envsubst < /src/packaging/linux/control.in > /pkg/DEBIAN/control && \
-    dpkg-deb --build /pkg "/out/olive-editor_${VERSION}-${REVISION}_debian12_${ARCH}.deb"
+    dpkg-deb --build /pkg "/out/amber-editor_${VERSION}-${REVISION}_debian12_${ARCH}.deb"

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
 
-project(olive-editor LANGUAGES CXX)
+project(amber-editor VERSION 1.0.0 LANGUAGES CXX)
 
 option(BUILD_DOXYGEN "Build Doxygen documentation" OFF)
 
@@ -73,11 +73,12 @@ elseif(UNIX AND NOT APPLE)
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
 endif()
+list(APPEND OLIVE_DEFINITIONS -DAPPVERSION="${PROJECT_VERSION}")
 if(DEFINED GIT_HASH)
-  message("Olive: git hash = " "${GIT_HASH}")
+  message("Amber: git hash = " "${GIT_HASH}")
   list(APPEND OLIVE_DEFINITIONS -DGITHASH="${GIT_HASH}")
 else()
-  message("Olive: No git hash defined!")
+  message("Amber: No git hash defined!")
 endif()
 
 find_package(Doxygen)
@@ -419,24 +420,24 @@ set(OLIVE_EFFECTS
 )
 
 qt_add_translation(OLIVE_QM_FILES
-  ts/olive_ar.ts
-  ts/olive_bs.ts
-  ts/olive_cs.ts
-  ts/olive_de.ts
-  ts/olive_es.ts
-  ts/olive_fr.ts
-  ts/olive_it.ts
-  ts/olive_ru.ts
-  ts/olive_sr.ts
-  ts/olive_id.ts
-  ts/olive_tr.ts
-  ts/olive_pt-BR.ts
-  ts/olive_uk.ts
-  ts/olive_zh-CN.ts
-  ts/olive_zh-TW.ts
+  ts/amber_ar.ts
+  ts/amber_bs.ts
+  ts/amber_cs.ts
+  ts/amber_de.ts
+  ts/amber_es.ts
+  ts/amber_fr.ts
+  ts/amber_it.ts
+  ts/amber_ru.ts
+  ts/amber_sr.ts
+  ts/amber_id.ts
+  ts/amber_tr.ts
+  ts/amber_pt-BR.ts
+  ts/amber_uk.ts
+  ts/amber_zh-CN.ts
+  ts/amber_zh-TW.ts
 )
 
-set(OLIVE_TARGET "olive-editor")
+set(OLIVE_TARGET "amber-editor")
 if(APPLE)
   set(OLIVE_TARGET "Olive")
 endif()
@@ -484,17 +485,17 @@ endif()
 
 if(UNIX AND NOT APPLE)
   install(TARGETS ${OLIVE_TARGET} RUNTIME DESTINATION bin)
-  install(FILES ${OLIVE_EFFECTS} DESTINATION share/olive-editor/effects)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.olivevideoeditor.Olive.desktop DESTINATION share/applications)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.olivevideoeditor.Olive.appdata.xml DESTINATION share/metainfo)
+  install(FILES ${OLIVE_EFFECTS} DESTINATION share/amber-editor/effects)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.desktop DESTINATION share/applications)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.appdata.xml DESTINATION share/metainfo)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.olivevideoeditor.Olive.xml DESTINATION share/mime/packages)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/16x16/org.olivevideoeditor.Olive.png DESTINATION share/icons/hicolor/16x16/apps)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/32x32/org.olivevideoeditor.Olive.png DESTINATION share/icons/hicolor/32x32/apps)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/48x48/org.olivevideoeditor.Olive.png DESTINATION share/icons/hicolor/48x48/apps)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/64x64/org.olivevideoeditor.Olive.png DESTINATION share/icons/hicolor/64x64/apps)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/128x128/org.olivevideoeditor.Olive.png DESTINATION share/icons/hicolor/128x128/apps)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/256x256/org.olivevideoeditor.Olive.png DESTINATION share/icons/hicolor/256x256/apps)
-  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/512x512/org.olivevideoeditor.Olive.png DESTINATION share/icons/hicolor/512x512/apps)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/16x16/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/16x16/apps)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/32x32/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/32x32/apps)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/48x48/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/48x48/apps)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/64x64/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/64x64/apps)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/128x128/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/128x128/apps)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/256x256/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/256x256/apps)
+  install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/512x512/org.ambervideoeditor.Amber.png DESTINATION share/icons/hicolor/512x512/apps)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/16x16/application-vnd.olive-project.png DESTINATION share/icons/hicolor/16x16/mimetypes)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/32x32/application-vnd.olive-project.png DESTINATION share/icons/hicolor/32x32/mimetypes)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/48x48/application-vnd.olive-project.png DESTINATION share/icons/hicolor/48x48/mimetypes)
@@ -502,5 +503,5 @@ if(UNIX AND NOT APPLE)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/128x128/application-vnd.olive-project.png DESTINATION share/icons/hicolor/128x128/mimetypes)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/256x256/application-vnd.olive-project.png DESTINATION share/icons/hicolor/256x256/mimetypes)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/512x512/application-vnd.olive-project.png DESTINATION share/icons/hicolor/512x512/mimetypes)
-  install(FILES ${OLIVE_QM_FILES} DESTINATION share/olive-editor/ts)
+  install(FILES ${OLIVE_QM_FILES} DESTINATION share/amber-editor/ts)
 endif()
