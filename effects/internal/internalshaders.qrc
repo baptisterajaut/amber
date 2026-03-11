@@ -6,5 +6,6 @@
         <file>cornerpin.vert</file>
         <file>premultiply.frag</file>
         <file>dropshadow.frag</file>
+        <file>yuv2rgb.frag</file>
     </qresource>
 </RCC>

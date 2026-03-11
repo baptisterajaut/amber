@@ -36,6 +36,27 @@
 #include "undo/undo.h"
 #include "global/debug.h"
 
+#include <QOpenGLContext>
+#include <QOpenGLFunctions>
+#include <QOpenGLShaderProgram>
+
+extern "C" {
+#include <libavutil/pixfmt.h>
+}
+
+#ifndef GL_R8
+#define GL_R8 0x8229
+#endif
+#ifndef GL_RG8
+#define GL_RG8 0x822B
+#endif
+#ifndef GL_RED
+#define GL_RED 0x1903
+#endif
+#ifndef GL_RG
+#define GL_RG 0x8227
+#endif
+
 const int kRGBAComponentCount = 4;
 
 Clip::Clip(Sequence* s) :
@@ -55,8 +76,12 @@ Clip::Clip(Sequence* s) :
   replaced(false),
   fbo(nullptr),
   open_(false),
-  texture(nullptr)
+  cacher_uses_rgba_(false),
+  texture(nullptr),
+  yuv_fbo(nullptr),
+  cached_texture_id(0)
 {
+  yuv_textures[0] = yuv_textures[1] = yuv_textures[2] = 0;
 }
 
 ClipPtr Clip::copy(Sequence* s) {
@@ -471,6 +496,7 @@ void Clip::refactor_frame_rate(ComboAction* ca, double multiplier, bool change_t
 void Clip::Open() {
   if (!open_ && state_change_lock.tryLock()) {
     open_ = true;
+    cacher_uses_rgba_ = NeedsCpuRgba();
 
     for (int i=0;i<effects.size();i++) {
       effects.at(i)->open();
@@ -497,6 +523,15 @@ void Clip::Close(bool wait) {
     if (media() != nullptr && media()->get_type() == MEDIA_TYPE_SEQUENCE) {
       close_active_clips(media()->to_sequence().get());
     }
+
+    // destroy YUV conversion resources
+    delete yuv_fbo;
+    yuv_fbo = nullptr;
+    if (yuv_textures[0] != 0) {
+      glDeleteTextures(3, yuv_textures);
+      yuv_textures[0] = yuv_textures[1] = yuv_textures[2] = 0;
+    }
+    cached_texture_id = 0;
 
     // destroy opengl texture in main thread
     delete texture;
@@ -541,7 +576,7 @@ void Clip::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playb
   cacher_frame = playhead;
 }
 
-bool Clip::Retrieve()
+bool Clip::Retrieve(QOpenGLShaderProgram* yuv_program)
 {
   bool ret = false;
 
@@ -565,62 +600,154 @@ bool Clip::Retrieve()
 
     if (frame != nullptr && cacher.queue()->contains(frame)) {
 
-      // check if the opengl texture exists yet, create it if not
-      if (texture == nullptr) {
-        texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
+      bool is_yuv420p = (frame->format == AV_PIX_FMT_YUV420P);
+      bool is_nv12 = (frame->format == AV_PIX_FMT_NV12);
 
-        // the raw frame size may differ from the one we're using (e.g. a lower resolution proxy), so we make sure
-        // the texture is using the correct dimensions, but then treat it as if it's the original resolution in the
-        // composition
-        texture->setSize(cacher.media_width(), cacher.media_height());
+      if (yuv_program != nullptr && (is_yuv420p || is_nv12)) {
+        // GPU YUV→RGB path: upload plane textures and convert via shader
+        int w = cacher.media_width();
+        int h = cacher.media_height();
 
-        texture->setFormat(QOpenGLTexture::RGBA8_UNorm);
-        texture->setMipLevels(texture->maximumMipLevels());
-        texture->setMinMagFilters(QOpenGLTexture::LinearMipMapLinear, QOpenGLTexture::Linear);
-        texture->allocateStorage(QOpenGLTexture::RGBA, QOpenGLTexture::UInt8);
-      }
-
-      glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[0]/kRGBAComponentCount);
-
-      // 2 data buffers to ping-pong between
-      bool using_db_1 = true;
-      uint8_t* data_buffer_1 = frame->data[0];
-      uint8_t* data_buffer_2 = nullptr;
-
-      int frame_size = frame->linesize[0]*frame->height;
-
-      for (int i=0;i<effects.size();i++) {
-        Effect* e = effects.at(i).get();
-        if ((e->Flags() & Effect::ImageFlag) && e->IsEnabled()) {
-          if (data_buffer_1 == frame->data[0]) {
-            data_buffer_1 = new uint8_t[frame_size];
-            data_buffer_2 = new uint8_t[frame_size];
-
-            memcpy(data_buffer_1, frame->data[0], frame_size);
-          }
-
-          e->process_image(get_timecode(this, cacher_frame),
-                           using_db_1 ? data_buffer_1 : data_buffer_2,
-                           using_db_1 ? data_buffer_2 : data_buffer_1,
-                           frame_size
-                           );
-
-          using_db_1 = !using_db_1;
+        if (yuv_textures[0] == 0) {
+          glGenTextures(3, yuv_textures);
         }
+
+        if (yuv_fbo == nullptr) {
+          yuv_fbo = new QOpenGLFramebufferObject(w, h);
+        }
+
+        QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
+
+        // Upload Y plane (full resolution, GL_R8)
+        f->glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, yuv_textures[0]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[0]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, frame->data[0]);
+
+        // Upload U/UV plane (half resolution)
+        f->glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, yuv_textures[1]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        if (is_nv12) {
+          glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[1] / 2);
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, w / 2, h / 2, 0, GL_RG, GL_UNSIGNED_BYTE, frame->data[1]);
+        } else {
+          glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[1]);
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, frame->data[1]);
+        }
+
+        // Upload V plane (YUV420P only)
+        if (is_yuv420p) {
+          f->glActiveTexture(GL_TEXTURE2);
+          glBindTexture(GL_TEXTURE_2D, yuv_textures[2]);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+          glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[2]);
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, frame->data[2]);
+        }
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+
+        // Render YUV→RGB conversion into yuv_fbo
+        yuv_fbo->bind();
+        glViewport(0, 0, w, h);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        yuv_program->bind();
+        yuv_program->setUniformValue("y_tex", 0);
+        yuv_program->setUniformValue("u_tex", 1);
+        yuv_program->setUniformValue("v_tex", 2);
+        yuv_program->setUniformValue("format_type", is_nv12 ? 1 : 0);
+
+        // Fullscreen quad (textures already bound to units 0/1/2)
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, 1, 0, 1, -1, 1);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(0, 0);
+        glTexCoord2f(1, 0); glVertex2f(1, 0);
+        glTexCoord2f(1, 1); glVertex2f(1, 1);
+        glTexCoord2f(0, 1); glVertex2f(0, 1);
+        glEnd();
+        glPopMatrix();
+
+        yuv_program->release();
+        yuv_fbo->release();
+
+        // Reset texture state
+        f->glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        f->glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        f->glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        cached_texture_id = yuv_fbo->texture();
+        ret = true;
+      } else {
+        // CPU RGBA path (original code)
+
+        // check if the opengl texture exists yet, create it if not
+        if (texture == nullptr) {
+          texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
+
+          // the raw frame size may differ from the one we're using (e.g. a lower resolution proxy), so we make sure
+          // the texture is using the correct dimensions, but then treat it as if it's the original resolution in the
+          // composition
+          texture->setSize(cacher.media_width(), cacher.media_height());
+
+          texture->setFormat(QOpenGLTexture::RGBA8_UNorm);
+          texture->setMipLevels(texture->maximumMipLevels());
+          texture->setMinMagFilters(QOpenGLTexture::LinearMipMapLinear, QOpenGLTexture::Linear);
+          texture->allocateStorage(QOpenGLTexture::RGBA, QOpenGLTexture::UInt8);
+        }
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[0]/kRGBAComponentCount);
+
+        // 2 data buffers to ping-pong between
+        bool using_db_1 = true;
+        uint8_t* data_buffer_1 = frame->data[0];
+        uint8_t* data_buffer_2 = nullptr;
+
+        int frame_size = frame->linesize[0]*frame->height;
+
+        for (int i=0;i<effects.size();i++) {
+          Effect* e = effects.at(i).get();
+          if ((e->Flags() & Effect::ImageFlag) && e->IsEnabled()) {
+            if (data_buffer_1 == frame->data[0]) {
+              data_buffer_1 = new uint8_t[frame_size];
+              data_buffer_2 = new uint8_t[frame_size];
+
+              memcpy(data_buffer_1, frame->data[0], frame_size);
+            }
+
+            e->process_image(get_timecode(this, cacher_frame),
+                             using_db_1 ? data_buffer_1 : data_buffer_2,
+                             using_db_1 ? data_buffer_2 : data_buffer_1,
+                             frame_size
+                             );
+
+            using_db_1 = !using_db_1;
+          }
+        }
+
+        texture->setData(QOpenGLTexture::RGBA,
+                            QOpenGLTexture::UInt8,
+                            const_cast<const uint8_t*>(using_db_1 ? data_buffer_1 : data_buffer_2));
+
+        if (data_buffer_1 != frame->data[0]) {
+          delete [] data_buffer_1;
+          delete [] data_buffer_2;
+        }
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+
+        cached_texture_id = texture->textureId();
+        ret = true;
       }
-
-      texture->setData(QOpenGLTexture::RGBA,
-                          QOpenGLTexture::UInt8,
-                          const_cast<const uint8_t*>(using_db_1 ? data_buffer_1 : data_buffer_2));
-
-      if (data_buffer_1 != frame->data[0]) {
-        delete [] data_buffer_1;
-        delete [] data_buffer_2;
-      }
-
-      glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-
-      ret = true;
     } else {
       qCritical() << "Failed to retrieve frame for clip" << name();
     }
@@ -634,6 +761,21 @@ bool Clip::Retrieve()
 bool Clip::UsesCacher()
 {
   return track() >= 0 || (media() != nullptr && media()->get_type() == MEDIA_TYPE_FOOTAGE);
+}
+
+bool Clip::NeedsCpuRgba() const
+{
+  for (int i = 0; i < effects.size(); i++) {
+    if ((effects.at(i)->Flags() & Effect::ImageFlag) && effects.at(i)->IsEnabled()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool Clip::NeedsCacherReconfigure() const
+{
+  return open_ && (NeedsCpuRgba() != cacher_uses_rgba_);
 }
 
 ClipSpeed::ClipSpeed() :

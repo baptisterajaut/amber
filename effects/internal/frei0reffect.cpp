@@ -39,7 +39,9 @@ typedef void (*f0rSetParamValue) (f0r_instance_t instance,
 
 Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
   Effect(c, em),
-  open(false)
+  open(false),
+  instance_width(0),
+  instance_height(0)
 {
   SetFlags(ImageFlag);
 
@@ -127,6 +129,15 @@ Frei0rEffect::~Frei0rEffect() {
 }
 
 void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *output, int) {
+  // Reconstruct Frei0r instance if clip dimensions changed since construction
+  // (e.g., effect was created during project load before media was analyzed)
+  int w = parent_clip->media_width();
+  int h = parent_clip->media_height();
+  if (w != instance_width || h != instance_height) {
+    destruct_module();
+    construct_module();
+  }
+
   f0rUpdateFunc update_func = reinterpret_cast<f0rUpdateFunc>(handle.resolve("f0r_update"));
   if (update_func == nullptr) return;
 
@@ -200,8 +211,11 @@ void Frei0rEffect::destruct_module() {
 }
 
 void Frei0rEffect::construct_module() {
+  instance_width = parent_clip->media_width();
+  instance_height = parent_clip->media_height();
+
   f0rConstructFunc construct = reinterpret_cast<f0rConstructFunc>(handle.resolve("f0r_construct"));
-  instance = construct(parent_clip->media_width(), parent_clip->media_height());
+  instance = construct(instance_width, instance_height);
 
   open = true;
 }

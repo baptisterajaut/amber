@@ -566,7 +566,9 @@ void Cacher::CacheVideoWorker() {
         seek_ts = qMax(zero, seek_ts - second_pts);
 
         have_existing_frame_to_use = true;
-      } while (retrieve_code >= 0 && decoded_frame->pts > target_pts && !seeked_to_zero);
+      } while (retrieve_code >= 0
+              && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts)
+              && !seeked_to_zero);
 
       // also we assume none of the frames in the queue are usable
       queue_.lock();
@@ -755,27 +757,18 @@ void Cacher::CacheVideoWorker() {
 
         } else {
 
-          // if a frame has no timestamp (pts == AV_NOPTS_VALUE), we assume it's an invalid frame and don't use it
+          // Frame has no timestamp — skip it and try the next one.
+          // This commonly happens after seeking in certain codecs (e.g. H.264).
 
           qWarning() << clip->name() << "frame had no PTS value";
           av_frame_free(&decoded_frame);
 
-          if (retrieve_code == AVERROR_EOF && retrieved_frame == nullptr && !queue_.isEmpty()) {
-            // if we reached the end of the file, it's not an error but there are no more frames to retrieve
-            // some formats EOF before the end of the duration that Olive calculates. In this event, we simply
-            // return the last frame we retrieved
-            //
-            // TODO: Check duration formula
-
-            SetRetrievedFrame(queue_.last());
-
-          } else {
-
-            SetRetrievedFrame(nullptr);
-
+          if (retrieve_code == AVERROR_EOF) {
+            if (retrieved_frame == nullptr && !queue_.isEmpty()) {
+              SetRetrievedFrame(queue_.last());
+            }
+            break;
           }
-
-          break;
 
         }
       } while (!interrupt_);
@@ -784,10 +777,15 @@ void Cacher::CacheVideoWorker() {
 
   }
 
-  // For some reason we couldn't get the frame, we should wake up the RenderThread anyway
+  // If we couldn't find the exact target frame, fall back to the closest available frame
   if (retrieved_frame == nullptr) {
-    qCritical() << "Couldn't retrieve an appropriate frame. This is an error and may mean this media is corrupt.";
-    SetRetrievedFrame(nullptr);
+    if (!queue_.isEmpty()) {
+      qWarning() << "Exact frame not found, using closest available frame from queue";
+      SetRetrievedFrame(queue_.last());
+    } else {
+      qCritical() << "Couldn't retrieve an appropriate frame. This is an error and may mean this media is corrupt.";
+      SetRetrievedFrame(nullptr);
+    }
   }
 }
 
@@ -1020,8 +1018,11 @@ void Cacher::OpenWorker() {
         last_filter = yadif_filter;
       }
 
-      const char* chosen_format = av_get_pix_fmt_name(kDestPixFmt);
-      snprintf(filter_args, sizeof(filter_args), "pix_fmts=%s", chosen_format);
+      if (clip->NeedsCpuRgba()) {
+        snprintf(filter_args, sizeof(filter_args), "pix_fmts=%s", av_get_pix_fmt_name(kDestPixFmt));
+      } else {
+        snprintf(filter_args, sizeof(filter_args), "pix_fmts=yuv420p|nv12|%s", av_get_pix_fmt_name(kDestPixFmt));
+      }
 
       AVFilterContext* format_conv;
       avfilter_graph_create_filter(&format_conv, avfilter_get_by_name("format"), "fmt", filter_args, nullptr, filter_graph);

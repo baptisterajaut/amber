@@ -214,6 +214,11 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
               // does the media have a valid media stream source and is it active?
               if (ms != nullptr && c->IsActiveAt(playhead)) {
 
+                // reopen if cacher format needs to change (e.g. ImageFlag effect added/removed)
+                if (c->NeedsCacherReconfigure()) {
+                  c->Close(false);
+                }
+
                 // open if not open
                 if (!c->IsOpen()) {
                   c->Open();
@@ -322,13 +327,12 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
         // if media is footage
         if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
 
-          // retrieve video frame from cache and store it in c->texture
+          // retrieve video frame from cache and store it in texture
           c->Cache(qMax(playhead, c->timeline_in()), false, params.nests, params.playback_speed);
-          if (!c->Retrieve()) {
+          if (!c->Retrieve(params.yuv_program)) {
             params.texture_failed = true;
           } else {
-            // retrieve ID from c->texture
-            textureID = c->texture->textureId();
+            textureID = c->cached_texture_id;
           }
 
           if (textureID == 0) {
@@ -375,7 +379,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
               fbo_switcher = true;
             } else if (c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
 
-              if (!c->media()->to_footage()->alpha_is_premultiplied) {
+              if (textureID > 0 && !c->media()->to_footage()->alpha_is_premultiplied) {
                 // alpha is not premultiplied, we'll need to multiply it for the rest of the pipeline
                 params.premultiply_program->bind();
 

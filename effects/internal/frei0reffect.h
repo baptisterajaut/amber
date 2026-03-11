@@ -48,6 +48,8 @@ private:
   void destruct_module();
   void construct_module();
   bool open;
+  int instance_width;
+  int instance_height;
 };
 
 #endif

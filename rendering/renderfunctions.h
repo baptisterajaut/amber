@@ -155,6 +155,16 @@ struct ComposeSequenceParams {
     QOpenGLShaderProgram* premultiply_program;
 
     /**
+     * @brief YUV to RGB conversion shader
+     *
+     * Used only for video rendering. Never accessed with audio rendering.
+     *
+     * Converts YUV420P/NV12 plane textures to RGBA in a GPU shader, avoiding the CPU format conversion
+     * in FFmpeg's AVFilter pipeline.
+     */
+    QOpenGLShaderProgram* yuv_program;
+
+    /**
      * @brief The OpenGL framebuffer object that the final texture to be shown is rendered to.
      *
      * Used only for video rendering. Never accessed with audio rendering.

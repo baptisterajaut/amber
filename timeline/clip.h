@@ -51,6 +51,7 @@ struct ClipSpeed {
 
 using ClipPtr = std::shared_ptr<Clip>;
 
+class QOpenGLShaderProgram;
 class Sequence;
 
 class Clip {
@@ -136,7 +137,7 @@ public:
   // playback functions
   void Open();
   void Cache(long playhead, bool scrubbing, QVector<Clip*> &nests, int playback_speed);
-  bool Retrieve();
+  bool Retrieve(QOpenGLShaderProgram* yuv_program = nullptr);
   void Close(bool wait);
   bool IsOpen();
 
@@ -151,9 +152,15 @@ public:
   QMutex state_change_lock;
   QMutex cache_lock;
 
+  bool NeedsCpuRgba() const;
+  bool NeedsCacherReconfigure() const;
+
   // video playback variables
   QOpenGLFramebufferObject** fbo;
   QOpenGLTexture* texture;
+  GLuint yuv_textures[3];
+  QOpenGLFramebufferObject* yuv_fbo;
+  GLuint cached_texture_id;
   long texture_frame;
 
 private:
@@ -177,6 +184,7 @@ private:
   QVector<Marker> markers;
   QColor color_;
   bool open_;
+  bool cacher_uses_rgba_;
 };
 
 #endif // CLIP_H

@@ -40,6 +40,7 @@ RenderThread::RenderThread() :
   ctx(nullptr),
   blend_mode_program(nullptr),
   premultiply_program(nullptr),
+  yuv_program(nullptr),
   seq(nullptr),
   tex_width(-1),
   tex_height(-1),
@@ -106,6 +107,11 @@ void RenderThread::run() {
           premultiply_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/common.vert");
           premultiply_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/premultiply.frag");
           premultiply_program->link();
+
+          yuv_program = new QOpenGLShaderProgram();
+          yuv_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/common.vert");
+          yuv_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/yuv2rgb.frag");
+          yuv_program->link();
         }
 
         // draw frame
@@ -151,6 +157,7 @@ void RenderThread::paint() {
   params.playback_speed = playback_speed_;
   params.blend_mode_program = blend_mode_program;
   params.premultiply_program = premultiply_program;
+  params.yuv_program = yuv_program;
   params.backend_buffer1 = back_buffer_1.buffer();
   params.backend_buffer2 = back_buffer_2.buffer();
   params.backend_attachment1 = back_buffer_1.texture();
@@ -311,6 +318,9 @@ void RenderThread::delete_shaders() {
 
   delete premultiply_program;
   premultiply_program = nullptr;
+
+  delete yuv_program;
+  yuv_program = nullptr;
 }
 
 void RenderThread::delete_ctx() {
