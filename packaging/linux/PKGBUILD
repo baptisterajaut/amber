@@ -1,5 +1,5 @@
 pkgname=amber-editor
-pkgver=1.0
+pkgver=1.0.0
 pkgrel=1
 pkgdesc='Professional open-source non-linear video editor'
 arch=('x86_64')
@@ -16,6 +16,7 @@ makedepends=(
   'cmake'
   'qt6-tools'
 )
+conflicts=('olive-editor')
 source=("git+ssh://git@github.com/baptisterajaut/amber.git#branch=0.1.x")
 sha256sums=('SKIP')
 
