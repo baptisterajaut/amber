@@ -162,6 +162,8 @@ void GraphEditor::update_panel() {
 }
 
 void GraphEditor::set_row(EffectRow *r) {
+  if (r == row) return;
+
   for (int i=0;i<field_sliders_.size();i++) {
     delete field_sliders_.at(i);
     delete field_enable_buttons.at(i);

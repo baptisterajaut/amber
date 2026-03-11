@@ -604,16 +604,22 @@ void EffectControls::Reload() {
 
 void EffectControls::SetClips()
 {
-  Clear(true);
-
   if (olive::ActiveSequence == nullptr) {
+    Clear(true);
     selected_clips_.clear();
-  } else {
-    // replace clip vector
-    selected_clips_ = olive::ActiveSequence->SelectedClips(false);
-
-    Load();
+    return;
   }
+
+  QVector<Clip*> new_clips = olive::ActiveSequence->SelectedClips(false);
+
+  // If the selected clips haven't changed, skip the expensive teardown/rebuild
+  if (new_clips == selected_clips_) {
+    return;
+  }
+
+  Clear(true);
+  selected_clips_ = new_clips;
+  Load();
 }
 
 void EffectControls::Load() {
