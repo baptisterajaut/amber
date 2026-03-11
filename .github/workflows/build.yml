@@ -65,13 +65,10 @@ jobs:
 
       - name: Build
         run: |
-          export PATH="$(brew --prefix qt@6)/bin:$PATH"
           export CMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix ffmpeg)"
-          mkdir build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
-                ..
-          make -j$(sysctl -n hw.ncpu)
+          cmake -S src -B build -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+          cmake --build build -j$(sysctl -n hw.ncpu)
 
       - name: Create .app bundle
         run: |

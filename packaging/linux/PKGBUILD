@@ -20,7 +20,7 @@ source=("git+ssh://git@github.com/baptisterajaut/olive.git#branch=0.1.x")
 sha256sums=('SKIP')
 
 build() {
-  cmake -B build -S olive \
+  cmake -B build -S olive/src \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr
   cmake --build build -j$(nproc)

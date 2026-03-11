@@ -26,7 +26,7 @@ RUN dnf install -y unzip curl && \
     cp /tmp/${FFMPEG_ARCHIVE}/bin/*.dll "${SYSROOT}/bin/" && \
     rm -rf /tmp/ffmpeg*
 
-COPY . /src
+COPY src/ /src
 WORKDIR /src/build
 
 RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release .. && \
@@ -36,6 +36,8 @@ RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release .. && \
 FROM build AS package
 
 RUN dnf install -y curl mingw64-nsis mingw-nsis-base && dnf clean all
+
+COPY packaging/ /src/packaging/
 
 # Collect everything into /out
 RUN SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \

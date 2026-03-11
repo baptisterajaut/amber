@@ -9,9 +9,8 @@ Olive Video Editor — free, open-source non-linear video editor (GPLv3). C++11,
 ## Build
 
 ```bash
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc)
+cmake -S src -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
 ```
 
 **Dependencies:** Qt 6 (Core, Gui, Widgets, Multimedia, OpenGL, OpenGLWidgets, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample), OpenGL. Optional: Frei0r plugins (disable with `-DNOFREI0R`), OpenColorIO (Windows only).

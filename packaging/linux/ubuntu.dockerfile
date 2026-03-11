@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     frei0r-plugins-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . /src
+COPY src/ /src
 WORKDIR /src/build
 
 RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && \
@@ -29,6 +29,8 @@ ARG REVISION
 
 RUN apt-get update && apt-get install -y dpkg-dev gettext-base && rm -rf /var/lib/apt/lists/*
 
+COPY packaging/ /src/packaging/
+
 RUN DESTDIR=/pkg make install && \
     export ARCH=$(dpkg --print-architecture) && \
     mkdir -p /pkg/DEBIAN /out && \
@@ -41,6 +43,8 @@ FROM build AS appimage
 ARG VERSION
 
 RUN apt-get update && apt-get install -y curl file libfuse2 && rm -rf /var/lib/apt/lists/*
+
+COPY packaging/ /src/packaging/
 
 RUN curl -L -o /tmp/linuxdeploy.AppImage \
     https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage && \

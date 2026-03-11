@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
     frei0r-plugins-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . /src
+COPY src/ /src
 WORKDIR /src/build
 
 RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr .. && \
@@ -30,6 +30,8 @@ ARG VERSION
 ARG REVISION
 
 RUN apt-get update && apt-get install -y dpkg-dev gettext-base && rm -rf /var/lib/apt/lists/*
+
+COPY packaging/ /src/packaging/
 
 RUN export ARCH=$(dpkg --print-architecture) && \
     mkdir -p /pkg/DEBIAN /out && \

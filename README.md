@@ -21,9 +21,8 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x` — 
 ## Build (Linux)
 
 ```bash
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc)
+cmake -S src -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
 ```
 
 **Dependencies:** Qt 6 (Core, Gui, Widgets, Multimedia, OpenGL, OpenGLWidgets, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample), OpenGL.
@@ -46,11 +45,9 @@ docker run --rm olive-win64 cat /out/olive-setup.exe > olive-setup.exe
 
 ```bash
 brew install qt@6 ffmpeg cmake
-export PATH="$(brew --prefix qt@6)/bin:$PATH"
 export CMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix ffmpeg)"
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" ..
-make -j$(sysctl -n hw.ncpu)
+cmake -S src -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+cmake --build build -j$(sysctl -n hw.ncpu)
 ```
 
 To create an app bundle: `macdeployqt build/Olive.app`
