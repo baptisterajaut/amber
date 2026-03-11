@@ -340,7 +340,17 @@ set(OLIVE_SOURCES
   ui/viewerwindow.h
   undo/comboaction.cpp
   undo/comboaction.h
-  undo/undo.cpp
+  undo/undoactions.h
+  undo/undo_clip.cpp
+  undo/undo_clip.h
+  undo/undo_effect.cpp
+  undo/undo_effect.h
+  undo/undo_generic.cpp
+  undo/undo_generic.h
+  undo/undo_media.cpp
+  undo/undo_media.h
+  undo/undo_timeline.cpp
+  undo/undo_timeline.h
   undo/undo.h
   undo/undostack.cpp
   undo/undostack.h
