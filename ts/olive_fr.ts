@@ -162,7 +162,7 @@
     <message>
         <location filename="../ui/collapsiblewidget.cpp" line="54"/>
         <source>&lt;untitled&gt;</source>
-        <translation>&amp;lt;Sans titre&amp;gt;</translation>
+        <translation>&lt;Sans titre&gt;</translation>
     </message>
 </context>
 <context>
@@ -1556,7 +1556,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="943"/>
         <source>&lt;untitled&gt;</source>
-        <translation>&amp;lt;Sans titre&amp;gt;</translation>
+        <translation>&lt;Sans titre&gt;</translation>
     </message>
     <message>
         <source>Open Project...</source>
