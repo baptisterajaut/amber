@@ -23,27 +23,28 @@
 
 #include <QScrollBar>
 
-class ResizableScrollBar : public QScrollBar
-{
-    Q_OBJECT
-public:
-    explicit ResizableScrollBar(QWidget * parent = nullptr);
-    bool is_resizing();
-signals:
-    void resize_move(double i);
-protected:
-    void resizeEvent(QResizeEvent *event) override;
-    void mousePressEvent(QMouseEvent *) override;
-    void mouseMoveEvent(QMouseEvent *) override;
-    void mouseReleaseEvent(QMouseEvent *) override;
-private:
-    bool resize_init{false};
-    bool resize_proc{false};
-    int resize_start;
-    bool resize_top;
+class ResizableScrollBar : public QScrollBar {
+  Q_OBJECT
+ public:
+  explicit ResizableScrollBar(QWidget *parent = nullptr);
+  bool is_resizing();
+ signals:
+  void resize_move(double i);
 
-    int resize_start_max;
-    int resize_start_width;
+ protected:
+  void resizeEvent(QResizeEvent *event) override;
+  void mousePressEvent(QMouseEvent *) override;
+  void mouseMoveEvent(QMouseEvent *) override;
+  void mouseReleaseEvent(QMouseEvent *) override;
+
+ private:
+  bool resize_init{false};
+  bool resize_proc{false};
+  int resize_start{0};
+  bool resize_top{false};
+
+  int resize_start_max{0};
+  int resize_start_width{0};
 };
 
-#endif // RESIZABLESCROLLBAR_H
+#endif  // RESIZABLESCROLLBAR_H

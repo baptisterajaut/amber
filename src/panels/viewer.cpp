@@ -21,51 +21,51 @@
 #include "viewer.h"
 
 extern "C" {
-#include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 }
 
-#include <QtMath>
 #include <QAudioSink>
-#include <QPainter>
-#include <QStringList>
-#include <QRegularExpression>
-#include <QTimer>
-#include <QHBoxLayout>
-#include <QPushButton>
 #include <QDrag>
+#include <QHBoxLayout>
 #include <QMimeData>
+#include <QPainter>
+#include <QPushButton>
+#include <QRegularExpression>
+#include <QStringList>
+#include <QTimer>
+#include <QtMath>
 
-#include "rendering/audio.h"
-#include "timeline.h"
-#include "panels/project.h"
-#include "panels/effectcontrols.h"
-#include "timeline/sequence.h"
-#include "timeline/clip.h"
-#include "panels/panels.h"
 #include "global/config.h"
+#include "global/debug.h"
+#include "global/global.h"
+#include "panels/effectcontrols.h"
+#include "panels/panels.h"
+#include "panels/project.h"
 #include "project/footage.h"
 #include "project/media.h"
+#include "rendering/audio.h"
+#include "rendering/renderfunctions.h"
+#include "timeline.h"
+#include "timeline/clip.h"
+#include "timeline/sequence.h"
+#include "ui/audiomonitor.h"
+#include "ui/icons.h"
+#include "ui/labelslider.h"
+#include "ui/resizablescrollbar.h"
+#include "ui/timelineheader.h"
+#include "ui/viewercontainer.h"
 #include "undo/undo.h"
 #include "undo/undostack.h"
-#include "ui/audiomonitor.h"
-#include "rendering/renderfunctions.h"
-#include "ui/viewercontainer.h"
-#include "ui/labelslider.h"
-#include "ui/timelineheader.h"
-#include "ui/resizablescrollbar.h"
-#include "ui/icons.h"
-#include "global/global.h"
-#include "global/debug.h"
 
-#define FRAMES_IN_ONE_MINUTE 1798 // 1800 - 2
-#define FRAMES_IN_TEN_MINUTES 17978 // (FRAMES_IN_ONE_MINUTE * 10) - 2
+#define FRAMES_IN_ONE_MINUTE 1798    // 1800 - 2
+#define FRAMES_IN_TEN_MINUTES 17978  // (FRAMES_IN_ONE_MINUTE * 10) - 2
 
-Viewer::Viewer(QWidget *parent) :
-  Panel(parent),
-  
-  seq(nullptr)
-  
+Viewer::Viewer(QWidget* parent)
+    : Panel(parent),
+
+      seq(nullptr)
+
 {
   setup_ui();
 
@@ -100,26 +100,18 @@ Viewer::~Viewer() = default;
 
 void Viewer::Retranslate() {
   /// Viewer panels are retranslated through the MainWindow to differentiate Media and Sequence Viewers
-//  update_window_title();
+  //  update_window_title();
 }
 
 bool Viewer::is_focused() {
-  return headers->hasFocus()
-      || viewer_widget->hasFocus()
-      || go_to_start_button->hasFocus()
-      || prev_frame_button->hasFocus()
-      || play_button->hasFocus()
-      || next_frame_button->hasFocus()
-      || go_to_end_frame->hasFocus();
+  return headers->hasFocus() || viewer_widget->hasFocus() || go_to_start_button->hasFocus() ||
+         prev_frame_button->hasFocus() || play_button->hasFocus() || next_frame_button->hasFocus() ||
+         go_to_end_frame->hasFocus();
 }
 
-bool Viewer::is_main_sequence() {
-  return main_sequence;
-}
+bool Viewer::is_main_sequence() { return main_sequence; }
 
-void Viewer::set_main_sequence() {
-  set_sequence(true, olive::ActiveSequence);
-}
+void Viewer::set_main_sequence() { set_sequence(true, olive::ActiveSequence); }
 
 void Viewer::reset_all_audio() {
   // reset all clip audio
@@ -154,13 +146,13 @@ long timecode_to_frame(const QString& s, int view, double frame_rate) {
   if (view == olive::kTimecodeMilliseconds) {
     long milliseconds = s.toLong();
 
-    hours = milliseconds/3600000;
-    milliseconds -= (hours*3600000);
-    minutes = milliseconds/60000;
-    milliseconds -= (minutes*60000);
-    seconds = milliseconds/1000;
-    milliseconds -= (seconds*1000);
-    frames = qRound64((milliseconds*0.001)*frame_rate);
+    hours = milliseconds / 3600000;
+    milliseconds -= (hours * 3600000);
+    minutes = milliseconds / 60000;
+    milliseconds -= (minutes * 60000);
+    seconds = milliseconds / 1000;
+    milliseconds -= (seconds * 1000);
+    frames = qRound64((milliseconds * 0.001) * frame_rate);
 
     seconds = qRound64(seconds * frame_rate);
     minutes = qRound64(minutes * frame_rate * 60);
@@ -179,12 +171,15 @@ long timecode_to_frame(const QString& s, int view, double frame_rate) {
     int d;
     int m;
 
-    int dropFrames = qRound(frame_rate * .066666); //Number of frames to drop on the minute marks is the nearest integer to 6% of the framerate
-    int framesPer10Minutes = qRound(frame_rate * 60 * 10); //Number of frames per ten minutes
-    int framesPerMinute = (qRound(frame_rate)*60)-  dropFrames; //Number of frames per minute is the round of the framerate * 60 minus the number of dropped frames
+    int dropFrames =
+        qRound(frame_rate *
+               .066666);  // Number of frames to drop on the minute marks is the nearest integer to 6% of the framerate
+    int framesPer10Minutes = qRound(frame_rate * 60 * 10);         // Number of frames per ten minutes
+    int framesPerMinute = (qRound(frame_rate) * 60) - dropFrames;  // Number of frames per minute is the round of the
+                                                                   // framerate * 60 minus the number of dropped frames
 
     d = f / framesPer10Minutes;
-    f -= dropFrames*9*d;
+    f -= dropFrames * 9 * d;
 
     m = f % framesPer10Minutes;
 
@@ -210,31 +205,36 @@ QString frame_to_timecode(long f, int view, double frame_rate) {
   QString token = ":";
 
   if ((view == olive::kTimecodeDrop || view == olive::kTimecodeMilliseconds) && frame_rate_is_droppable(frame_rate)) {
-    //CONVERT A FRAME NUMBER TO DROP FRAME TIMECODE
-    //Code by David Heidelberger, adapted from Andrew Duncan, further adapted for Olive by Olive Team
-    //Given an int called framenumber and a double called framerate
-    //Framerate should be 29.97, 59.94, or 23.976, otherwise the calculations will be off.
+    // CONVERT A FRAME NUMBER TO DROP FRAME TIMECODE
+    // Code by David Heidelberger, adapted from Andrew Duncan, further adapted for Olive by Olive Team
+    // Given an int called framenumber and a double called framerate
+    // Framerate should be 29.97, 59.94, or 23.976, otherwise the calculations will be off.
 
     int d;
     int m;
 
-    int dropFrames = qRound(frame_rate * .066666); //Number of frames to drop on the minute marks is the nearest integer to 6% of the framerate
-    int framesPerHour = qRound(frame_rate*60*60); //Number of frqRound64ames in an hour
-    int framesPer24Hours = framesPerHour*24; //Number of frames in a day - timecode rolls over after 24 hours
-    int framesPer10Minutes = qRound(frame_rate * 60 * 10); //Number of frames per ten minutes
-    int framesPerMinute = (qRound(frame_rate)*60)-  dropFrames; //Number of frames per minute is the round of the framerate * 60 minus the number of dropped frames
+    int dropFrames =
+        qRound(frame_rate *
+               .066666);  // Number of frames to drop on the minute marks is the nearest integer to 6% of the framerate
+    int framesPerHour = qRound(frame_rate * 60 * 60);  // Number of frqRound64ames in an hour
+    int framesPer24Hours = framesPerHour * 24;         // Number of frames in a day - timecode rolls over after 24 hours
+    int framesPer10Minutes = qRound(frame_rate * 60 * 10);         // Number of frames per ten minutes
+    int framesPerMinute = (qRound(frame_rate) * 60) - dropFrames;  // Number of frames per minute is the round of the
+                                                                   // framerate * 60 minus the number of dropped frames
 
-    //If framenumber is greater than 24 hrs, next operation will rollover clock
-    f = f % framesPer24Hours; // % is the modulus operator, which returns a remainder. a % b = the remainder of a/b
+    // If framenumber is greater than 24 hrs, next operation will rollover clock
+    f = f % framesPer24Hours;  // % is the modulus operator, which returns a remainder. a % b = the remainder of a/b
 
-    d = f / framesPer10Minutes; // \ means integer division, which is a/b without a remainder. Some languages you could use floor(a/b)
+    d = f / framesPer10Minutes;  // \ means integer division, which is a/b without a remainder. Some languages you could
+                                 // use floor(a/b)
     m = f % framesPer10Minutes;
 
-    //In the original post, the next line read m>1, which only worked for 29.97. Jean-Baptiste Mardelle correctly pointed out that m should be compared to dropFrames.
+    // In the original post, the next line read m>1, which only worked for 29.97. Jean-Baptiste Mardelle correctly
+    // pointed out that m should be compared to dropFrames.
     if (m > dropFrames) {
-      f = f + (dropFrames*9*d) + dropFrames * ((m - dropFrames) / framesPerMinute);
+      f = f + (dropFrames * 9 * d) + dropFrames * ((m - dropFrames) / framesPerMinute);
     } else {
-      f = f + dropFrames*9*d;
+      f = f + dropFrames * 9 * d;
     }
 
     int frRound = qRound(frame_rate);
@@ -249,18 +249,16 @@ QString frame_to_timecode(long f, int view, double frame_rate) {
 
     int int_fps = qRound(frame_rate);
     hours = f / (3600 * int_fps);
-    mins = f / (60*int_fps) % 60;
-    secs = f/int_fps % 60;
-    frames = f%int_fps;
+    mins = f / (60 * int_fps) % 60;
+    secs = f / int_fps % 60;
+    frames = f % int_fps;
   }
   if (view == olive::kTimecodeMilliseconds) {
-    return QString::number((hours*3600000)+(mins*60000)+(secs*1000)+qCeil(frames*1000/frame_rate));
+    return QString::number((hours * 3600000) + (mins * 60000) + (secs * 1000) + qCeil(frames * 1000 / frame_rate));
   }
-  return QString(QString::number(hours).rightJustified(2, '0') +
-                 ":" + QString::number(mins).rightJustified(2, '0') +
-                 ":" + QString::number(secs).rightJustified(2, '0') +
-                 token + QString::number(frames).rightJustified(2, '0')
-                 );
+  return QString(QString::number(hours).rightJustified(2, '0') + ":" + QString::number(mins).rightJustified(2, '0') +
+                 ":" + QString::number(secs).rightJustified(2, '0') + token +
+                 QString::number(frames).rightJustified(2, '0'));
 }
 
 bool frame_rate_is_droppable(double rate) {
@@ -297,9 +295,7 @@ void Viewer::go_to_end() {
   if (seq != nullptr) seek(seq->getEndFrame());
 }
 
-void Viewer::close_media() {
-  set_media(nullptr);
-}
+void Viewer::close_media() { set_media(nullptr); }
 
 void Viewer::go_to_in() {
   if (seq != nullptr) {
@@ -312,11 +308,11 @@ void Viewer::go_to_in() {
 }
 
 void Viewer::previous_frame() {
-  if (seq != nullptr && seq->playhead > 0) seek(seq->playhead-1);
+  if (seq != nullptr && seq->playhead > 0) seek(seq->playhead - 1);
 }
 
 void Viewer::next_frame() {
-  if (seq != nullptr) seek(seq->playhead+1);
+  if (seq != nullptr) seek(seq->playhead + 1);
 }
 
 void Viewer::go_to_out() {
@@ -344,9 +340,7 @@ void Viewer::uncue_recording() {
   play_button->setStyleSheet(QString());
 }
 
-bool Viewer::is_recording_cued() {
-  return cue_recording_internal;
-}
+bool Viewer::is_recording_cued() { return cue_recording_internal; }
 
 void Viewer::toggle_play() {
   if (playing) {
@@ -357,7 +351,7 @@ void Viewer::toggle_play() {
 }
 
 void Viewer::increase_speed() {
-  int new_speed = playback_speed+1;
+  int new_speed = playback_speed + 1;
   if (new_speed == 0) {
     new_speed++;
   }
@@ -365,7 +359,7 @@ void Viewer::increase_speed() {
 }
 
 void Viewer::decrease_speed() {
-  int new_speed = playback_speed-1;
+  int new_speed = playback_speed - 1;
   if (new_speed == 0) {
     new_speed--;
   }
@@ -387,39 +381,34 @@ void Viewer::play(bool in_to_out) {
 
   playing_in_to_out = in_to_out;
 
-  if (seq != nullptr) {
-
-    if (playing_in_to_out) {
-      uncue_recording();
-    }
-
-    bool seek_to_in = (seq->using_workarea && (olive::CurrentConfig.loop || playing_in_to_out));
-    if (!is_recording_cued()
-        && playback_speed >= 0
-        && (playing_in_to_out
-            || (olive::CurrentConfig.auto_seek_to_beginning && seq->playhead >= sequence_end_frame)
-            || (seek_to_in && seq->playhead >= seq->workarea_out))) {
-      seek(seek_to_in ? seq->workarea_in : 0);
-    }
-
-    if (playback_speed == 0) {
-      playback_speed = 1;
-    }
-
-    reset_all_audio();
-    if (is_recording_cued() && !start_recording()) {
-      qCritical() << "Failed to record audio";
-      return;
-    }
-
-    playhead_start = seq->playhead;
-    playing = true;
-    SetAudioWakeObject(this);
-    set_playpause_icon(false);
-    start_msecs = QDateTime::currentMSecsSinceEpoch();
-
-    timer_update();
+  if (playing_in_to_out) {
+    uncue_recording();
   }
+
+  bool seek_to_in = (seq->using_workarea && (olive::CurrentConfig.loop || playing_in_to_out));
+  if (!is_recording_cued() && playback_speed >= 0 &&
+      (playing_in_to_out || (olive::CurrentConfig.auto_seek_to_beginning && seq->playhead >= sequence_end_frame) ||
+       (seek_to_in && seq->playhead >= seq->workarea_out))) {
+    seek(seek_to_in ? seq->workarea_in : 0);
+  }
+
+  if (playback_speed == 0) {
+    playback_speed = 1;
+  }
+
+  reset_all_audio();
+  if (is_recording_cued() && !start_recording()) {
+    qCritical() << "Failed to record audio";
+    return;
+  }
+
+  playhead_start = seq->playhead;
+  playing = true;
+  SetAudioWakeObject(this);
+  set_playpause_icon(false);
+  start_msecs = QDateTime::currentMSecsSinceEpoch();
+
+  timer_update();
 }
 
 void Viewer::play_wake() {
@@ -462,7 +451,7 @@ void Viewer::pause() {
       // wait for footage to be completely ready before taking metadata from it
       f->ready_lock.lock();
 
-      c->set_media(m, 0); // latest media
+      c->set_media(m, 0);  // latest media
       c->set_timeline_in(recording_start);
       c->set_timeline_out(recording_start + f->get_length_in_frames(seq->frame_rate));
       c->set_clip_in(0);
@@ -474,24 +463,24 @@ void Viewer::pause() {
 
       QVector<ClipPtr> add_clips;
       add_clips.append(c);
-      olive::UndoStack.push(new AddClipCommand(seq.get(), add_clips)); // add clip
+      olive::UndoStack.push(new AddClipCommand(seq.get(), add_clips));  // add clip
     }
   }
 }
 
-void Viewer::update_playhead_timecode(long p) {
-  current_timecode_slider->SetValue(p);
-}
+void Viewer::update_playhead_timecode(long p) { current_timecode_slider->SetValue(p); }
 
 void Viewer::update_end_timecode() {
-  end_timecode->setText((seq == nullptr) ? frame_to_timecode(0, olive::CurrentConfig.timecode_view, 30) : frame_to_timecode(seq->getEndFrame(), olive::CurrentConfig.timecode_view, seq->frame_rate));
+  end_timecode->setText(
+      (seq == nullptr) ? frame_to_timecode(0, olive::CurrentConfig.timecode_view, 30)
+                       : frame_to_timecode(seq->getEndFrame(), olive::CurrentConfig.timecode_view, seq->frame_rate));
 }
 
 void Viewer::update_header_zoom() {
   if (seq != nullptr) {
     long sequenceEndFrame = seq->getEndFrame();
     if (cached_end_frame != sequenceEndFrame) {
-      minimum_zoom = (sequenceEndFrame > 0) ? ((double) headers->width() / (double) sequenceEndFrame) : 1;
+      minimum_zoom = (sequenceEndFrame > 0) ? ((double)headers->width() / (double)sequenceEndFrame) : 1;
       headers->update_zoom(qMax(headers->get_zoom(), minimum_zoom));
       set_sb_max();
       viewer_widget->waveform_zoom = headers->get_zoom();
@@ -510,15 +499,11 @@ void Viewer::update_parents(bool reload_fx) {
   }
 }
 
-int Viewer::get_playback_speed() {
-  return playback_speed;
-}
+int Viewer::get_playback_speed() { return playback_speed; }
 
-void Viewer::set_marker() {
-  set_marker_internal(seq.get());
-}
+void Viewer::set_marker() { set_marker_internal(seq.get()); }
 
-void Viewer::resizeEvent(QResizeEvent *e) {
+void Viewer::resizeEvent(QResizeEvent* e) {
   QDockWidget::resizeEvent(e);
   if (seq != nullptr) {
     set_sb_max();
@@ -535,8 +520,7 @@ void Viewer::update_viewer() {
   update_end_timecode();
 }
 
-void Viewer::initiate_drag(olive::timeline::MediaImportType drag_type)
-{
+void Viewer::initiate_drag(olive::timeline::MediaImportType drag_type) {
   // FIXME: This should contain actual metadata rather than fake metadata
 
   QDrag* drag = new QDrag(this);
@@ -547,24 +531,21 @@ void Viewer::initiate_drag(olive::timeline::MediaImportType drag_type)
 }
 
 void Viewer::clear_in() {
-  if (seq != nullptr
-      && seq->using_workarea) {
+  if (seq != nullptr && seq->using_workarea) {
     olive::UndoStack.push(new SetTimelineInOutCommand(seq.get(), true, 0, seq->workarea_out));
     update_parents();
   }
 }
 
 void Viewer::clear_out() {
-  if (seq != nullptr
-      && seq->using_workarea) {
+  if (seq != nullptr && seq->using_workarea) {
     olive::UndoStack.push(new SetTimelineInOutCommand(seq.get(), true, seq->workarea_in, seq->getEndFrame()));
     update_parents();
   }
 }
 
 void Viewer::clear_inout_point() {
-  if (seq != nullptr
-      && seq->using_workarea) {
+  if (seq != nullptr && seq->using_workarea) {
     olive::UndoStack.push(new SetTimelineInOutCommand(seq.get(), false, 0, 0));
     update_parents();
   }
@@ -584,17 +565,16 @@ void Viewer::set_out_point() {
 
 void Viewer::set_zoom(bool in) {
   if (seq != nullptr) {
-    set_zoom_value(in ? headers->get_zoom()*2 : qMax(minimum_zoom, headers->get_zoom()*0.5));
+    set_zoom_value(in ? headers->get_zoom() * 2 : qMax(minimum_zoom, headers->get_zoom() * 0.5));
   }
 }
 
-void Viewer::set_panel_name(const QString &n) {
+void Viewer::set_panel_name(const QString& n) {
   panel_name = n;
   update_window_title();
 }
 
-void Viewer::show_videoaudio_buttons(bool s)
-{
+void Viewer::show_videoaudio_buttons(bool s) {
   video_only_button->setVisible(s);
   audio_only_button->setVisible(s);
 }
@@ -617,14 +597,11 @@ void Viewer::set_zoom_value(double d) {
   }
   if (seq != nullptr) {
     set_sb_max();
-    if (!horizontal_bar->is_resizing())
-      center_scroll_to_playhead(horizontal_bar, headers->get_zoom(), seq->playhead);
+    if (!horizontal_bar->is_resizing()) center_scroll_to_playhead(horizontal_bar, headers->get_zoom(), seq->playhead);
   }
 }
 
-void Viewer::set_sb_max() {
-  headers->set_scrollbar_max(horizontal_bar, seq->getEndFrame(), headers->width());
-}
+void Viewer::set_sb_max() { headers->set_scrollbar_max(horizontal_bar, seq->getEndFrame(), headers->width()); }
 
 void Viewer::set_playback_speed(int s) {
   pause();
@@ -635,15 +612,14 @@ void Viewer::set_playback_speed(int s) {
 }
 
 long Viewer::get_seq_in() {
-  return ((olive::CurrentConfig.loop || playing_in_to_out) && seq->using_workarea)
-      ? seq->workarea_in
-      : 0;
+  return ((olive::CurrentConfig.loop || playing_in_to_out) && seq->using_workarea) ? seq->workarea_in : 0;
 }
 
 long Viewer::get_seq_out() {
-  return ((olive::CurrentConfig.loop || playing_in_to_out) && seq->using_workarea && previous_playhead < seq->workarea_out)
-      ? seq->workarea_out
-      : seq->getEndFrame();
+  return ((olive::CurrentConfig.loop || playing_in_to_out) && seq->using_workarea &&
+          previous_playhead < seq->workarea_out)
+             ? seq->workarea_out
+             : seq->getEndFrame();
 }
 
 void Viewer::setup_ui() {
@@ -764,7 +740,7 @@ void Viewer::setup_ui() {
   end_timecode_layout->setContentsMargins(0, 0, 0, 0);
 
   end_timecode = new QLabel();
-  end_timecode->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
+  end_timecode->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
   end_timecode_layout->addWidget(end_timecode);
 
   lower_control_layout->addWidget(end_timecode_container);
@@ -780,93 +756,90 @@ void Viewer::set_media(Media* m) {
 
   if (media != nullptr) {
     switch (media->get_type()) {
-    case MEDIA_TYPE_FOOTAGE:
-    {
-      Footage* footage = media->to_footage();
+      case MEDIA_TYPE_FOOTAGE: {
+        Footage* footage = media->to_footage();
 
-      marker_ref = &footage->markers;
+        marker_ref = &footage->markers;
 
-      new_sequence = std::make_shared<Sequence>();
-      created_sequence = true;
-      new_sequence->wrapper_sequence = true;
-      new_sequence->name = footage->name;
+        new_sequence = std::make_shared<Sequence>();
+        created_sequence = true;
+        new_sequence->wrapper_sequence = true;
+        new_sequence->name = footage->name;
 
-      new_sequence->using_workarea = footage->using_inout;
-      if (footage->using_inout) {
-        new_sequence->workarea_in = footage->in;
-        new_sequence->workarea_out = footage->out;
-      }
-
-      new_sequence->frame_rate = olive::CurrentConfig.default_sequence_framerate;
-
-      if (footage->video_tracks.size() > 0) {
-        const FootageStream& video_stream = footage->video_tracks.at(0);
-        new_sequence->width = video_stream.video_width;
-        new_sequence->height = video_stream.video_height;
-        if (video_stream.video_frame_rate > 0 && !video_stream.infinite_length) {
-          new_sequence->frame_rate = video_stream.video_frame_rate * footage->speed;
+        new_sequence->using_workarea = footage->using_inout;
+        if (footage->using_inout) {
+          new_sequence->workarea_in = footage->in;
+          new_sequence->workarea_out = footage->out;
         }
 
-        ClipPtr c = std::make_shared<Clip>(new_sequence.get());
-        c->set_media(media, video_stream.file_index);
-        c->set_timeline_in(0);
-        c->set_timeline_out(footage->get_length_in_frames(new_sequence->frame_rate));
-        if (c->timeline_out() <= 0) {
-          // FIXME: Move this magic number to Config
-          c->set_timeline_out(150);
+        new_sequence->frame_rate = olive::CurrentConfig.default_sequence_framerate;
+
+        if (footage->video_tracks.size() > 0) {
+          const FootageStream& video_stream = footage->video_tracks.at(0);
+          new_sequence->width = video_stream.video_width;
+          new_sequence->height = video_stream.video_height;
+          if (video_stream.video_frame_rate > 0 && !video_stream.infinite_length) {
+            new_sequence->frame_rate = video_stream.video_frame_rate * footage->speed;
+          }
+
+          ClipPtr c = std::make_shared<Clip>(new_sequence.get());
+          c->set_media(media, video_stream.file_index);
+          c->set_timeline_in(0);
+          c->set_timeline_out(footage->get_length_in_frames(new_sequence->frame_rate));
+          if (c->timeline_out() <= 0) {
+            // FIXME: Move this magic number to Config
+            c->set_timeline_out(150);
+          }
+          c->set_track(-1);
+          c->set_clip_in(0);
+          c->refresh();
+          new_sequence->clips.append(c);
+        } else {
+          new_sequence->width = olive::CurrentConfig.default_sequence_width;
+          new_sequence->height = olive::CurrentConfig.default_sequence_height;
         }
-        c->set_track(-1);
-        c->set_clip_in(0);
-        c->refresh();
-        new_sequence->clips.append(c);
-      } else {
-        new_sequence->width = olive::CurrentConfig.default_sequence_width;
-        new_sequence->height = olive::CurrentConfig.default_sequence_height;
-      }
 
-      if (footage->audio_tracks.size() > 0) {
-        const FootageStream& audio_stream = footage->audio_tracks.at(0);
-        new_sequence->audio_frequency = audio_stream.audio_frequency;
+        if (footage->audio_tracks.size() > 0) {
+          const FootageStream& audio_stream = footage->audio_tracks.at(0);
+          new_sequence->audio_frequency = audio_stream.audio_frequency;
 
-        ClipPtr c = std::make_shared<Clip>(new_sequence.get());
-        c->set_media(media, audio_stream.file_index);
-        c->set_timeline_in(0);
-        c->set_timeline_out(footage->get_length_in_frames(new_sequence->frame_rate));
-        c->set_track(0);
-        c->set_clip_in(0);
-        c->refresh();
-        new_sequence->clips.append(c);
+          ClipPtr c = std::make_shared<Clip>(new_sequence.get());
+          c->set_media(media, audio_stream.file_index);
+          c->set_timeline_in(0);
+          c->set_timeline_out(footage->get_length_in_frames(new_sequence->frame_rate));
+          c->set_track(0);
+          c->set_clip_in(0);
+          c->refresh();
+          new_sequence->clips.append(c);
 
-        if (footage->video_tracks.size() == 0) {
-          viewer_widget->waveform = true;
-          viewer_widget->waveform_clip = c;
-          viewer_widget->waveform_ms = &audio_stream;
-          viewer_widget->frame_update();
+          if (footage->video_tracks.size() == 0) {
+            viewer_widget->waveform = true;
+            viewer_widget->waveform_clip = c;
+            viewer_widget->waveform_ms = &audio_stream;
+            viewer_widget->frame_update();
+          }
+        } else {
+          new_sequence->audio_frequency = olive::CurrentConfig.default_sequence_audio_frequency;
         }
-      } else {
-        new_sequence->audio_frequency = olive::CurrentConfig.default_sequence_audio_frequency;
-      }
 
-      new_sequence->audio_layout = AV_CH_LAYOUT_STEREO;
-    }
-      break;
-    case MEDIA_TYPE_SEQUENCE:
-      new_sequence = media->to_sequence();
-      break;
+        new_sequence->audio_layout = AV_CH_LAYOUT_STEREO;
+      } break;
+      case MEDIA_TYPE_SEQUENCE:
+        new_sequence = media->to_sequence();
+        break;
     }
   }
 
   set_sequence(false, new_sequence);
 }
 
-void Viewer::update_playhead() {
-  seek(current_timecode_slider->value());
-}
+void Viewer::update_playhead() { seek(current_timecode_slider->value()); }
 
 void Viewer::timer_update() {
   previous_playhead = seq->playhead;
 
-  seq->playhead = qMax(0, qRound(playhead_start + ((QDateTime::currentMSecsSinceEpoch()-start_msecs) * 0.001 * seq->frame_rate * playback_speed)));
+  seq->playhead = qMax(0, qRound(playhead_start + ((QDateTime::currentMSecsSinceEpoch() - start_msecs) * 0.001 *
+                                                   seq->frame_rate * playback_speed)));
 
   if (olive::CurrentConfig.seek_also_selects) {
     panel_timeline->select_from_playhead();
@@ -883,7 +856,8 @@ void Viewer::timer_update() {
       }
     } else if (playback_speed > 0) {
       long end_frame = seq->getEndFrame();
-      if ((olive::CurrentConfig.auto_seek_to_beginning || previous_playhead < end_frame) && seq->playhead >= end_frame) {
+      if ((olive::CurrentConfig.auto_seek_to_beginning || previous_playhead < end_frame) &&
+          seq->playhead >= end_frame) {
         pause();
       }
       if (seq->using_workarea && seq->playhead >= seq->workarea_out) {
@@ -906,19 +880,11 @@ void Viewer::recording_flasher_update() {
   }
 }
 
-void Viewer::resize_move(double d) {
-  set_zoom_value(headers->get_zoom()*d);
-}
+void Viewer::resize_move(double d) { set_zoom_value(headers->get_zoom() * d); }
 
-void Viewer::drag_video_only()
-{
-  initiate_drag(olive::timeline::kImportVideoOnly);
-}
+void Viewer::drag_video_only() { initiate_drag(olive::timeline::kImportVideoOnly); }
 
-void Viewer::drag_audio_only()
-{
-  initiate_drag(olive::timeline::kImportAudioOnly);
-}
+void Viewer::drag_audio_only() { initiate_drag(olive::timeline::kImportAudioOnly); }
 
 void Viewer::clean_created_seq() {
   viewer_widget->waveform = false;
@@ -955,8 +921,6 @@ void Viewer::set_sequence(bool main, SequencePtr s) {
   clean_created_seq();
 
   main_sequence = main;
-
-
 
   seq = (main) ? olive::ActiveSequence : s;
 

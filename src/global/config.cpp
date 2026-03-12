@@ -24,196 +24,162 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
-#include "panels/project.h"
 #include "panels/panels.h"
+#include "panels/project.h"
 
 #include "debug.h"
 
 Config olive::CurrentConfig;
 RuntimeConfig olive::CurrentRuntimeConfig;
 
+namespace {
+
+struct BoolEntry {
+  const char* name;
+  bool Config::* field;
+};
+struct IntEntry {
+  const char* name;
+  int Config::* field;
+};
+struct DoubleEntry {
+  const char* name;
+  double Config::* field;
+};
+struct StringEntry {
+  const char* name;
+  QString Config::* field;
+};
+
+constexpr BoolEntry kBoolEntries[] = {
+    {"HardwareDecoding", &Config::hardware_decoding},
+    {"ShowTrackLines", &Config::show_track_lines},
+    {"ScrollZooms", &Config::scroll_zooms},
+    {"InvertTimelineScrollAxes", &Config::invert_timeline_scroll_axes},
+    {"EditToolSelectsLinks", &Config::edit_tool_selects_links},
+    {"EditToolAlsoSeeks", &Config::edit_tool_also_seeks},
+    {"SelectAlsoSeeks", &Config::select_also_seeks},
+    {"PasteSeeks", &Config::paste_seeks},
+    {"RectifiedWaveforms", &Config::rectified_waveforms},
+    {"ShowTitleSafeArea", &Config::show_title_safe_area},
+    {"UseCustomTitleSafeRatio", &Config::use_custom_title_safe_ratio},
+    {"EnableDragFilesToTimeline", &Config::enable_drag_files_to_timeline},
+    {"AutoscaleByDefault", &Config::autoscale_by_default},
+    {"EnableSeekToImport", &Config::enable_seek_to_import},
+    {"AudioScrubbing", &Config::enable_audio_scrubbing},
+    {"DropFileOnMediaToReplace", &Config::drop_on_media_to_replace},
+    {"HoverFocus", &Config::hover_focus},
+    {"SetNameWithMarker", &Config::set_name_with_marker},
+    {"ShowProjectToolbar", &Config::show_project_toolbar},
+    {"Loop", &Config::loop},
+    {"SeekAlsoSelects", &Config::seek_also_selects},
+    {"AutoSeekToBeginning", &Config::auto_seek_to_beginning},
+    {"UseSoftwareFallback", &Config::use_software_fallback},
+    {"CenterTimelineTimecodes", &Config::center_timeline_timecodes},
+    {"AddDefaultEffectsToClips", &Config::add_default_effects_to_clips},
+    {"NativeMenuStyling", &Config::use_native_menu_styling},
+    {"LockedPanels", &Config::locked_panels},
+    {"ShowWelcomeDialog", &Config::show_welcome_dialog},
+};
+
+constexpr IntEntry kIntEntries[] = {
+    {"DefaultTransitionLength", &Config::default_transition_length},
+    {"TimecodeView", &Config::timecode_view},
+    {"RecordingMode", &Config::recording_mode},
+    {"Autoscroll", &Config::autoscroll},
+    {"AudioRate", &Config::audio_rate},
+    {"ProjectViewType", &Config::project_view_type},
+    {"PreviousFrameQueueType", &Config::previous_queue_type},
+    {"UpcomingFrameQueueType", &Config::upcoming_queue_type},
+    {"EffectTextboxLines", &Config::effect_textbox_lines},
+    {"ThumbnailResolution", &Config::thumbnail_resolution},
+    {"WaveformResolution", &Config::waveform_resolution},
+    {"DefaultSequenceWidth", &Config::default_sequence_width},
+    {"DefaultSequenceHeight", &Config::default_sequence_height},
+    {"DefaultSequenceAudioFrequency", &Config::default_sequence_audio_frequency},
+    {"DefaultSequenceAudioLayout", &Config::default_sequence_audio_channel_layout},
+};
+
+constexpr DoubleEntry kDoubleEntries[] = {
+    {"CustomTitleSafeRatio", &Config::custom_title_safe_ratio},
+    {"PreviousFrameQueueSize", &Config::previous_queue_size},
+    {"UpcomingFrameQueueSize", &Config::upcoming_queue_size},
+    {"DefaultSequenceFrameRate", &Config::default_sequence_framerate},
+};
+
+constexpr StringEntry kStringEntries[] = {
+    {"ImageSequenceFormats", &Config::img_seq_formats},
+    {"CSSPath", &Config::css_path},
+    {"PreferredAudioOutput", &Config::preferred_audio_output},
+    {"PreferredAudioInput", &Config::preferred_audio_input},
+    {"LanguageFile", &Config::language_file},
+};
+
+}  // namespace
+
 Config::Config()
-  : 
-    img_seq_formats("jpg|jpeg|bmp|tiff|tif|psd|png|tga|jp2|gif")
-    
+    : img_seq_formats("jpg|jpeg|bmp|tiff|tif|psd|png|tga|jp2|gif")
+
 {}
 
 void Config::load(QString path) {
   QFile f(path);
-  if (f.exists() && f.open(QIODevice::ReadOnly)) {
-    QXmlStreamReader stream(&f);
+  if (!f.exists() || !f.open(QIODevice::ReadOnly)) return;
 
-    while (!stream.atEnd()) {
-      stream.readNext();
-      if (stream.isStartElement()) {
-        if (stream.name() == QLatin1String("HardwareDecoding")) {
-          stream.readNext();
-          hardware_decoding = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("ShowTrackLines")) {
-          stream.readNext();
-          show_track_lines = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("ScrollZooms")) {
-          stream.readNext();
-          scroll_zooms = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("InvertTimelineScrollAxes")) {
-          stream.readNext();
-          invert_timeline_scroll_axes = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("EditToolSelectsLinks")) {
-          stream.readNext();
-          edit_tool_selects_links = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("EditToolAlsoSeeks")) {
-          stream.readNext();
-          edit_tool_also_seeks = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("SelectAlsoSeeks")) {
-          stream.readNext();
-          select_also_seeks = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("PasteSeeks")) {
-          stream.readNext();
-          paste_seeks = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("ImageSequenceFormats")) {
-          stream.readNext();
-          img_seq_formats = stream.text().toString();
-        } else if (stream.name() == QLatin1String("RectifiedWaveforms")) {
-          stream.readNext();
-          rectified_waveforms = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("DefaultTransitionLength")) {
-          stream.readNext();
-          default_transition_length = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("TimecodeView")) {
-          stream.readNext();
-          timecode_view = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("ShowTitleSafeArea")) {
-          stream.readNext();
-          show_title_safe_area = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("UseCustomTitleSafeRatio")) {
-          stream.readNext();
-          use_custom_title_safe_ratio = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("CustomTitleSafeRatio")) {
-          stream.readNext();
-          custom_title_safe_ratio = stream.text().toDouble();
-        } else if (stream.name() == QLatin1String("EnableDragFilesToTimeline")) {
-          stream.readNext();
-          enable_drag_files_to_timeline = (stream.text() == QLatin1String("1"));;
-        } else if (stream.name() == QLatin1String("AutoscaleByDefault")) {
-          stream.readNext();
-          autoscale_by_default = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("RecordingMode")) {
-          stream.readNext();
-          recording_mode = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("EnableSeekToImport")) {
-          stream.readNext();
-          enable_seek_to_import = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("AudioScrubbing")) {
-          stream.readNext();
-          enable_audio_scrubbing = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("DropFileOnMediaToReplace")) {
-          stream.readNext();
-          drop_on_media_to_replace = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("Autoscroll")) {
-          stream.readNext();
-          autoscroll = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("AudioRate")) {
-          stream.readNext();
-          audio_rate = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("HoverFocus")) {
-          stream.readNext();
-          hover_focus = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("ProjectViewType")) {
-          stream.readNext();
-          project_view_type = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("SetNameWithMarker")) {
-          stream.readNext();
-          set_name_with_marker = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("ShowProjectToolbar")) {
-          stream.readNext();
-          show_project_toolbar = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("PreviousFrameQueueSize")) {
-          stream.readNext();
-          previous_queue_size = stream.text().toDouble();
-        } else if (stream.name() == QLatin1String("PreviousFrameQueueType")) {
-          stream.readNext();
-          previous_queue_type = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("UpcomingFrameQueueSize")) {
-          stream.readNext();
-          upcoming_queue_size = stream.text().toDouble();
-        } else if (stream.name() == QLatin1String("UpcomingFrameQueueType")) {
-          stream.readNext();
-          upcoming_queue_type = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("Loop")) {
-          stream.readNext();
-          loop = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("SeekAlsoSelects")) {
-          stream.readNext();
-          seek_also_selects = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("AutoSeekToBeginning")) {
-          stream.readNext();
-          auto_seek_to_beginning = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("CSSPath")) {
-          stream.readNext();
-          css_path = stream.text().toString();
-        } else if (stream.name() == QLatin1String("EffectTextboxLines")) {
-          stream.readNext();
-          effect_textbox_lines = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("UseSoftwareFallback")) {
-          stream.readNext();
-          use_software_fallback = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("CenterTimelineTimecodes")) {
-          stream.readNext();
-          center_timeline_timecodes =  (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("PreferredAudioOutput")) {
-          stream.readNext();
-          preferred_audio_output = stream.text().toString();
-        } else if (stream.name() == QLatin1String("PreferredAudioInput")) {
-          stream.readNext();
-          preferred_audio_input = stream.text().toString();
-        } else if (stream.name() == QLatin1String("LanguageFile")) {
-          stream.readNext();
-          language_file = stream.text().toString();
-        } else if (stream.name() == QLatin1String("ThumbnailResolution")) {
-          stream.readNext();
-          thumbnail_resolution = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("WaveformResolution")) {
-          stream.readNext();
-          waveform_resolution = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("AddDefaultEffectsToClips")) {
-          stream.readNext();
-          add_default_effects_to_clips = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("Style")) {
-          stream.readNext();
-          style = static_cast<olive::styling::Style>(stream.text().toInt());
-        } else if (stream.name() == QLatin1String("NativeMenuStyling")) {
-          stream.readNext();
-          use_native_menu_styling = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("DefaultSequenceWidth")) {
-          stream.readNext();
-          default_sequence_width = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("DefaultSequenceHeight")) {
-          stream.readNext();
-          default_sequence_height = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("DefaultSequenceFrameRate")) {
-          stream.readNext();
-          default_sequence_framerate = stream.text().toDouble();
-        } else if (stream.name() == QLatin1String("DefaultSequenceAudioFrequency")) {
-          stream.readNext();
-          default_sequence_audio_frequency = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("DefaultSequenceAudioLayout")) {
-          stream.readNext();
-          default_sequence_audio_channel_layout = stream.text().toInt();
-        } else if (stream.name() == QLatin1String("LockedPanels")) {
-          stream.readNext();
-          locked_panels = (stream.text() == QLatin1String("1"));
-        } else if (stream.name() == QLatin1String("ShowWelcomeDialog")) {
-          stream.readNext();
-          show_welcome_dialog = (stream.text() == QLatin1String("1"));
+  QXmlStreamReader stream(&f);
+
+  while (!stream.atEnd()) {
+    stream.readNext();
+    if (!stream.isStartElement()) continue;
+
+    auto name = stream.name();
+    stream.readNext();
+    auto text = stream.text();
+
+    bool handled = false;
+    for (const auto& e : kBoolEntries) {
+      if (name == QLatin1String(e.name)) {
+        this->*e.field = (text == QLatin1String("1"));
+        handled = true;
+        break;
+      }
+    }
+    if (!handled) {
+      for (const auto& e : kIntEntries) {
+        if (name == QLatin1String(e.name)) {
+          this->*e.field = text.toInt();
+          handled = true;
+          break;
         }
       }
     }
-    if (stream.hasError()) {
-      qCritical() << "Error parsing config XML." << stream.errorString();
+    if (!handled) {
+      for (const auto& e : kDoubleEntries) {
+        if (name == QLatin1String(e.name)) {
+          this->*e.field = text.toDouble();
+          handled = true;
+          break;
+        }
+      }
     }
-
-    f.close();
+    if (!handled) {
+      for (const auto& e : kStringEntries) {
+        if (name == QLatin1String(e.name)) {
+          this->*e.field = text.toString();
+          handled = true;
+          break;
+        }
+      }
+    }
+    if (!handled && name == QLatin1String("Style")) {
+      style = static_cast<olive::styling::Style>(text.toInt());
+    }
   }
+
+  if (stream.hasError()) {
+    qCritical() << "Error parsing config XML." << stream.errorString();
+  }
+  f.close();
 }
 
 void Config::save(QString path) {
@@ -225,8 +191,8 @@ void Config::save(QString path) {
 
   QXmlStreamWriter stream(&f);
   stream.setAutoFormatting(true);
-  stream.writeStartDocument(); // doc
-  stream.writeStartElement("Configuration"); // configuration
+  stream.writeStartDocument();                // doc
+  stream.writeStartElement("Configuration");  // configuration
 
   stream.writeTextElement("Version", QString::number(olive::kSaveVersion));
   stream.writeTextElement("HardwareDecoding", QString::number(hardware_decoding));
@@ -283,11 +249,11 @@ void Config::save(QString path) {
   stream.writeTextElement("LockedPanels", QString::number(locked_panels));
   stream.writeTextElement("ShowWelcomeDialog", QString::number(show_welcome_dialog));
 
-  stream.writeEndElement(); // configuration
-  stream.writeEndDocument(); // doc
+  stream.writeEndElement();   // configuration
+  stream.writeEndDocument();  // doc
   f.close();
 }
 
-RuntimeConfig::RuntimeConfig() 
-  
-= default;
+RuntimeConfig::RuntimeConfig()
+
+    = default;
