@@ -34,9 +34,9 @@ class VoidEffect : public Effect {
 public:
   VoidEffect(Clip* c, const QString& n);
 
-  virtual EffectPtr copy(Clip* c) override;
-  virtual void load(QXmlStreamReader &stream) override;
-  virtual void save(QXmlStreamWriter &stream) override;
+  EffectPtr copy(Clip* c) override;
+  void load(QXmlStreamReader &stream) override;
+  void save(QXmlStreamWriter &stream) override;
 private:
   QByteArray bytes;
   EffectMeta void_meta;

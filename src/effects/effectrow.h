@@ -241,7 +241,7 @@ private:
    *
    * Set by SetKeyframingInternal() and retrieved with IsKeyframing().
    */
-  bool keyframing_;
+  bool keyframing_{false};
 
   /**
    * @brief Internal variable for whether this row should be saved.

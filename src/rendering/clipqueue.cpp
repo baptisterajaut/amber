@@ -22,9 +22,7 @@
 
 
 ClipQueue::ClipQueue()
-{
-
-}
+= default;
 
 ClipQueue::~ClipQueue()
 {

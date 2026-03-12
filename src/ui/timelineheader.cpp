@@ -61,14 +61,9 @@ bool center_scroll_to_playhead(QScrollBar* bar, double zoom, long playhead) {
 
 TimelineHeader::TimelineHeader(QWidget *parent) :
   QWidget(parent),
-  snapping(true),
-  dragging(false),
-  resizing_workarea(false),
-  zoom(1),
-  in_visible(0),
+  
   fm(font()),
-  dragging_markers(false),
-  scroll(0),
+  
   height_actual(fm.height())
 {
   setCursor(Qt::ArrowCursor);
@@ -449,8 +444,8 @@ void TimelineHeader::paintEvent(QPaintEvent*) {
       int marker_x = getHeaderScreenPointFromFrame(m.frame);
 
       bool selected = false;
-      for (int j=0;j<selected_markers.size();j++) {
-        if (selected_markers.at(j) == i) {
+      for (int selected_marker : selected_markers) {
+        if (selected_marker == i) {
           selected = true;
           break;
         }

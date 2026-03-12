@@ -126,7 +126,7 @@ void CollapsibleWidget::on_visible_change() {
   SetExpanded(!IsExpanded());
 }
 
-CollapsibleWidgetHeader::CollapsibleWidgetHeader(QWidget* parent) : QWidget(parent), selected(false) {
+CollapsibleWidgetHeader::CollapsibleWidgetHeader(QWidget* parent) : QWidget(parent) {
   setContextMenuPolicy(Qt::CustomContextMenu);
 }
 

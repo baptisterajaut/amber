@@ -45,8 +45,8 @@ extern "C" {
 
 struct ClipSpeed {
   ClipSpeed();
-  double value;
-  bool maintain_audio_pitch;
+  double value{1.0};
+  bool maintain_audio_pitch{false};
 };
 
 using ClipPtr = std::shared_ptr<Clip>;
@@ -145,8 +145,8 @@ public:
 
   // temporary variables
   int load_id;
-  bool undeletable;
-  bool replaced;
+  bool undeletable{false};
+  bool replaced{false};
 
   // caching functions
   QMutex state_change_lock;
@@ -156,26 +156,26 @@ public:
   bool NeedsCacherReconfigure() const;
 
   // video playback variables
-  QOpenGLFramebufferObject** fbo;
-  QOpenGLTexture* texture;
+  QOpenGLFramebufferObject** fbo{nullptr};
+  QOpenGLTexture* texture{nullptr};
   GLuint yuv_textures[3];
-  QOpenGLFramebufferObject* yuv_fbo;
-  GLuint cached_texture_id;
+  QOpenGLFramebufferObject* yuv_fbo{nullptr};
+  GLuint cached_texture_id{0};
   long texture_frame;
 
 private:
   // timeline variables (should be copied in copy())
-  bool enabled_;
-  long clip_in_;
-  long timeline_in_;
-  long timeline_out_;
-  int track_;
+  bool enabled_{true};
+  long clip_in_{0};
+  long timeline_in_{0};
+  long timeline_out_{0};
+  int track_{0};
   QString name_;
-  Media* media_;
+  Media* media_{nullptr};
   int media_stream_;
   ClipSpeed speed_;
   double cached_fr_;
-  bool reverse_;
+  bool reverse_{false};
   bool autoscale_;
 
   Cacher cacher;
@@ -183,8 +183,8 @@ private:
 
   QVector<Marker> markers;
   QColor color_;
-  bool open_;
-  bool cacher_uses_rgba_;
+  bool open_{false};
+  bool cacher_uses_rgba_{false};
 };
 
 #endif // CLIP_H

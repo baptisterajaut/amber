@@ -92,8 +92,8 @@ void MediaIconService::AnimationUpdate() {
 
   throbber_lock_.lock();
 
-  for (int i=0;i<throbber_items_.size();i++) {
-    olive::project_model.set_icon(throbber_items_.at(i), throbber_ico);
+  for (auto throbber_item : throbber_items_) {
+    olive::project_model.set_icon(throbber_item, throbber_ico);
   }
 
   throbber_lock_.unlock();

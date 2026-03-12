@@ -27,14 +27,14 @@ class Panel : public QDockWidget {
   Q_OBJECT
 public:
   Panel(QWidget* parent = nullptr);
-  virtual ~Panel() override;
+  ~Panel() override;
 
   virtual void Retranslate() = 0;
 
   virtual void LoadLayoutState(const QByteArray& data);
   virtual QByteArray SaveLayoutState();
 protected:
-  virtual void changeEvent(QEvent* e) override;
+  void changeEvent(QEvent* e) override;
 };
 
 namespace olive {

@@ -1,13 +1,13 @@
 #include "comboaction.h"
 
-ComboAction::ComboAction() {}
+ComboAction::ComboAction() = default;
 
 ComboAction::~ComboAction() {
-    for (int i=0;i<commands.size();i++) {
-        delete commands.at(i);
+    for (auto command : commands) {
+        delete command;
     }
-    for (int i=0;i<post_commands.size();i++) {
-        delete post_commands.at(i);
+    for (auto post_command : post_commands) {
+        delete post_command;
     }
 }
 
@@ -15,17 +15,17 @@ void ComboAction::undo() {
     for (int i=commands.size()-1;i>=0;i--) {
         commands.at(i)->undo();
     }
-    for (int i=0;i<post_commands.size();i++) {
-        post_commands.at(i)->undo();
+    for (auto post_command : post_commands) {
+        post_command->undo();
     }
 }
 
 void ComboAction::redo() {
-    for (int i=0;i<commands.size();i++) {
-        commands.at(i)->redo();
+    for (auto command : commands) {
+        command->redo();
     }
-    for (int i=0;i<post_commands.size();i++) {
-        post_commands.at(i)->redo();
+    for (auto post_command : post_commands) {
+        post_command->redo();
     }
 }
 

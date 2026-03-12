@@ -24,7 +24,7 @@ public:
    *
    * Creates and connects to a QLabel.
    */
-  virtual QWidget* CreateWidget(QWidget *existing = nullptr) override;
+  QWidget* CreateWidget(QWidget *existing = nullptr) override;
 private:
   /**
    * @brief Internal text string

@@ -137,7 +137,7 @@ class Effect : public QObject {
   Q_OBJECT
 public:
   Effect(Clip *c, const EffectMeta* em);
-  ~Effect();
+  ~Effect() override;
 
   Clip* parent_clip;
   const EffectMeta* meta;
@@ -226,28 +226,28 @@ public slots:
   void load_from_file();
 protected:
   // glsl effect
-  QOpenGLShaderProgram* glslProgram;
+  QOpenGLShaderProgram* glslProgram{nullptr};
   QString vertPath;
   QString fragPath;
 
   // superimpose effect
   QImage img;
-  QOpenGLTexture* texture;
+  QOpenGLTexture* texture{nullptr};
 
   // enable effect to update constantly
   virtual bool AlwaysUpdate();
 
 private:
-  bool isOpen;
+  bool isOpen{false};
   QVector<EffectRow*> rows;
   QVector<EffectGizmo*> gizmos;
-  bool bound;
-  int iterations;
+  bool bound{false};
+  int iterations{1};
 
-  bool enabled_;
-  bool expanded_;
+  bool enabled_{true};
+  bool expanded_{true};
 
-  int flags_;
+  int flags_{0};
 
   QVector<KeyframeDataChange*> gizmo_dragging_actions_;
 

@@ -5,12 +5,8 @@
 DoubleField::DoubleField(EffectRow* parent, const QString& id) :
   EffectField(parent, id, EFFECT_FIELD_DOUBLE),
   min_(qSNaN()),
-  max_(qSNaN()),
-  default_(0),
-  display_type_(LabelSlider::Normal),
-  frame_rate_(30),
-  value_set_(false),
-  kdc_(nullptr)
+  max_(qSNaN())
+  
 {
   connect(this, &DoubleField::Changed, this, &DoubleField::ValueHasBeenSet, Qt::DirectConnection);
 }

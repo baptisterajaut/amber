@@ -1,5 +1,3 @@
 #include "dropshadoweffect.h"
 
-DropShadowEffect::DropShadowEffect() {
-
-}
+DropShadowEffect::DropShadowEffect() = default;

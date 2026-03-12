@@ -257,8 +257,8 @@ bool EffectUI::IsAttachedToClip(Clip *c)
     return true;
   }
 
-  for (int i=0;i<additional_effects_.size();i++) {
-    if (additional_effects_.at(i)->parent_clip == c) {
+  for (auto additional_effect : additional_effects_) {
+    if (additional_effect->parent_clip == c) {
       return true;
     }
   }
@@ -319,16 +319,16 @@ void EffectUI::show_context_menu(const QPoint& pos) {
     QAction* delete_action = menu.addAction(tr("D&elete"), GetEffect(), &Effect::delete_self);
 
     // Loop through additional effects and link these too
-    for (int i=0;i<additional_effects_.size();i++) {
+    for (auto additional_effect : additional_effects_) {
       if (move_up_action != nullptr) {
-        connect(move_up_action, &QAction::triggered, additional_effects_.at(i), &Effect::move_up);
+        connect(move_up_action, &QAction::triggered, additional_effect, &Effect::move_up);
       }
 
       if (move_down_action != nullptr) {
-        connect(move_down_action, &QAction::triggered, additional_effects_.at(i), &Effect::move_down);
+        connect(move_down_action, &QAction::triggered, additional_effect, &Effect::move_down);
       }
 
-      connect(delete_action, &QAction::triggered, additional_effects_.at(i), &Effect::delete_self);
+      connect(delete_action, &QAction::triggered, additional_effect, &Effect::delete_self);
     }
 
     menu.addSeparator();

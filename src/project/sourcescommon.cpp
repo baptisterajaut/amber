@@ -48,7 +48,7 @@
 #include "undo/undostack.h"
 
 SourcesCommon::SourcesCommon(Project* parent, ProjectFilter &sort_filter) :
-  editing_item(nullptr),
+  
   project_parent(parent),
   sort_filter_(sort_filter)
 {
@@ -59,8 +59,8 @@ SourcesCommon::SourcesCommon(Project* parent, ProjectFilter &sort_filter) :
 void SourcesCommon::create_seq_from_selected() {
   if (!selected_items.isEmpty()) {
     QVector<olive::timeline::MediaImportData> media_list;
-    for (int i=0;i<selected_items.size();i++) {
-      media_list.append(project_parent->item_to_media(selected_items.at(i)));
+    for (const auto & selected_item : selected_items) {
+      media_list.append(project_parent->item_to_media(selected_item));
     }
 
     ComboAction* ca = new ComboAction();
@@ -136,8 +136,8 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
     bool all_footage = true;
 
     cached_selected_footage.clear();
-    for (int i=0;i<items.size();i++) {
-      Media* m = project_parent->item_to_media(items.at(i));
+    for (const auto & item : items) {
+      Media* m = project_parent->item_to_media(item);
       if (m->get_type() != MEDIA_TYPE_SEQUENCE) {
         all_sequences = false;
       }
@@ -181,8 +181,8 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
         bool footage_without_proxies_exists = false;
         bool footage_with_proxies_exists = false;
 
-        for (int i=0;i<cached_selected_footage.size();i++) {
-          if (cached_selected_footage.at(i)->to_footage()->proxy) {
+        for (auto i : cached_selected_footage) {
+          if (i->to_footage()->proxy) {
             footage_with_proxies_exists = true;
           } else {
             footage_without_proxies_exists = true;
@@ -277,8 +277,8 @@ void SourcesCommon::dropEvent(QWidget* parent,
     QList<QUrl> urls = mimeData->urls();
     if (!urls.isEmpty()) {
       QStringList paths;
-      for (int i=0;i<urls.size();i++) {
-        paths.append(urls.at(i).toLocalFile());
+      for (const auto & url : urls) {
+        paths.append(url.toLocalFile());
       }
       bool replace = false;
       if (urls.size() == 1
@@ -324,8 +324,8 @@ void SourcesCommon::dropEvent(QWidget* parent,
             // if child belongs to a selected parent, assume the user is just moving the parent and ignore the child
             QModelIndex par = parent;
             while (par.isValid() && !ignore) {
-              for (int j=0;j<items.size();j++) {
-                if (par == items.at(j)) {
+              for (const auto & item : items) {
+                if (par == item) {
                   ignore = true;
                   break;
                 }
@@ -412,8 +412,8 @@ void SourcesCommon::open_create_proxy_dialog() {
 void SourcesCommon::clear_proxies_from_selected() {
   QList<QString> delete_list;
 
-  for (int i=0;i<cached_selected_footage.size();i++) {
-    Footage* f = cached_selected_footage.at(i)->to_footage();
+  for (auto i : cached_selected_footage) {
+    Footage* f = i->to_footage();
 
     if (f->proxy && !f->proxy_path.isEmpty()) {
       if (QFileInfo::exists(f->proxy_path)) {
@@ -436,8 +436,8 @@ void SourcesCommon::clear_proxies_from_selected() {
   }
 
   // delete proxies requested to be deleted
-  for (int i=0;i<delete_list.size();i++) {
-    QFile::remove(delete_list.at(i));
+  for (const auto & i : delete_list) {
+    QFile::remove(i);
   }
 
   if (olive::ActiveSequence != nullptr) {

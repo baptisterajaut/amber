@@ -36,10 +36,10 @@ class AudioSenderThread : public QThread {
   Q_OBJECT
 public:
   AudioSenderThread();
-  void run();
+  void run() override;
   void stop();
   QWaitCondition cond;
-  bool close;
+  bool close{false};
   QMutex lock;
 public slots:
   void notifyReceiver();

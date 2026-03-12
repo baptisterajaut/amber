@@ -30,10 +30,10 @@ class ViewerContainer : public QWidget
 {
 	Q_OBJECT
 public:
-	explicit ViewerContainer(QWidget *parent = 0);
-	~ViewerContainer();
+	explicit ViewerContainer(QWidget *parent = nullptr);
+	~ViewerContainer() override;
 
-	bool fit;
+	bool fit{true};
 	double zoom;
 
 	void dragScrollPress(const QPoint&);
@@ -41,14 +41,14 @@ public:
 	void parseWheelEvent(QWheelEvent* event);
 
 	Viewer* viewer;
-	ViewerWidget* child;
+	ViewerWidget* child{nullptr};
 	void adjust();
 
 	// manually moves scrollbars into the correct position
 	void adjust_scrollbars();
 
 protected:
-	void resizeEvent(QResizeEvent *event);
+	void resizeEvent(QResizeEvent *event) override;
 
 signals:
 

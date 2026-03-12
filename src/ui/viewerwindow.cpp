@@ -34,10 +34,8 @@
 #include "mainwindow.h"
 
 ViewerWindow::ViewerWindow(QWidget *parent) :
-  QOpenGLWidget(parent, Qt::Window),
-  texture(0),
-  mutex(nullptr),
-  show_fullscreen_msg(false)
+  QOpenGLWidget(parent, Qt::Window)
+  
 {
   setMouseTracking(true);
 
@@ -54,13 +52,13 @@ void ViewerWindow::set_texture(GLuint t, double iar, QMutex* imutex) {
 
 void ViewerWindow::shortcut_copier(QVector<QShortcut*>& shortcuts, QMenu* menu) {
   QList<QAction*> menu_action = menu->actions();
-  for (int i=0;i<menu_action.size();i++) {
-    if (menu_action.at(i)->menu() != nullptr) {
-      shortcut_copier(shortcuts, menu_action.at(i)->menu());
-    } else if (!menu_action.at(i)->isSeparator() && !menu_action.at(i)->shortcut().isEmpty()) {
+  for (auto i : menu_action) {
+    if (i->menu() != nullptr) {
+      shortcut_copier(shortcuts, i->menu());
+    } else if (!i->isSeparator() && !i->shortcut().isEmpty()) {
       QShortcut* sc = new QShortcut(this);
-      sc->setKey(menu_action.at(i)->shortcut());
-      connect(sc, &QShortcut::activated, menu_action.at(i), &QAction::trigger);
+      sc->setKey(i->shortcut());
+      connect(sc, &QShortcut::activated, i, &QAction::trigger);
       shortcuts.append(sc);
     }
   }
@@ -75,15 +73,15 @@ void ViewerWindow::showEvent(QShowEvent *)
   // solutions I can find.
 
   // Clear any existing shortcuts in case they've changed since the last showing
-  for (int i=0;i<shortcuts_.size();i++) {
-    delete shortcuts_.at(i);
+  for (auto shortcut : shortcuts_) {
+    delete shortcut;
   }
   shortcuts_.clear();
 
   // Recursively copy all shortcuts from MainWindow to this window
   QList<QAction*> menubar_actions = olive::MainWindow->menuBar()->actions();
-  for (int i=0;i<menubar_actions.size();i++) {
-    shortcut_copier(shortcuts_, menubar_actions.at(i)->menu());
+  for (auto menubar_action : menubar_actions) {
+    shortcut_copier(shortcuts_, menubar_action->menu());
   }
 }
 

@@ -48,7 +48,7 @@ public:
   virtual TransitionPtr copy(Clip* c, Clip* s);
   Clip* secondary_clip;
 
-  virtual void save(QXmlStreamWriter& stream) override;
+  void save(QXmlStreamWriter& stream) override;
 
   void set_length(int l);
   int get_true_length();

@@ -25,10 +25,10 @@
 
 class CheckboxCommand : public OliveAction {
 public:
-  CheckboxCommand(QCheckBox* b);
-  virtual ~CheckboxCommand() override;
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit CheckboxCommand(QCheckBox* b);
+  ~CheckboxCommand() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   QCheckBox* box;
   bool checked;
@@ -38,8 +38,8 @@ private:
 class SetBool : public OliveAction {
 public:
   SetBool(bool* b, bool setting);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   bool* boolean;
   bool old_setting;
@@ -49,8 +49,8 @@ private:
 class SetInt : public OliveAction {
 public:
   SetInt(int* pointer, int new_value);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   int* p;
   int oldval;
@@ -60,8 +60,8 @@ private:
 class SetLong : public OliveAction {
 public:
   SetLong(long* pointer, long old_value, long new_value);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   long* p;
   long oldval;
@@ -71,8 +71,8 @@ private:
 class SetDouble : public OliveAction {
 public:
   SetDouble(double* pointer, double old_value, double new_value);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   double* p;
   double oldval;
@@ -82,8 +82,8 @@ private:
 class SetString : public OliveAction {
 public:
   SetString(QString* pointer, QString new_value);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   QString* p;
   QString oldval;
@@ -93,8 +93,8 @@ private:
 class SetPointer : public OliveAction {
 public:
   SetPointer(void** pointer, void* data);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   bool old_changed;
   void** p;
@@ -105,8 +105,8 @@ private:
 class SetQVariant : public OliveAction {
 public:
   SetQVariant(QVariant* itarget, const QVariant& iold, const QVariant& inew);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   QVariant* target;
   QVariant old_val;
@@ -115,14 +115,14 @@ private:
 
 class CloseAllClipsCommand : public OliveAction {
 public:
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 };
 
 class UpdateViewer : public OliveAction {
 public:
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 };
 
 #endif // UNDO_GENERIC_H

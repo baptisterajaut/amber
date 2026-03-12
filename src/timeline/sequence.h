@@ -53,13 +53,13 @@ public:
   bool IsTransitionSelected(Transition* t);
 
   QVector<Selection> selections;
-  long playhead;
+  long playhead{0};
 
-  bool using_workarea;
-  long workarea_in;
-  long workarea_out;
+  bool using_workarea{false};
+  long workarea_in{0};
+  long workarea_out{0};
 
-  bool wrapper_sequence;
+  bool wrapper_sequence{false};
 
   int save_id;
 

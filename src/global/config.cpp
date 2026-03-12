@@ -33,55 +33,9 @@ Config olive::CurrentConfig;
 RuntimeConfig olive::CurrentRuntimeConfig;
 
 Config::Config()
-  : show_track_lines(true),
-    hardware_decoding(false),
-    scroll_zooms(false),
-    edit_tool_selects_links(false),
-    edit_tool_also_seeks(false),
-    select_also_seeks(false),
-    paste_seeks(true),
-    img_seq_formats("jpg|jpeg|bmp|tiff|tif|psd|png|tga|jp2|gif"),
-    rectified_waveforms(false),
-    default_transition_length(30),
-    timecode_view(olive::kTimecodeDrop),
-    show_title_safe_area(false),
-    use_custom_title_safe_ratio(false),
-    custom_title_safe_ratio(1),
-    enable_drag_files_to_timeline(true),
-    autoscale_by_default(false),
-    recording_mode(2),
-    enable_seek_to_import(false),
-    enable_audio_scrubbing(true),
-    drop_on_media_to_replace(true),
-    autoscroll(olive::AUTOSCROLL_PAGE_SCROLL),
-    audio_rate(48000),
-    hover_focus(false),
-    project_view_type(olive::PROJECT_VIEW_TREE),
-    set_name_with_marker(true),
-    show_project_toolbar(true),
-    previous_queue_size(3),
-    previous_queue_type(olive::FRAME_QUEUE_TYPE_FRAMES),
-    upcoming_queue_size(0.5),
-    upcoming_queue_type(olive::FRAME_QUEUE_TYPE_SECONDS),
-    loop(false),
-    seek_also_selects(false),
-    auto_seek_to_beginning(true),
-    effect_textbox_lines(3),
-    use_software_fallback(false),
-    center_timeline_timecodes(true),
-    waveform_resolution(64),
-    thumbnail_resolution(120),
-    add_default_effects_to_clips(true),
-    invert_timeline_scroll_axes(true),
-    style(olive::styling::kOliveDefaultDark),
-    use_native_menu_styling(true),
-    default_sequence_width(1920),
-    default_sequence_height(1080),
-    default_sequence_framerate(29.97),
-    default_sequence_audio_frequency(48000),
-    default_sequence_audio_channel_layout(3),
-    locked_panels(false),
-    show_welcome_dialog(true)
+  : 
+    img_seq_formats("jpg|jpeg|bmp|tiff|tif|psd|png|tga|jp2|gif")
+    
 {}
 
 void Config::load(QString path) {
@@ -334,7 +288,6 @@ void Config::save(QString path) {
   f.close();
 }
 
-RuntimeConfig::RuntimeConfig() :
-  shaders_are_enabled(true),
-  disable_blending(false)
-{}
+RuntimeConfig::RuntimeConfig() 
+  
+= default;

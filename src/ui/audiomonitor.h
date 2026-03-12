@@ -61,14 +61,14 @@ protected:
    *
    * Paints the
    */
-  void paintEvent(QPaintEvent *);
+  void paintEvent(QPaintEvent *) override;
 
   /**
    * @brief Internal resize event handler
    *
    * Triggers a repaint when the widget is resized.
    */
-  void resizeEvent(QResizeEvent *);
+  void resizeEvent(QResizeEvent *) override;
 
 signals:
 

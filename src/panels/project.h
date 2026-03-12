@@ -89,7 +89,7 @@ public:
   bool IsToolbarVisible();
   bool IsProjectWidget(QObject *child);
 
-  virtual void Retranslate() override;
+  void Retranslate() override;
 protected:
 public slots:
   void import_dialog();

@@ -33,9 +33,8 @@
 
 // enforces aspect ratio
 ViewerContainer::ViewerContainer(QWidget *parent) :
-  QWidget(parent),
-  fit(true),
-  child(nullptr)
+  QWidget(parent)
+  
 {
   horizontal_scrollbar = new QScrollBar(Qt::Horizontal, this);
   vertical_scrollbar = new QScrollBar(Qt::Vertical, this);
@@ -53,7 +52,7 @@ ViewerContainer::ViewerContainer(QWidget *parent) :
   connect(vertical_scrollbar, &QScrollBar::valueChanged, this, &ViewerContainer::scroll_changed);
 }
 
-ViewerContainer::~ViewerContainer() {}
+ViewerContainer::~ViewerContainer() = default;
 
 void ViewerContainer::dragScrollPress(const QPoint &p) {
   drag_start_x = p.x();

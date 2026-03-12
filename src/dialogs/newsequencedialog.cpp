@@ -128,8 +128,7 @@ void NewSequenceDialog::accept() {
     esc->audio_layout = AV_CH_LAYOUT_STEREO;
     ca->append(esc);
 
-    for (int i=0;i<existing_sequence->clips.size();i++) {
-      ClipPtr c = existing_sequence->clips.at(i);
+    for (auto c : existing_sequence->clips) {
       if (c != nullptr) {
         c->refactor_frame_rate(ca, multiplier, true);
       }

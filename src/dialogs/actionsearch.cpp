@@ -101,8 +101,8 @@ void ActionSearch::search_update(const QString &s, const QString &p, QMenu *pare
     QList<QAction*> menus = olive::MainWindow->menuBar()->actions();
 
     // Loop through all menus from the menubar and run this function on each one.
-    for (int i=0;i<menus.size();i++) {
-      QMenu* menu = menus.at(i)->menu();
+    for (auto i : menus) {
+      QMenu* menu = i->menu();
 
       search_update(s, p, menu);
     }
@@ -125,9 +125,7 @@ void ActionSearch::search_update(const QString &s, const QString &p, QMenu *pare
 
     // Loop over the menu's actions
     QList<QAction*> actions = parent->actions();
-    for (int i=0;i<actions.size();i++) {
-
-      QAction* a = actions.at(i);
+    for (auto a : actions) {
 
       // Ignore separator actions
       if (!a->isSeparator()) {

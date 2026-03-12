@@ -39,7 +39,7 @@ class ProxyGenerator : public QThread {
   Q_OBJECT
 public:
   ProxyGenerator();
-  void run();
+  void run() override;
   void queue(const ProxyInfo& info);
   void cancel();
   double get_proxy_progress(Media *f);
@@ -52,7 +52,7 @@ private:
   QMutex mutex;
 
   // set to true if you want to permanently close ProxyGenerator
-  bool cancelled;
+  bool cancelled{false};
 
   // set to true if you want to abort the footage currently being processed
   bool skip;

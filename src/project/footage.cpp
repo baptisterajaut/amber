@@ -63,15 +63,15 @@ long Footage::get_length_in_frames(double frame_rate) {
 
 FootageStream* Footage::get_stream_from_file_index(bool video, int index) {
   if (video) {
-    for (int i=0;i<video_tracks.size();i++) {
-      if (video_tracks.at(i).file_index == index) {
-        return &video_tracks[i];
+    for (auto & video_track : video_tracks) {
+      if (video_track.file_index == index) {
+        return &video_track;
       }
     }
   } else {
-    for (int i=0;i<audio_tracks.size();i++) {
-      if (audio_tracks.at(i).file_index == index) {
-        return &audio_tracks[i];
+    for (auto & audio_track : audio_tracks) {
+      if (audio_track.file_index == index) {
+        return &audio_track;
       }
     }
   }

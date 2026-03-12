@@ -60,34 +60,8 @@ int olive::timeline::kTrackMinHeight = 30;
 int olive::timeline::kTrackHeightIncrement = 10;
 
 Timeline::Timeline(QWidget *parent) :
-  Panel(parent),
-  cursor_frame(0),
-  cursor_track(0),
-  zoom(1.0),
-  zoom_just_changed(false),
-  showing_all(false),
-  snapping(true),
-  snapped(false),
-  snap_point(0),
-  selecting(false),
-  rect_select_init(false),
-  rect_select_proc(false),
-  moving_init(false),
-  moving_proc(false),
-  move_insert(false),
-  trim_target(-1),
-  trim_type(TRIM_NONE),
-  splitting(false),
-  importing(false),
-  importing_files(false),
-  creating(false),
-  transition_tool_init(false),
-  transition_tool_proc(false),
-  transition_tool_open_clip(-1),
-  transition_tool_close_clip(-1),
-  hand_moving(false),
-  block_repaints(false),
-  scroll(0)
+  Panel(parent)
+  
 {
   setup_ui();
 
@@ -118,7 +92,7 @@ Timeline::Timeline(QWidget *parent) :
   Retranslate();
 }
 
-Timeline::~Timeline() {}
+Timeline::~Timeline() = default;
 
 // Retranslate() moved to timeline_ui.cpp
 
@@ -172,10 +146,9 @@ void Timeline::create_ghosts_from_media(Sequence* seq, long entry_point, QVector
   video_ghosts = false;
   audio_ghosts = false;
 
-  for (int i=0;i<media_list.size();i++) {
+  for (auto import_data : media_list) {
     bool can_import = true;
 
-    const olive::timeline::MediaImportData import_data = media_list.at(i);
     Media* medium = import_data.media();
     Footage* m = nullptr;
     Sequence* s = nullptr;
@@ -282,8 +255,7 @@ void Timeline::create_ghosts_from_media(Sequence* seq, long entry_point, QVector
       entry_point = g.out;
     }
   }
-  for (int i=0;i<ghosts.size();i++) {
-    Ghost& g = ghosts[i];
+  for (auto & g : ghosts) {
     g.old_in = g.in;
     g.old_out = g.out;
     g.old_track = g.track;
@@ -294,9 +266,7 @@ void Timeline::add_clips_from_ghosts(ComboAction* ca, Sequence* s) {
   // add clips
   long earliest_point = LONG_MAX;
   QVector<ClipPtr> added_clips;
-  for (int i=0;i<ghosts.size();i++) {
-    const Ghost& g = ghosts.at(i);
-
+  for (const auto & g : ghosts) {
     earliest_point = qMin(earliest_point, g.in);
 
     ClipPtr c = std::make_shared<Clip>(s);
@@ -362,8 +332,8 @@ void Timeline::add_transition() {
   ComboAction* ca = new ComboAction();
   bool adding = false;
 
-  for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
-    Clip* c = olive::ActiveSequence->clips.at(i).get();
+  for (const auto & clip : olive::ActiveSequence->clips) {
+    Clip* c = clip.get();
     if (c != nullptr && c->IsSelected()) {
       int transition_to_add = (c->track() < 0) ? TRANSITION_INTERNAL_CROSSDISSOLVE : TRANSITION_INTERNAL_LINEARFADE;
       if (c->opening_transition == nullptr) {
@@ -404,8 +374,8 @@ void Timeline::nest() {
 
       // get earliest point in selected clips
       long earliest_point = LONG_MAX;
-      for (int i=0;i<selected_clips.size();i++) {
-        earliest_point = qMin(olive::ActiveSequence->clips.at(selected_clips.at(i))->timeline_in(), earliest_point);
+      for (int selected_clip : selected_clips) {
+        earliest_point = qMin(olive::ActiveSequence->clips.at(selected_clip)->timeline_in(), earliest_point);
       }
 
       ComboAction* ca = new ComboAction();
@@ -421,12 +391,12 @@ void Timeline::nest() {
       s->audio_layout = olive::ActiveSequence->audio_layout;
 
       // copy all selected clips to the nest
-      for (int i=0;i<selected_clips.size();i++) {
+      for (int selected_clip : selected_clips) {
         // delete clip from old sequence
-        ca->append(new DeleteClipAction(olive::ActiveSequence.get(), selected_clips.at(i)));
+        ca->append(new DeleteClipAction(olive::ActiveSequence.get(), selected_clip));
 
         // copy to new
-        ClipPtr copy(olive::ActiveSequence->clips.at(selected_clips.at(i))->copy(s.get()));
+        ClipPtr copy(olive::ActiveSequence->clips.at(selected_clip)->copy(s.get()));
         copy->set_timeline_in(copy->timeline_in() - earliest_point);
         copy->set_timeline_out(copy->timeline_out() - earliest_point);
         s->clips.append(copy);
@@ -447,8 +417,7 @@ void Timeline::nest() {
       for (int j=0;j<olive::ActiveSequence->clips.size();j++) {
         Clip* c = olive::ActiveSequence->clips.at(j).get();
         if (c != nullptr && !selected_clips.contains(j)) {
-          for (int i=0;i<ghosts.size();i++) {
-            Ghost& g = ghosts[i];
+          for (auto & g : ghosts) {
             if (c->track() == g.track
                 && !((c->timeline_in() < g.in
                 && c->timeline_out() < g.in)
@@ -534,8 +503,7 @@ bool Timeline::can_ripple_empty_space(long frame, int track) {
   rc_ripple_min = 0;
   rc_ripple_max = LONG_MAX;
 
-  for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
-    ClipPtr c = olive::ActiveSequence->clips.at(i);
+  for (auto c : olive::ActiveSequence->clips) {
     if (c != nullptr) {
       if (c->timeline_in() > frame || c->timeline_out() > frame) {
         at_end_of_sequence = false;
@@ -606,8 +574,7 @@ void Timeline::toggle_enable_on_selected_clips() {
       SetClipProperty* set_action = new SetClipProperty(kSetClipPropertyEnabled);
 
       // add each selected clip to the action
-      for (int i=0;i<selected_clips.size();i++) {
-        Clip* c = selected_clips.at(i);
+      for (auto c : selected_clips) {
         set_action->AddSetting(c, !c->enabled());
       }
 
@@ -649,8 +616,7 @@ void Timeline::delete_selection(QVector<Selection>& selections, bool ripple_dele
         if (c != nullptr && c->timeline_in() < ripple_point && c->timeline_out() > ripple_point) {
           // conflict detected, but this clip may be getting deleted so let's check
           bool deleted = false;
-          for (int j=0;j<selections.size();j++) {
-            const Selection& s = selections.at(j);
+          for (const auto & s : selections) {
             if (s.track == c->track()
                 && !(c->timeline_in() < s.in && c->timeline_out() < s.in)
                 && !(c->timeline_in() > s.out && c->timeline_out() > s.out)) {
@@ -659,8 +625,7 @@ void Timeline::delete_selection(QVector<Selection>& selections, bool ripple_dele
             }
           }
           if (!deleted) {
-            for (int j=0;j<olive::ActiveSequence->clips.size();j++) {
-              ClipPtr cc = olive::ActiveSequence->clips.at(j);
+            for (auto cc : olive::ActiveSequence->clips) {
               if (cc != nullptr
                   && cc->track() == c->track()
                   && cc->timeline_in() > c->timeline_out()
@@ -732,18 +697,18 @@ void Timeline::zoom_out() {
 }
 
 int Timeline::GetTrackHeight(int track) {
-  for (int i=0;i<track_heights.size();i++) {
-    if (track_heights.at(i).index == track) {
-      return track_heights.at(i).height;
+  for (auto track_height : track_heights) {
+    if (track_height.index == track) {
+      return track_height.height;
     }
   }
   return olive::timeline::kTrackDefaultHeight;
 }
 
 void Timeline::SetTrackHeight(int track, int height) {
-  for (int i=0;i<track_heights.size();i++) {
-    if (track_heights.at(i).index == track) {
-      track_heights[i].height = height;
+  for (auto & track_height : track_heights) {
+    if (track_height.index == track) {
+      track_height.height = height;
       return;
     }
   }
@@ -793,8 +758,7 @@ void Timeline::delete_areas_and_relink(ComboAction* ca, QVector<Selection>& area
   QVector<int> pre_clips;
   QVector<ClipPtr> post_clips;
 
-  for (int i=0;i<areas.size();i++) {
-    const Selection& s = areas.at(i);
+  for (const auto & s : areas) {
     for (int j=0;j<olive::ActiveSequence->clips.size();j++) {
       Clip* c = olive::ActiveSequence->clips.at(j).get();
       if (c != nullptr && c->track() == s.track && !c->undeletable) {
@@ -845,8 +809,7 @@ void Timeline::delete_areas_and_relink(ComboAction* ca, QVector<Selection>& area
   // deselect selected clip areas
   if (deselect_areas) {
     QVector<Selection> area_copy = areas;
-    for (int i=0;i<area_copy.size();i++) {
-      const Selection& s = area_copy.at(i);
+    for (const auto & s : area_copy) {
       deselect_area(s.in, s.out, s.track);
     }
   }
@@ -1033,8 +996,8 @@ bool Timeline::snap_to_timeline(long* l, bool use_playhead, bool use_markers, bo
 
     // snap to marker
     if (use_markers) {
-      for (int i=0;i<olive::ActiveSequence->markers.size();i++) {
-        if (snap_to_point(olive::ActiveSequence->markers.at(i).frame, l)) return true;
+      for (const auto & marker : olive::ActiveSequence->markers) {
+        if (snap_to_point(marker.frame, l)) return true;
       }
     }
 
@@ -1045,8 +1008,7 @@ bool Timeline::snap_to_timeline(long* l, bool use_playhead, bool use_markers, bo
     }
 
     // snap to clip/transition
-    for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
-      ClipPtr c = olive::ActiveSequence->clips.at(i);
+    for (auto c : olive::ActiveSequence->clips) {
       if (c != nullptr) {
         if (snap_to_point(c->timeline_in(), l)) {
           return true;
@@ -1109,8 +1071,8 @@ void Timeline::toggle_links() {
       if (c->linked.size() > 0) {
         command->link = false; // prioritize unlinking
 
-        for (int j=0;j<c->linked.size();j++) { // add links to the command
-          if (!command->clips.contains(c->linked.at(j))) command->clips.append(c->linked.at(j));
+        for (int j : c->linked) { // add links to the command
+          if (!command->clips.contains(j)) command->clips.append(j);
         }
       }
     }
@@ -1214,8 +1176,7 @@ void Timeline::transition_tool_click() {
 
   Menu transition_menu(this);
 
-  for (int i=0;i<effects.size();i++) {
-    const EffectMeta& em = effects.at(i);
+  for (const auto & em : effects) {
     if (em.type == EFFECT_TYPE_TRANSITION && em.subtype == EFFECT_TYPE_VIDEO) {
       QAction* a = transition_menu.addAction(em.name);
       a->setObjectName("v");
@@ -1225,8 +1186,7 @@ void Timeline::transition_tool_click() {
 
   transition_menu.addSeparator();
 
-  for (int i=0;i<effects.size();i++) {
-    const EffectMeta& em = effects.at(i);
+  for (const auto & em : effects) {
     if (em.type == EFFECT_TYPE_TRANSITION && em.subtype == EFFECT_TYPE_AUDIO) {
       QAction* a = transition_menu.addAction(em.name);
       a->setObjectName("a");

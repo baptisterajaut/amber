@@ -76,10 +76,10 @@ QAudioDevice get_audio_device(bool output) {
   // try to retrieve preferred device from config
   QString preferred_device = output ? olive::CurrentConfig.preferred_audio_output : olive::CurrentConfig.preferred_audio_input;
   if (!preferred_device.isEmpty()) {
-    for (int i=0;i<devs.size();i++) {
+    for (const auto & dev : devs) {
       // try to match available devices with preferred device
-      if (devs.at(i).description() == preferred_device) {
-        return devs.at(i);
+      if (dev.description() == preferred_device) {
+        return dev;
       }
     }
   }
@@ -173,7 +173,7 @@ qint64 get_buffer_offset_from_frame(double framerate, long frame) {
   }
 }
 
-AudioSenderThread::AudioSenderThread() : close(false) {
+AudioSenderThread::AudioSenderThread()  {
   connect(this, &QThread::finished, this, &QObject::deleteLater);
 }
 

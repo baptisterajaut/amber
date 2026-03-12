@@ -104,9 +104,9 @@ EffectPtr Effect::Create(Clip* c, const EffectMeta* em) {
 }
 
 const EffectMeta* Effect::GetInternalMeta(int internal_id, int type) {
-  for (int i=0;i<effects.size();i++) {
-    if (effects.at(i).internal == internal_id && effects.at(i).type == type) {
-      return &effects.at(i);
+  for (const auto & effect : effects) {
+    if (effect.internal == internal_id && effect.type == type) {
+      return &effect;
     }
   }
   return nullptr;
@@ -114,15 +114,8 @@ const EffectMeta* Effect::GetInternalMeta(int internal_id, int type) {
 
 Effect::Effect(Clip* c, const EffectMeta *em) :
   parent_clip(c),
-  meta(em),
-  flags_(0),
-  glslProgram(nullptr),
-  texture(nullptr),
-  isOpen(false),
-  bound(false),
-  iterations(1),
-  enabled_(true),
-  expanded_(true)
+  meta(em)
+  
 {
   if (em != nullptr) {
     // set up UI from effect file
@@ -137,8 +130,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
           if (reader.name() == QLatin1String("row") && reader.isStartElement()) {
             QString row_name;
             const QXmlStreamAttributes& attributes = reader.attributes();
-            for (int i=0;i<attributes.size();i++) {
-              const QXmlStreamAttribute& attr = attributes.at(i);
+            for (const auto & attr : attributes) {
               if (attr.name() == QLatin1String("name")) {
                 row_name = attr.value().toString();
               }
@@ -153,8 +145,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
 
                   // get field type
                   const QXmlStreamAttributes& attributes = reader.attributes();
-                  for (int i=0;i<attributes.size();i++) {
-                    const QXmlStreamAttribute& attr = attributes.at(i);
+                  for (const auto & attr : attributes) {
                     if (attr.name() == QLatin1String("type")) {
                       QString comp = attr.value().toString().toUpper();
                       if (comp == "DOUBLE") {
@@ -188,8 +179,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
 
                       DoubleField* double_field = new DoubleField(row, id);
 
-                      for (int i=0;i<attributes.size();i++) {
-                        const QXmlStreamAttribute& attr = attributes.at(i);
+                      for (const auto & attr : attributes) {
                         if (attr.name() == QLatin1String("default")) {
                           double_field->SetDefault(attr.value().toDouble());
                         } else if (attr.name() == QLatin1String("min")) {
@@ -208,8 +198,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
 
                       field = new ColorField(row, id);
 
-                      for (int i=0;i<attributes.size();i++) {
-                        const QXmlStreamAttribute& attr = attributes.at(i);
+                      for (const auto & attr : attributes) {
                         if (attr.name() == QLatin1String("r")) {
                           color.setRed(attr.value().toInt());
                         } else if (attr.name() == QLatin1String("g")) {
@@ -232,8 +221,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       break;
                     case EffectField::EFFECT_FIELD_STRING:
                       field = new StringField(row, id);
-                      for (int i=0;i<attributes.size();i++) {
-                        const QXmlStreamAttribute& attr = attributes.at(i);
+                      for (const auto & attr : attributes) {
                         if (attr.name() == QLatin1String("default")) {
                           field->SetValueAt(0, attr.value().toString());
                         }
@@ -241,8 +229,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       break;
                     case EffectField::EFFECT_FIELD_BOOL:
                       field = new BoolField(row, id);
-                      for (int i=0;i<attributes.size();i++) {
-                        const QXmlStreamAttribute& attr = attributes.at(i);
+                      for (const auto & attr : attributes) {
                         if (attr.name() == QLatin1String("default")) {
                           field->SetValueAt(0, attr.value() == QLatin1String("1"));
                         }
@@ -252,8 +239,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                     {
                       ComboField* combo_field = new ComboField(row, id);
                       int combo_default_index = 0;
-                      for (int i=0;i<attributes.size();i++) {
-                        const QXmlStreamAttribute& attr = attributes.at(i);
+                      for (const auto & attr : attributes) {
                         if (attr.name() == QLatin1String("default")) {
                           combo_default_index = attr.value().toInt();
                           break;
@@ -274,8 +260,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       break;
                     case EffectField::EFFECT_FIELD_FONT:
                       field = new FontField(row, id);
-                      for (int i=0;i<attributes.size();i++) {
-                        const QXmlStreamAttribute& attr = attributes.at(i);
+                      for (const auto & attr : attributes) {
                         if (attr.name() == QLatin1String("default")) {
                           field->SetValueAt(0, attr.value().toString());
                         }
@@ -283,8 +268,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
                       break;
                     case EffectField::EFFECT_FIELD_FILE:
                       field = new FileField(row, id);
-                      for (int i=0;i<attributes.size();i++) {
-                        const QXmlStreamAttribute& attr = attributes.at(i);
+                      for (const auto & attr : attributes) {
                         if (attr.name() == QLatin1String("filename")) {
                           field->SetValueAt(0, attr.value().toString());
                         }
@@ -298,8 +282,7 @@ Effect::Effect(Clip* c, const EffectMeta *em) :
           } else if (reader.name() == QLatin1String("shader") && reader.isStartElement()) {
             SetFlags(Flags() | ShaderFlag);
             const QXmlStreamAttributes& attributes = reader.attributes();
-            for (int i=0;i<attributes.size();i++) {
-              const QXmlStreamAttribute& attr = attributes.at(i);
+            for (const auto & attr : attributes) {
               if (attr.name() == QLatin1String("vert")) {
                 vertPath = attr.value().toString();
               } else if (attr.name() == QLatin1String("frag")) {
@@ -351,8 +334,8 @@ Effect::~Effect() {
     }
   }
 
-  for (int i = 0; i < gizmo_dragging_actions_.size(); i++) {
-    delete gizmo_dragging_actions_.at(i);
+  for (auto gizmo_dragging_action : gizmo_dragging_actions_) {
+    delete gizmo_dragging_action;
   }
 }
 
@@ -622,8 +605,7 @@ void Effect::save(QXmlStreamWriter& stream) {
   stream.writeAttribute("name", meta->category + "/" + meta->name);
   stream.writeAttribute("enabled", QString::number(IsEnabled()));
 
-  for (int i=0;i<rows.size();i++) {
-    EffectRow* row = rows.at(i);
+  for (auto row : rows) {
     if (row->IsSavable()) {
       stream.writeStartElement("row"); // row
       for (int j=0;j<row->FieldCount();j++) {
@@ -655,8 +637,7 @@ void Effect::save(QXmlStreamWriter& stream) {
 
 void Effect::load_from_string(const QByteArray &s) {
   // clear existing keyframe data
-  for (int i=0;i<rows.size();i++) {
-    EffectRow* row = rows.at(i);
+  for (auto row : rows) {
     row->SetKeyframingInternal(false);
     for (int j=0;j<row->FieldCount();j++) {
       EffectField* field = row->Field(j);
@@ -675,8 +656,7 @@ void Effect::load_from_string(const QByteArray &s) {
 
       // check the name to see if it matches this effect
       const QXmlStreamAttributes& attributes = stream.attributes();
-      for (int i=0;i<attributes.size();i++) {
-        const QXmlStreamAttribute& attr = attributes.at(i);
+      for (const auto & attr : attributes) {
         if (attr.name() == QLatin1String("name")) {
           if (get_meta_from_name(attr.value().toString()) == meta) {
             // pass off to standard loading function
@@ -725,11 +705,11 @@ void Effect::validate_meta_path() {
   if (!meta->path.isEmpty() || (vertPath.isEmpty() && fragPath.isEmpty())) return;
   QList<QString> effects_paths = get_effects_paths();
   const QString& test_fn = vertPath.isEmpty() ? fragPath : vertPath;
-  for (int i=0;i<effects_paths.size();i++) {
-    if (QFileInfo::exists(effects_paths.at(i) + "/" + test_fn)) {
-      for (int j=0;j<effects.size();j++) {
-        if (&effects.at(j) == meta) {
-          effects[j].path = effects_paths.at(i);
+  for (const auto & effects_path : effects_paths) {
+    if (QFileInfo::exists(effects_path + "/" + test_fn)) {
+      for (auto & effect : effects) {
+        if (&effect == meta) {
+          effect.path = effects_path;
           return;
         }
       }
@@ -848,8 +828,7 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration) {
   glslProgram->setUniformValue("time", GLfloat(timecode));
   glslProgram->setUniformValue("iteration", iteration);
 
-  for (int i=0;i<rows.size();i++) {
-    EffectRow* row = rows.at(i);
+  for (auto row : rows) {
     for (int j=0;j<row->FieldCount();j++) {
       EffectField* field = row->Field(j);
       if (!field->id().isEmpty()) {
@@ -938,9 +917,9 @@ void Effect::gizmo_draw(double, GLTextureCoords &) {}
 
 void Effect::gizmo_move(EffectGizmo* gizmo, int x_movement, int y_movement, double timecode, bool done) {
   // Loop through each gizmo to find `gizmo`
-  for (int i=0;i<gizmos.size();i++) {
+  for (auto i : gizmos) {
 
-    if (gizmos.at(i) == gizmo) {
+    if (i == gizmo) {
 
       // If (!done && gizmo_dragging_actions_.isEmpty()), that means the drag just started and we're going to save
       // the current state of the attach fields' keyframes in KeyframeDataChange objects to make the changes undoable
@@ -987,13 +966,13 @@ void Effect::gizmo_move(EffectGizmo* gizmo, int x_movement, int y_movement, doub
         // undoable together rather than having to be undone individually).
         ComboAction* ca = new ComboAction();
 
-        for (int j=0;j<gizmo_dragging_actions_.size();j++) {
+        for (auto gizmo_dragging_action : gizmo_dragging_actions_) {
           // Set the current state of the keyframes as the "new" keyframes (the old values were set earlier when the
           // KeyframeDataChange object was constructed).
-          gizmo_dragging_actions_.at(j)->SetNewKeyframes();
+          gizmo_dragging_action->SetNewKeyframes();
 
           // Add this KeyframeDataChange object to the ComboAction
-          ca->append(gizmo_dragging_actions_.at(j));
+          ca->append(gizmo_dragging_action);
         }
 
         olive::UndoStack.push(ca);
@@ -1014,9 +993,7 @@ void Effect::gizmo_world_to_screen() {
   QMatrix4x4 view_matrix(view_val);
   QMatrix4x4 projection_matrix(projection_val);
 
-  for (int i=0;i<gizmos.size();i++) {
-    EffectGizmo* g = gizmos.at(i);
-
+  for (auto g : gizmos) {
     for (int j=0;j<g->get_point_count();j++) {
       QVector4D screen_pos = QVector4D(g->world_pos[j].x(), g->world_pos[j].y(), 0, 1.0) * (view_matrix * projection_matrix);
 
@@ -1120,11 +1097,11 @@ const EffectMeta* get_meta_from_name(const QString& input) {
   }
   QString name = input.mid(split_index + 1);
 
-  for (int j=0;j<effects.size();j++) {
-    if (effects.at(j).name == name
-        && (effects.at(j).category == category
+  for (const auto & effect : effects) {
+    if (effect.name == name
+        && (effect.category == category
             || category.isEmpty())) {
-      return &effects.at(j);
+      return &effect;
     }
   }
   return nullptr;

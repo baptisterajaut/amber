@@ -25,16 +25,11 @@
 #include "panels/panels.h"
 #include "global/debug.h"
 
-Sequence::Sequence() :
-  playhead(0),
-  using_workarea(false),
-  workarea_in(0),
-  workarea_out(0),
-  wrapper_sequence(false)
-{
-}
+Sequence::Sequence() 
+  
+= default;
 
-Sequence::~Sequence() {}
+Sequence::~Sequence() = default;
 
 SequencePtr Sequence::copy() {
   SequencePtr s = std::make_shared<Sequence>();
@@ -66,8 +61,7 @@ SequencePtr Sequence::copy() {
 
 long Sequence::getEndFrame() {
   long end = 0;
-  for (int j=0;j<clips.size();j++) {
-    ClipPtr c = clips.at(j);
+  for (auto c : clips) {
     if (c != nullptr && c->timeline_out() > end) {
       end = c->timeline_out();
     }
@@ -76,9 +70,7 @@ long Sequence::getEndFrame() {
 }
 
 void Sequence::RefreshClips(Media *m) {
-  for (int i=0;i<clips.size();i++) {
-    ClipPtr c = clips.at(i);
-
+  for (auto c : clips) {
     if (c != nullptr
         && (m == nullptr || c->media() == m)) {
       c->Close(true);
@@ -91,8 +83,8 @@ QVector<Clip *> Sequence::SelectedClips(bool containing)
 {
   QVector<Clip*> selected_clips;
 
-  for (int i=0;i<clips.size();i++) {
-    Clip* c = clips.at(i).get();
+  for (const auto & clip : clips) {
+    Clip* c = clip.get();
     if (c != nullptr && IsClipSelected(c, containing)) {
       selected_clips.append(c);
     }
@@ -119,8 +111,8 @@ Effect *Sequence::GetSelectedGizmo()
 {
   Effect* gizmo_ptr = nullptr;
 
-  for (int i=0;i<clips.size();i++) {
-    Clip* c = clips.at(i).get();
+  for (const auto & clip : clips) {
+    Clip* c = clip.get();
     if (c != nullptr
         && c->IsActiveAt(playhead)
         && IsClipSelected(c, true)) {
@@ -131,8 +123,8 @@ Effect *Sequence::GetSelectedGizmo()
         // find which effect has gizmos selected, or default to the first gizmo effect we find if there is
         // none selected
 
-        for (int j=0;j<c->effects.size();j++) {
-          Effect* e = c->effects.at(j).get();
+        for (const auto & effect : c->effects) {
+          Effect* e = effect.get();
 
           // retrieve gizmo data from effect
           if (e->are_gizmos_enabled()) {
@@ -163,8 +155,7 @@ bool Sequence::IsClipSelected(int clip_index, bool containing)
 
 bool Sequence::IsClipSelected(Clip *clip, bool containing)
 {
-  for (int i=0;i<selections.size();i++) {
-    const Selection& s = selections.at(i);
+  for (const auto & s : selections) {
     if (clip->track() == s.track && ((clip->timeline_in() >= s.in && clip->timeline_out() <= s.out)
                                   || (!containing && !(clip->timeline_in() >= s.out || clip->timeline_out() <= s.in)))) {
       return true;
@@ -204,10 +195,10 @@ bool Sequence::IsTransitionSelected(Transition *t)
   }
 
   // See if there's a selection matching this
-  for (int i=0;i<selections.size();i++) {
-    if (selections.at(i).in <= transition_in_point
-        && selections.at(i).out >= transition_out_point
-        && selections.at(i).track == transition_track) {
+  for (const auto & selection : selections) {
+    if (selection.in <= transition_in_point
+        && selection.out >= transition_out_point
+        && selection.track == transition_track) {
       return true;
     }
   }
@@ -218,8 +209,7 @@ bool Sequence::IsTransitionSelected(Transition *t)
 void Sequence::getTrackLimits(int* video_tracks, int* audio_tracks) {
   int vt = 0;
   int at = 0;
-  for (int j=0;j<clips.size();j++) {
-    ClipPtr c = clips.at(j);
+  for (auto c : clips) {
     if (c != nullptr) {
       if (c->track() < 0 && c->track() < vt) { // video clip
         vt = c->track();

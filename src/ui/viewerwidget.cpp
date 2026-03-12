@@ -61,15 +61,8 @@ extern "C" {
 #include "mainwindow.h"
 
 ViewerWidget::ViewerWidget(QWidget *parent) :
-  QOpenGLWidget(parent),
-  waveform(false),
-  waveform_zoom(1.0),
-  waveform_scroll(0),
-  dragging(false),
-  gizmos(nullptr),
-  selected_gizmo(nullptr),
-  x_scroll(0),
-  y_scroll(0)
+  QOpenGLWidget(parent)
+  
 {
   setMouseTracking(true);
   setFocusPolicy(Qt::ClickFocus);

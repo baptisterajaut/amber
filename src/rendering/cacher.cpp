@@ -63,12 +63,7 @@ void Cacher::WakeMainThread()
 
 Cacher::Cacher(Clip* c) :
   clip(c),
-  frame_(nullptr),
-  pkt(nullptr),
-  formatCtx(nullptr),
-  opts(nullptr),
-  filter_graph(nullptr),
-  codecCtx(nullptr),
+  
   is_valid_state_(false)
 {}
 

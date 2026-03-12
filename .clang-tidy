@@ -1,0 +1,37 @@
+---
+# Amber Video Editor — clang-tidy configuration
+# Focus: modernization + bug prevention, no style nitpicks
+
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  -modernize-concat-nested-namespaces,
+  performance-*,
+  readability-redundant-*,
+  readability-misplaced-array-index,
+  misc-unused-using-decls,
+  misc-redundant-expression,
+
+# Rationale for disabled checks:
+#   bugprone-easily-swappable-parameters — too noisy on callback-heavy Qt code
+#   bugprone-narrowing-conversions — Qt API returns int everywhere, float math is common
+#   modernize-use-trailing-return-type — stylistic, not a real improvement
+#   modernize-avoid-c-arrays — FFmpeg interop uses C arrays extensively
+#   modernize-concat-nested-namespaces — only one namespace (olive::), no benefit
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '.*/(effects|rendering|timeline|ui|panels|dialogs|global|project|undo)/.*\.h$'
+
+CheckOptions:
+  - key: modernize-use-override.AllowOverrideAndFinal
+    value: false
+  - key: modernize-use-auto.MinTypeNameLength
+    value: 8
+  - key: performance-unnecessary-value-param.AllowedTypes
+    value: 'QString;QStringList;QList;QVector'

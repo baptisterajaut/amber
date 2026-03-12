@@ -48,29 +48,29 @@ void draw_waveform(ClipPtr clip, const FootageStream *ms, long media_length, QPa
 class TimelineWidget : public QWidget {
   Q_OBJECT
 public:
-  explicit TimelineWidget(QWidget *parent = 0);
+  explicit TimelineWidget(QWidget *parent = nullptr);
   QScrollBar* scrollBar;
   bool bottom_align;
 
 public slots:
 
 protected:
-  void paintEvent(QPaintEvent*);
+  void paintEvent(QPaintEvent*) override;
 
-  void resizeEvent(QResizeEvent *event);
+  void resizeEvent(QResizeEvent *event) override;
 
-  void mouseDoubleClickEvent(QMouseEvent *event);
-  void mousePressEvent(QMouseEvent *event);
-  void mouseReleaseEvent(QMouseEvent *event);
-  void mouseMoveEvent(QMouseEvent *event);
-  void leaveEvent(QEvent *event);
+  void mouseDoubleClickEvent(QMouseEvent *event) override;
+  void mousePressEvent(QMouseEvent *event) override;
+  void mouseReleaseEvent(QMouseEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
+  void leaveEvent(QEvent *event) override;
 
-  void dragEnterEvent(QDragEnterEvent *event);
-  void dragLeaveEvent(QDragLeaveEvent *event);
-  void dropEvent(QDropEvent* event);
-  void dragMoveEvent(QDragMoveEvent *event);
+  void dragEnterEvent(QDragEnterEvent *event) override;
+  void dragLeaveEvent(QDragLeaveEvent *event) override;
+  void dropEvent(QDropEvent* event) override;
+  void dragMoveEvent(QDragMoveEvent *event) override;
 
-  void wheelEvent(QWheelEvent *event);
+  void wheelEvent(QWheelEvent *event) override;
 private:
   void init_ghosts();
   void update_ghosts(const QPoint& mouse_pos, bool lock_frame);

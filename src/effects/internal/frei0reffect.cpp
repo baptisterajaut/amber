@@ -27,21 +27,19 @@
 
 #include "timeline/clip.h"
 
-typedef f0r_instance_t (*f0rConstructFunc)(unsigned int width, unsigned int height);
-typedef int (*f0rInitFunc) ();
-typedef void (*f0rDeinitFunc) ();
-typedef void (*f0rUpdateFunc) (f0r_instance_t instance,
+using f0rConstructFunc = f0r_instance_t (*)(unsigned int width, unsigned int height);
+using f0rInitFunc = int (*) ();
+using f0rDeinitFunc = void (*) ();
+using f0rUpdateFunc = void (*) (f0r_instance_t instance,
             double time, const uint32_t* inframe, uint32_t* outframe);
-typedef void (*f0rDestructFunc)(f0r_instance_t instance);
-typedef void (*f0rGetPluginInfo)(f0r_plugin_info_t* info);
-typedef void (*f0rSetParamValue) (f0r_instance_t instance,
+using f0rDestructFunc = void (*)(f0r_instance_t instance);
+using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
+using f0rSetParamValue = void (*) (f0r_instance_t instance,
         f0r_param_t param, int param_index);
 
 Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
-  Effect(c, em),
-  open(false),
-  instance_width(0),
-  instance_height(0)
+  Effect(c, em)
+  
 {
   SetFlags(ImageFlag);
 

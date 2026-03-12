@@ -56,10 +56,10 @@ class EffectField;
 class OliveAction : public QUndoCommand {
 public:
   OliveAction(bool iset_window_modified = true);
-  virtual ~OliveAction() override;
+  ~OliveAction() override;
 
-  virtual void undo() override;
-  virtual void redo() override;
+  void undo() override;
+  void redo() override;
 
   virtual void doUndo() = 0;
   virtual void doRedo() = 0;

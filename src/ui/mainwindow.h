@@ -32,7 +32,7 @@ class MainWindow : public QMainWindow {
   Q_OBJECT
 public:
   explicit MainWindow(QWidget *parent);
-  virtual ~MainWindow() override;
+  ~MainWindow() override;
 
   /**
      * @brief Update window title
@@ -109,14 +109,14 @@ protected:
      * exits. It's preferable to call clean-up functions here rather than in the destructor because this will get called
      * first.
      */
-  virtual void closeEvent(QCloseEvent *) override;
+  void closeEvent(QCloseEvent *) override;
 
   /**
      * @brief Paint event
      *
      * Overridden to provide the finished_first_paint() signal.
      */
-  virtual void paintEvent(QPaintEvent *) override;
+  void paintEvent(QPaintEvent *) override;
 
   /**
    * @brief Change event
@@ -128,7 +128,7 @@ protected:
    * @param e
    * @return
    */
-  virtual void changeEvent(QEvent* e) override;
+  void changeEvent(QEvent* e) override;
 
 private slots:
   /**
@@ -343,7 +343,7 @@ private:
   QByteArray temp_panel_state;
 
   // used in paintEvent() to determine the first paintEvent() performed
-  bool first_show;
+  bool first_show{true};
 };
 
 namespace olive {

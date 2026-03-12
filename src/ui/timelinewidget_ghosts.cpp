@@ -220,8 +220,7 @@ void TimelineWidget::init_ghosts() {
     // used for trim ops
     g.media_length = c->media_length();
   }
-  for (int i=0;i<olive::ActiveSequence->selections.size();i++) {
-    Selection& s = olive::ActiveSequence->selections[i];
+  for (auto & s : olive::ActiveSequence->selections) {
     s.old_in = s.in;
     s.old_out = s.out;
     s.old_track = s.track;
@@ -372,9 +371,7 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
 
       // ripple ops
       if (effective_tool == TIMELINE_TOOL_RIPPLE) {
-        for (int j=0;j<post_clips.size();j++) {
-          ClipPtr post = post_clips.at(j);
-
+        for (auto post : post_clips) {
           // prevent any rippled clip from going below 0
           if (panel_timeline->trim_type == TRIM_IN) {
             validator = post->timeline_in() - frame_diff;
@@ -382,8 +379,7 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
           }
 
           // prevent any post-clips colliding with pre-clips
-          for (int k=0;k<pre_clips.size();k++) {
-            ClipPtr pre = pre_clips.at(k);
+          for (auto pre : pre_clips) {
             if (pre != post && pre->track() == post->track()) {
               if (panel_timeline->trim_type == TRIM_IN) {
                 validator = post->timeline_in() - frame_diff - pre->timeline_out();
@@ -563,8 +559,7 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
           s.out = s.old_out + frame_diff;
         }
       } else if (clips_are_movable) {
-        for (int i=0;i<olive::ActiveSequence->selections.size();i++) {
-          Selection& s = olive::ActiveSequence->selections[i];
+        for (auto & s : olive::ActiveSequence->selections) {
           s.in = s.old_in + frame_diff;
           s.out = s.old_out + frame_diff;
           s.track = s.old_track;

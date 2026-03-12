@@ -26,16 +26,9 @@
 
 EffectGizmo::EffectGizmo(Effect *parent, int type) :
   QObject(parent),
-  x_field1(nullptr),
-  x_field_multi1(1.0),
-  y_field1(nullptr),
-  y_field_multi1(1.0),
-  x_field2(nullptr),
-  x_field_multi2(1.0),
-  y_field2(nullptr),
-  y_field_multi2(1.0),
-  type(type),
-  cursor(-1)
+  
+  type(type)
+  
 {
   Q_ASSERT(parent != nullptr);
 

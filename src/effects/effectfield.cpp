@@ -41,9 +41,8 @@
 EffectField::EffectField(EffectRow* parent, const QString &i, EffectFieldType t) :
   QObject(parent),
   type_(t),
-  id_(i),
-  enabled_(true),
-  colspan_(1)
+  id_(i)
+  
 {
   // EffectField MUST be created with a parent.
   Q_ASSERT(parent != nullptr);

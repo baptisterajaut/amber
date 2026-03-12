@@ -43,8 +43,8 @@ public:
 
   TimelineHeader* header;
 
-  long visible_in;
-  long visible_out;
+  long visible_in{0};
+  long visible_out{0};
 signals:
   void wheel_event_signal(QWheelEvent*);
 public slots:
@@ -59,16 +59,16 @@ private:
   QVector<int> rowY;
   QVector<EffectRow*> rows;
   QVector<long> old_key_vals;
-  void mousePressEvent(QMouseEvent* event);
-  void mouseMoveEvent(QMouseEvent* event);
-  void mouseReleaseEvent(QMouseEvent *event);
-  void paintEvent(QPaintEvent *event);
-  void wheelEvent(QWheelEvent* e);
-  bool mousedown;
-  bool dragging;
-  bool keys_selected;
-  bool select_rect;
-  bool scroll_drag;
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseMoveEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent *event) override;
+  void paintEvent(QPaintEvent *event) override;
+  void wheelEvent(QWheelEvent* e) override;
+  bool mousedown{false};
+  bool dragging{false};
+  bool keys_selected{false};
+  bool select_rect{false};
+  bool scroll_drag{false};
 
   bool keyframeIsSelected(EffectField *field, int keyframe);
 
@@ -80,8 +80,8 @@ private:
   int rect_select_h;
   int rect_select_offset;
 
-  int x_scroll;
-  int y_scroll;
+  int x_scroll{0};
+  int y_scroll{0};
 
   void update_keys();
 private slots:

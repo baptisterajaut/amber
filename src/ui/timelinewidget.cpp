@@ -118,14 +118,14 @@ void TimelineWidget::dragEnterEvent(QDragEnterEvent *event) {
     if (!urls.isEmpty()) {
       QStringList file_list;
 
-      for (int i=0;i<urls.size();i++) {
-        file_list.append(urls.at(i).toLocalFile());
+      for (const auto & url : urls) {
+        file_list.append(url.toLocalFile());
       }
 
       panel_project->process_file_list(file_list);
 
-      for (int i=0;i<panel_project->last_imported_media.size();i++) {
-        Footage* f = panel_project->last_imported_media.at(i)->to_footage();
+      for (auto i : panel_project->last_imported_media) {
+        Footage* f = i->to_footage();
 
         // waits for media to have a duration
         // TODO would be much nicer if this was multithreaded
@@ -133,7 +133,7 @@ void TimelineWidget::dragEnterEvent(QDragEnterEvent *event) {
         f->ready_lock.unlock();
 
         if (f->ready) {
-          media_list.append(panel_project->last_imported_media.at(i));
+          media_list.append(i);
         }
       }
 
@@ -267,8 +267,7 @@ void TimelineWidget::dragLeaveEvent(QDragLeaveEvent* event) {
 void delete_area_under_ghosts(ComboAction* ca) {
   // delete areas before adding
   QVector<Selection> delete_areas;
-  for (int i=0;i<panel_timeline->ghosts.size();i++) {
-    const Ghost& g = panel_timeline->ghosts.at(i);
+  for (const auto & g : panel_timeline->ghosts) {
     Selection sel;
     sel.in = g.in;
     sel.out = g.out;
@@ -288,9 +287,7 @@ void insert_clips(ComboAction* ca) {
   long latest_new_point = LONG_MIN;
 
   QVector<int> ignore_clips;
-  for (int i=0;i<panel_timeline->ghosts.size();i++) {
-    const Ghost& g = panel_timeline->ghosts.at(i);
-
+  for (const auto & g : panel_timeline->ghosts) {
     earliest_old_point = qMin(earliest_old_point, g.old_in);
     latest_old_point = qMax(latest_old_point, g.old_out);
     earliest_new_point = qMin(earliest_new_point, g.in);
@@ -311,8 +308,8 @@ void insert_clips(ComboAction* ca) {
     if (c != nullptr) {
       // don't split any clips that are moving
       bool found = false;
-      for (int j=0;j<panel_timeline->ghosts.size();j++) {
-        if (panel_timeline->ghosts.at(j).clip == i) {
+      for (const auto & ghost : panel_timeline->ghosts) {
+        if (ghost.clip == i) {
           found = true;
           break;
         }
@@ -343,13 +340,11 @@ void insert_clips(ComboAction* ca) {
     ripple_clips(ca, olive::ActiveSequence.get(), latest_old_point, second_ripple_length, ignore_clips);
 
     if (earliest_old_point < earliest_new_point) {
-      for (int i=0;i<panel_timeline->ghosts.size();i++) {
-        Ghost& g = panel_timeline->ghosts[i];
+      for (auto & g : panel_timeline->ghosts) {
         g.in += second_ripple_length;
         g.out += second_ripple_length;
       }
-      for (int i=0;i<olive::ActiveSequence->selections.size();i++) {
-        Selection& s = olive::ActiveSequence->selections[i];
+      for (auto & s : olive::ActiveSequence->selections) {
         s.in += second_ripple_length;
         s.out += second_ripple_length;
       }
@@ -390,9 +385,7 @@ void TimelineWidget::dropEvent(QDropEvent* event) {
       if (mbox.clickedButton() == custom_param_btn
           && !qFuzzyCompare(old_fr, s->frame_rate)) {
         // If we're here, the user changed the frame rate so all the ghosts will need adjustment
-        for (int i=0;i<panel_timeline->ghosts.size();i++) {
-          Ghost& g = panel_timeline->ghosts[i];
-
+        for (auto & g : panel_timeline->ghosts) {
           g.in = rescale_frame_number(g.in, old_fr, s->frame_rate);
           g.out = rescale_frame_number(g.out, old_fr, s->frame_rate);
           g.clip_in = rescale_frame_number(g.clip_in, old_fr, s->frame_rate);
@@ -556,8 +549,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event) {
 
                 // if the user isn't holding alt, also deselect all of its links as well
                 if (!alt) {
-                  for (int i=0;i<clip->linked.size();i++) {
-                    ClipPtr link = olive::ActiveSequence->clips.at(clip->linked.at(i));
+                  for (int i : clip->linked) {
+                    ClipPtr link = olive::ActiveSequence->clips.at(i);
                     panel_timeline->deselect_area(link->timeline_in(), link->timeline_out(), link->track());
                   }
                 }
@@ -570,8 +563,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event) {
 
                 panel_timeline->deselect_area(clip->timeline_in(), clip->timeline_out(), clip->track());
 
-                for (int i=0;i<clip->linked.size();i++) {
-                  ClipPtr link = olive::ActiveSequence->clips.at(clip->linked.at(i));
+                for (int i : clip->linked) {
+                  ClipPtr link = olive::ActiveSequence->clips.at(i);
                   panel_timeline->deselect_area(link->timeline_in(), link->timeline_out(), link->track());
                 }
 
@@ -645,9 +638,9 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event) {
               // if alt is not down, select links (provided we're not selecting transitions)
               if (!alt && panel_timeline->transition_select == kTransitionNone) {
 
-                for (int i=0;i<clip->linked.size();i++) {
+                for (int i : clip->linked) {
 
-                  Clip* link = olive::ActiveSequence->clips.at(clip->linked.at(i)).get();
+                  Clip* link = olive::ActiveSequence->clips.at(i).get();
 
                   // check if the clip is already selected
                   if (!link->IsSelected()) {
@@ -828,8 +821,7 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
 
         bool process_moving = false;
 
-        for (int i=0;i<panel_timeline->ghosts.size();i++) {
-          const Ghost& g = panel_timeline->ghosts.at(i);
+        for (const auto & g : panel_timeline->ghosts) {
           if (g.in != g.old_in
               || g.out != g.old_out
               || g.clip_in != g.old_clip_in
@@ -858,9 +850,9 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
 
               // for in trimming movements we also move the selections forward (unnecessary for out trimming since
               // the selected clips more or less stay in the same place)
-              for (int i=0;i<olive::ActiveSequence->selections.size();i++) {
-                olive::ActiveSequence->selections[i].in += ripple_length;
-                olive::ActiveSequence->selections[i].out += ripple_length;
+              for (auto & selection : olive::ActiveSequence->selections) {
+                selection.in += ripple_length;
+                selection.out += ripple_length;
               }
             } else {
 
@@ -902,8 +894,7 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
             QVector<int> old_clips;
             QVector<ClipPtr> new_clips;
             QVector<Selection> delete_areas;
-            for (int i=0;i<panel_timeline->ghosts.size();i++) {
-              const Ghost& g = panel_timeline->ghosts.at(i);
+            for (const auto & g : panel_timeline->ghosts) {
               if (g.old_in != g.in || g.old_out != g.out || g.track != g.old_track || g.clip_in != g.old_clip_in) {
 
                 // create copy of clip
@@ -953,10 +944,8 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
 
               // delete everything under the new clips
               QVector<Selection> delete_areas;
-              for (int i=0;i<panel_timeline->ghosts.size();i++) {
+              for (const auto & g : panel_timeline->ghosts) {
                 // step 1 - set clips that are moving to "undeletable" (to avoid step 2 deleting any part of them)
-                const Ghost& g = panel_timeline->ghosts.at(i);
-
                 // set clip to undeletable so it's unaffected by delete_areas_and_relink() below
                 olive::ActiveSequence->clips.at(g.clip)->undeletable = true;
 
@@ -979,8 +968,7 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
               panel_timeline->delete_areas_and_relink(ca, delete_areas, false);
 
               // clean up, i.e. make everything not undeletable again
-              for (int i=0;i<panel_timeline->ghosts.size();i++) {
-                const Ghost& g = panel_timeline->ghosts.at(i);
+              for (const auto & g : panel_timeline->ghosts) {
                 olive::ActiveSequence->clips.at(g.clip)->undeletable = false;
 
                 if (g.transition != nullptr) {
@@ -993,9 +981,7 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
             }
 
             // finally, perform actual movement of clips
-            for (int i=0;i<panel_timeline->ghosts.size();i++) {
-              Ghost& g = panel_timeline->ghosts[i];
-
+            for (auto & g : panel_timeline->ghosts) {
               Clip* c = olive::ActiveSequence->clips.at(g.clip).get();
 
               if (g.transition == nullptr) {
@@ -1370,9 +1356,9 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
           if (c != nullptr && c->IsSelected(false)) {
 
             // loop through linked clips
-            for (int k=0;k<c->linked.size();k++) {
+            for (int k : c->linked) {
 
-              ClipPtr link = olive::ActiveSequence->clips.at(c->linked.at(k));
+              ClipPtr link = olive::ActiveSequence->clips.at(k);
 
               // see if one of the selections is already covering this track
               if (!(link->track() >= minimum_selection_track
@@ -1471,9 +1457,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
                 && (c->opening_transition != nullptr || c->closing_transition != nullptr)) {
 
               // check if any selections contain a whole transition
-              for (int j=0;j<olive::ActiveSequence->selections.size();j++) {
-
-                const Selection& s = olive::ActiveSequence->selections.at(j);
+              for (const auto & s : olive::ActiveSequence->selections) {
 
                 if (s.track == c->track()) {
                   if (selection_contains_transition(s, c, kTransitionOpening)) {
@@ -1505,8 +1489,8 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
               if (g.transition != nullptr) {
 
                 // transition may be a dual transition, check if it's already been added elsewhere
-                for (int j=0;j<panel_timeline->ghosts.size();j++) {
-                  if (panel_timeline->ghosts.at(j).transition == g.transition) {
+                for (const auto & ghost : panel_timeline->ghosts) {
+                  if (ghost.transition == g.transition) {
                     add = false;
                     break;
                   }
@@ -1599,8 +1583,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
           }
 
           // loop through clips and cache which are earlier than the axis and which after after
-          for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
-            ClipPtr c = olive::ActiveSequence->clips.at(i);
+          for (auto c : olive::ActiveSequence->clips) {
             if (c != nullptr && !ghost_clips.contains(c)) {
               bool clip_is_post = (c->timeline_in() >= axis);
 
@@ -1609,16 +1592,16 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
 
               // check if there's already a clip in this list on this track, and if this clip is closer or not
               bool found = false;
-              for (int j=0;j<clip_list.size();j++) {
+              for (auto & j : clip_list) {
 
-                ClipPtr compare = clip_list.at(j);
+                ClipPtr compare = j;
 
                 if (compare->track() == c->track()) {
 
                   // if the clip is closer, use this one instead of the current one in the list
                   if ((!clip_is_post && compare->timeline_out() < c->timeline_out())
                       || (clip_is_post && compare->timeline_in() > c->timeline_in())) {
-                    clip_list[j] = c;
+                    j = c;
                   }
 
                   found = true;
@@ -1722,19 +1705,18 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event) {
             session_clips.append(clip);
 
             if (!alt) {
-              for (int j=0;j<clip->linked.size();j++) {
-                session_clips.append(olive::ActiveSequence->clips.at(clip->linked.at(j)));
+              for (int j : clip->linked) {
+                session_clips.append(olive::ActiveSequence->clips.at(j));
               }
             }
 
             // for each of these clips, see if clip has already been added -
             // this can easily happen due to adding linked clips
-            for (int j=0;j<session_clips.size();j++) {
+            for (auto c : session_clips) {
               bool found = false;
 
-              ClipPtr c = session_clips.at(j);
-              for (int k=0;k<selected_clips.size();k++) {
-                if (selected_clips.at(k) == c) {
+              for (const auto & selected_clip : selected_clips) {
+                if (selected_clip == c) {
                   found = true;
                   break;
                 }

@@ -146,9 +146,9 @@ void PreviewGenerator::parse_media() {
         QVector<FootageStream>& stream_list = (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) ?
               footage_->audio_tracks : footage_->video_tracks;
 
-        for (int j=0;j<stream_list.size();j++) {
-          if (stream_list.at(j).file_index == i) {
-            stream_list[j] = ms;
+        for (auto & j : stream_list) {
+          if (j.file_index == i) {
+            j = ms;
             append = false;
           }
         }
@@ -174,8 +174,7 @@ bool PreviewGenerator::retrieve_preview(const QString& hash) {
   }
 
   bool found = true;
-  for (int i=0;i<footage_->video_tracks.size();i++) {
-    FootageStream& ms = footage_->video_tracks[i];
+  for (auto & ms : footage_->video_tracks) {
     QString thumb_path = get_thumbnail_path(hash, ms);
     QFile f(thumb_path);
     if (f.exists() && ms.video_preview.load(thumb_path)) {
@@ -185,8 +184,7 @@ bool PreviewGenerator::retrieve_preview(const QString& hash) {
       break;
     }
   }
-  for (int i=0;i<footage_->audio_tracks.size();i++) {
-    FootageStream& ms = footage_->audio_tracks[i];
+  for (auto & ms : footage_->audio_tracks) {
     QString waveform_path = get_waveform_path(hash, ms);
     QFile f(waveform_path);
     if (f.exists()) {
@@ -207,12 +205,10 @@ bool PreviewGenerator::retrieve_preview(const QString& hash) {
     }
   }
   if (!found) {
-    for (int i=0;i<footage_->video_tracks.size();i++) {
-      FootageStream& ms = footage_->video_tracks[i];
+    for (auto & ms : footage_->video_tracks) {
       ms.preview_done = false;
     }
-    for (int i=0;i<footage_->audio_tracks.size();i++) {
-      FootageStream& ms = footage_->audio_tracks[i];
+    for (auto & ms : footage_->audio_tracks) {
       ms.audio_preview.clear();
       ms.preview_done = false;
     }
@@ -499,8 +495,8 @@ void PreviewGenerator::generate_waveform() {
           done = false;
         } else if (footage_->audio_tracks.size() == 0) {
           done = true;
-          for (int i=0;i<footage_->video_tracks.size();i++) {
-            if (!footage_->video_tracks.at(i).preview_done) {
+          for (const auto & video_track : footage_->video_tracks) {
+            if (!video_track.preview_done) {
               done = false;
               break;
             }
@@ -531,8 +527,8 @@ void PreviewGenerator::generate_waveform() {
     }
 
     // by this point, we'll have made all audio waveform previews
-    for (int i=0;i<footage_->audio_tracks.size();i++) {
-      footage_->audio_tracks[i].preview_done = true;
+    for (auto & audio_track : footage_->audio_tracks) {
+      audio_track.preview_done = true;
     }
   }
 
@@ -610,13 +606,11 @@ void PreviewGenerator::run() {
 
           if (!cancelled_) {
             // save preview to file
-            for (int i=0;i<footage_->video_tracks.size();i++) {
-              FootageStream& ms = footage_->video_tracks[i];
+            for (auto & ms : footage_->video_tracks) {
               ms.video_preview.save(get_thumbnail_path(hash, ms), "PNG");
               //dout << "saved" << ms->file_index << "thumbnail to" << get_thumbnail_path(hash, ms);
             }
-            for (int i=0;i<footage_->audio_tracks.size();i++) {
-              FootageStream& ms = footage_->audio_tracks[i];
+            for (auto & ms : footage_->audio_tracks) {
               QFile f(get_waveform_path(hash, ms));
               if (f.open(QFile::WriteOnly)) {
                 f.write(ms.audio_preview.constData(), ms.audio_preview.size());

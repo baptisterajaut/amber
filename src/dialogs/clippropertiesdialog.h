@@ -31,7 +31,7 @@ protected:
   /**
    * @brief Accept override. Saves the current properties to the array of Clips.
    */
-  virtual void accept() override;
+  void accept() override;
 private:
   /**
    * @brief Internal clip array (set in the constructor)

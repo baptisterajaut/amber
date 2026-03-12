@@ -44,16 +44,8 @@
 #include "ui/menu.h"
 
 KeyframeView::KeyframeView(QWidget *parent) :
-  QWidget(parent),
-  visible_in(0),
-  visible_out(0),
-  mousedown(false),
-  dragging(false),
-  keys_selected(false),
-  select_rect(false),
-  x_scroll(0),
-  y_scroll(0),
-  scroll_drag(false)
+  QWidget(parent)
+  
 {
   setFocusPolicy(Qt::ClickFocus);
   setMouseTracking(true);
@@ -110,15 +102,14 @@ void KeyframeView::paintEvent(QPaintEvent*) {
     visible_in = LONG_MAX;
     visible_out = 0;
 
-    for (int i=0;i<open_effects_.size();i++) {
-      Clip* c = open_effects_.at(i)->GetEffect()->parent_clip;
+    for (auto open_effect : open_effects_) {
+      Clip* c = open_effect->GetEffect()->parent_clip;
       visible_in = qMin(visible_in, c->timeline_in());
       visible_out = qMax(visible_out, c->timeline_out());
     }
 
-    for (int j=0;j<open_effects_.size();j++) {
+    for (auto container : open_effects_) {
 
-      EffectUI* container = open_effects_.at(j);
       Effect* e = container->GetEffect();
 
       if (container->IsExpanded()) {
@@ -140,8 +131,8 @@ void KeyframeView::paintEvent(QPaintEvent*) {
                 int appearances = 0;
                 for (int m=0;m<row->FieldCount();m++) {
                   EffectField* compf = row->Field(m);
-                  for (int n=0;n<compf->keyframes.size();n++) {
-                    if (f->keyframes.at(k).time == compf->keyframes.at(n).time) {
+                  for (const auto & keyframe : compf->keyframes) {
+                    if (f->keyframes.at(k).time == keyframe.time) {
                       appearances++;
                     }
                   }

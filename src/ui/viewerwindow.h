@@ -34,16 +34,16 @@ public:
   ViewerWindow(QWidget *parent);
   void set_texture(GLuint t, double iar, QMutex *imutex);
 protected:
-  virtual void showEvent(QShowEvent*) override;
-  virtual void keyPressEvent(QKeyEvent*) override;
-  virtual void mousePressEvent(QMouseEvent*) override;
-  virtual void mouseMoveEvent(QMouseEvent*) override;
+  void showEvent(QShowEvent*) override;
+  void keyPressEvent(QKeyEvent*) override;
+  void mousePressEvent(QMouseEvent*) override;
+  void mouseMoveEvent(QMouseEvent*) override;
 
-  virtual void paintGL() override;
+  void paintGL() override;
 private:
-  GLuint texture;
+  GLuint texture{0};
   double ar;
-  QMutex* mutex;
+  QMutex* mutex{nullptr};
 
   // shortcuts
   void shortcut_copier(QVector<QShortcut*>& shortcuts, QMenu* menu);
@@ -51,7 +51,7 @@ private:
 
   // exit full screen message
   QTimer fullscreen_msg_timer;
-  bool show_fullscreen_msg;
+  bool show_fullscreen_msg{false};
   QRect fullscreen_msg_rect;
 private slots:
   void fullscreen_msg_timeout();

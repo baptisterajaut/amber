@@ -69,11 +69,9 @@ QString get_channel_layout_name(int channels, uint64_t layout) {
   }
 }
 
-Media::Media() :
-  root(false),
-  type(-1)
-{
-}
+Media::Media() 
+  
+= default;
 
 Footage* Media::to_footage() {
   return static_cast<Footage*>(object.get());
@@ -384,9 +382,9 @@ void Media::removeChild(int i) {
 
 MediaPtr Media::get_shared_ptr(Media *m)
 {
-  for (int i=0;i<children.size();i++) {
-    if (children.at(i).get() == m) {
-      return children.at(i);
+  for (const auto & i : children) {
+    if (i.get() == m) {
+      return i;
     }
   }
   return MediaPtr();

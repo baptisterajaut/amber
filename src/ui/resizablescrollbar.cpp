@@ -29,9 +29,8 @@
 #define RESIZE_HANDLE_SIZE 10
 
 ResizableScrollBar::ResizableScrollBar(QWidget *parent) :
-  QScrollBar(parent),
-  resize_init(false),
-  resize_proc(false)
+  QScrollBar(parent)
+  
 {
   setSingleStep(20);
   setMaximum(0);

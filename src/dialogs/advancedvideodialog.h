@@ -59,7 +59,7 @@ public slots:
   /**
    * @brief Overridden accept for saving the UI data into the provided VideoCodecParams struct.
    */
-  virtual void accept() override;
+  void accept() override;
 private:
   /**
    * @brief Internal reference to VideoCodecParams struct provided by ExportDialog.

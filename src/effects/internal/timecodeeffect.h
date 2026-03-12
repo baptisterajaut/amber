@@ -41,7 +41,7 @@ public:
   ComboField* tc_select;
 
 protected:
-  virtual bool AlwaysUpdate() override;
+  bool AlwaysUpdate() override;
 
 private:
   QFont font;

@@ -164,7 +164,7 @@ struct Config {
    *
    * **TRUE** if the Timeline should show lines between tracks.
    */
-  bool show_track_lines;
+  bool show_track_lines{true};
 
   /**
    * @brief Use hardware-accelerated video decoding
@@ -172,7 +172,7 @@ struct Config {
    * **TRUE** if Olive should attempt to use hardware decoding (VAAPI on Linux, D3D11VA on Windows,
    * VideoToolbox on macOS). Falls back to software decoding if unavailable.
    */
-  bool hardware_decoding;
+  bool hardware_decoding{false};
 
   /**
    * @brief The scroll wheel zooms rather than scrolls
@@ -180,35 +180,35 @@ struct Config {
    * **TRUE** if the scroll wheel should zoom in and out rather than scroll up and down.
    * The Control key temporarily toggles this setting.
    */
-  bool scroll_zooms;
+  bool scroll_zooms{false};
 
   /**
    * @brief Edit tool selects links
    *
    * **TRUE** if the edit tool should also select links when the user selects a clip.
    */
-  bool edit_tool_selects_links;
+  bool edit_tool_selects_links{false};
 
   /**
    * @brief Edit tool also seeks
    *
    * **TRUE** if using the edit tool should also seek the sequence's playhead
    */
-  bool edit_tool_also_seeks;
+  bool edit_tool_also_seeks{false};
 
   /**
    * @brief Selecting also seeks
    *
    * **TRUE** if the playhead should automatically seek to the start of any clip that gets selected
    */
-  bool select_also_seeks;
+  bool select_also_seeks{false};
 
   /**
    * @brief Paste also seeks
    *
    * **TRUE** if the playhead should seek to the end of clips that are pasted
    */
-  bool paste_seeks;
+  bool paste_seeks{true};
 
   /**
    * @brief Image sequence formats
@@ -223,14 +223,14 @@ struct Config {
    * **TRUE** if Olive should display waveforms as "rectified". Rectified waveforms start at the bottom rather than
    * from the middle.
    */
-  bool rectified_waveforms;
+  bool rectified_waveforms{false};
 
   /**
    * @brief Default transition length
    *
    * The default transition length used when making a transition without the transition tool
    */
-  int default_transition_length;
+  int default_transition_length{30};
 
   /**
    * @brief Timecode display mode
@@ -240,21 +240,21 @@ struct Config {
    *
    * Set to a member of enum TimecodeType.
    */
-  int timecode_view;
+  int timecode_view{olive::kTimecodeDrop};
 
   /**
    * @brief Show title/action safe area
    *
    * **TRUE** if the title/action safe area should be shown on the Viewer.
    */
-  bool show_title_safe_area;
+  bool show_title_safe_area{false};
 
   /**
    * @brief Use custom title/action safe area aspect ratio
    *
    * **TRUE** if the title/action save area should use a custom aspect ratio
    */
-  bool use_custom_title_safe_ratio;
+  bool use_custom_title_safe_ratio{false};
 
   /**
    * @brief Custom title/action safe area aspect ratio
@@ -263,14 +263,14 @@ struct Config {
    *
    * Set to the result of an aspect ratio division (i.e. for 4:3 set to 1.333333 (4.0 / 3.0)
    */
-  double custom_title_safe_ratio;
+  double custom_title_safe_ratio{1};
 
   /**
    * @brief Enable dragging files outside Olive directly into the Timeline
    *
    * **TRUE** if the Timeline should respond to files dropped from outside Olive.
    */
-  bool enable_drag_files_to_timeline;
+  bool enable_drag_files_to_timeline{true};
 
   /**
    * @brief Auto-scale by default
@@ -278,7 +278,7 @@ struct Config {
    * **TRUE** if clips imported into the timeline should have Clip::autoscale **TRUE** by default. If a Clip is
    * smaller or larger than the Sequence, auto-scale will automatically resize it to fit to the Sequence boundaries.
    */
-  bool autoscale_by_default;
+  bool autoscale_by_default{false};
 
   /**
    * @brief Recording mode/channel layout
@@ -287,21 +287,21 @@ struct Config {
    *
    * Set to a member of enum RecordingMode.
    */
-  int recording_mode;
+  int recording_mode{2};
 
   /**
    * @brief Enable seek to import
    *
    * **TRUE** if the playhead should automatically seek to any newly imported clips
    */
-  bool enable_seek_to_import;
+  bool enable_seek_to_import{false};
 
   /**
    * @brief Enable audio scrubbing
    *
    * **TRUE** if audio should "scrub" as the user drags the playhead around
    */
-  bool enable_audio_scrubbing;
+  bool enable_audio_scrubbing{true};
 
   /**
    * @brief Enable drop on media to replace
@@ -309,7 +309,7 @@ struct Config {
    * **TRUE** if dropping a file from outside Olive onto a media item in the Project panel should prompt the user
    * whether the dropped file should replace the media item that the file was dropped on.
    */
-  bool drop_on_media_to_replace;
+  bool drop_on_media_to_replace{true};
 
   /**
    * @brief Auto-scroll mode
@@ -318,7 +318,7 @@ struct Config {
    *
    * Set to a member of enum AutoScrollMode.
    */
-  int autoscroll;
+  int autoscroll{olive::AUTOSCROLL_PAGE_SCROLL};
 
   /**
    * @brief Current audio sample rate
@@ -326,7 +326,7 @@ struct Config {
    * The sample rate to set the audio output device to. Also used as the value to resample audio to during playback
    * (but not during rendering).
    */
-  int audio_rate;
+  int audio_rate{48000};
 
   /**
    * @brief Enable hover focus
@@ -336,7 +336,7 @@ struct Config {
    *
    * **TRUE** to enable hover focus mode.
    */
-  bool hover_focus;
+  bool hover_focus{false};
 
   /**
    * @brief Project view type
@@ -345,7 +345,7 @@ struct Config {
    *
    * Set to a member of enum ProjectView.
    */
-  int project_view_type;
+  int project_view_type{olive::PROJECT_VIEW_TREE};
 
   /**
    * @brief Ask for a marker name when setting a marker
@@ -353,7 +353,7 @@ struct Config {
    * **TRUE** if Olive should ask the user to name a marker when setting one. **FALSE** if markers should just be
    * created without asking.
    */
-  bool set_name_with_marker;
+  bool set_name_with_marker{true};
 
   /**
    * @brief Show the project toolbar
@@ -362,7 +362,7 @@ struct Config {
    *
    * Set to **TRUE** to show it.
    */
-  bool show_project_toolbar;
+  bool show_project_toolbar{true};
 
   /**
    * @brief Previous frame queue size
@@ -373,7 +373,7 @@ struct Config {
    *
    * This value corresponds to Config::previous_queue_type.
    */
-  double previous_queue_size;
+  double previous_queue_size{3};
 
   /**
    * @brief Previous frame queue type
@@ -383,7 +383,7 @@ struct Config {
    *
    * Set to a member of enum FrameQueueType.
    */
-  int previous_queue_type;
+  int previous_queue_type{olive::FRAME_QUEUE_TYPE_FRAMES};
 
   /**
    * @brief Upcoming frame queue size
@@ -394,7 +394,7 @@ struct Config {
    *
    * This value corresponds to Config::upcoming_queue_type.
    */
-  double upcoming_queue_size;
+  double upcoming_queue_size{0.5};
 
   /**
    * @brief Upcoming frame queue type
@@ -404,7 +404,7 @@ struct Config {
    *
    * Set to a member of enum FrameQueueType.
    */
-  int upcoming_queue_type;
+  int upcoming_queue_type{olive::FRAME_QUEUE_TYPE_SECONDS};
 
   /**
    * @brief Loop
@@ -413,7 +413,7 @@ struct Config {
    * should rewind to the in point and start playing again after it reaches the out point repeatedly until the user
    * pauses.
    */
-  bool loop;
+  bool loop{false};
 
   /**
    * @brief Seeking also selects
@@ -422,14 +422,14 @@ struct Config {
    *
    * **TRUE** if this mode should be enabled.
    */
-  bool seek_also_selects;
+  bool seek_also_selects{false};
 
   /**
    * @brief Automatically seek to the beginning of a sequence if the user plays beyond the end of it
    *
    * TRUE if this behavior should be enabled.
    */
-  bool auto_seek_to_beginning;
+  bool auto_seek_to_beginning{true};
 
   /**
    * @brief CSS Path
@@ -446,7 +446,7 @@ struct Config {
    *
    * Set to a value >= 1
    */
-  int effect_textbox_lines;
+  int effect_textbox_lines{3};
 
   /**
    * @brief Use software fallbacks when possible
@@ -457,7 +457,7 @@ struct Config {
    *
    * **TRUE** if Olive should prefer software fallbacks to hardware acceleration when they're available.
    */
-  bool use_software_fallback;
+  bool use_software_fallback{false};
 
   /**
    * @brief Center Timeline timecodes
@@ -466,7 +466,7 @@ struct Config {
    * always be desirable as, for example, this forces the initial 00:00:00;00 timecode's left half to be cut off.
    * Olive supports aligning the timecode to the right of the frame rather than the center to address this.
    */
-  bool center_timeline_timecodes;
+  bool center_timeline_timecodes{true};
 
   /**
    * @brief Preferred audio output device
@@ -503,14 +503,14 @@ struct Config {
    * Specifically sets how many samples per second should be "cached" for preview. If the waveforms are too blocky,
    * set this higher. If Timeline performance is slow, set this lower.
    */
-  int waveform_resolution;
+  int waveform_resolution{64};
 
   /**
    * @brief Thumbnail resolution
    *
    * The vertical pixel height to use for generating thumbnails.
    */
-  int thumbnail_resolution;
+  int thumbnail_resolution{120};
 
   /**
    * @brief Add default effects to clips
@@ -518,65 +518,65 @@ struct Config {
    * **TRUE** if new clips imported into the Timeline should have a set of default effects (TransformEffect,
    * VolumeEffect, and PanEffect) added to them by default.
    */
-  bool add_default_effects_to_clips;
+  bool add_default_effects_to_clips{true};
 
   /**
    * @brief Invert Timeline scroll axes
    *
    * **TRUE** if scrolling vertically on the Timeline should scroll it horizontally
    */
-  bool invert_timeline_scroll_axes;
+  bool invert_timeline_scroll_axes{true};
 
   /**
    * @brief Style to use when theming Olive.
    *
    * Set to a member of olive::styling::Style.
    */
-  olive::styling::Style style;
+  olive::styling::Style style{olive::styling::kOliveDefaultDark};
 
   /**
    * @brief Use native menu styling
    *
    * Use native styling on menus rather than cross-platform Fusion.
    */
-  bool use_native_menu_styling;
+  bool use_native_menu_styling{true};
 
   /**
    * @brief Default Sequence video width
    */
-  int default_sequence_width;
+  int default_sequence_width{1920};
 
   /**
    * @brief Default Sequence video height
    */
-  int default_sequence_height;
+  int default_sequence_height{1080};
 
   /**
    * @brief Default Sequence video frame rate
    */
-  double default_sequence_framerate;
+  double default_sequence_framerate{29.97};
 
   /**
    * @brief Default Sequence audio frequency
    */
-  int default_sequence_audio_frequency;
+  int default_sequence_audio_frequency{48000};
 
   /**
    * @brief Default Sequence audio channel layout
    */
-  int default_sequence_audio_channel_layout;
+  int default_sequence_audio_channel_layout{3};
 
   /**
    * @brief Sets whether panels should load locked or not
    */
-  bool locked_panels;
+  bool locked_panels{false};
 
   /**
    * @brief Show the welcome dialog on startup
    *
    * **TRUE** if the welcome dialog should be shown on startup (release builds only).
    */
-  bool show_welcome_dialog;
+  bool show_welcome_dialog{true};
 
   /**
    * @brief Load config from file
@@ -620,7 +620,7 @@ struct RuntimeConfig {
    *
    * Debugging tool. Set to **FALSE** to bypass OpenGL shaders.
    */
-  bool shaders_are_enabled;
+  bool shaders_are_enabled{true};
 
   /**
    * @brief Disable blending modes
@@ -628,7 +628,7 @@ struct RuntimeConfig {
    * Some users had difficulty utilizing blending modes (provided by shaders). Set this to **TRUE** to bypass
    * shader-based blending modes and utilize standard (less versatile) OpenGL blending instead.
    */
-  bool disable_blending;
+  bool disable_blending{false};
 
   /**
    * @brief Load an external translation file

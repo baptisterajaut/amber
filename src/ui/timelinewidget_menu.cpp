@@ -75,8 +75,8 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
       bool video_clips_are_selected = false;
       bool audio_clips_are_selected = false;
 
-      for (int i=0;i<selected_clips.size();i++) {
-        if (selected_clips.at(i)->track() < 0) {
+      for (auto selected_clip : selected_clips) {
+        if (selected_clip->track() < 0) {
           video_clips_are_selected = true;
         } else {
           audio_clips_are_selected = true;
@@ -143,8 +143,7 @@ void TimelineWidget::toggle_autoscale() {
   if (!selected_clips.isEmpty()) {
     SetClipProperty* action = new SetClipProperty(kSetClipPropertyAutoscale);
 
-    for (int i=0;i<selected_clips.size();i++) {
-      Clip* c = selected_clips.at(i);
+    for (auto c : selected_clips) {
       action->AddSetting(c, !c->autoscaled());
     }
 
@@ -177,9 +176,9 @@ void TimelineWidget::open_sequence_properties() {
     all_top_level_items.append(olive::project_model.child(i));
   }
   panel_project->get_all_media_from_table(all_top_level_items, sequence_items, MEDIA_TYPE_SEQUENCE); // find all sequences in project
-  for (int i=0;i<sequence_items.size();i++) {
-    if (sequence_items.at(i)->to_sequence() == olive::ActiveSequence) {
-      NewSequenceDialog nsd(this, sequence_items.at(i));
+  for (auto sequence_item : sequence_items) {
+    if (sequence_item->to_sequence() == olive::ActiveSequence) {
+      NewSequenceDialog nsd(this, sequence_item);
       nsd.exec();
       return;
     }

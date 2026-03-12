@@ -50,8 +50,8 @@ std::unique_ptr<OliveGlobal> olive::Global;
 QString olive::ActiveProjectFilename;
 QString olive::AppName;
 
-OliveGlobal::OliveGlobal() :
-  changed_since_last_autorecovery(false)
+OliveGlobal::OliveGlobal() 
+  
 {
   // sets current app name
   QString version_id;

@@ -37,22 +37,22 @@ public:
    *
    * Creates and connects to a ColorButton.
    */
-  virtual QWidget* CreateWidget(QWidget *existing = nullptr) override;
+  QWidget* CreateWidget(QWidget *existing = nullptr) override;
 
   /**
    * @brief Reimplementation of EffectField::UpdateWidgetValue()
    */
-  virtual void UpdateWidgetValue(QWidget* widget, double timecode) override;
+  void UpdateWidgetValue(QWidget* widget, double timecode) override;
 
   /**
    * @brief Reimplementation of EffectField::ConvertStringToValue()
    */
-  virtual QVariant ConvertStringToValue(const QString& s) override;
+  QVariant ConvertStringToValue(const QString& s) override;
 
   /**
    * @brief Reimplementation of EffectField::ConvertValueToString()
    */
-  virtual QString ConvertValueToString(const QVariant& v) override;
+  QString ConvertValueToString(const QVariant& v) override;
 private slots:
   /**
    * @brief Internal function connected to any QWidget made from CreateWidget() to update the value based on user input

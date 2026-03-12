@@ -59,12 +59,12 @@ public slots:
    *
    * The result of QDialog::exec(), a DialogCode result.
    */
-  virtual int exec() override;
+  int exec() override;
 private slots:
   /**
    * @brief Override of accept() to perform the selected changes on the Clips
    */
-  virtual void accept() override;
+  void accept() override;
 
   /**
    * @brief Slot when the speed percentage field is changed by the user

@@ -59,7 +59,7 @@ private slots:
    * * The Media is not a folder
    * * The Media is not the currently active Sequence
    */
-  virtual void accept() override;
+  void accept() override;
 private:
   /**
    * @brief Internal pointer to the Media we're replacing

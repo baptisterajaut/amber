@@ -39,8 +39,8 @@ void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int 
   double timecode_end;
   timecode_end = timecode_start + bytes_to_seconds(nb_bytes, frame->ch_layout.nb_channels, frame->sample_rate);
 
-  for (int j=0;j<clip->effects.size();j++) {
-    Effect* e = clip->effects.at(j).get();
+  for (const auto & effect : clip->effects) {
+    Effect* e = effect.get();
     if (e->IsEnabled()) {
       e->process_audio(timecode_start, timecode_end, frame->data[0], nb_bytes, 2);
     }

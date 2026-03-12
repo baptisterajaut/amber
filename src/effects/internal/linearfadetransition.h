@@ -26,7 +26,7 @@
 class LinearFadeTransition : public Transition {
 public:
     LinearFadeTransition(Clip* c, Clip* s, const EffectMeta* em);
-  void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes, int channel_count);
+  void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes, int channel_count) override;
 };
 
 #endif // LINEARFADETRANSITION_H

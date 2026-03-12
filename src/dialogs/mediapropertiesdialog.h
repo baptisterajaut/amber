@@ -86,7 +86,7 @@ private slots:
   /**
    * @brief Overridden accept function for saving the properties back to the Media class
    */
-  void accept();
+  void accept() override;
 };
 
 #endif // MEDIAPROPERTIESDIALOG_H

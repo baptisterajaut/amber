@@ -42,12 +42,12 @@ public slots:
 protected:
 
   // function that filters whether rows are displayed or not
-  virtual bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const;
+  bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override;
 
 private:
 
   // internal variable for whether to show sequences
-  bool show_sequences;
+  bool show_sequences{true};
 
   // search filter variable
   QString search_filter;

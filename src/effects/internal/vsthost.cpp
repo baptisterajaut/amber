@@ -102,15 +102,15 @@ intptr_t hostCallback(AEffect* effect, int32_t opcode, int32_t index, intptr_t v
 }
 
 // Plugin's entry point
-typedef AEffect *(*vstPluginFuncPtr)(audioMasterCallback host);
+using vstPluginFuncPtr = AEffect *(*)(audioMasterCallback host);
 // Plugin's getParameter() method
-typedef float (*getParameterFuncPtr)(AEffect *effect, int32_t index);
+using getParameterFuncPtr = float (*)(AEffect *effect, int32_t index);
 // Plugin's setParameter() method
-typedef void (*setParameterFuncPtr)(AEffect *effect, int32_t index, float value);
+using setParameterFuncPtr = void (*)(AEffect *effect, int32_t index, float value);
 // Plugin's processEvents() method
-typedef int32_t (*processEventsFuncPtr)(VstEvents *events);
+using processEventsFuncPtr = int32_t (*)(VstEvents *events);
 // Plugin's process() method
-typedef void (*processFuncPtr)(AEffect *effect, float **inputs, float **outputs, int32_t sampleFrames);
+using processFuncPtr = void (*)(AEffect *effect, float **inputs, float **outputs, int32_t sampleFrames);
 
 void VSTHost::loadPlugin() {
 
@@ -239,9 +239,8 @@ void VSTHost::send_data_cache_to_plugin()
 }
 
 VSTHost::VSTHost(Clip* c, const EffectMeta *em) :
-  Effect(c, em),
-  plugin(nullptr),
-  dialog(nullptr)
+  Effect(c, em)
+  
 {
   plugin = nullptr;
 

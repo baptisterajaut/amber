@@ -81,7 +81,7 @@ DeleteClipAction::DeleteClipAction(Sequence *s, int clip) {
   closing_transition = -1;
 }
 
-DeleteClipAction::~DeleteClipAction() {}
+DeleteClipAction::~DeleteClipAction() = default;
 
 void DeleteClipAction::doUndo() {
   // restore ref to clip
@@ -127,7 +127,7 @@ AddClipCommand::AddClipCommand(Sequence *s, QVector<ClipPtr>& add) {
   clips = add;
 }
 
-AddClipCommand::~AddClipCommand() {}
+AddClipCommand::~AddClipCommand() = default;
 
 void AddClipCommand::doUndo() {
   // clear effects panel
@@ -139,8 +139,8 @@ void AddClipCommand::doUndo() {
 
     if (c != nullptr) {
       // un-offset all the clips
-      for (int j=0;j<c->linked.size();j++) {
-        c->linked[j] -= link_offset_;
+      for (int & j : c->linked) {
+        j -= link_offset_;
       }
 
       // deselect the area occupied by this clip
@@ -160,14 +160,12 @@ void AddClipCommand::doUndo() {
 
 void AddClipCommand::doRedo() {
   link_offset_ = seq->clips.size();
-  for (int i=0;i<clips.size();i++) {
-    ClipPtr original = clips.at(i);
-
+  for (auto original : clips) {
     if (original != nullptr) {
 
       // offset all links by the current clip size
-      for (int j=0;j<original->linked.size();j++) {
-        original->linked[j] += link_offset_;
+      for (int & j : original->linked) {
+        j += link_offset_;
       }
 
     }
@@ -228,8 +226,8 @@ SetClipProperty::SetClipProperty(SetClipPropertyType type) : type_(type)
 
 void SetClipProperty::AddSetting(QVector<Clip *> clips, bool setting)
 {
-  for (int i=0;i<clips.size();i++) {
-    AddSetting(clips.at(i), setting);
+  for (auto clip : clips) {
+    AddSetting(clip, setting);
   }
 }
 
@@ -337,7 +335,7 @@ RemoveClipsFromClipboard::RemoveClipsFromClipboard(int index) {
   done = false;
 }
 
-RemoveClipsFromClipboard::~RemoveClipsFromClipboard() {}
+RemoveClipsFromClipboard::~RemoveClipsFromClipboard() = default;
 
 void RemoveClipsFromClipboard::doUndo() {
   clipboard.insert(pos, clip);
@@ -361,10 +359,10 @@ void RefreshClips::doUndo() {
 void RefreshClips::doRedo() {
   // close any clips currently using this media
   QVector<Media*> all_sequences = panel_project->list_all_project_sequences();
-  for (int i=0;i<all_sequences.size();i++) {
-    Sequence* s = all_sequences.at(i)->to_sequence().get();
-    for (int j=0;j<s->clips.size();j++) {
-      Clip* c = s->clips.at(j).get();
+  for (auto all_sequence : all_sequences) {
+    Sequence* s = all_sequence->to_sequence().get();
+    for (const auto & clip : s->clips) {
+      Clip* c = clip.get();
       if (c != nullptr && c->media() == media) {
         c->replaced = true;
         c->refresh();

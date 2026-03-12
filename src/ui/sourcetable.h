@@ -37,11 +37,11 @@ public:
   SourceTable(SourcesCommon& commons);
   Project* project_parent;
 protected:
-  void mousePressEvent(QMouseEvent*);
-  void mouseDoubleClickEvent(QMouseEvent *);
-  void dragEnterEvent(QDragEnterEvent *event);
-  void dragMoveEvent(QDragMoveEvent *event);
-  void dropEvent(QDropEvent *event);
+  void mousePressEvent(QMouseEvent*) override;
+  void mouseDoubleClickEvent(QMouseEvent *) override;
+  void dragEnterEvent(QDragEnterEvent *event) override;
+  void dragMoveEvent(QDragMoveEvent *event) override;
+  void dropEvent(QDropEvent *event) override;
 private slots:
   void item_click(const QModelIndex& index);
   void show_context_menu();

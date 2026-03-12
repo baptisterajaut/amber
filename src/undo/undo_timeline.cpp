@@ -161,9 +161,9 @@ void EditSequenceCommand::update() {
   // Update sequence's tooltip
   item->update_tooltip();
 
-  for (int i=0;i<seq->clips.size();i++) {
-    if (seq->clips.at(i) != nullptr) {
-      seq->clips.at(i)->refresh();
+  for (const auto & clip : seq->clips) {
+    if (clip != nullptr) {
+      clip->refresh();
     }
   }
 

@@ -51,8 +51,8 @@ ShakeEffect::ShakeEffect(Clip* c, const EffectMeta *em) : Effect(c, em) {
   frequency_val->SetDefault(5);
 
   const auto limit = std::numeric_limits<int32_t>::max();
-  for (int i=0;i<RANDOM_VAL_SIZE;i++) {
-    random_vals[i] = static_cast<double>(this->randomNumber<int32_t>()) / limit;
+  for (double & random_val : random_vals) {
+    random_val = static_cast<double>(this->randomNumber<int32_t>()) / limit;
   }
 }
 

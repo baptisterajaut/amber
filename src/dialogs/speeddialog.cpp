@@ -298,9 +298,7 @@ void SpeedDialog::frame_rate_update() {
   }
 
   // analyze audio clips
-  for (int i=0;i<clips_.size();i++) {
-    Clip* c = clips_.at(i);
-
+  for (auto c : clips_) {
     if (c->track() >= 0) {
 
       long new_clip_len = (qIsNaN(old_pc_val) || qIsNaN(pc_val)) ?
@@ -364,9 +362,7 @@ void SpeedDialog::accept() {
   long earliest_point = LONG_MAX;
   long longest_ripple = LONG_MIN;
 
-  for (int i=0;i<clips_.size();i++) {
-    Clip* c = clips_.at(i);
-
+  for (auto c : clips_) {
     // make sure the clip is closed while we're making changes
     if (c->IsOpen()) {
       c->Close(true);
@@ -392,8 +388,7 @@ void SpeedDialog::accept() {
   if (!qIsNaN(percent->value())) {
 
     // if we have a percentage value, use that on all the clips
-    for (int i=0;i<clips_.size();i++) {
-      Clip* c = clips_.at(i);
+    for (auto c : clips_) {
       set_speed(ca, c, percent->value(), ripple->isChecked(), earliest_point, longest_ripple);
     }
 
@@ -421,8 +416,7 @@ void SpeedDialog::accept() {
     }
 
     // make changes
-    for (int i=0;i<clips_.size();i++) {
-      Clip* c = clips_.at(i);
+    for (auto c : clips_) {
       if (c->track() < 0) {
         set_speed(ca, c, frame_rate->value() / c->media_frame_rate(), ripple->isChecked(), earliest_point, longest_ripple);
       } else if (can_change_all) {
@@ -431,8 +425,7 @@ void SpeedDialog::accept() {
     }
   } else if (!qIsNaN(duration->value())) {
     // simply set duration
-    for (int i=0;i<clips_.size();i++) {
-      Clip* c = clips_.at(i);
+    for (auto c : clips_) {
       set_speed(ca, c, (c->length() * c->speed().value) / duration->value(), ripple->isChecked(), earliest_point, longest_ripple);
     }
   }

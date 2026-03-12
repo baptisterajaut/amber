@@ -30,7 +30,7 @@ OliveAction::OliveAction(bool iset_window_modified) {
   set_window_modified = iset_window_modified;
 }
 
-OliveAction::~OliveAction() {}
+OliveAction::~OliveAction() = default;
 
 void OliveAction::undo() {
   doUndo();
@@ -60,7 +60,7 @@ CheckboxCommand::CheckboxCommand(QCheckBox* b) {
   done = true;
 }
 
-CheckboxCommand::~CheckboxCommand() {}
+CheckboxCommand::~CheckboxCommand() = default;
 
 void CheckboxCommand::doUndo() {
   box->setChecked(!checked);

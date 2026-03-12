@@ -26,7 +26,7 @@ public:
     /**
      * @brief ~ComboAction Destructor. Cleans up all QUndoCommand classes that have been added to it.
      */
-    virtual ~ComboAction() override;
+    ~ComboAction() override;
 
     /**
      * @brief Undo Function
@@ -37,7 +37,7 @@ public:
      * in REVERSE order to how they were added. Then calls QUndoCommand::redo() on every action added by appendPost()
      * in the order they were added (not in reverse).
      */
-    virtual void undo() override;
+    void undo() override;
 
     /**
      * @brief Redo Function
@@ -48,7 +48,7 @@ public:
      * in the order they were added. Then calls QUndoCommand::redo() on every action added by appendPost() in
      * the order they were added.
      */
-    virtual void redo() override;
+    void redo() override;
 
     /**
      * @brief Add an undo action

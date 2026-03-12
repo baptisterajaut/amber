@@ -16,9 +16,9 @@ public:
   const GLuint& buffer();
   const GLuint& texture();
 private:
-  QOpenGLContext* ctx_;
-  GLuint buffer_;
-  GLuint texture_;
+  QOpenGLContext* ctx_{nullptr};
+  GLuint buffer_{0};
+  GLuint texture_{0};
 };
 
 #endif // FRAMEBUFFEROBJECT_H

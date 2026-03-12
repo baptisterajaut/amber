@@ -421,7 +421,7 @@ private:
      * prevents an autorecovery file saving multiple times if the project hasn't actually changed since the last
      * autorecovery, but still hasn't been saved into the original file yet.
      */
-    bool changed_since_last_autorecovery;
+    bool changed_since_last_autorecovery{false};
 
 private slots:
 

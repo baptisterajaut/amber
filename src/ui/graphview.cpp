@@ -143,8 +143,7 @@ void GraphView::set_view_to_all() {
     double min_dbl = DBL_MAX;
     double max_dbl = DBL_MIN;
     for (int i=0;i<row->FieldCount();i++) {
-      for (int j=0;j<row->Field(i)->keyframes.size();j++) {
-        const EffectKeyframe& key = row->Field(i)->keyframes.at(j);
+      for (const auto & key : row->Field(i)->keyframes) {
         min_time = qMin(key.time, min_time);
         max_time = qMax(key.time, max_time);
         min_dbl = qMin(key.data.toDouble(), min_dbl);
@@ -308,8 +307,8 @@ void GraphView::paintEvent(QPaintEvent *) {
           if (last_key_x < width()) p.drawLine(last_key_x, last_key_y, width(), last_key_y);
 
           // draw keys
-          for (int j=0;j<sorted_keys.size();j++) {
-            const EffectKeyframe& key = field->keyframes.at(sorted_keys.at(j));
+          for (int sorted_key : sorted_keys) {
+            const EffectKeyframe& key = field->keyframes.at(sorted_key);
 
             int key_x = get_screen_x(key.time);
             int key_y = get_screen_y(key.data.toDouble());
@@ -330,7 +329,7 @@ void GraphView::paintEvent(QPaintEvent *) {
 
             bool selected = false;
             for (int k=0;k<selected_keys.size();k++) {
-              if (selected_keys.at(k) == sorted_keys.at(j) && selected_keys_fields.at(k) == i) {
+              if (selected_keys.at(k) == sorted_key && selected_keys_fields.at(k) == i) {
                 selected = true;
                 break;
               }
@@ -570,8 +569,7 @@ void GraphView::mouseMoveEvent(QMouseEvent *event) {
     bool hovering_key = false;
 
     for (int i=0;i<row->FieldCount();i++) {
-      for (int j=0;j<row->Field(i)->keyframes.size();j++) {
-        const EffectKeyframe& key = row->Field(i)->keyframes.at(j);
+      for (const auto & key : row->Field(i)->keyframes) {
         int key_x = get_screen_x(key.time);
         int key_y = get_screen_y(key.data.toDouble());
         QRect test_rect(
@@ -863,8 +861,8 @@ void GraphView::set_field_visibility(int field, bool b) {
 void GraphView::delete_selected_keys() {
   if (row != nullptr) {
     QVector<EffectField*> fields;
-    for (int i=0;i<selected_keys_fields.size();i++) {
-      fields.append(row->Field(selected_keys_fields.at(i)));
+    for (int selected_keys_field : selected_keys_fields) {
+      fields.append(row->Field(selected_keys_field));
     }
     delete_keyframes(fields, selected_keys);
   }

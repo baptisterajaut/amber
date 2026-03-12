@@ -47,7 +47,7 @@ public:
   KeyframeView* keyframe_area;
   TimelineHeader* header;
 protected:
-  void resizeEvent(QResizeEvent*);
+  void resizeEvent(QResizeEvent*) override;
 public slots:
   void receive_wheel_event(QWheelEvent* e);
 };
@@ -57,7 +57,7 @@ class EffectControls : public Panel
   Q_OBJECT
 public:
   explicit EffectControls(QWidget *parent = nullptr);
-  virtual ~EffectControls() override;
+  ~EffectControls() override;
 
 
   void Reload();
@@ -73,17 +73,17 @@ public:
   void delete_selected_keyframes();
   void scroll_to_frame(long frame);
 
-  double zoom;
+  double zoom{1};
 
   ResizableScrollBar* horizontalScrollBar;
   QScrollBar* verticalScrollBar;
 
   QMutex effects_loaded;
 
-  virtual void Retranslate() override;
+  void Retranslate() override;
 
-  virtual void LoadLayoutState(const QByteArray& data) override;
-  virtual QByteArray SaveLayoutState() override;
+  void LoadLayoutState(const QByteArray& data) override;
+  QByteArray SaveLayoutState() override;
 public slots:
   void cut();
   void copy(bool del = false);
@@ -103,7 +103,7 @@ private slots:
 
   void effects_area_context_menu();
 protected:
-  virtual void resizeEvent(QResizeEvent *event) override;
+  void resizeEvent(QResizeEvent *event) override;
 private:
   QVector<Clip*> selected_clips_;
   QVector<EffectUI*> open_effects_;

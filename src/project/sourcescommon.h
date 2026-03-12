@@ -60,7 +60,7 @@ private slots:
   void open_create_proxy_dialog();
   void clear_proxies_from_selected();
 private:
-  Media* editing_item;
+  Media* editing_item{nullptr};
   QModelIndex editing_index;
   QModelIndexList selected_items;
   Project* project_parent;

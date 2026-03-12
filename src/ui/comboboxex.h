@@ -26,10 +26,10 @@
 class ComboBoxEx : public QComboBox {
   Q_OBJECT
 public:
-  ComboBoxEx(QWidget* parent = nullptr);
+  explicit ComboBoxEx(QWidget* parent = nullptr);
   void setScrollingEnabled(bool b);
 protected:
-  virtual void wheelEvent(QWheelEvent* e) override;
+  void wheelEvent(QWheelEvent* e) override;
 private:
   bool scrolling_enabled_;
 };

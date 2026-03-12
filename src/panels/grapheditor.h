@@ -46,7 +46,7 @@ public:
   void delete_selected_keys();
   void select_all();
 
-  virtual void Retranslate() override;
+  void Retranslate() override;
 protected:
 private:
   GraphView* view;
@@ -55,7 +55,7 @@ private:
   QVector<LabelSlider*> field_sliders_;
   QVector<QPushButton*> field_enable_buttons;
   QLabel* current_row_desc;
-  EffectRow* row;
+  EffectRow* row{nullptr};
   KeyframeNavigator* keyframe_nav;
   QPushButton* linear_button;
   QPushButton* bezier_button;

@@ -78,7 +78,7 @@ private slots:
   /**
    * @brief Override of accept() to store the entered text string so it can be retrieved by get_string().
    */
-  virtual void accept() override;
+  void accept() override;
 
   /**
    * @brief Slot for the font_weight combobox to set the font weight based on its data value

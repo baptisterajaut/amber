@@ -44,7 +44,7 @@ protected:
   /**
    * @brief Function that runs in the other thread.
    */
-  void run();
+  void run() override;
 };
 
 #endif // EFFECTLOADERS_H

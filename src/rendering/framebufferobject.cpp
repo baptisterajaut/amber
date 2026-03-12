@@ -2,11 +2,9 @@
 
 #include <QOpenGLFunctions>
 
-FramebufferObject::FramebufferObject() :
-  buffer_(0),
-  texture_(0),
-  ctx_(nullptr)
-{}
+FramebufferObject::FramebufferObject() 
+  
+= default;
 
 FramebufferObject::~FramebufferObject()
 {

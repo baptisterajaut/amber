@@ -6,7 +6,7 @@
 class PlayButton : public QPushButton
 {
 public:
-	PlayButton(QWidget* parent = 0);
+	explicit PlayButton(QWidget* parent = nullptr);
 private:
 	QString play_text;
 	QString pause_text;

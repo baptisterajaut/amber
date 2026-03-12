@@ -171,10 +171,10 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
   long playhead = s->playhead;
 
   if (!params.nests.isEmpty()) {
-    for (int i=0;i<params.nests.size();i++) {
-      s = params.nests.at(i)->media()->to_sequence().get();
-      playhead += params.nests.at(i)->clip_in(true) - params.nests.at(i)->timeline_in(true);
-      playhead = rescale_frame_number(playhead, params.nests.at(i)->sequence->frame_rate, s->frame_rate);
+    for (auto nest : params.nests) {
+      s = nest->media()->to_sequence().get();
+      playhead += nest->clip_in(true) - nest->timeline_in(true);
+      playhead = rescale_frame_number(playhead, nest->sequence->frame_rate, s->frame_rate);
     }
 
     if (params.video && params.nests.last()->fbo != nullptr) {
@@ -189,9 +189,9 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
   QVector<Clip*> current_clips;
 
   // loop through clips, find currently active, and sort by track
-  for (int i=0;i<s->clips.size();i++) {
+  for (const auto & clip : s->clips) {
 
-    Clip* c = s->clips.at(i).get();
+    Clip* c = clip.get();
 
     if (c != nullptr) {
 
@@ -298,9 +298,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
 
   // loop through current clips
 
-  for (int i=0;i<current_clips.size();i++) {
-    Clip* c = current_clips.at(i);
-
+  for (auto c : current_clips) {
     bool got_mutex = true;
 
     if (params.wait_for_mutexes) {
@@ -715,8 +713,8 @@ int64_t playhead_to_timestamp(Clip* c, long playhead) {
 
 void close_active_clips(Sequence* s) {
   if (s != nullptr) {
-    for (int i=0;i<s->clips.size();i++) {
-      Clip* c = s->clips.at(i).get();
+    for (const auto & clip : s->clips) {
+      Clip* c = clip.get();
       if (c != nullptr) {
         c->Close(true);
       }

@@ -38,12 +38,12 @@ public:
    *
    * Creates and connects to a EmbeddedFileChooser.
    */
-  virtual QWidget* CreateWidget(QWidget *existing = nullptr) override;
+  QWidget* CreateWidget(QWidget *existing = nullptr) override;
 
   /**
    * @brief Reimplementation of EffectField::UpdateWidgetValue()
    */
-  virtual void UpdateWidgetValue(QWidget *widget, double timecode) override;
+  void UpdateWidgetValue(QWidget *widget, double timecode) override;
 private slots:
   /**
    * @brief Internal function connected to any QWidget made from CreateWidget() to update the value based on user input

@@ -56,12 +56,12 @@ protected:
   /**
    * @brief Overrides change event to trigger Retranslate() on a LanguageChange event.
    */
-  virtual void changeEvent(QEvent* e) override;
+  void changeEvent(QEvent* e) override;
   /**
    * @brief Overrides show event to trigger an update of the visual log (the visual log does not update while the
    * debug dialog is hidden).
    */
-  virtual void showEvent(QShowEvent* event) override;
+  void showEvent(QShowEvent* event) override;
 private:
   /**
    * @brief Display widget for the debug dialog.

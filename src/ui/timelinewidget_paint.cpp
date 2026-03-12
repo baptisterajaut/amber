@@ -152,8 +152,7 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
     // get widget width and height
     int video_track_limit = 0;
     int audio_track_limit = 0;
-    for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
-      ClipPtr clip = olive::ActiveSequence->clips.at(i);
+    for (auto clip : olive::ActiveSequence->clips) {
       if (clip != nullptr) {
         video_track_limit = qMin(video_track_limit, clip->track());
         audio_track_limit = qMax(audio_track_limit, clip->track());
@@ -479,8 +478,7 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
     }
 
     // Draw selections
-    for (int i=0;i<olive::ActiveSequence->selections.size();i++) {
-      const Selection& s = olive::ActiveSequence->selections.at(i);
+    for (const auto & s : olive::ActiveSequence->selections) {
       if (is_track_visible(s.track)) {
         int selection_y = getScreenPointFromTrack(s.track);
         int selection_x = panel_timeline->getTimelineScreenPointFromFrame(s.in);
@@ -530,11 +528,11 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
         int insert_x = panel_timeline->getTimelineScreenPointFromFrame(first_ghost);
         int tri_size = olive::timeline::kTrackMinHeight>>2;
 
-        for (int i=0;i<insert_points.size();i++) {
+        for (int insert_point : insert_points) {
           QPoint points[3] = {
-            QPoint(insert_x, insert_points.at(i) - tri_size),
-            QPoint(insert_x + tri_size, insert_points.at(i)),
-            QPoint(insert_x, insert_points.at(i) + tri_size)
+            QPoint(insert_x, insert_point - tri_size),
+            QPoint(insert_x + tri_size, insert_point),
+            QPoint(insert_x, insert_point + tri_size)
           };
           p.drawPolygon(points, 3);
         }

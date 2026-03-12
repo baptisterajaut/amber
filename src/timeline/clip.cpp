@@ -62,24 +62,11 @@ const int kRGBAComponentCount = 4;
 Clip::Clip(Sequence* s) :
   sequence(s),
   cacher(this),
-  enabled_(true),
-  clip_in_(0),
-  timeline_in_(0),
-  timeline_out_(0),
-  track_(0),
-  media_(nullptr),
-  reverse_(false),
+  
   autoscale_(olive::CurrentConfig.autoscale_by_default),
   opening_transition(nullptr),
-  closing_transition(nullptr),
-  undeletable(false),
-  replaced(false),
-  fbo(nullptr),
-  open_(false),
-  cacher_uses_rgba_(false),
-  texture(nullptr),
-  yuv_fbo(nullptr),
-  cached_texture_id(0)
+  closing_transition(nullptr)
+  
 {
   yuv_textures[0] = yuv_textures[1] = yuv_textures[2] = 0;
 }
@@ -99,8 +86,8 @@ ClipPtr Clip::copy(Sequence* s) {
   copy->set_speed(speed());
   copy->set_reversed(reversed());
 
-  for (int i=0;i<effects.size();i++) {
-    copy->effects.append(effects.at(i)->copy(copy.get()));
+  for (const auto & effect : effects) {
+    copy->effects.append(effect->copy(copy.get()));
   }
 
   copy->set_cached_frame_rate((this->sequence == nullptr) ? cached_frame_rate() : this->sequence->frame_rate);
@@ -227,8 +214,8 @@ void Clip::reset_audio() {
   }
   if (media() != nullptr && media()->get_type() == MEDIA_TYPE_SEQUENCE) {
     Sequence* nested_sequence = media()->to_sequence().get();
-    for (int i=0;i<nested_sequence->clips.size();i++) {
-      Clip* c = nested_sequence->clips.at(i).get();
+    for (const auto & clip : nested_sequence->clips) {
+      Clip* c = clip.get();
       if (c != nullptr) {
         c->reset_audio();
       }
@@ -250,8 +237,8 @@ void Clip::refresh() {
   replaced = false;
 
   // reinitializes all effects... just in case
-  for (int i=0;i<effects.size();i++) {
-    effects.at(i)->refresh();
+  for (const auto & effect : effects) {
+    effect->refresh();
   }
 }
 
@@ -479,14 +466,13 @@ void Clip::refactor_frame_rate(ComboAction* ca, double multiplier, bool change_t
   }
 
   // move keyframes
-  for (int i=0;i<effects.size();i++) {
-    EffectPtr e = effects.at(i);
+  for (auto e : effects) {
     for (int j=0;j<e->row_count();j++) {
       EffectRow* r = e->row(j);
       for (int l=0;l<r->FieldCount();l++) {
         EffectField* f = r->Field(l);
-        for (int k=0;k<f->keyframes.size();k++) {
-          ca->append(new SetLong(&f->keyframes[k].time, f->keyframes[k].time, qRound(f->keyframes[k].time * multiplier)));
+        for (auto & keyframe : f->keyframes) {
+          ca->append(new SetLong(&keyframe.time, keyframe.time, qRound(keyframe.time * multiplier)));
         }
       }
     }
@@ -498,8 +484,8 @@ void Clip::Open() {
     open_ = true;
     cacher_uses_rgba_ = NeedsCpuRgba();
 
-    for (int i=0;i<effects.size();i++) {
-      effects.at(i)->open();
+    for (const auto & effect : effects) {
+      effect->open();
     }
 
     // reset variable used to optimize uploading frame data
@@ -538,9 +524,9 @@ void Clip::Close(bool wait) {
     texture = nullptr;
 
     // close all effects
-    for (int i=0;i<effects.size();i++) {
-      if (effects.at(i)->is_open()) {
-        effects.at(i)->close();
+    for (const auto & effect : effects) {
+      if (effect->is_open()) {
+        effect->close();
       }
     }
 
@@ -714,8 +700,8 @@ bool Clip::Retrieve(QOpenGLShaderProgram* yuv_program)
 
         int frame_size = frame->linesize[0]*frame->height;
 
-        for (int i=0;i<effects.size();i++) {
-          Effect* e = effects.at(i).get();
+        for (const auto & effect : effects) {
+          Effect* e = effect.get();
           if ((e->Flags() & Effect::ImageFlag) && e->IsEnabled()) {
             if (data_buffer_1 == frame->data[0]) {
               data_buffer_1 = new uint8_t[frame_size];
@@ -765,8 +751,8 @@ bool Clip::UsesCacher()
 
 bool Clip::NeedsCpuRgba() const
 {
-  for (int i = 0; i < effects.size(); i++) {
-    if ((effects.at(i)->Flags() & Effect::ImageFlag) && effects.at(i)->IsEnabled()) {
+  for (const auto & effect : effects) {
+    if ((effect->Flags() & Effect::ImageFlag) && effect->IsEnabled()) {
       return true;
     }
   }
@@ -778,8 +764,6 @@ bool Clip::NeedsCacherReconfigure() const
   return open_ && (NeedsCpuRgba() != cacher_uses_rgba_);
 }
 
-ClipSpeed::ClipSpeed() :
-  value(1.0),
-  maintain_audio_pitch(false)
-{
-}
+ClipSpeed::ClipSpeed() 
+  
+= default;

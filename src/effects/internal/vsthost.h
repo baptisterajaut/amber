@@ -28,17 +28,17 @@
 #include "include/vestige.h"
 
 // Plugin's dispatcher function
-typedef intptr_t (*dispatcherFuncPtr)(AEffect *effect, int32_t opCode, int32_t index, int32_t value, void *ptr, float opt);
+using dispatcherFuncPtr = intptr_t (*)(AEffect *effect, int32_t opCode, int32_t index, int32_t value, void *ptr, float opt);
 
 class VSTHost : public Effect {
   Q_OBJECT
 public:
   VSTHost(Clip* c, const EffectMeta* em);
-  ~VSTHost();
-  void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes, int channel_count);
+  ~VSTHost() override;
+  void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes, int channel_count) override;
 
-  void custom_load(QXmlStreamReader& stream);
-  void save(QXmlStreamWriter& stream);
+  void custom_load(QXmlStreamReader& stream) override;
+  void save(QXmlStreamWriter& stream) override;
 private slots:
   void show_interface(bool show);
   void uncheck_show_button();
@@ -50,7 +50,7 @@ private:
   void loadPlugin();
   void freePlugin();
   dispatcherFuncPtr dispatcher;
-  AEffect* plugin;
+  AEffect* plugin{nullptr};
   bool configurePluginCallbacks();
   void startPlugin();
   void stopPlugin();
@@ -61,7 +61,7 @@ private:
   void CreateDialogIfNull();
   float** inputs;
   float** outputs;
-  QDialog* dialog;
+  QDialog* dialog{nullptr};
   QByteArray data_cache;
 
   void send_data_cache_to_plugin();

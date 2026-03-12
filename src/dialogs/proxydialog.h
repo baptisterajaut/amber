@@ -54,7 +54,7 @@ public slots:
    * Called when the user clicks OK on the dialog. Verifies all proxies, asking the user whether they want to overwrite
    * existing proxies if necessary, and if everything is valid, queues the footage with ProxyGenerator.
    */
-  virtual void accept() override;
+  void accept() override;
 private:
   /**
    * @brief User's desired dimensions

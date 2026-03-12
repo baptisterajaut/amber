@@ -27,8 +27,8 @@ QWidget *ComboField::CreateWidget(QWidget *existing)
 
     cb->setScrollingEnabled(false);
 
-    for (int i=0;i<items_.size();i++) {
-      cb->addItem(items_.at(i).name);
+    for (const auto & item : items_) {
+      cb->addItem(item.name);
     }
   } else {
     cb = static_cast<ComboBoxEx*>(existing);

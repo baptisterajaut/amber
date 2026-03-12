@@ -40,8 +40,7 @@ void Timeline::copy(bool del) {
   for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
     ClipPtr c = olive::ActiveSequence->clips.at(i);
     if (c != nullptr) {
-      for (int j=0;j<olive::ActiveSequence->selections.size();j++) {
-        const Selection& s = olive::ActiveSequence->selections.at(j);
+      for (const auto & s : olive::ActiveSequence->selections) {
         if (s.track == c->track() && !((c->timeline_in() <= s.in && c->timeline_out() <= s.in) || (c->timeline_in() >= s.out && c->timeline_out() >= s.out))) {
           if (!cleared) {
             clear_clipboard();
@@ -78,9 +77,9 @@ void Timeline::copy(bool del) {
     }
   }
 
-  for (int i=0;i<clipboard.size();i++) {
+  for (const auto & i : clipboard) {
     // initialize all timeline_ins to 0 or offsets of
-    ClipPtr c = std::static_pointer_cast<Clip>(clipboard.at(i));
+    ClipPtr c = std::static_pointer_cast<Clip>(i);
     c->set_timeline_in(c->timeline_in() - min_in);
     c->set_timeline_out(c->timeline_out() - min_in);
   }
@@ -117,8 +116,8 @@ void Timeline::paste(bool insert) {
       QVector<ClipPtr> pasted_clips;
       long paste_start = LONG_MAX;
       long paste_end = LONG_MIN;
-      for (int i=0;i<clipboard.size();i++) {
-        ClipPtr c = std::static_pointer_cast<Clip>(clipboard.at(i));
+      for (const auto & i : clipboard) {
+        ClipPtr c = std::static_pointer_cast<Clip>(i);
 
         // create copy of clip and offset by playhead
         ClipPtr cc = c->copy(olive::ActiveSequence.get());
@@ -186,11 +185,9 @@ void Timeline::paste(bool insert) {
 
       QVector<Clip*> selected_clips = olive::ActiveSequence->SelectedClips();
 
-      for (int i=0;i<selected_clips.size();i++) {
-        Clip* c = selected_clips.at(i);
-
-        for (int j=0;j<clipboard.size();j++) {
-          EffectPtr e = std::static_pointer_cast<Effect>(clipboard.at(j));
+      for (auto c : selected_clips) {
+        for (const auto & j : clipboard) {
+          EffectPtr e = std::static_pointer_cast<Effect>(j);
           if ((c->track() < 0) == (e->meta->subtype == EFFECT_TYPE_VIDEO)) {
             int found = -1;
             if (ask_conflict) {

@@ -41,7 +41,7 @@ class PreviewGenerator : public QThread
   Q_OBJECT
 public:
   PreviewGenerator(Media*);
-  void run();
+  void run() override;
   void cancel();
 
   static void AnalyzeMedia(Media*);

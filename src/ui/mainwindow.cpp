@@ -91,8 +91,7 @@ void MainWindow::setup_layout(bool reset) {
           // get panel name from XML attribute
           QString panel_name;
           const QXmlStreamAttributes& attributes = stream.attributes();
-          for (int i=0;i<attributes.size();i++) {
-            const QXmlStreamAttribute& attr = attributes.at(i);
+          for (const auto & attr : attributes) {
             if (attr.name() == QLatin1String("name")) {
               panel_name = attr.value().toString();
               break;
@@ -106,9 +105,8 @@ void MainWindow::setup_layout(bool reset) {
 
             bool found_panel = false;
 
-            for (int i=0;i<olive::panels.size();i++) {
+            for (auto panel : olive::panels) {
 
-              Panel* panel = olive::panels.at(i);
               if (panel->objectName() == panel_name) {
 
                 // found the panel, so we can load its state
@@ -142,8 +140,8 @@ void MainWindow::setup_layout(bool reset) {
 
   if (reset) {
     // remove all panels from the main window
-    for (int i=0;i<olive::panels.size();i++) {
-      removeDockWidget(olive::panels.at(i));
+    for (auto panel : olive::panels) {
+      removeDockWidget(panel);
     }
 
     addDockWidget(Qt::TopDockWidgetArea, panel_project);
@@ -181,8 +179,8 @@ void MainWindow::setup_layout(bool reset) {
 }
 
 MainWindow::MainWindow(QWidget *parent) :
-  QMainWindow(parent),
-  first_show(true)
+  QMainWindow(parent)
+  
 {
   olive::cursor::Initialize();
 
@@ -215,8 +213,8 @@ MainWindow::MainWindow(QWidget *parent) :
       // delete auto-recoveries older than 7 days
       QStringList old_autorecoveries = dir.entryList(QStringList("autorecovery.ove.*"), QDir::Files);
       int deleted_ars = 0;
-      for (int i=0;i<old_autorecoveries.size();i++) {
-        QString file_name = data_dir + "/" + old_autorecoveries.at(i);
+      for (const auto & old_autorecoverie : old_autorecoveries) {
+        QString file_name = data_dir + "/" + old_autorecoverie;
         qint64 file_time = QFileInfo(file_name).lastModified().toMSecsSinceEpoch();
         if (file_time < a_week_ago) {
           if (QFile(file_name).remove()) deleted_ars++;
@@ -229,8 +227,8 @@ MainWindow::MainWindow(QWidget *parent) :
       if (preview_dir.exists()) {
         deleted_ars = 0;
         QStringList old_prevs = preview_dir.entryList(QDir::Files);
-        for (int i=0;i<old_prevs.size();i++) {
-          QString file_name = preview_dir.filePath(old_prevs.at(i));
+        for (const auto & old_prev : old_prevs) {
+          QString file_name = preview_dir.filePath(old_prev);
           qint64 file_time = QFileInfo(file_name).lastRead().toMSecsSinceEpoch();
           if (file_time < a_month_ago) {
             if (QFile(file_name).remove()) deleted_ars++;
@@ -303,8 +301,7 @@ MainWindow::~MainWindow() {
 
 void kbd_shortcut_processor(QByteArray& file, QMenu* menu, bool save, bool first) {
   QList<QAction*> actions = menu->actions();
-  for (int i=0;i<actions.size();i++) {
-    QAction* a = actions.at(i);
+  for (auto a : actions) {
     if (a->menu() != nullptr) {
       kbd_shortcut_processor(file, a->menu(), save, first);
     } else if (!a->isSeparator()) {
@@ -358,8 +355,8 @@ void MainWindow::load_shortcuts(const QString& fn) {
     shortcut_path.close();
   }
   QList<QAction*> menus = menuBar()->actions();
-  for (int i=0;i<menus.size();i++) {
-    QMenu* menu = menus.at(i)->menu();
+  for (auto i : menus) {
+    QMenu* menu = i->menu();
     kbd_shortcut_processor(shortcut_bytes, menu, false, true);
   }
 }
@@ -368,8 +365,8 @@ void MainWindow::save_shortcuts(const QString& fn) {
   // save main menu actions
   QList<QAction*> menus = menuBar()->actions();
   QByteArray shortcut_file;
-  for (int i=0;i<menus.size();i++) {
-    QMenu* menu = menus.at(i)->menu();
+  for (auto i : menus) {
+    QMenu* menu = i->menu();
     kbd_shortcut_processor(shortcut_file, menu, true, false);
   }
   QFile shortcut_file_io(fn);
@@ -933,8 +930,8 @@ void MainWindow::Retranslate()
 
   // the recommended changeEvent() and event() methods of propagating language change messages provided mixed results
   // (i.e. different panels failed to translate in different sessions), so we translate them manually here
-  for (int i=0;i<olive::panels.size();i++) {
-    olive::panels.at(i)->Retranslate();
+  for (auto panel : olive::panels) {
+    panel->Retranslate();
   }
   olive::MenuHelper.Retranslate();
 
@@ -1085,13 +1082,13 @@ void MainWindow::maximize_panel() {
       temp_panel_state = saveState();
 
       // remove all dock widgets that aren't the hovered panel
-      for (int i=0;i<olive::panels.size();i++) {
-        if (olive::panels.at(i) != focused_panel) {
+      for (auto panel : olive::panels) {
+        if (panel != focused_panel) {
           // hide the panel
-          olive::panels.at(i)->setVisible(false);
+          panel->setVisible(false);
 
           // set it to floating
-          olive::panels.at(i)->setFloating(true);
+          panel->setFloating(true);
         }
       }
     }
@@ -1106,8 +1103,7 @@ void MainWindow::maximize_panel() {
 
 void MainWindow::windowMenu_About_To_Be_Shown() {
   QList<QAction*> window_actions = window_menu->actions();
-  for (int i=0;i<window_actions.size();i++) {
-    QAction* a = window_actions.at(i);
+  for (auto a : window_actions) {
     if (!a->data().isNull()) {
       a->setChecked(reinterpret_cast<QDockWidget*>(a->data().value<quintptr>())->isVisible());
     }
@@ -1175,9 +1171,7 @@ void MainWindow::toggle_panel_visibility() {
 
 void MainWindow::set_panels_locked(bool locked)
 {
-  for (int i=0;i<olive::panels.size();i++) {
-    Panel* panel = olive::panels.at(i);
-
+  for (auto panel : olive::panels) {
     if (locked) {
       // disable moving on QDockWidget
       panel->setFeatures(panel->features() & ~QDockWidget::DockWidgetMovable);

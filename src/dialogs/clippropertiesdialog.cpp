@@ -91,9 +91,7 @@ void ClipPropertiesDialog::accept()
 
   ComboAction* ca = new ComboAction();
 
-  for (int i=0;i<clips_.size();i++) {
-    Clip* clip = clips_.at(i);
-
+  for (auto clip : clips_) {
     // If the user entered a Clip name and the name is different from the Clip's name, create a rename command
     if (!clip_name.isEmpty() && clip_name != clip->name()) {
       ca->append(new RenameClipCommand(clip, clip_name));

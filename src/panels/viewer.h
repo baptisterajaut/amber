@@ -47,7 +47,7 @@ class Viewer : public Panel
 
 public:
   explicit Viewer(QWidget *parent = nullptr);
-  ~Viewer();
+  ~Viewer() override;
 
   bool is_focused();
   bool is_main_sequence();
@@ -71,7 +71,7 @@ public:
   void seek(long p);
   void play(bool in_to_out = false);
   void pause();
-  bool playing;
+  bool playing{false};
   long playhead_start;
   qint64 start_msecs;
   QTimer playback_updater;
@@ -91,7 +91,7 @@ public:
 
   ViewerWidget* viewer_widget;
 
-  Media* media;
+  Media* media{nullptr};
   SequencePtr seq;
   QVector<Marker>* marker_ref;
 
@@ -103,9 +103,9 @@ public:
 
   void initiate_drag(olive::timeline::MediaImportType drag_type);
 
-  virtual void Retranslate() override;
+  void Retranslate() override;
 protected:
-  virtual void resizeEvent(QResizeEvent *event) override;
+  void resizeEvent(QResizeEvent *event) override;
 
 public slots:
   void play_wake();
@@ -138,10 +138,10 @@ private:
   void clean_created_seq();
   void set_sequence(bool main, SequencePtr s);
   bool main_sequence;
-  bool created_sequence;
+  bool created_sequence{false};
   long cached_end_frame;
   QString panel_name;
-  double minimum_zoom;
+  double minimum_zoom{1.0};
   bool playing_in_to_out;
   long last_playhead;
   void set_zoom_value(double d);
@@ -167,11 +167,11 @@ private:
   QPushButton* video_only_button;
   QPushButton* audio_only_button;
 
-  bool cue_recording_internal;
+  bool cue_recording_internal{false};
   QTimer recording_flasher;
 
   long previous_playhead;
-  int playback_speed;
+  int playback_speed{0};
 };
 
 #endif // VIEWER_H

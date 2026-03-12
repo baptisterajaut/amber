@@ -63,13 +63,9 @@ extern "C" {
 
 Viewer::Viewer(QWidget *parent) :
   Panel(parent),
-  playing(false),
-  media(nullptr),
-  seq(nullptr),
-  created_sequence(false),
-  minimum_zoom(1.0),
-  cue_recording_internal(false),
-  playback_speed(0)
+  
+  seq(nullptr)
+  
 {
   setup_ui();
 
@@ -100,7 +96,7 @@ Viewer::Viewer(QWidget *parent) :
   update_end_timecode();
 }
 
-Viewer::~Viewer() {}
+Viewer::~Viewer() = default;
 
 void Viewer::Retranslate() {
   /// Viewer panels are retranslated through the MainWindow to differentiate Media and Sequence Viewers
@@ -129,8 +125,7 @@ void Viewer::reset_all_audio() {
   // reset all clip audio
   if (seq != nullptr) {
     long last_frame = 0;
-    for (int i=0;i<seq->clips.size();i++) {
-      ClipPtr c = seq->clips.at(i);
+    for (auto c : seq->clips) {
       if (c != nullptr) {
         c->reset_audio();
         last_frame = qMax(last_frame, c->timeline_out());

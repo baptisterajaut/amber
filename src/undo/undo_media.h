@@ -26,19 +26,19 @@
 class AddMediaCommand : public OliveAction {
 public:
   AddMediaCommand(MediaPtr iitem, Media* iparent);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   MediaPtr item;
   Media* parent;
-  bool done_;
+  bool done_{false};
 };
 
 class DeleteMediaCommand : public OliveAction {
 public:
-  DeleteMediaCommand(MediaPtr i);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit DeleteMediaCommand(MediaPtr i);
+  void doUndo() override;
+  void doRedo() override;
 private:
   MediaPtr item;
   Media* parent;
@@ -47,8 +47,8 @@ private:
 class ReplaceMediaCommand : public OliveAction {
 public:
   ReplaceMediaCommand(MediaPtr, QString);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   MediaPtr item;
   QString old_filename;
@@ -61,8 +61,8 @@ public:
   MediaMove();
   QVector<MediaPtr> items;
   Media* to;
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   QVector<Media*> froms;
 };
@@ -70,8 +70,8 @@ private:
 class MediaRename : public OliveAction {
 public:
   MediaRename(Media* iitem, QString to);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Media* item;
   QString from;
@@ -80,9 +80,9 @@ private:
 
 class UpdateFootageTooltip : public OliveAction {
 public:
-  UpdateFootageTooltip(Media* i);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit UpdateFootageTooltip(Media* i);
+  void doUndo() override;
+  void doRedo() override;
 private:
   Media* item;
 };

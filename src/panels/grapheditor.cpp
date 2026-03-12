@@ -39,7 +39,7 @@
 #include "ui/icons.h"
 #include "global/debug.h"
 
-GraphEditor::GraphEditor(QWidget* parent) : Panel(parent), row(nullptr) {
+GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   resize(720, 480);
 
   QWidget* main_widget = new QWidget(this);

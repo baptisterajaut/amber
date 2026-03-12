@@ -34,7 +34,7 @@
 
 #ifndef NOFREI0R
 #include <frei0r.h>
-typedef void (*f0rGetPluginInfo)(f0r_plugin_info_t* info);
+using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
 #endif
 
 void load_internal_effects() {
@@ -138,14 +138,14 @@ void load_shader_effects_worker(const QString& effects_path) {
   QDir effects_dir(effects_path);
   if (effects_dir.exists()) {
     QList<QString> entries = effects_dir.entryList(QStringList("*.xml"), QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
-    for (int i=0;i<entries.size();i++) {
-      QString entry_path = effects_dir.filePath(entries.at(i));
+    for (const auto & entrie : entries) {
+      QString entry_path = effects_dir.filePath(entrie);
       if (QFileInfo(entry_path).isDir()) {
         load_shader_effects_worker(entry_path);
       } else {
-        QFile file(effects_path + "/" + entries.at(i));
+        QFile file(effects_path + "/" + entrie);
         if (!file.open(QIODevice::ReadOnly)) {
-          qCritical() << "Could not open" << entries.at(i);
+          qCritical() << "Could not open" << entrie;
           return;
         }
 
@@ -155,11 +155,11 @@ void load_shader_effects_worker(const QString& effects_path) {
             QString effect_name = "";
             QString effect_cat = "";
             const QXmlStreamAttributes attr = reader.attributes();
-            for (int j=0;j<attr.size();j++) {
-              if (attr.at(j).name() == QLatin1String("name")) {
-                effect_name = attr.at(j).value().toString();
-              } else if (attr.at(j).name() == QLatin1String("category")) {
-                effect_cat = attr.at(j).value().toString();
+            for (const auto & j : attr) {
+              if (j.name() == QLatin1String("name")) {
+                effect_name = j.value().toString();
+              } else if (j.name() == QLatin1String("category")) {
+                effect_cat = j.value().toString();
               }
             }
             if (!effect_name.isEmpty()) {
@@ -173,7 +173,7 @@ void load_shader_effects_worker(const QString& effects_path) {
               em.internal = -1;
               effects.append(em);
             } else {
-              qCritical() << "Invalid effect found in" << entries.at(i);
+              qCritical() << "Invalid effect found in" << entrie;
             }
             break;
           }
@@ -189,8 +189,7 @@ void load_shader_effects_worker(const QString& effects_path) {
 void load_shader_effects() {
   QList<QString> effects_paths = get_effects_paths();
 
-  for (int h=0;h<effects_paths.size();h++) {
-    const QString& effects_path = effects_paths.at(h);
+  for (const auto & effects_path : effects_paths) {
     load_shader_effects_worker(effects_path);
   }
 }
@@ -206,13 +205,13 @@ void load_frei0r_effects_worker(const QString& dir, EffectMeta& em, QVector<QStr
   QDir search_dir(dir);
   if (search_dir.exists()) {
     QList<QString> entry_list = search_dir.entryList(QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
-    for (int j=0;j<entry_list.size();j++) {
-      QString entry_path = search_dir.filePath(entry_list.at(j));
+    for (const auto & j : entry_list) {
+      QString entry_path = search_dir.filePath(j);
       if (QFileInfo(entry_path).isDir()) {
         load_frei0r_effects_worker(entry_path, em, loaded_names);
       } else {
 
-        QString path_without_extension = search_dir.filePath(QFileInfo(entry_list.at(j)).baseName());
+        QString path_without_extension = search_dir.filePath(QFileInfo(j).baseName());
 
         QLibrary effect;
         effect.setFileName(path_without_extension);
@@ -227,7 +226,7 @@ void load_frei0r_effects_worker(const QString& dir, EffectMeta& em, QVector<QStr
                 && info.color_model == F0R_COLOR_MODEL_RGBA8888) {
               em.name = info.name;
               em.path = dir;
-              em.filename = entry_list.at(j);
+              em.filename = j;
               em.tooltip = QString("%1\n%2\n%3\n%4").arg(em.name, info.author, info.explanation, em.filename);
 
               loaded_names.append(em.name);
@@ -264,8 +263,8 @@ void load_frei0r_effects() {
   em.subtype = EFFECT_TYPE_VIDEO;
   em.internal = EFFECT_INTERNAL_FREI0R;
 
-  for (int i=0;i<effect_dirs.size();i++) {
-    load_frei0r_effects_worker(effect_dirs.at(i), em, loaded_names);
+  for (const auto & effect_dir : effect_dirs) {
+    load_frei0r_effects_worker(effect_dir, em, loaded_names);
   }
 }
 #endif

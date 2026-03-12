@@ -74,7 +74,7 @@ class ExportThread : public QThread {
   Q_OBJECT
 public:
   ExportThread(const ExportParams& params, const VideoCodecParams& vparams, QObject* parent = nullptr);
-  virtual void run() override;
+  void run() override;
 
   const QString& GetError();
 
@@ -100,25 +100,25 @@ private:
   ExportParams params_;
   VideoCodecParams vcodec_params_;
 
-  AVFormatContext* fmt_ctx;
-  AVStream* video_stream;
-  const AVCodec* vcodec;
-  AVCodecContext* vcodec_ctx;
-  AVFrame* video_frame;
-  AVFrame* sws_frame;
-  SwsContext* sws_ctx;
-  AVStream* audio_stream;
-  const AVCodec* acodec;
-  AVFrame* audio_frame;
-  AVFrame* swr_frame;
-  AVCodecContext* acodec_ctx;
+  AVFormatContext* fmt_ctx{nullptr};
+  AVStream* video_stream{nullptr};
+  const AVCodec* vcodec{nullptr};
+  AVCodecContext* vcodec_ctx{nullptr};
+  AVFrame* video_frame{nullptr};
+  AVFrame* sws_frame{nullptr};
+  SwsContext* sws_ctx{nullptr};
+  AVStream* audio_stream{nullptr};
+  const AVCodec* acodec{nullptr};
+  AVFrame* audio_frame{nullptr};
+  AVFrame* swr_frame{nullptr};
+  AVCodecContext* acodec_ctx{nullptr};
   AVPacket* video_pkt;
   AVPacket* audio_pkt;
-  SwrContext* swr_ctx;
+  SwrContext* swr_ctx{nullptr};
 
   int aframe_bytes;
   int ret;
-  char* c_filename;
+  char* c_filename{nullptr};
 
   QMutex mutex;
   QWaitCondition waitCond;

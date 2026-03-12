@@ -41,7 +41,7 @@ EffectRow::EffectRow(Effect *parent, const QString &n, bool savable, bool keyfra
   QObject(parent),
   name_(n),
   keyframable_(keyframable),
-  keyframing_(false),
+  
   savable_(savable)
 {
   Q_ASSERT(parent != nullptr);
@@ -142,8 +142,8 @@ void EffectRow::GoToPreviousKeyframe() {
     EffectField* f = Field(i);
 
     // Loop through all of this field's keyframes for a keyframe EARLIER than the playhead
-    for (int j=0;j<f->keyframes.size();j++) {
-      long comp = f->keyframes.at(j).time + time_adjustment;
+    for (const auto & keyframe : f->keyframes) {
+      long comp = keyframe.time + time_adjustment;
 
       // Get the closest keyframe
       if (comp < sequence_playhead) {
@@ -231,8 +231,8 @@ void EffectRow::GoToNextKeyframe() {
   Clip* c = GetParentEffect()->parent_clip;
   for (int i=0;i<FieldCount();i++) {
     EffectField* f = Field(i);
-    for (int j=0;j<f->keyframes.size();j++) {
-      long comp = f->keyframes.at(j).time - c->clip_in() + c->timeline_in();
+    for (const auto & keyframe : f->keyframes) {
+      long comp = keyframe.time - c->clip_in() + c->timeline_in();
       if (comp > olive::ActiveSequence->playhead) {
         key = qMin(comp, key);
       }

@@ -39,7 +39,7 @@ extern "C" {
 
 enum AVCodecID temp_enc_codec = AV_CODEC_ID_PRORES;
 
-ProxyGenerator::ProxyGenerator() : cancelled(false) {}
+ProxyGenerator::ProxyGenerator()  = default;
 
 void ProxyGenerator::transcode(const ProxyInfo& info) {
   Footage* footage = info.media->to_footage();

@@ -32,13 +32,13 @@ class TimelineHeader : public QWidget
 {
 	Q_OBJECT
 public:
-	explicit TimelineHeader(QWidget *parent = 0);
+	explicit TimelineHeader(QWidget *parent = nullptr);
 	void set_in_point(long p);
 	void set_out_point(long p);
 
 	Viewer* viewer;
 
-	bool snapping;
+	bool snapping{true};
 
 	void show_text(bool enable);
 	double get_zoom();
@@ -53,26 +53,26 @@ public slots:
 	void resized_scroll_listener(double d);
 
 protected:
-	void paintEvent(QPaintEvent*);
-	void mousePressEvent(QMouseEvent*);
-	void mouseMoveEvent(QMouseEvent*);
-	void mouseReleaseEvent(QMouseEvent*);
-	void focusOutEvent(QFocusEvent*);
+	void paintEvent(QPaintEvent*) override;
+	void mousePressEvent(QMouseEvent*) override;
+	void mouseMoveEvent(QMouseEvent*) override;
+	void mouseReleaseEvent(QMouseEvent*) override;
+	void focusOutEvent(QFocusEvent*) override;
 
 private:
 	void update_parents();
 
-	bool dragging;
+	bool dragging{false};
 
-	bool resizing_workarea;
+	bool resizing_workarea{false};
 	bool resizing_workarea_in;
 	long temp_workarea_in;
 	long temp_workarea_out;
 	long sequence_end;
 
-	double zoom;
+	double zoom{1};
 
-	long in_visible;
+	long in_visible{0};
 
 	void set_playhead(int mouse_x);
 
@@ -81,14 +81,14 @@ private:
 	QFontMetrics fm;
 
 	int drag_start;
-	bool dragging_markers;
+	bool dragging_markers{false};
 	QVector<int> selected_markers;
 	QVector<long> selected_marker_original_times;
 
 	long getHeaderFrameFromScreenPoint(int x);
 	int getHeaderScreenPointFromFrame(long frame);
 
-	int scroll;
+	int scroll{0};
 
 	int height_actual;
 	bool text_enabled;

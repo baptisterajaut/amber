@@ -31,7 +31,7 @@ class KeyframeNavigator : public QWidget
   Q_OBJECT
 public:
   KeyframeNavigator(QWidget* parent = nullptr, bool addLeftPad = true);
-  ~KeyframeNavigator();
+  ~KeyframeNavigator() override;
 
   void enable_keyframe_toggle(bool);
 public slots:

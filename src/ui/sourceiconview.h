@@ -33,8 +33,8 @@ class SourceIconDelegate;
 class SourceIconDelegate : public QStyledItemDelegate {
 public:
   SourceIconDelegate(QObject *parent = nullptr);
-  virtual QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
-  virtual void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+  QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+  void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 };
 
 class SourceIconView : public QListView {
@@ -43,11 +43,11 @@ public:
   SourceIconView(SourcesCommon& commons);
   Project* project_parent;
 
-  void mousePressEvent(QMouseEvent* event);
-  void mouseDoubleClickEvent(QMouseEvent *event);
-  void dragEnterEvent(QDragEnterEvent *event);
-  void dragMoveEvent(QDragMoveEvent *event);
-  void dropEvent(QDropEvent* event);
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseDoubleClickEvent(QMouseEvent *event) override;
+  void dragEnterEvent(QDragEnterEvent *event) override;
+  void dragMoveEvent(QDragMoveEvent *event) override;
+  void dropEvent(QDropEvent* event) override;
 signals:
   void changed_root();
 private slots:

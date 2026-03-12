@@ -44,7 +44,7 @@ public:
    *
    * Creates and connects to a QPushButton.
    */
-  virtual QWidget* CreateWidget(QWidget *existing = nullptr) override;
+  QWidget* CreateWidget(QWidget *existing = nullptr) override;
 
 public slots:
   /**

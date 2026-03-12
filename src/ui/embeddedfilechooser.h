@@ -28,7 +28,7 @@ class QLabel;
 class EmbeddedFileChooser : public QWidget {
   Q_OBJECT
 public:
-  EmbeddedFileChooser(QWidget* parent = 0);
+  EmbeddedFileChooser(QWidget* parent = nullptr);
 
   const QString& getFilename();
   void setFilename(const QString& s);

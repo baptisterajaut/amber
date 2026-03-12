@@ -10,16 +10,11 @@ ColumnedGridLayout::ColumnedGridLayout(QWidget* parent,
 void ColumnedGridLayout::Add(QWidget *widget)
 {
   if (maximum_columns_ > 0) {
-
     int row = count() / maximum_columns_;
     int column = count() % maximum_columns_;
-
     addWidget(widget, row, column);
-
   } else {
-
     addWidget(widget);
-
   }
 }
 

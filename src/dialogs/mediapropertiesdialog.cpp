@@ -54,9 +54,7 @@ MediaPropertiesDialog::MediaPropertiesDialog(QWidget *parent, Media *i) :
   row++;
 
   track_list = new QListWidget(this);
-  for (int i=0;i<f->video_tracks.size();i++) {
-    const FootageStream& fs = f->video_tracks.at(i);
-
+  for (const auto & fs : f->video_tracks) {
     QListWidgetItem* item = new QListWidgetItem(
           tr("Video %1: %2x%3 %4FPS").arg(
             QString::number(fs.file_index),
@@ -71,8 +69,7 @@ MediaPropertiesDialog::MediaPropertiesDialog(QWidget *parent, Media *i) :
     item->setData(Qt::UserRole+1, fs.file_index);
     track_list->addItem(item);
   }
-  for (int i=0;i<f->audio_tracks.size();i++) {
-    const FootageStream& fs = f->audio_tracks.at(i);
+  for (const auto & fs : f->audio_tracks) {
     QListWidgetItem* item = new QListWidgetItem(
           tr("Audio %1: %2Hz %3").arg(
             QString::number(fs.file_index),
@@ -155,17 +152,17 @@ void MediaPropertiesDialog::accept() {
     if (!data.isNull()) {
       int index = data.toInt();
       bool found = false;
-      for (int j=0;j<f->video_tracks.size();j++) {
-        if (f->video_tracks.at(j).file_index == index) {
-          f->video_tracks[j].enabled = (item->checkState() == Qt::Checked);
+      for (auto & video_track : f->video_tracks) {
+        if (video_track.file_index == index) {
+          video_track.enabled = (item->checkState() == Qt::Checked);
           found = true;
           break;
         }
       }
       if (!found) {
-        for (int j=0;j<f->audio_tracks.size();j++) {
-          if (f->audio_tracks.at(j).file_index == index) {
-            f->audio_tracks[j].enabled = (item->checkState() == Qt::Checked);
+        for (auto & audio_track : f->audio_tracks) {
+          if (audio_track.file_index == index) {
+            audio_track.enabled = (item->checkState() == Qt::Checked);
             break;
           }
         }

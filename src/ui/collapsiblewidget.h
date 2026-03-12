@@ -34,10 +34,10 @@ class CollapsibleWidgetHeader : public QWidget {
   Q_OBJECT
 public:
   CollapsibleWidgetHeader(QWidget* parent = nullptr);
-  bool selected;
+  bool selected{false};
 protected:
-  void mousePressEvent(QMouseEvent* event);
-  void paintEvent(QPaintEvent *event);
+  void mousePressEvent(QMouseEvent* event) override;
+  void paintEvent(QPaintEvent *event) override;
 signals:
   void select(bool, bool);
 };

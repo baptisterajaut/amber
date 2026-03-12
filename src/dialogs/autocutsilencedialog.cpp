@@ -122,9 +122,9 @@ void AutoCutSilenceDialog::cut_silence() {
   ComboAction* ca = new ComboAction();
 
   // Loop over clips provided to this dialog
-  for (int j=0;j<clips_.size();j++) {
+  for (int j : clips_) {
 
-    Clip* clip = olive::ActiveSequence->clips.at(clips_.at(j)).get();
+    Clip* clip = olive::ActiveSequence->clips.at(j).get();
 
     // Check if this clip is an audio footage clip
     if (clip->track() >= 0
@@ -202,7 +202,7 @@ void AutoCutSilenceDialog::cut_silence() {
         }
       }
 
-      panel_timeline->split_clip_at_positions(ca, clips_.at(j), split_positions);
+      panel_timeline->split_clip_at_positions(ca, j, split_positions);
     }
 
   }

@@ -28,8 +28,8 @@
 
 AddMediaCommand::AddMediaCommand(MediaPtr iitem, Media *iparent) :
   item(iitem),
-  parent(iparent),
-  done_(false)
+  parent(iparent)
+  
 {
   doRedo();
 }
@@ -69,10 +69,9 @@ ReplaceMediaCommand::ReplaceMediaCommand(MediaPtr i, QString s) {
 void ReplaceMediaCommand::replace(QString& filename) {
   // close any clips currently using this media
   QVector<Media*> all_sequences = panel_project->list_all_project_sequences();
-  for (int i=0;i<all_sequences.size();i++) {
-    Sequence* s = all_sequences.at(i)->to_sequence().get();
-    for (int j=0;j<s->clips.size();j++) {
-      ClipPtr c = s->clips.at(j);
+  for (auto all_sequence : all_sequences) {
+    Sequence* s = all_sequence->to_sequence().get();
+    for (auto c : s->clips) {
       if (c != nullptr && c->media() == item.get() && c->IsOpen()) {
         c->Close(true);
         c->replaced = true;
@@ -97,7 +96,7 @@ void ReplaceMediaCommand::doRedo() {
   replace(new_filename);
 }
 
-MediaMove::MediaMove() {}
+MediaMove::MediaMove() = default;
 
 void MediaMove::doUndo() {
   for (int i=0;i<items.size();i++) {

@@ -507,12 +507,12 @@ private:
   /**
    * @brief Internal enabled value
    */
-  bool enabled_;
+  bool enabled_{true};
 
   /**
    * @brief Internal column span value
    */
-  int colspan_;
+  int colspan_{1};
 
 };
 

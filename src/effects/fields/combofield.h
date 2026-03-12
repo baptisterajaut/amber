@@ -54,12 +54,12 @@ public:
    *
    * Creates and connects to a QComboBox with the set of items added in AddItem().
    */
-  virtual QWidget *CreateWidget(QWidget *existing = nullptr) override;
+  QWidget *CreateWidget(QWidget *existing = nullptr) override;
 
   /**
    * @brief Reimplementation of EffectField::UpdateWidgetValue()
    */
-  virtual void UpdateWidgetValue(QWidget* widget, double timecode) override;
+  void UpdateWidgetValue(QWidget* widget, double timecode) override;
 
 signals:
   /**

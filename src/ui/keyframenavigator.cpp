@@ -81,7 +81,7 @@ KeyframeNavigator::KeyframeNavigator(QWidget *parent, bool addLeftPad) : QWidget
   key_controls->addWidget(keyframe_enable);
 }
 
-KeyframeNavigator::~KeyframeNavigator() {}
+KeyframeNavigator::~KeyframeNavigator() = default;
 
 void KeyframeNavigator::enable_keyframes(bool b) {
   keyframe_enable->setChecked(b);

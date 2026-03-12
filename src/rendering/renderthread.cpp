@@ -34,19 +34,11 @@ namespace OCIO = OCIO_NAMESPACE;
 #include "timeline/sequence.h"
 
 RenderThread::RenderThread() :
-  gizmos(nullptr),
+  
   front_buffer_switcher(false),
-  share_ctx(nullptr),
-  ctx(nullptr),
-  blend_mode_program(nullptr),
-  premultiply_program(nullptr),
-  yuv_program(nullptr),
-  seq(nullptr),
-  tex_width(-1),
-  tex_height(-1),
-  queued(false),
-  texture_failed(false),
-  running(true)
+  
+  queued(false)
+  
 {
   surface.create();
 }

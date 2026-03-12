@@ -109,8 +109,7 @@ void ReplaceClipMediaDialog::accept() {
               use_same_media_in_points->isChecked()
               );
 
-        for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
-          ClipPtr c = olive::ActiveSequence->clips.at(i);
+        for (auto c : olive::ActiveSequence->clips) {
           if (c != nullptr && c->media() == media) {
             rcmc->clips.append(c);
           }

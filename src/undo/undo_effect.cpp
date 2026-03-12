@@ -88,7 +88,7 @@ void EffectDeleteCommand::doRedo() {
   panel_effect_controls->Reload();
 }
 
-MoveEffectCommand::MoveEffectCommand() {}
+MoveEffectCommand::MoveEffectCommand() = default;
 
 void MoveEffectCommand::doUndo() {
   clip->effects.move(to, from);
@@ -258,8 +258,8 @@ void KeyframeDelete::doRedo() {
 KeyframeAdd::KeyframeAdd(EffectField *ifield, int ii) :
   field(ifield),
   index(ii),
-  key(ifield->keyframes.at(ii)),
-  done(true)
+  key(ifield->keyframes.at(ii))
+  
 {
 }
 
@@ -276,8 +276,8 @@ void KeyframeAdd::doRedo() {
 }
 
 KeyframeDataChange::KeyframeDataChange(EffectField *field) :
-  field_(field),
-  done_(true)
+  field_(field)
+  
 {
   old_keys_ = field_->keyframes;
   old_persistent_data_ = field_->persistent_data_;

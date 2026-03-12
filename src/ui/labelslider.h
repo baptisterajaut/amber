@@ -147,9 +147,9 @@ public slots:
   void SetMaximum(double v);
 
 protected:
-  void mousePressEvent(QMouseEvent *ev);
-  void mouseMoveEvent(QMouseEvent *ev);
-  void mouseReleaseEvent(QMouseEvent *ev);
+  void mousePressEvent(QMouseEvent *ev) override;
+  void mouseMoveEvent(QMouseEvent *ev) override;
+  void mouseReleaseEvent(QMouseEvent *ev) override;
 private:
 
   /**

@@ -79,12 +79,12 @@ public:
   // get markers from internal object
   QVector<Marker>& get_markers();
 
-  bool root;
+  bool root{false};
   int temp_id;
   int temp_id2;
 
 private:
-  int type;
+  int type{-1};
   VoidPtr object;
 
   QString GetStringDuration();

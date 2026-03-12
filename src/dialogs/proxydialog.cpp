@@ -94,17 +94,17 @@ void ProxyDialog::accept() {
   // set to TRUE if any existing proxies exist and the user chooses to overwrite all of them
   bool overwrite_all_existing = false;
 
-  for (int i=0;i<selected_media.size();i++) {
+  for (auto i : selected_media) {
     // loop through selected footage and send info to the proxy queue
 
     ProxyInfo info;
 
     // fill info struct based on user input
-    info.media = selected_media.at(i);
+    info.media = i;
     info.codec_type = 0;
     info.size_multiplier = size_combobox->currentData().toDouble();
 
-    Footage* footage = selected_media.at(i)->to_footage();
+    Footage* footage = i->to_footage();
 
     QString base_footage_fn = QFileInfo(footage->url).baseName();
 
@@ -148,12 +148,12 @@ void ProxyDialog::accept() {
   }
 
   // all proxy info checks out, queue it with the proxy generator
-  for (int i=0;i<info_list.size();i++) {
-    Footage* footage = info_list.at(i).media->to_footage();
+  for (const auto & i : info_list) {
+    Footage* footage = i.media->to_footage();
     footage->proxy = true;
     footage->proxy_path.clear();
 
-    olive::proxy_generator.queue(info_list.at(i));
+    olive::proxy_generator.queue(i);
   }
 
   olive::Global->set_modified(true);

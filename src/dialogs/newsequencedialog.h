@@ -88,7 +88,7 @@ private slots:
   /**
    * @brief Override accept function to create/edit a Sequence
    */
-  virtual void accept() override;
+  void accept() override;
 
   /**
    * @brief Slot when the user changes the preset

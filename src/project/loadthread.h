@@ -36,7 +36,7 @@ class LoadThread : public QThread
   Q_OBJECT
 public:
   LoadThread(const QString& filename, bool autorecovery);
-  void run();
+  void run() override;
 public slots:
   void cancel();
 signals:
@@ -83,7 +83,7 @@ private:
   QMutex mutex;
   QWaitCondition waitCond;
 
-  bool cancelled_;
+  bool cancelled_{false};
   bool xml_error;
 
   QMessageBox::StandardButton question_btn;

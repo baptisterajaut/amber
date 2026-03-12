@@ -26,8 +26,8 @@
 class SetEffectEnabled : public OliveAction {
 public:
   SetEffectEnabled(Effect* e, bool enabled);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Effect* effect_;
   bool old_val_;
@@ -37,8 +37,8 @@ private:
 class AddEffectCommand : public OliveAction {
 public:
   AddEffectCommand(Clip* c, EffectPtr e, const EffectMeta* m, int insert_pos = -1);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Clip* clip;
   const EffectMeta* meta;
@@ -49,9 +49,9 @@ private:
 
 class EffectDeleteCommand : public OliveAction {
 public:
-  EffectDeleteCommand(Effect* e);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit EffectDeleteCommand(Effect* e);
+  void doUndo() override;
+  void doRedo() override;
 private:
   Effect* effect_;
   EffectPtr deleted_obj_;
@@ -62,8 +62,8 @@ private:
 class MoveEffectCommand : public OliveAction {
 public:
   MoveEffectCommand();
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
   Clip* clip;
   int from;
   int to;
@@ -72,8 +72,8 @@ public:
 class SetEffectData : public OliveAction {
 public:
   SetEffectData(Effect* e, const QByteArray &s);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Effect* effect;
   QByteArray data;
@@ -82,15 +82,15 @@ private:
 
 class ReloadEffectsCommand : public OliveAction {
 public:
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 };
 
 class SetIsKeyframing : public OliveAction {
 public:
   SetIsKeyframing(EffectRow* irow, bool ib);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   EffectRow* row;
   bool b;
@@ -99,8 +99,8 @@ private:
 class AddTransitionCommand : public OliveAction {
 public:
   AddTransitionCommand(Clip* iopen, Clip* iclose, TransitionPtr copy, const EffectMeta* itransition, int ilength);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Clip* open_;
   Clip* close_;
@@ -115,8 +115,8 @@ private:
 class ModifyTransitionCommand : public OliveAction {
 public:
   ModifyTransitionCommand(TransitionPtr t, long ilength);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   TransitionPtr transition_ref_;
   long new_length_;
@@ -125,9 +125,9 @@ private:
 
 class DeleteTransitionCommand : public OliveAction {
 public:
-  DeleteTransitionCommand(TransitionPtr t);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit DeleteTransitionCommand(TransitionPtr t);
+  void doUndo() override;
+  void doRedo() override;
 private:
   TransitionPtr transition_ref_;
   Clip* opened_clip_;
@@ -137,8 +137,8 @@ private:
 class KeyframeDelete : public OliveAction {
 public:
   KeyframeDelete(EffectField* ifield, int iindex);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   EffectField* field;
   int index;
@@ -149,23 +149,23 @@ private:
 class KeyframeAdd : public OliveAction {
 public:
   KeyframeAdd(EffectField* ifield, int ii);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   EffectField* field;
   int index;
   EffectKeyframe key;
-  bool done;
+  bool done{true};
 };
 
 class KeyframeDataChange : public OliveAction {
 public:
-  KeyframeDataChange(EffectField* field);
+  explicit KeyframeDataChange(EffectField* field);
 
   void SetNewKeyframes();
 
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 
 private:
   EffectField* field_;
@@ -173,7 +173,7 @@ private:
   QVector<EffectKeyframe> new_keys_;
   QVariant old_persistent_data_;
   QVariant new_persistent_data_;
-  bool done_;
+  bool done_{true};
 };
 
 #endif // UNDO_EFFECT_H

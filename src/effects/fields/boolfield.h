@@ -37,22 +37,22 @@ public:
    *
    * Creates and connects to a QCheckBox.
    */
-  virtual QWidget* CreateWidget(QWidget *existing = nullptr) override;
+  QWidget* CreateWidget(QWidget *existing = nullptr) override;
 
   /**
    * @brief Reimplementation of EffectField::UpdateWidgetValue()
    */
-  virtual void UpdateWidgetValue(QWidget* widget, double timecode) override;
+  void UpdateWidgetValue(QWidget* widget, double timecode) override;
 
   /**
    * @brief Reimplementation of EffectField::ConvertStringToValue()
    */
-  virtual QVariant ConvertStringToValue(const QString& s) override;
+  QVariant ConvertStringToValue(const QString& s) override;
 
   /**
    * @brief Reimplementation of EffectField::ConvertValueToString()
    */
-  virtual QString ConvertValueToString(const QVariant& v) override;
+  QString ConvertValueToString(const QVariant& v) override;
 signals:
   /**
    * @brief Emitted whenever the UI widget's boolean value has changed

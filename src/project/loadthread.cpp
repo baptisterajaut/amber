@@ -39,8 +39,8 @@
 
 LoadThread::LoadThread(const QString& filename, bool autorecovery) :
   filename_(filename),
-  autorecovery_(autorecovery),
-  cancelled_(false)
+  autorecovery_(autorecovery)
+  
 {
   connect(this, &QThread::finished, this, &QObject::deleteLater);
 
@@ -78,8 +78,8 @@ void LoadThread::load_effect(QXmlStreamReader& stream, Clip* c) {
 
       // Find the clip with the ID referenced in the transition
       int clip_id = attr.value().toInt();
-      for (int i=0;i<c->sequence->clips.size();i++) {
-        Clip* test_clip = c->sequence->clips.at(i).get();
+      for (const auto & clip : c->sequence->clips) {
+        Clip* test_clip = clip.get();
         if (test_clip->load_id == clip_id) {
           sharing_clip = test_clip;
           break;
@@ -490,10 +490,10 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
                   switch (media_type) {
                   case MEDIA_TYPE_FOOTAGE:
                     if (media_id >= 0 && stream_id >= 0) {
-                      for (int j=0;j<loaded_media_items.size();j++) {
-                        Footage* m = loaded_media_items.at(j)->to_footage();
+                      for (auto loaded_media_item : loaded_media_items) {
+                        Footage* m = loaded_media_item->to_footage();
                         if (m->save_id == media_id) {
-                          c->set_media(loaded_media_items.at(j), stream_id);
+                          c->set_media(loaded_media_item, stream_id);
                           break;
                         }
                       }
@@ -594,8 +594,8 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
 
 Media* LoadThread::find_loaded_folder_by_id(int id) {
   if (id == 0) return nullptr;
-  for (int j=0;j<loaded_folders.size();j++) {
-    Media* parent_item = loaded_folders.at(j).get();
+  for (const auto & loaded_folder : loaded_folders) {
+    Media* parent_item = loaded_folder.get();
     if (parent_item->temp_id == id) {
       return parent_item;
     }
@@ -604,8 +604,7 @@ Media* LoadThread::find_loaded_folder_by_id(int id) {
 }
 
 void LoadThread::OrganizeFolders(int folder) {
-  for (int i=0;i<loaded_folders.size();i++) {
-    MediaPtr item = loaded_folders.at(i);
+  for (auto item : loaded_folders) {
     int parent_id = item->temp_id2;
 
     if (parent_id == folder) {
@@ -693,12 +692,12 @@ void LoadThread::run() {
       cont = false;
     } else {
       // attach nested sequence clips to their sequences
-      for (int i=0;i<loaded_clips.size();i++) {
-        for (int j=0;j<loaded_sequences.size();j++) {
-          if (loaded_clips.at(i)->media() == nullptr
-              && loaded_clips.at(i)->media_stream_index() == loaded_sequences.at(j)->to_sequence()->save_id) {
-            loaded_clips.at(i)->set_media(loaded_sequences.at(j), loaded_clips.at(i)->media_stream_index());
-            loaded_clips.at(i)->refresh();
+      for (const auto & loaded_clip : loaded_clips) {
+        for (auto loaded_sequence : loaded_sequences) {
+          if (loaded_clip->media() == nullptr
+              && loaded_clip->media_stream_index() == loaded_sequence->to_sequence()->save_id) {
+            loaded_clip->set_media(loaded_sequence, loaded_clip->media_stream_index());
+            loaded_clip->refresh();
             break;
           }
         }
@@ -709,8 +708,8 @@ void LoadThread::run() {
   if (cont) {
     emit success(); // run in main thread
 
-    for (int i=0;i<loaded_media_items.size();i++) {
-      PreviewGenerator::AnalyzeMedia(loaded_media_items.at(i));
+    for (auto loaded_media_item : loaded_media_items) {
+      PreviewGenerator::AnalyzeMedia(loaded_media_item);
     }
   } else {
     if (error_str.isEmpty()) {

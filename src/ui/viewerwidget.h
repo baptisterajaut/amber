@@ -46,21 +46,21 @@ class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions
   Q_OBJECT
 public:
   ViewerWidget(QWidget *parent = nullptr);
-  ~ViewerWidget();
+  ~ViewerWidget() override;
 
   void close_window();
   void wait_until_render_is_paused();
 
-  void paintGL();
-  void initializeGL();
+  void paintGL() override;
+  void initializeGL() override;
   Viewer* viewer;
   ViewerContainer* container;
 
-  bool waveform;
+  bool waveform{false};
   ClipPtr waveform_clip;
   const FootageStream* waveform_ms;
-  double waveform_zoom;
-  int waveform_scroll;
+  double waveform_zoom{1.0};
+  int waveform_scroll{0};
 
   void frame_update();
   RenderThread* get_renderer();
@@ -69,28 +69,28 @@ public slots:
   void set_waveform_scroll(int s);
   void set_fullscreen(int screen = 0);
 protected:
-  void mousePressEvent(QMouseEvent *event);
-  void mouseMoveEvent(QMouseEvent *event);
-  void mouseReleaseEvent(QMouseEvent *event);
-  void wheelEvent(QWheelEvent* event);
+  void mousePressEvent(QMouseEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
+  void mouseReleaseEvent(QMouseEvent *event) override;
+  void wheelEvent(QWheelEvent* event) override;
 private:
   void draw_waveform_func();
   void draw_title_safe_area();
   void draw_gizmos();
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
   void move_gizmos(QMouseEvent *event, bool done);
-  bool dragging;
+  bool dragging{false};
   void seek_from_click(int x);
-  Effect* gizmos;
+  Effect* gizmos{nullptr};
   int drag_start_x;
   int drag_start_y;
   int gizmo_x_mvmt;
   int gizmo_y_mvmt;
-  EffectGizmo* selected_gizmo;
+  EffectGizmo* selected_gizmo{nullptr};
   RenderThread* renderer;
   ViewerWindow* window;
-  double x_scroll;
-  double y_scroll;
+  double x_scroll{0};
+  double y_scroll{0};
 public slots:
   void queue_repaint();
 

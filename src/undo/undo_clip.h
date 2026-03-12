@@ -26,8 +26,8 @@
 class MoveClipAction : public OliveAction {
 public:
   MoveClipAction(Clip* c, long iin, long iout, long iclip_in, int itrack, bool irelative);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Clip* clip;
 
@@ -47,9 +47,9 @@ private:
 class DeleteClipAction : public OliveAction {
 public:
   DeleteClipAction(Sequence* s, int clip);
-  virtual ~DeleteClipAction() override;
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  ~DeleteClipAction() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Sequence* seq;
   ClipPtr ref;
@@ -65,9 +65,9 @@ private:
 class AddClipCommand : public OliveAction {
 public:
   AddClipCommand(Sequence* s, QVector<ClipPtr>& add);
-  virtual ~AddClipCommand() override;
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  ~AddClipCommand() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Sequence* seq;
   QVector<ClipPtr> clips;
@@ -77,8 +77,8 @@ private:
 class ReplaceClipMediaCommand : public OliveAction {
 public:
   ReplaceClipMediaCommand(Media *, Media *, bool);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
   QVector<ClipPtr> clips;
 private:
   Media* old_media;
@@ -97,9 +97,9 @@ enum SetClipPropertyType {
 
 class SetClipProperty : public OliveAction {
 public:
-  SetClipProperty(SetClipPropertyType type);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit SetClipProperty(SetClipPropertyType type);
+  void doUndo() override;
+  void doRedo() override;
   void AddSetting(QVector<Clip *> clips, bool setting);
   void AddSetting(Clip *c, bool setting);
 private:
@@ -113,8 +113,8 @@ private:
 class SetSpeedAction : public OliveAction {
 public:
   SetSpeedAction(Clip* c, double speed);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Clip* clip;
   double old_speed;
@@ -124,8 +124,8 @@ private:
 class RenameClipCommand : public OliveAction {
 public:
   RenameClipCommand(Clip* clip, QString new_name);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   QString old_name_;
   QString new_name_;
@@ -134,10 +134,10 @@ private:
 
 class RemoveClipsFromClipboard : public OliveAction {
 public:
-  RemoveClipsFromClipboard(int index);
-  virtual ~RemoveClipsFromClipboard() override;
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit RemoveClipsFromClipboard(int index);
+  ~RemoveClipsFromClipboard() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   int pos;
   ClipPtr clip;
@@ -146,9 +146,9 @@ private:
 
 class RefreshClips : public OliveAction {
 public:
-  RefreshClips(Media* m);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit RefreshClips(Media* m);
+  void doUndo() override;
+  void doRedo() override;
 private:
   Media* media;
 };
@@ -156,8 +156,8 @@ private:
 class LinkCommand : public OliveAction {
 public:
   LinkCommand();
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
   Sequence* s;
   QVector<int> clips;
   bool link;

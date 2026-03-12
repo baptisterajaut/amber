@@ -33,9 +33,9 @@ class AutoCutSilenceDialog : public QDialog
 public:
   AutoCutSilenceDialog(QWidget* parent, QVector<int> clips);
 public slots:
-  virtual int exec() override;
+  int exec() override;
 private slots:
-  virtual void accept() override;
+  void accept() override;
 private:
   void cut_silence();
 

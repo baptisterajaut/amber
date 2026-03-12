@@ -121,7 +121,7 @@ public:
    * Once the thread has started, all Cacher functions will be called from here until the Cacher closes at which point
    * it will close and exit gracefully.
    */
-  void run();
+  void run() override;
 
   /**
    * @brief Open the cacher
@@ -360,12 +360,12 @@ private:
   /**
    * @brief FFmpeg format/file context - used for media decoding
    */
-  AVFormatContext* formatCtx;
+  AVFormatContext* formatCtx{nullptr};
 
   /**
    * @brief FFmpeg decoder context - used for media decoding
    */
-  AVCodecContext* codecCtx;
+  AVCodecContext* codecCtx{nullptr};
 
   /**
    * @brief FFmpeg hardware device context for GPU-accelerated decoding (nullptr if software)
@@ -380,7 +380,7 @@ private:
   /**
    * @brief FFmpeg packet - used for media decoding
    */
-  AVPacket* pkt;
+  AVPacket* pkt{nullptr};
 
   /**
    * @brief FFmpeg frame - used for media decoding
@@ -388,7 +388,7 @@ private:
    * This is usually used as a raw decoded frame before the RGBA conversion/AVFilter stack. Converted/filtered frames go
    * into Cacher::queue.
    */
-  AVFrame* frame_;
+  AVFrame* frame_{nullptr};
 
   /**
    * @brief Retrieved frame reference for Retrieve()
@@ -406,7 +406,7 @@ private:
    * here if necessary (e.g. yadif for deinterlacing). GLSL effects are preferred when available since FFmpeg filters
    * aren't always fast enough for realtime playback.
    */
-  AVFilterGraph* filter_graph;
+  AVFilterGraph* filter_graph{nullptr};
 
   /**
    * @brief FFmpeg buffer source
@@ -430,7 +430,7 @@ private:
   /**
    * @brief Options set by the cacher for FFmpeg's decoders (settings like multithreading or other optimizations)
    */
-  AVDictionary* opts;
+  AVDictionary* opts{nullptr};
 
   // audio playback variables
   /**

@@ -31,8 +31,8 @@ void Timeline::split_clip_at_positions(ComboAction* ca, int clip_index, QVector<
   // Add the clip and each of its links to the pre_splits array
   Clip* clip = olive::ActiveSequence->clips.at(clip_index).get();
   pre_splits.append(clip_index);
-  for (int i=0;i<clip->linked.size();i++)   {
-    pre_splits.append(clip->linked.at(i));
+  for (int i : clip->linked)   {
+    pre_splits.append(i);
   }
 
   std::sort(positions.begin(), positions.end());
@@ -64,9 +64,9 @@ void Timeline::split_clip_at_positions(ComboAction* ca, int clip_index, QVector<
     }
   }
 
-  for (int i=0;i<post_splits.size();i++) {
-    relink_clips_using_ids(pre_splits, post_splits[i]);
-    ca->append(new AddClipCommand(olive::ActiveSequence.get(), post_splits[i]));
+  for (auto & post_split : post_splits) {
+    relink_clips_using_ids(pre_splits, post_split);
+    ca->append(new AddClipCommand(olive::ActiveSequence.get(), post_split));
   }
 
 }
@@ -175,8 +175,7 @@ bool Timeline::split_clip_and_relink(ComboAction *ca, int clip, long frame, bool
         bool original_clip_is_selected = c->IsSelected();
 
         // find linked clips of old clip
-        for (int i=0;i<c->linked.size();i++) {
-          int l = c->linked.at(i);
+        for (int l : c->linked) {
           if (!split_cache.contains(l)) {
             Clip* link = olive::ActiveSequence->clips.at(l).get();
             if ((original_clip_is_selected && link->IsSelected()) || !original_clip_is_selected) {
@@ -255,8 +254,7 @@ bool Timeline::split_selection(ComboAction* ca) {
   for (int j=0;j<olive::ActiveSequence->clips.size();j++) {
     ClipPtr clip = olive::ActiveSequence->clips.at(j);
     if (clip != nullptr) {
-      for (int i=0;i<olive::ActiveSequence->selections.size();i++) {
-        const Selection& s = olive::ActiveSequence->selections.at(i);
+      for (const auto & s : olive::ActiveSequence->selections) {
         if (s.track == clip->track()) {
           ClipPtr post_b = split_clip(ca, true, j, s.out);
           ClipPtr post_a = split_clip(ca, true, j, s.in);

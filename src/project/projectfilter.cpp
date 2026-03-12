@@ -26,8 +26,8 @@
 #include <QDebug>
 
 ProjectFilter::ProjectFilter(QObject *parent) :
-  QSortFilterProxyModel(parent),
-  show_sequences(true)
+  QSortFilterProxyModel(parent)
+  
 {}
 
 bool ProjectFilter::get_show_sequences() {
@@ -76,8 +76,8 @@ bool ProjectFilter::filterAcceptsRow(int source_row, const QModelIndex &source_p
         if (media->get_type() == MEDIA_TYPE_SEQUENCE
                 || media->get_type() == MEDIA_TYPE_FOOTAGE) {
             QVector<Marker>& markers = media->get_markers();
-            for (int i=0;i<markers.size();i++) {
-                if (markers.at(i).name.contains(search_filter, Qt::CaseInsensitive)) {
+            for (const auto & marker : markers) {
+                if (marker.name.contains(search_filter, Qt::CaseInsensitive)) {
                     marker_contains_search = true;
                     break;
                 }

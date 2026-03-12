@@ -9,7 +9,7 @@ public:
   RichTextEffect(Clip* c, const EffectMeta *em);
   void redraw(double timecode) override;
 protected:
-  virtual bool AlwaysUpdate() override;
+  bool AlwaysUpdate() override;
 private:
   StringField* text_val;
   DoubleField* padding_field;

@@ -125,7 +125,7 @@ protected:
   /**
    * @brief Override of QListWidget's double click event that emits a signal.
    */
-  void mouseDoubleClickEvent(QMouseEvent *);
+  void mouseDoubleClickEvent(QMouseEvent *) override;
 signals:
   /**
    * @brief Signal emitted when a QListWidget item is double clicked.
@@ -154,7 +154,7 @@ protected:
    * @brief Override of QLineEdit's key press event that listens for up/down key presses.
    * @param event
    */
-  void keyPressEvent(QKeyEvent * event);
+  void keyPressEvent(QKeyEvent * event) override;
 signals:
   /**
    * @brief Emitted when the user presses the up arrow key.

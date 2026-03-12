@@ -64,24 +64,24 @@ public:
   /**
    * @brief Reimplementation of EffectField::ConvertStringToValue()
    */
-  virtual QVariant ConvertStringToValue(const QString& s) override;
+  QVariant ConvertStringToValue(const QString& s) override;
 
   /**
    * @brief Reimplementation of EffectField::ConvertValueToString()
    */
-  virtual QString ConvertValueToString(const QVariant& v) override;
+  QString ConvertValueToString(const QVariant& v) override;
 
   /**
    * @brief Reimplementation of EffectField::CreateWidget()
    *
    * Creates and connects to a LabelSlider.
    */
-  virtual QWidget* CreateWidget(QWidget *existing = nullptr) override;
+  QWidget* CreateWidget(QWidget *existing = nullptr) override;
 
   /**
    * @brief Reimplementation of EffectField::UpdateWidgetValue()
    */
-  virtual void UpdateWidgetValue(QWidget* widget, double timecode) override;
+  void UpdateWidgetValue(QWidget* widget, double timecode) override;
 signals:
   /**
    * @brief Signal emitted when the field's maximum value has changed
@@ -136,28 +136,28 @@ private:
    *
    * \see SetDefault().
    */
-  double default_;
+  double default_{0};
 
   /**
    * @brief Internal display type value
    *
    * \see SetDisplayType().
    */
-  LabelSlider::DisplayType display_type_;
+  LabelSlider::DisplayType display_type_{LabelSlider::Normal};
 
   /**
    * @brief Internal frame rate value
    *
    * \see SetFrameRate().
    */
-  double frame_rate_;
+  double frame_rate_{30};
 
   /**
    * @brief Internal value used to allow SetDefault() to set the value as well if none has been set
    *
    * Initialized to FALSE, then set to TRUE indefinitely whenever the value gets set on this field.
    */
-  bool value_set_;
+  bool value_set_{false};
 
   /**
    * @brief An internal KeyframeDataChange undoable command
@@ -166,7 +166,7 @@ private:
    * the undo stack. Instead an undo command can be created at the start of a drag, and then pushed at the end
    * to make it one single undoable action.
    */
-  KeyframeDataChange* kdc_;
+  KeyframeDataChange* kdc_{nullptr};
 private slots:
   /**
    * @brief Connected to EffectField::Changed() to ensure value_set_ gets set to TRUE whenever a value is set on this

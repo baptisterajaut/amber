@@ -13,7 +13,7 @@ class ColumnedGridLayout : public QGridLayout
 {
   Q_OBJECT
 public:
-  ColumnedGridLayout(QWidget* parent = nullptr,
+  explicit ColumnedGridLayout(QWidget* parent = nullptr,
                      int maximum_columns = 0);
 
   void Add(QWidget* widget);

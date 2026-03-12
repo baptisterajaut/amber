@@ -51,21 +51,8 @@ ExportThread::ExportThread(const ExportParams &params,
   QThread(parent),
   params_(params),
   vcodec_params_(vparams),
-  interrupt_(false),
-  fmt_ctx(nullptr),
-  video_stream(nullptr),
-  vcodec(nullptr),
-  vcodec_ctx(nullptr),
-  video_frame(nullptr),
-  sws_ctx(nullptr),
-  audio_stream(nullptr),
-  acodec(nullptr),
-  audio_frame(nullptr),
-  sws_frame(nullptr),
-  swr_frame(nullptr),
-  acodec_ctx(nullptr),
-  swr_ctx(nullptr),
-  c_filename(nullptr)
+  interrupt_(false)
+  
 {
   // Create offscreen surface for rendering while exporting
   surface.create();

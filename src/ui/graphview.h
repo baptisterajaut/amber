@@ -34,11 +34,11 @@ class GraphView : public QWidget {
 public:
   GraphView(QWidget* parent = nullptr);
 
-  void paintEvent(QPaintEvent *event);
-  void mousePressEvent(QMouseEvent *event);
-  void mouseMoveEvent(QMouseEvent *event);
-  void mouseReleaseEvent(QMouseEvent *event);
-  void wheelEvent(QWheelEvent *event);
+  void paintEvent(QPaintEvent *event) override;
+  void mousePressEvent(QMouseEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
+  void mouseReleaseEvent(QMouseEvent *event) override;
+  void wheelEvent(QWheelEvent *event) override;
 
   void set_row(EffectRow* r);
 

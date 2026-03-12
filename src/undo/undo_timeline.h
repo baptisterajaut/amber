@@ -26,8 +26,8 @@
 class RippleAction : public OliveAction {
 public:
   RippleAction(Sequence* is, long ipoint, long ilength, const QVector<int>& iignore);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Sequence* s;
   long point;
@@ -38,9 +38,9 @@ private:
 
 class ChangeSequenceAction : public OliveAction {
 public:
-  ChangeSequenceAction(SequencePtr s);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit ChangeSequenceAction(SequencePtr s);
+  void doUndo() override;
+  void doRedo() override;
 private:
   SequencePtr old_sequence;
   SequencePtr new_sequence;
@@ -49,8 +49,8 @@ private:
 class SetTimelineInOutCommand : public OliveAction {
 public:
   SetTimelineInOutCommand(Sequence* s, bool enabled, long in, long out);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Sequence* seq;
 
@@ -65,9 +65,9 @@ private:
 
 class SetSelectionsCommand : public OliveAction {
 public:
-  SetSelectionsCommand(Sequence* s);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit SetSelectionsCommand(Sequence* s);
+  void doUndo() override;
+  void doRedo() override;
   QVector<Selection> old_data;
   QVector<Selection> new_data;
 private:
@@ -78,8 +78,8 @@ private:
 class EditSequenceCommand : public OliveAction {
 public:
   EditSequenceCommand(Media *i, SequencePtr s);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
   void update();
 
   QString name;
@@ -103,8 +103,8 @@ private:
 class AddMarkerAction : public OliveAction {
 public:
   AddMarkerAction(QVector<Marker>* m, long t, QString n);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   QVector<Marker>* active_array;
   long time;
@@ -116,8 +116,8 @@ private:
 class MoveMarkerAction : public OliveAction {
 public:
   MoveMarkerAction(Marker* m, long o, long n);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  void doUndo() override;
+  void doRedo() override;
 private:
   Marker* marker;
   long old_time;
@@ -126,9 +126,9 @@ private:
 
 class DeleteMarkerAction : public OliveAction {
 public:
-  DeleteMarkerAction(QVector<Marker>* m);
-  virtual void doUndo() override;
-  virtual void doRedo() override;
+  explicit DeleteMarkerAction(QVector<Marker>* m);
+  void doUndo() override;
+  void doRedo() override;
   QVector<int> markers;
 private:
   QVector<Marker>* active_array;

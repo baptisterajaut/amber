@@ -44,13 +44,13 @@ class RenderThread : public QThread {
   Q_OBJECT
 public:
   RenderThread();
-  ~RenderThread();
-  void run();
+  ~RenderThread() override;
+  void run() override;
 
   QMutex* get_texture_mutex();
   const GLuint& get_texture();
 
-  Effect* gizmos;
+  Effect* gizmos{nullptr};
   void paint();
   void start_render(QOpenGLContext* share,
                     Sequence *s,
@@ -92,11 +92,11 @@ private:
   QMutex main_thread_lock_;
 
   QOffscreenSurface surface;
-  QOpenGLContext* share_ctx;
-  QOpenGLContext* ctx;
-  QOpenGLShaderProgram* blend_mode_program;
-  QOpenGLShaderProgram* premultiply_program;
-  QOpenGLShaderProgram* yuv_program;
+  QOpenGLContext* share_ctx{nullptr};
+  QOpenGLContext* ctx{nullptr};
+  QOpenGLShaderProgram* blend_mode_program{nullptr};
+  QOpenGLShaderProgram* premultiply_program{nullptr};
+  QOpenGLShaderProgram* yuv_program{nullptr};
 
   FramebufferObject back_buffer_1;
   FramebufferObject back_buffer_2;
@@ -105,14 +105,14 @@ private:
   GLuint ocio_lut_texture;
   QOpenGLShaderProgram* ocio_shader;
 
-  Sequence* seq;
+  Sequence* seq{nullptr};
   int playback_speed_;
   int divider;
-  int tex_width;
-  int tex_height;
+  int tex_width{-1};
+  int tex_height{-1};
   QAtomicInt queued;
-  bool texture_failed;
-  bool running;
+  bool texture_failed{false};
+  bool running{true};
   QString save_fn;
   GLvoid *pixel_buffer;
   int pixel_buffer_linesize;

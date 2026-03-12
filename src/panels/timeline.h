@@ -107,7 +107,7 @@ class Timeline : public Panel
   Q_OBJECT
 public:
   explicit Timeline(QWidget *parent = nullptr);
-  virtual ~Timeline() override;
+  ~Timeline() override;
 
   bool focused();
   void multiply_zoom(double m);
@@ -142,73 +142,73 @@ public:
 
   // shared information
   int tool;
-  long cursor_frame;
-  int cursor_track;
-  double zoom;
-  bool zoom_just_changed;
+  long cursor_frame{0};
+  int cursor_track{0};
+  double zoom{1.0};
+  bool zoom_just_changed{false};
   long drag_frame_start;
   int drag_track_start;
   void update_effect_controls();
-  bool showing_all;
+  bool showing_all{false};
   double old_zoom;
 
   int GetTrackHeight(int track);
   void SetTrackHeight(int track, int height);
 
   // snapping
-  bool snapping;
-  bool snapped;
-  long snap_point;
+  bool snapping{true};
+  bool snapped{false};
+  long snap_point{0};
 
   // selecting functions
-  bool selecting;
+  bool selecting{false};
   int selection_offset;
   void delete_selection(QVector<Selection> &selections, bool ripple);
   void select_all();
-  bool rect_select_init;
-  bool rect_select_proc;
+  bool rect_select_init{false};
+  bool rect_select_proc{false};
   QRect rect_select_rect;
 
   // moving
-  bool moving_init;
-  bool moving_proc;
+  bool moving_init{false};
+  bool moving_proc{false};
   QVector<Ghost> ghosts;
   bool video_ghosts;
   bool audio_ghosts;
-  bool move_insert;
+  bool move_insert{false};
 
   // trimming
-  int trim_target;
-  TrimType trim_type;
+  int trim_target{-1};
+  TrimType trim_type{TRIM_NONE};
   int transition_select;
 
   // splitting
-  bool splitting;
+  bool splitting{false};
   QVector<int> split_tracks;
   QVector<int> split_cache;
 
   // importing
-  bool importing;
-  bool importing_files;
+  bool importing{false};
+  bool importing_files{false};
 
   // creating variables
-  bool creating;
+  bool creating{false};
   int creating_object;
 
   // transition variables
-  bool transition_tool_init;
-  bool transition_tool_proc;
-  int transition_tool_open_clip;
-  int transition_tool_close_clip;
+  bool transition_tool_init{false};
+  bool transition_tool_proc{false};
+  int transition_tool_open_clip{-1};
+  int transition_tool_close_clip{-1};
   const EffectMeta* transition_tool_meta;
   int transition_tool_side;
 
   // hand tool variables
-  bool hand_moving;
+  bool hand_moving{false};
   int drag_x_start;
   int drag_y_start;
 
-  bool block_repaints;
+  bool block_repaints{false};
 
   TimelineHeader* headers;
   AudioMonitor* audio_monitor;
@@ -229,9 +229,9 @@ public:
 
   bool can_ripple_empty_space(long frame, int track);
 
-  virtual void Retranslate() override;
+  void Retranslate() override;
 protected:
-  virtual void resizeEvent(QResizeEvent *event) override;
+  void resizeEvent(QResizeEvent *event) override;
 public slots:
   void paste(bool insert = false);
   void repaint_timeline();
@@ -281,7 +281,7 @@ private:
   QVector<QPushButton*> tool_buttons;
   void decheck_tool_buttons(QObject* sender);
   void set_tool(int tool);
-  int scroll;
+  int scroll{0};
   void set_sb_max();
   void UpdateTitle();
 

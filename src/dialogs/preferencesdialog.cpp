@@ -99,9 +99,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent) :
 
 void PreferencesDialog::setup_kbd_shortcut_worker(QMenu* menu, QTreeWidgetItem* parent) {
   QList<QAction*> actions = menu->actions();
-  for (int i=0;i<actions.size();i++) {
-    QAction* a = actions.at(i);
-
+  for (auto a : actions) {
     if (!a->isSeparator() && a->property("keyignore").isNull()) {
       QTreeWidgetItem* item = new QTreeWidgetItem(parent);
       item->setText(0, a->text().replace("&", ""));
@@ -129,9 +127,7 @@ void PreferencesDialog::delete_previews(char type) {
     preview_path.removeRecursively();
   } else {
     QStringList preview_file_list = preview_path.entryList(QDir::Files | QDir::NoDotAndDotDot);
-    for (int i=0;i<preview_file_list.size();i++) {
-
-      const QString& preview_file_str = preview_file_list.at(i);
+    for (const auto & preview_file_str : preview_file_list) {
 
       // use filename to determine whether this is a thumbnail or a waveform
       int identifier_char_index = qMax(0, preview_file_str.size()-2);
@@ -164,8 +160,8 @@ void PreferencesDialog::AddBoolPair(QCheckBox *ui, bool *value, bool restart_req
 void PreferencesDialog::setup_kbd_shortcuts(QMenuBar* menubar) {
   QList<QAction*> menus = menubar->actions();
 
-  for (int i=0;i<menus.size();i++) {
-    QMenu* menu = menus.at(i)->menu();
+  for (auto i : menus) {
+    QMenu* menu = i->menu();
 
     QTreeWidgetItem* item = new QTreeWidgetItem(keyboard_tree);
     item->setText(0, menu->title().replace("&", ""));
@@ -320,8 +316,8 @@ void PreferencesDialog::accept() {
   }
 
   // Save keyboard shortcuts
-  for (int i=0;i<key_shortcut_fields.size();i++) {
-    key_shortcut_fields.at(i)->set_action_shortcut();
+  for (auto key_shortcut_field : key_shortcut_fields) {
+    key_shortcut_field->set_action_shortcut();
   }
 
   // Audio settings may require the audio device to be re-initiated.
@@ -364,8 +360,8 @@ void PreferencesDialog::reset_all_shortcuts() {
         tr("Confirm Reset All Shortcuts"),
         tr("Are you sure you wish to reset all keyboard shortcuts to their defaults?"),
         QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
-    for (int i=0;i<key_shortcut_fields.size();i++) {
-      key_shortcut_fields.at(i)->reset_to_default();
+    for (auto key_shortcut_field : key_shortcut_fields) {
+      key_shortcut_field->reset_to_default();
     }
   }
 }
@@ -418,8 +414,8 @@ void PreferencesDialog::load_shortcut_file() {
     if (f.exists() && f.open(QFile::ReadOnly)) {
       QByteArray ba = f.readAll();
       f.close();
-      for (int i=0;i<key_shortcut_fields.size();i++) {
-        int index = ba.indexOf(key_shortcut_fields.at(i)->action_name().toUtf8());
+      for (auto key_shortcut_field : key_shortcut_fields) {
+        int index = ba.indexOf(key_shortcut_field->action_name().toUtf8());
         if (index == 0 || (index > 0 && ba.at(index-1) == '\n')) {
           while (index < ba.size() && ba.at(index) != '\t') index++;
           QString ks;
@@ -428,9 +424,9 @@ void PreferencesDialog::load_shortcut_file() {
             ks.append(ba.at(index));
             index++;
           }
-          key_shortcut_fields.at(i)->setKeySequence(ks);
+          key_shortcut_field->setKeySequence(ks);
         } else {
-          key_shortcut_fields.at(i)->reset_to_default();
+          key_shortcut_field->reset_to_default();
         }
       }
     } else {
@@ -449,8 +445,8 @@ void PreferencesDialog::save_shortcut_file() {
     QFile f(fn);
     if (f.open(QFile::WriteOnly)) {
       bool start = true;
-      for (int i=0;i<key_shortcut_fields.size();i++) {
-        QString s = key_shortcut_fields.at(i)->export_shortcut();
+      for (auto key_shortcut_field : key_shortcut_fields) {
+        QString s = key_shortcut_field->export_shortcut();
         if (!s.isEmpty()) {
           if (!start) f.write("\n");
           f.write(s.toUtf8());
@@ -515,16 +511,16 @@ void PreferencesDialog::setup_ui() {
   QList<QString> translation_paths = get_language_paths();
 
   // iterate through all language search paths
-  for (int j=0;j<translation_paths.size();j++) {
-    QDir translation_dir(translation_paths.at(j));
+  for (const auto & translation_path : translation_paths) {
+    QDir translation_dir(translation_path);
     if (translation_dir.exists()) {
       QStringList translation_files = translation_dir.entryList({"*.qm"}, QDir::Files | QDir::NoDotAndDotDot);
-      for (int i=0;i<translation_files.size();i++) {
+      for (const auto & translation_file : translation_files) {
         // get path of translation relative to the application path
-        QString locale_full_path = translation_dir.filePath(translation_files.at(i));
+        QString locale_full_path = translation_dir.filePath(translation_file);
         QString locale_relative_path = QDir(get_app_path()).relativeFilePath(locale_full_path);
 
-        QFileInfo locale_file(translation_files.at(i));
+        QFileInfo locale_file(translation_file);
         QString locale_file_basename = locale_file.baseName();
         QString locale_str = locale_file_basename.mid(locale_file_basename.lastIndexOf('_')+1);
         language_combobox->addItem(QLocale(locale_str).nativeLanguageName(), locale_relative_path);
@@ -767,10 +763,10 @@ void PreferencesDialog::setup_ui() {
   // list all available audio output devices
   QList<QAudioDevice> devs = QMediaDevices::audioOutputs();
   bool found_preferred_device = false;
-  for (int i=0;i<devs.size();i++) {
-    audio_output_devices->addItem(devs.at(i).description(), devs.at(i).description());
+  for (const auto & dev : devs) {
+    audio_output_devices->addItem(dev.description(), dev.description());
     if (!found_preferred_device
-        && devs.at(i).description() == olive::CurrentConfig.preferred_audio_output) {
+        && dev.description() == olive::CurrentConfig.preferred_audio_output) {
       audio_output_devices->setCurrentIndex(audio_output_devices->count()-1);
       found_preferred_device = true;
     }
@@ -790,10 +786,10 @@ void PreferencesDialog::setup_ui() {
   // list all available audio input devices
   devs = QMediaDevices::audioInputs();
   found_preferred_device = false;
-  for (int i=0;i<devs.size();i++) {
-    audio_input_devices->addItem(devs.at(i).description(), devs.at(i).description());
+  for (const auto & dev : devs) {
+    audio_input_devices->addItem(dev.description(), dev.description());
     if (!found_preferred_device
-        && devs.at(i).description() == olive::CurrentConfig.preferred_audio_input) {
+        && dev.description() == olive::CurrentConfig.preferred_audio_input) {
       audio_input_devices->setCurrentIndex(audio_input_devices->count()-1);
       found_preferred_device = true;
     }

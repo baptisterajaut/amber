@@ -39,12 +39,12 @@ public:
    *
    * Creates and connects to a QComboBox.
    */
-  virtual QWidget *CreateWidget(QWidget *existing = nullptr) override;
+  QWidget *CreateWidget(QWidget *existing = nullptr) override;
 
   /**
    * @brief Reimplementation of EffectField::UpdateWidgetValue()
    */
-  virtual void UpdateWidgetValue(QWidget* widget, double timecode) override;
+  void UpdateWidgetValue(QWidget* widget, double timecode) override;
 
 private:
   /**
