@@ -16,7 +16,7 @@ makedepends=(
   'cmake'
   'qt6-tools'
 )
-conflicts=('olive-editor')
+conflicts=('olive')
 source=("git+ssh://git@github.com/baptisterajaut/amber.git#branch=0.1.x")
 sha256sums=('SKIP')
 

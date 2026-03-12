@@ -55,7 +55,14 @@ jobs:
           path: amber-setup.exe
 
   macos:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
 
@@ -102,12 +109,12 @@ jobs:
         run: |
           cd build
           hdiutil create -volname "Amber" -srcfolder Amber.app -ov -format UDZO \
-            "Amber-${{ env.VERSION }}-arm64.dmg"
+            "Amber-${{ env.VERSION }}-${{ matrix.arch }}.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: macos-package
+          name: macos-package-${{ matrix.arch }}
           path: build/Amber-*.dmg
 
   release:
