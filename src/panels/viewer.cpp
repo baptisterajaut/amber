@@ -440,6 +440,14 @@ void Viewer::pause() {
   playback_updater.stop();
   playback_speed = 0;
 
+  // Flush audio buffer on pause to prevent stale samples from playing
+  clear_audio_ibuffer();
+
+  // Reset VU meter immediately (null-check: panel_timeline is created after Viewer in alloc_panels)
+  if (panel_timeline != nullptr && panel_timeline->audio_monitor != nullptr) {
+    panel_timeline->audio_monitor->clear();
+  }
+
   if (is_recording_cued()) {
     uncue_recording();
 

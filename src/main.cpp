@@ -99,6 +99,11 @@ int main(int argc, char *argv[]) {
     qInstallMessageHandler(debug_message_handler);
   }
 
+  // Work around Qt 6.10 PipeWire backend bug: Bluetooth audio sinks are not
+  // enumerated.  Force the PulseAudio backend which works correctly through
+  // pipewire-pulse.  Safe on native PulseAudio systems and no-ops on Windows/macOS.
+  qputenv("QT_AUDIO_BACKEND", "pulseaudio");
+
   QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 
   QSurfaceFormat format;

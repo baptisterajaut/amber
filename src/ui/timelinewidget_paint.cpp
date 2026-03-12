@@ -35,19 +35,24 @@
 bool current_tool_shows_cursor();
 
 void draw_waveform(ClipPtr clip, const FootageStream* ms, long media_length, QPainter *p, const QRect& clip_rect, int waveform_start, int waveform_limit, double zoom) {
+  if (ms->audio_channels <= 0 || ms->audio_preview.size() < 2) return;
+
   // audio channels multiplied by the number of bytes in a 16-bit audio sample
   int divider = ms->audio_channels*2;
 
   int channel_height = clip_rect.height()/ms->audio_channels;
 
   int last_waveform_index = -1;
+  int preview_size = ms->audio_preview.size();
 
   for (int i=waveform_start;i<waveform_limit;i++) {
-    int waveform_index = qFloor((((clip->clip_in() + (double(i)/zoom))/media_length) * ms->audio_preview.size())/divider)*divider;
+    int waveform_index = qFloor((((clip->clip_in() + (double(i)/zoom))/media_length) * preview_size)/divider)*divider;
 
     if (clip->reversed()) {
-      waveform_index = ms->audio_preview.size() - waveform_index - (ms->audio_channels * 2);
+      waveform_index = preview_size - waveform_index - (ms->audio_channels * 2);
     }
+
+    if (waveform_index < 0 || waveform_index >= preview_size) continue;
 
     if (last_waveform_index < 0) last_waveform_index = waveform_index;
 
@@ -59,10 +64,12 @@ void draw_waveform(ClipPtr clip, const FootageStream* ms, long media_length, QPa
       int offset_range_min = qMin(offset_range_start, offset_range_end);
       int offset_range_max = qMax(offset_range_start, offset_range_end);
 
+      if (offset_range_min < 0 || offset_range_min + 1 >= preview_size) continue;
+
       qint8 min = qint8(qRound(double(ms->audio_preview.at(offset_range_min)) / 128.0 * (channel_height/2)));
       qint8 max = qint8(qRound(double(ms->audio_preview.at(offset_range_min+1)) / 128.0 * (channel_height/2)));
 
-      if ((offset_range_max + 1) < ms->audio_preview.size()) {
+      if ((offset_range_max + 1) < preview_size) {
 
         // for waveform drawings, we get the maximum below 0 and maximum above 0 for this waveform range
         for (int k=offset_range_min+2;k<=offset_range_max;k+=2) {

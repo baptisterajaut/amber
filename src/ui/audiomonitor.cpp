@@ -46,7 +46,9 @@ AudioMonitor::AudioMonitor(QWidget *parent) :
 }
 
 void AudioMonitor::set_value(const QVector<double> &ivalues) {
+  values_mutex.lock();
   values = ivalues;
+  values_mutex.unlock();
   update();
 
   QMetaObject::invokeMethod(&clear_timer, "start", Qt::QueuedConnection);
@@ -55,7 +57,9 @@ void AudioMonitor::set_value(const QVector<double> &ivalues) {
 void AudioMonitor::clear() {
   clear_timer.stop();
 
+  values_mutex.lock();
   values.fill(1);
+  values_mutex.unlock();
   update();
 }
 
@@ -68,31 +72,34 @@ void AudioMonitor::resizeEvent(QResizeEvent *e) {
 }
 
 void AudioMonitor::paintEvent(QPaintEvent *) {
-  if (olive::ActiveSequence != nullptr && values.size() > 0) {
-    QPainter p(this);
-    int channel_x = AUDIO_MONITOR_GAP;
-    int channel_count = values.size();
-    int channel_width = (width()/channel_count) - AUDIO_MONITOR_GAP;
-    int i;
-    for (i=0;i<channel_count;i++) {
-      QRect r(channel_x, AUDIO_MONITOR_PEAK_HEIGHT + AUDIO_MONITOR_GAP, channel_width, height());
-      p.fillRect(r, gradient);
+  if (olive::ActiveSequence != nullptr) {
+    QMutexLocker locker(&values_mutex);
+    if (values.size() > 0) {
+      QPainter p(this);
+      int channel_x = AUDIO_MONITOR_GAP;
+      int channel_count = values.size();
+      int channel_width = (width()/channel_count) - AUDIO_MONITOR_GAP;
+      int i;
+      for (i=0;i<channel_count;i++) {
+        QRect r(channel_x, AUDIO_MONITOR_PEAK_HEIGHT + AUDIO_MONITOR_GAP, channel_width, height());
+        p.fillRect(r, gradient);
 
-      bool peak = false;
+        bool peak = false;
 
-      r.setHeight(qRound(r.height()*(values.at(i))));
-      peak = (r.height() == 0);
+        r.setHeight(qRound(r.height()*(values.at(i))));
+        peak = (r.height() == 0);
 
-      QRect peak_rect(channel_x, 0, channel_width, AUDIO_MONITOR_PEAK_HEIGHT);
-      if (peak) {
-        p.fillRect(peak_rect, QColor(255, 0, 0));
-      } else {
-        p.fillRect(peak_rect, QColor(64, 0, 0));
+        QRect peak_rect(channel_x, 0, channel_width, AUDIO_MONITOR_PEAK_HEIGHT);
+        if (peak) {
+          p.fillRect(peak_rect, QColor(255, 0, 0));
+        } else {
+          p.fillRect(peak_rect, QColor(64, 0, 0));
+        }
+
+        p.fillRect(r, QColor(0, 0, 0, 160));
+
+        channel_x += channel_width + AUDIO_MONITOR_GAP;
       }
-
-      p.fillRect(r, QColor(0, 0, 0, 160));
-
-      channel_x += channel_width + AUDIO_MONITOR_GAP;
     }
   }
 }

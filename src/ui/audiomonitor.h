@@ -23,6 +23,7 @@
 
 #include <QWidget>
 #include <QTimer>
+#include <QMutex>
 
 /**
  * @brief The AudioMonitor class
@@ -83,6 +84,7 @@ private:
    * @brief Internal value storage
    */
   QVector<double> values;
+  QMutex values_mutex;
 
   /**
    * @brief Internal timer to clear the audio monitor after a certain amount of time
@@ -92,7 +94,7 @@ private:
    */
   QTimer clear_timer;
 
-private slots:
+public slots:
   /**
    * @brief Slot to clear the audio monitor
    */

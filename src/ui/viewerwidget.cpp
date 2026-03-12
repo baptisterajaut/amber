@@ -248,6 +248,7 @@ void ViewerWidget::seek_from_click(int x) {
 }
 
 void ViewerWidget::context_destroy() {
+  if (!isValid()) return;
   makeCurrent();
   if (viewer->seq != nullptr) {
     close_active_clips(viewer->seq.get());

@@ -9,28 +9,47 @@ permissions:
   contents: write
 
 env:
-  VERSION: "1.0.0"
+  VERSION: "1.0.1"
 
 jobs:
-  ubuntu:
+  ubuntu-deb:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build .deb + AppImage
+      - name: Build .deb
         run: |
           docker build \
             -f packaging/linux/ubuntu.dockerfile \
             --build-arg VERSION=${{ env.VERSION }} \
             --build-arg GIT_HASH=$(git rev-parse --short HEAD) \
-            --target both \
             --output type=local,dest=./out \
             .
 
-      - name: Upload artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ubuntu-packages
+          name: ubuntu-deb
+          path: out/
+
+  appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build AppImage
+        run: |
+          docker build \
+            -f packaging/linux/appimage.dockerfile \
+            --build-arg VERSION=${{ env.VERSION }} \
+            --build-arg GIT_HASH=$(git rev-parse --short HEAD) \
+            --output type=local,dest=./out \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: appimage
           path: out/
 
   windows:
@@ -118,7 +137,7 @@ jobs:
           path: build/Amber-*.dmg
 
   release:
-    needs: [ubuntu, windows, macos]
+    needs: [ubuntu-deb, appimage, windows, macos]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     steps:
