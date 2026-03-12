@@ -16,7 +16,8 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x`, por
 - Windows cross-compilation via Fedora mingw64
 - Hardware-accelerated video decoding (VAAPI on Linux, D3D11VA on Windows, VideoToolbox on macOS)
 - GPU YUV→RGB conversion via OpenGL shader (bypasses CPU format conversion for YUV420P/NV12 frames)
-- Various bug fixes (first-export audio corruption, race conditions, null pointers, memory leaks, Frei0r init, phantom audio on silent tracks, …)
+- AppImage uses Qt 6.10 (native PipeWire audio backend) via aqtinstall; Ubuntu .deb stays on system Qt 6.4
+- Various bug fixes (first-export audio corruption, race conditions, null pointers, memory leaks, Frei0r init, phantom audio on pause, waveform crash, VU meter thread safety, …)
 
 ## Packages
 
@@ -36,8 +37,11 @@ cmake --build build -j$(nproc)
 ## Build (Docker)
 
 ```bash
-# Ubuntu 24.04 .deb + AppImage
-docker buildx build -f packaging/linux/ubuntu.dockerfile --target both --output type=local,dest=./out .
+# Ubuntu 24.04 .deb
+docker buildx build -f packaging/linux/ubuntu.dockerfile --output type=local,dest=./out .
+
+# AppImage (Qt 6.10 + PipeWire audio)
+docker buildx build -f packaging/linux/appimage.dockerfile --output type=local,dest=./out .
 
 # Debian 12 .deb
 docker buildx build -f packaging/linux/debian.dockerfile --target package --output type=local,dest=./out .

@@ -21,9 +21,11 @@ No test suite exists in this branch.
 
 All packages at https://github.com/baptisterajaut/amber/releases
 
-Docker multi-stage builds (build stage compiles, package stage produces artifact):
+Docker builds (build stage compiles, package stage produces artifact via `FROM scratch` + `--output`):
 - `packaging/linux/debian.dockerfile` — Debian 12 `.deb` (`--target package`)
-- `packaging/linux/ubuntu.dockerfile` — Ubuntu 24.04 `.deb` (`--target deb`) + AppImage (`--target appimage`), shared build stage
+- `packaging/linux/ubuntu.dockerfile` — Ubuntu 24.04 `.deb` (system Qt 6.4, single-stage)
+- `packaging/linux/appimage.dockerfile` — AppImage (Qt 6.10 via aqtinstall, native PipeWire audio)
+- `packaging/linux/dev.dockerfile` — dev iterative AppImage build (volume mounts, cmake cache persistence)
 - `packaging/windows/cross-compile.dockerfile` — Windows NSIS installer via Fedora mingw64 (`--target package`)
 - `packaging/linux/PKGBUILD` — Arch, run with `makepkg` natively
 
@@ -35,6 +37,9 @@ Tested on Arch Linux only. Debian, Ubuntu, AppImage and Windows builds are best-
 
 - **FFmpeg compat**: `#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)` guards needed for `avcodec_get_supported_config()` (replaces `codec->pix_fmts`/`codec->sample_fmts`). `#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)` for `AV_FRAME_FLAG_INTERLACED`.
 - **Qt 6.4 compat**: `QStringView == "literal"` doesn't compile on Qt 6.4 (Debian/Ubuntu). All `stream.name()`, `attr.name()`, `attr.value()`, `reader.name()` comparisons must use `QLatin1String()` wrapper.
+- **Qt 6.10 PipeWire audio backend**: Does not enumerate Bluetooth audio sinks. Workaround: `qputenv("QT_AUDIO_BACKEND", "pulseaudio")` in `main.cpp` forces PulseAudio engine (works through `pipewire-pulse`). Safe no-op on Windows/macOS.
+- **AppImage VAAPI**: `libva` must NOT be bundled in the AppImage (`--exclude-library "libva*"`). The host's libva loads its own GPU-specific drivers; bundling the container's libva breaks driver discovery.
+- **AppImage FFmpeg ABI**: Qt 6.10 bundles FFmpeg 7.x. `FindFFMPEG.cmake` uses `NO_CMAKE_PATH` to prevent cmake from finding Qt's FFmpeg instead of the system one. Removing Qt's `libffmpegmediaplugin.so` before linuxdeploy avoids bundling a second FFmpeg.
 - **Cacher reconfigure**: Adding/removing an ImageFlag effect (e.g. Frei0r) on a clip requires closing and reopening the clip so the cacher switches between YUV and RGBA pipeline. This is handled by `NeedsCacherReconfigure()` in `compose_sequence()`.
 - **Frei0r dimensions**: Frei0r instances are constructed with fixed dimensions. If `media_width()`/`media_height()` aren't available yet (project load before media analysis), `process_image()` lazily reconstructs the instance when dimensions change.
 
