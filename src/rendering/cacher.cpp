@@ -285,31 +285,72 @@ void Cacher::OpenWorker() {
         qCritical() << "Could not create audio buffer source";
         audio_filter_ok = false;
       }
-      if (audio_filter_ok && avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out", nullptr, nullptr, filter_graph) < 0) {
-        qCritical() << "Could not create audio buffer sink";
+
+      // Compute target sample rate early — needed for buffersink options
+      int target_sample_rate = current_audio_freq();
+      double playback_speed_ = 1.0;
+      if (audio_filter_ok) {
+        playback_speed_ = clip->speed().value * m->speed;
+        if (!qFuzzyCompare(playback_speed_, 1.0) && !clip->speed().maintain_audio_pitch) {
+          target_sample_rate = qRound64(target_sample_rate / playback_speed_);
+        }
+      }
+
+      // FFmpeg 8+ requires abuffersink options to be set BEFORE initialization.
+      // Use avfilter_graph_alloc_filter + set options + avfilter_init_str.
+      if (audio_filter_ok) {
+        buffersink_ctx = avfilter_graph_alloc_filter(filter_graph, avfilter_get_by_name("abuffersink"), "out");
+        if (buffersink_ctx == nullptr) {
+          qCritical() << "Could not create audio buffer sink";
+          audio_filter_ok = false;
+        }
+      }
+
+      if (audio_filter_ok) {
+        // Set sample format — try new option name first (FFmpeg 7.1+), then legacy (FFmpeg 5/6)
+        const char* fmt_name = av_get_sample_fmt_name(kDestSampleFmt);
+        if (av_opt_set(buffersink_ctx, "sample_formats", fmt_name, AV_OPT_SEARCH_CHILDREN) < 0) {
+          enum AVSampleFormat sample_fmts[] = { kDestSampleFmt, static_cast<AVSampleFormat>(-1) };
+          if (av_opt_set_bin(buffersink_ctx, "sample_fmts",
+                             reinterpret_cast<const uint8_t*>(sample_fmts), sizeof(sample_fmts),
+                             AV_OPT_SEARCH_CHILDREN) < 0) {
+            qCritical() << "Could not set output sample format";
+            audio_filter_ok = false;
+          }
+        }
+      }
+
+      if (audio_filter_ok) {
+        // Set channel layout
+        if (av_opt_set(buffersink_ctx, "channel_layouts", "stereo", AV_OPT_SEARCH_CHILDREN) < 0) {
+          if (av_opt_set(buffersink_ctx, "ch_layouts", "stereo", AV_OPT_SEARCH_CHILDREN) < 0) {
+            qCritical() << "Could not set output channel layout";
+            audio_filter_ok = false;
+          }
+        }
+      }
+
+      if (audio_filter_ok) {
+        // Set sample rate
+        char rate_str[16];
+        snprintf(rate_str, sizeof(rate_str), "%d", target_sample_rate);
+        if (av_opt_set(buffersink_ctx, "samplerates", rate_str, AV_OPT_SEARCH_CHILDREN) < 0) {
+          int sample_rates[] = { target_sample_rate, 0 };
+          if (av_opt_set_bin(buffersink_ctx, "sample_rates",
+                             reinterpret_cast<const uint8_t*>(sample_rates), sizeof(sample_rates),
+                             AV_OPT_SEARCH_CHILDREN) < 0) {
+            qCritical() << "Could not set output sample rates";
+            audio_filter_ok = false;
+          }
+        }
+      }
+
+      if (audio_filter_ok && avfilter_init_str(buffersink_ctx, nullptr) < 0) {
+        qCritical() << "Could not initialize audio buffer sink";
         audio_filter_ok = false;
       }
 
       if (audio_filter_ok) {
-        enum AVSampleFormat sample_fmts[] = { kDestSampleFmt,  static_cast<AVSampleFormat>(-1) };
-        if (av_opt_set_int_list(buffersink_ctx, "sample_fmts", sample_fmts, -1, AV_OPT_SEARCH_CHILDREN) < 0) {
-          qCritical() << "Could not set output sample format";
-          audio_filter_ok = false;
-        }
-      }
-
-      if (audio_filter_ok) {
-        if (av_opt_set(buffersink_ctx, "ch_layouts", "stereo", AV_OPT_SEARCH_CHILDREN) < 0) {
-          qCritical() << "Could not set output channel layout";
-          audio_filter_ok = false;
-        }
-      }
-
-      if (audio_filter_ok) {
-        int target_sample_rate = current_audio_freq();
-
-        double playback_speed_ = clip->speed().value * m->speed;
-
         if (qFuzzyCompare(playback_speed_, 1.0)) {
           avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
         } else if (clip->speed().maintain_audio_pitch) {
@@ -341,14 +382,7 @@ void Cacher::OpenWorker() {
 
           avfilter_link(last_filter, 0, buffersink_ctx, 0);
         } else {
-          target_sample_rate = qRound64(target_sample_rate / playback_speed_);
           avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
-        }
-
-        int sample_rates[] = { target_sample_rate, 0 };
-        if (av_opt_set_int_list(buffersink_ctx, "sample_rates", sample_rates, 0, AV_OPT_SEARCH_CHILDREN) < 0) {
-          qCritical() << "Could not set output sample rates";
-          audio_filter_ok = false;
         }
       }
 
@@ -560,6 +594,7 @@ AVFrame *Cacher::Retrieve()
 
   // check if there's a frame ready to be shown by the cacher
 
+  int attempts = 0;
   while (retrieved_frame == nullptr) {
 
     if (clip->cache_lock.tryLock()) {
@@ -571,8 +606,14 @@ AVFrame *Cacher::Retrieve()
 
     } else {
 
-      // cacher is running, wait for it to give a frame
-      retrieve_wait_.wait(&retrieve_lock_);
+      // cacher is running, wait for it to give a frame (with timeout to avoid deadlock
+      // when the cacher finishes without producing a frame, e.g. missing/corrupt media)
+      if (!retrieve_wait_.wait(&retrieve_lock_, 500)) {
+        if (++attempts >= 4) {
+          qWarning() << "Timed out waiting for frame from cacher on clip" << clip->name();
+          break;
+        }
+      }
 
     }
 

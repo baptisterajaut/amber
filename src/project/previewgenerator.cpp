@@ -84,8 +84,22 @@ void PreviewGenerator::parse_media() {
           && fmt_ctx_->streams[i]->codecpar->height > 0) {
 
         // heuristic to determine if video is a still image (if it is, we treat it differently in the playback/render process)
+        bool is_still_image = false;
+
         if (fmt_ctx_->streams[i]->avg_frame_rate.den == 0
-            && fmt_ctx_->streams[i]->codecpar->codec_id != AV_CODEC_ID_DNXHD) { // silly hack but this is the only scenario i've seen this
+            && fmt_ctx_->streams[i]->codecpar->codec_id != AV_CODEC_ID_DNXHD) {
+          is_still_image = true;
+        }
+
+        // FFmpeg wraps single images (JPEG, PNG, etc.) in the "image2" demuxer even when
+        // avg_frame_rate is non-zero. Check the format name as a more reliable indicator.
+        if (!is_still_image && fmt_ctx_->iformat != nullptr
+            && QString(fmt_ctx_->iformat->name).contains(QLatin1String("image2"))
+            && !footage_->url.contains('%')) {
+          is_still_image = true;
+        }
+
+        if (is_still_image) {
           if (footage_->url.contains('%')) {
             // must be an image sequence
             ms.video_frame_rate = 25;

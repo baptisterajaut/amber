@@ -314,16 +314,20 @@ void Cacher::CacheVideoWorker() {
 
         } else {
 
-          // Frame has no timestamp — skip it and try the next one.
-          // This commonly happens after seeking in certain codecs (e.g. H.264).
+          // Frame has no timestamp. For still images (JPEG, PNG, etc.) this is expected —
+          // assign PTS 0 so the frame is usable. For video codecs this can happen after
+          // seeking; in that case use the target PTS as a reasonable approximation.
 
-          qWarning() << clip->name() << "frame had no PTS value";
-          av_frame_free(&decoded_frame);
+          decoded_frame->pts = target_pts;
 
           if (retrieve_code == AVERROR_EOF) {
-            if (retrieved_frame == nullptr && !queue_.isEmpty()) {
-              SetRetrievedFrame(queue_.last());
+            // No more frames — this was the last one, use it directly
+            if (retrieved_frame == nullptr) {
+              SetRetrievedFrame(decoded_frame);
             }
+            queue_.lock();
+            queue_.append(decoded_frame);
+            queue_.unlock();
             break;
           }
 
