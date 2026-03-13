@@ -13,6 +13,7 @@ Checks: >
   -modernize-concat-nested-namespaces,
   performance-*,
   readability-redundant-*,
+  -readability-redundant-access-specifiers,
   readability-misplaced-array-index,
   misc-unused-using-decls,
   misc-redundant-expression,

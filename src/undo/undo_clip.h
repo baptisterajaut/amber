@@ -88,7 +88,7 @@ private:
   void replace(bool undo);
 };
 
-enum SetClipPropertyType {
+enum SetClipPropertyType : uint8_t {
   kSetClipPropertyAutoscale,
   kSetClipPropertyReversed,
   kSetClipPropertyMaintainAudioPitch,

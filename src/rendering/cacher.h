@@ -21,10 +21,10 @@
 #ifndef CACHER_H
 #define CACHER_H
 
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS 1
+#ifndef STDC_FORMAT_MACROS
+#define STDC_FORMAT_MACROS 1
 #endif
-#include <inttypes.h>
+#include <cinttypes>
 
 extern "C" {
 #include <libavformat/avformat.h>

@@ -21,7 +21,9 @@
 #ifndef EFFECTGIZMO_H
 #define EFFECTGIZMO_H
 
-enum GizmoType {
+#include <cstdint>
+
+enum GizmoType : uint8_t {
   GIZMO_TYPE_DOT,
   GIZMO_TYPE_POLY,
   GIZMO_TYPE_TARGET

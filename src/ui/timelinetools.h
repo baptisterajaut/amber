@@ -21,7 +21,9 @@
 #ifndef TIMELINETOOLS_H
 #define TIMELINETOOLS_H
 
-enum TimelineTool {
+#include <cstdint>
+
+enum TimelineTool : uint8_t {
   TIMELINE_TOOL_POINTER,
   TIMELINE_TOOL_EDIT,
   TIMELINE_TOOL_RAZOR,

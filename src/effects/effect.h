@@ -63,7 +63,7 @@ extern QVector<EffectMeta> effects;
 
 double log_volume(double linear);
 
-enum EffectType {
+enum EffectType : uint8_t {
   EFFECT_TYPE_INVALID,
   EFFECT_TYPE_VIDEO,
   EFFECT_TYPE_AUDIO,
@@ -71,13 +71,13 @@ enum EffectType {
   EFFECT_TYPE_TRANSITION
 };
 
-enum EffectKeyframeType {
+enum EffectKeyframeType : uint8_t {
   EFFECT_KEYFRAME_LINEAR,
   EFFECT_KEYFRAME_BEZIER,
   EFFECT_KEYFRAME_HOLD
 };
 
-enum EffectInternal {
+enum EffectInternal : uint8_t {
   EFFECT_INTERNAL_TRANSFORM,
   EFFECT_INTERNAL_TEXT,
   EFFECT_INTERNAL_SOLID,
@@ -176,7 +176,7 @@ public:
   virtual void startEffect();
   virtual void endEffect();
 
-  enum VideoEffectFlags {
+  enum VideoEffectFlags : uint8_t {
     ShaderFlag        = 0x1,
     CoordsFlag        = 0x2,
     SuperimposeFlag   = 0x4,

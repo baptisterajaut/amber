@@ -23,13 +23,13 @@
 
 #include "effect.h"
 
-enum TransitionType {
+enum TransitionType : uint8_t {
   kTransitionNone,
   kTransitionOpening,
   kTransitionClosing
 };
 
-enum TransitionInternal {
+enum TransitionInternal : uint8_t {
   TRANSITION_INTERNAL_CROSSDISSOLVE,
   TRANSITION_INTERNAL_LINEARFADE,
   TRANSITION_INTERNAL_EXPONENTIALFADE,

@@ -9,7 +9,7 @@ namespace olive {
     /**
      * @brief Officially supported styles to use in Olive
      */
-    enum Style {
+    enum Style : uint8_t {
       /**
         Qt Fusion-based cross-platform UI. The default styling of Olive. Can also be heavily customized with a CSS
         file.

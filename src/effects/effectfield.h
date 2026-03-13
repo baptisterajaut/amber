@@ -64,7 +64,7 @@ public:
    * This enum is also currently used to match an external XML effect's fields with the correct derived class (e.g.
    * EFFECT_FIELD_DOUBLE matches to DoubleField).
    */
-  enum EffectFieldType {
+  enum EffectFieldType : uint8_t {
     /** Values are doubles. Also corresponds to DoubleField. */
     EFFECT_FIELD_DOUBLE,
 

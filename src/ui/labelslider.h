@@ -68,7 +68,7 @@ public:
    */
   double value();
 
-  enum DisplayType {
+  enum DisplayType : uint8_t {
     Normal,
     FrameNumber,
     Percent,

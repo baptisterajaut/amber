@@ -152,8 +152,8 @@ public:
   QMutex state_change_lock;
   QMutex cache_lock;
 
-  bool NeedsCpuRgba() const;
-  bool NeedsCacherReconfigure() const;
+  [[nodiscard]] bool NeedsCpuRgba() const;
+  [[nodiscard]] bool NeedsCacherReconfigure() const;
 
   // video playback variables
   QOpenGLFramebufferObject** fbo{nullptr};

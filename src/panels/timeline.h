@@ -36,7 +36,7 @@
 #include "ui/audiomonitor.h"
 #include "ui/panel.h"
 
-enum CreateObjects {
+enum CreateObjects : uint8_t {
   ADD_OBJ_TITLE,
   ADD_OBJ_SOLID,
   ADD_OBJ_BARS,
@@ -45,7 +45,7 @@ enum CreateObjects {
   ADD_OBJ_AUDIO
 };
 
-enum TrimType {
+enum TrimType : uint8_t {
   TRIM_NONE,
   TRIM_IN,
   TRIM_OUT

@@ -36,7 +36,7 @@ private:
 
 class DeleteMediaCommand : public OliveAction {
 public:
-  explicit DeleteMediaCommand(MediaPtr i);
+  explicit DeleteMediaCommand(const MediaPtr& i);
   void doUndo() override;
   void doRedo() override;
 private:

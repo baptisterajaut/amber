@@ -27,7 +27,7 @@
 #include "project/previewgenerator.h"
 
 AddMediaCommand::AddMediaCommand(MediaPtr iitem, Media *iparent) :
-  item(iitem),
+  item(std::move(iitem)),
   parent(iparent)
   
 {
@@ -46,7 +46,7 @@ void AddMediaCommand::doRedo() {
   }
 }
 
-DeleteMediaCommand::DeleteMediaCommand(MediaPtr i) :
+DeleteMediaCommand::DeleteMediaCommand(const MediaPtr& i) :
   item(i),
   parent(i->parentItem())
 {
@@ -61,7 +61,7 @@ void DeleteMediaCommand::doRedo() {
 }
 
 ReplaceMediaCommand::ReplaceMediaCommand(MediaPtr i, QString s) {
-  item = i;
+  item = std::move(i);
   new_filename = s;
   old_filename = item->to_footage()->url;
 }
@@ -71,7 +71,7 @@ void ReplaceMediaCommand::replace(QString& filename) {
   QVector<Media*> all_sequences = panel_project->list_all_project_sequences();
   for (auto all_sequence : all_sequences) {
     Sequence* s = all_sequence->to_sequence().get();
-    for (auto c : s->clips) {
+    for (const auto& c : s->clips) {
       if (c != nullptr && c->media() == item.get() && c->IsOpen()) {
         c->Close(true);
         c->replaced = true;

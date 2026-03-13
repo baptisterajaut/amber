@@ -42,7 +42,7 @@ public slots:
 protected:
 
   // function that filters whether rows are displayed or not
-  bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override;
+  [[nodiscard]] bool filterAcceptsRow(int source_row, const QModelIndex &source_parent) const override;
 
 private:
 

@@ -28,7 +28,7 @@
 #include "timeline/marker.h"
 #include "project/footage.h"
 
-enum MediaType {
+enum MediaType : uint8_t {
   MEDIA_TYPE_FOOTAGE,
   MEDIA_TYPE_SEQUENCE,
   MEDIA_TYPE_FOLDER
@@ -68,10 +68,10 @@ public:
   void appendChild(MediaPtr child);
   bool setData(int col, const QVariant &value);
   Media *child(int row);
-  int childCount() const;
-  int columnCount() const;
+  [[nodiscard]] int childCount() const;
+  [[nodiscard]] int columnCount() const;
   QVariant data(int column, int role);
-  int row() const;
+  [[nodiscard]] int row() const;
   Media *parentItem();
   void removeChild(int i);
   MediaPtr get_shared_ptr(Media* m);

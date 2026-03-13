@@ -77,7 +77,7 @@ private:
 
 class EditSequenceCommand : public OliveAction {
 public:
-  EditSequenceCommand(Media *i, SequencePtr s);
+  EditSequenceCommand(Media *i, const SequencePtr& s);
   void doUndo() override;
   void doRedo() override;
   void update();

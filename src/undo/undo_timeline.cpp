@@ -58,7 +58,7 @@ void RippleAction::doRedo() {
 }
 
 ChangeSequenceAction::ChangeSequenceAction(SequencePtr s) {
-  new_sequence = s;
+  new_sequence = std::move(s);
 }
 
 void ChangeSequenceAction::doUndo() {
@@ -126,7 +126,7 @@ void SetSelectionsCommand::doRedo() {
   }
 }
 
-EditSequenceCommand::EditSequenceCommand(Media* i, SequencePtr s) {
+EditSequenceCommand::EditSequenceCommand(Media* i, const SequencePtr& s) {
   item = i;
   seq = s;
   old_name = s->name;

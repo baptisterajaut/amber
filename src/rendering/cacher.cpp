@@ -20,18 +20,18 @@
 
 #include "cacher.h"
 
-#ifndef __STDC_FORMAT_MACROS
+#ifndef STDC_FORMAT_MACROS
 // For some reason the Windows AppVeyor build fails to find PRIx64 without this definition and including
 // <inttypes.h> Maybe something to do with the GCC version being used? Either way, that's why it's here.
-#define __STDC_FORMAT_MACROS 1
+#define STDC_FORMAT_MACROS 1
 #endif
 
-#include <inttypes.h>
+#include <cinttypes>
 
 #include <QOpenGLFramebufferObject>
 #include <QtMath>
 #include <QAudioSink>
-#include <math.h>
+#include <cmath>
 
 #include "project/projectelements.h"
 #include "rendering/audio.h"
@@ -346,9 +346,9 @@ void Cacher::OpenWorker() {
       }
 
       if (audio_filter_ok) {
-        if (qFuzzyCompare(playback_speed_, 1.0)) {
+        if (qFuzzyCompare(playback_speed_, 1.0) || !clip->speed().maintain_audio_pitch) {
           avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
-        } else if (clip->speed().maintain_audio_pitch) {
+        } else {
           AVFilterContext* previous_filter = buffersrc_ctx;
           AVFilterContext* last_filter = buffersrc_ctx;
 
@@ -376,8 +376,6 @@ void Cacher::OpenWorker() {
           avfilter_link(previous_filter, 0, last_filter, 0);
 
           avfilter_link(last_filter, 0, buffersink_ctx, 0);
-        } else {
-          avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
         }
       }
 

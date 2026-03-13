@@ -36,7 +36,7 @@ extern "C" {
 
 #include "timeline/marker.h"
 
-enum VideoInterlacingMode {
+enum VideoInterlacingMode : uint8_t {
   VIDEO_PROGRESSIVE,
   VIDEO_TOP_FIELD_FIRST,
   VIDEO_BOTTOM_FIELD_FIRST

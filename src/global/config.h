@@ -62,7 +62,7 @@ namespace olive {
    * functions (which should be used for all frame <-> timecode conversions) respond to the timecode display type
    * set in Config::timecode_view corresponding to a value from this enum.
    */
-  enum TimecodeType {
+  enum TimecodeType : uint8_t {
     /** Show frame number as a drop-frame timecode */
     kTimecodeDrop,
 
@@ -82,7 +82,7 @@ namespace olive {
    * Olive currently supports recording mono or stereo and gives users the option of which mode to use when
    * recording audio in-app. Audio recording responds to Config::recording_mode to a value from this enum.
    */
-  enum RecordingMode {
+  enum RecordingMode : uint8_t {
     /** Record all audio in mono */
     RECORD_MODE_MONO,
 
@@ -96,7 +96,7 @@ namespace olive {
    * The Timeline in Olive can automatically scroll to follow the playhead when the sequence is playing.
    * The Timeline will respond to Config::autoscroll set to a value from this enum.
    */
-  enum AutoScrollMode {
+  enum AutoScrollMode : uint8_t {
     /** Don't auto-scroll, scrolling will not follow the playhead */
     AUTOSCROLL_NO_SCROLL,
 
@@ -115,7 +115,7 @@ namespace olive {
    * The media in the Project panel can be displayed as a tree hierarchy or as an icon view. The Project panel
    * responds to Config::project_view_type set to a value from this enum.
    */
-  enum ProjectView {
+  enum ProjectView : uint8_t {
     /** Display project media in tree hierarchy */
     PROJECT_VIEW_TREE,
 
@@ -136,7 +136,7 @@ namespace olive {
    * The playback engine (playback/playback.h) responds to both Config::previous_queue_type and
    * Config::upcoming_queue_type set to a value from this enum.
    */
-  enum FrameQueueType {
+  enum FrameQueueType : uint8_t {
     /** Queue size value is in frames */
     FRAME_QUEUE_TYPE_FRAMES,
 

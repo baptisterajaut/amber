@@ -6,7 +6,7 @@
 namespace olive {
 namespace timeline {
 
-enum MediaImportType {
+enum MediaImportType : uint8_t {
   kImportVideoOnly,
   kImportAudioOnly,
   kImportBoth
@@ -15,8 +15,8 @@ enum MediaImportType {
 class MediaImportData {
 public:
   MediaImportData(Media* media = nullptr, MediaImportType import_type = kImportBoth);
-  Media* media() const;
-  MediaImportType type() const;
+  [[nodiscard]] Media* media() const;
+  [[nodiscard]] MediaImportType type() const;
 private:
   Media* media_;
   MediaImportType import_type_;
