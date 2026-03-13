@@ -55,7 +55,7 @@ clang-format with `.clang-format` in repo root (Google-based, 2-space indent, 12
 
 - **Timeline model** (`timeline/`): `Sequence` (timeline with tracks), `Clip` (individual clip on a track), `Marker`, `Selection`. These are pure data structures.
 - **Project model** (`project/`): `Media` items in a `ProjectModel` (Qt Model/View). `Footage` holds decoded media metadata. `LoadThread` handles `.ov` project file parsing. `PreviewGenerator`/`ProxyGenerator` create thumbnails and proxy files.
-- **Rendering** (`rendering/`): `RenderThread` runs OpenGL in a dedicated thread with FBOs. `ExportThread` encodes final output via FFmpeg. `Cacher` decodes and caches frames per-clip. Audio mixing in `audio.cpp`. GPU YUV→RGB conversion in `yuv2rgb.frag` shader (uploaded via `Clip::Retrieve()`).
+- **Rendering** (`rendering/`): `RenderThread` runs OpenGL in a dedicated thread with FBOs. `ExportThread` encodes final output via FFmpeg. `Cacher` decodes and caches frames per-clip. Audio mixing in `audio.cpp`. GPU YUV→RGB conversion in `yuv2rgb.frag` shader (uploaded via `Clip::Retrieve()`). `QuadBuffer` provides stateless quad drawing (transient VAO+VBO per draw, thread-safe). `MatrixUtil` provides CPU-side ortho/identity matrices replacing the old GL matrix stack.
 - **Effects** (`effects/`): `Effect` base class with `EffectRow`/`EffectField` for parameters and keyframing. Shader-based effects defined as XML+GLSL pairs in `effects/shaders/`. Built-in effects (transform, text, transitions) in `effects/internal/`. Frei0r plugin bridge in `frei0reffect.cpp`.
 - **UI panels** (`panels/`): `Project` (media browser), `Timeline`, `Viewer`, `EffectControls`, `GraphEditor`. Each panel is a dockable widget.
 - **UI widgets** (`ui/`): `MainWindow` orchestrates layout. `TimelineWidget` handles track rendering/interaction. `ViewerWidget` does OpenGL playback. Custom widgets: `LabelSlider`, `KeyframeView`, `CollapsibleWidget`, etc.
@@ -71,5 +71,7 @@ clang-format with `.clang-format` in repo root (Google-based, 2-space indent, 12
 - **CPU path** (when clip has ImageFlag effects like Frei0r): AVFilter outputs RGBA → effects process CPU buffer → uploaded to `QOpenGLTexture` → `cached_texture_id` points to that texture.
 
 Hardware-accelerated decoding (VAAPI/D3D11VA/VideoToolbox) is optional (preference toggle). Hwaccel frames are transferred to system memory before entering the pipeline above.
+
+**GL pipeline (Phase 0 modernized):** No fixed-function GL calls remain (`glBegin`/`glEnd`, `glMatrixMode`, `glOrtho`, `glPushMatrix`, etc. all removed). Rendering uses explicit VBOs via `QuadBuffer::draw()`, CPU-side `QMatrix4x4` uniforms via `MatrixUtil`, and shader programs with `uniform mat4 mvp_matrix` + `attribute vec2 a_position/a_texcoord`. Effects accumulate transforms in `GLTextureCoords.transform` (replaces GL matrix stack). Viewer overlays (title-safe, guides, gizmos) use QPainter. Still on Compatibility Profile — 35+ effect shaders use `#version 110` (`attribute`/`varying`/`gl_FragColor`); Core Profile migration requires updating them all to `#version 150`.
 
 **Translations:** Qt Linguist `.ts` files in `ts/`, compiled to `.qm` at build time. 15 languages supported.

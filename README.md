@@ -17,6 +17,7 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x`, por
 - Hardware-accelerated video decoding (VAAPI on Linux, D3D11VA on Windows, VideoToolbox on macOS)
 - GPU YUV→RGB conversion via OpenGL shader (bypasses CPU format conversion for YUV420P/NV12 frames)
 - AppImage uses Qt 6.10 (native PipeWire audio backend) via aqtinstall; Ubuntu .deb stays on system Qt 6.4
+- OpenGL fixed-function pipeline eliminated (VBO + explicit shaders + CPU matrices; prepares for future RHI migration)
 - Various bug fixes (first-export audio corruption, race conditions, null pointers, memory leaks, Frei0r init, phantom audio on pause, waveform crash, VU meter thread safety, …)
 
 ## Packages
