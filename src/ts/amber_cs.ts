@@ -1,4 +1,5 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TS>
 <TS version="2.1" language="cs_CZ">
 <context>
     <name>AboutDialog</name>
@@ -86,7 +87,7 @@
     <name>Cacher</name>
     <message>
         <source>Could not open %1 - %2</source>
-        <translation>Nepodařilo se otevřít %1 - %2</translation>
+        <translation type="vanished">Nepodařilo se otevřít %1 - %2</translation>
     </message>
 </context>
 <context>
@@ -107,8 +108,8 @@
 <context>
     <name>ClipPropertiesDialog</name>
     <message>
-        <source>"%1" Properties</source>
-        <translation>"%1" Vlastnosti</translation>
+        <source>&quot;%1&quot; Properties</source>
+        <translation>&quot;%1&quot; Vlastnosti</translation>
     </message>
     <message>
         <source>Multiple Clip Properties</source>
@@ -131,7 +132,7 @@
     <name>CollapsibleWidget</name>
     <message>
         <source>&lt;untitled&gt;</source>
-        <translation />
+        <translation></translation>
     </message>
 </context>
 <context>
@@ -190,7 +191,7 @@
         <translation>Pokud narazíte na jakékoli problémy, nahlaste je prosím na GitHubu: %1</translation>
     </message>
     <message>
-        <source>Don't show this message again</source>
+        <source>Don&apos;t show this message again</source>
         <translation>Tuto zprávu příště nezobrazovat</translation>
     </message>
 </context>
@@ -217,7 +218,7 @@
         <translation>Nastavení se nepodařilo nahrát</translation>
     </message>
     <message>
-        <source>This settings file doesn't match this effect.</source>
+        <source>This settings file doesn&apos;t match this effect.</source>
         <translation>Tento soubor s nastavením neodpovídá tomuto efektu.</translation>
     </message>
     <message>
@@ -225,16 +226,16 @@
         <translation>Nastavení XML efektu %1</translation>
     </message>
     <message>
-        <source>Failed to open "%1" for reading.</source>
-        <translation>Nepodařilo se otevřít "%1" pro čtení.</translation>
+        <source>Failed to open &quot;%1&quot; for reading.</source>
+        <translation>Nepodařilo se otevřít &quot;%1&quot; pro čtení.</translation>
     </message>
     <message>
-        <source>Failed to open "%1" for writing.</source>
-        <translation>Nepodařilo se otevřít "%1" pro zápis.</translation>
+        <source>Failed to open &quot;%1&quot; for writing.</source>
+        <translation>Nepodařilo se otevřít &quot;%1&quot; pro zápis.</translation>
     </message>
     <message>
-        <source>No candidate for effect '%1'. This effect may be corrupt. Try reinstalling it or Amber.</source>
-        <translation>Žádný kandidát pro efekt '%1'. Tento efekt může být poškozen. Zkuste ho přeinstalovat nebo Amber.</translation>
+        <source>No candidate for effect &apos;%1&apos;. This effect may be corrupt. Try reinstalling it or Amber.</source>
+        <translation>Žádný kandidát pro efekt &apos;%1&apos;. Tento efekt může být poškozen. Zkuste ho přeinstalovat nebo Amber.</translation>
     </message>
 </context>
 <context>
@@ -382,7 +383,7 @@
         <translation>Kodek:</translation>
     </message>
     <message>
-        <source>Couldn't determine output format. This is a bug, please contact the developers.</source>
+        <source>Couldn&apos;t determine output format. This is a bug, please contact the developers.</source>
         <translation>Nepodařilo se určit výstupní formát. Toto je chyba. Spojte se, prosím, s vývojáři.</translation>
     </message>
     <message>
@@ -399,7 +400,7 @@
     </message>
     <message>
         <source>Invalid codec</source>
-        <translation>Neplatný kodek</translation>
+        <translation type="vanished">Neplatný kodek</translation>
     </message>
     <message>
         <source>Frame Rate:</source>
@@ -434,8 +435,8 @@
         <translation>Typ komprese:</translation>
     </message>
     <message>
-        <source>Export "%1"</source>
-        <translation>Vyvést "%1"</translation>
+        <source>Export &quot;%1&quot;</source>
+        <translation>Vyvést &quot;%1&quot;</translation>
     </message>
     <message>
         <source>Export width and height must both be even numbers/divisible by 2.</source>
@@ -454,8 +455,8 @@
         <translation>Nepodařilo se vyvést - %1</translation>
     </message>
     <message>
-        <source>Couldn't determine output parameters for the selected codec. This is a bug, please contact the developers.</source>
-        <translation>Nepodařilo se určit výstupní parametry pro vybraný kodek. Toto je chyba. Spojte se, prosím, s vývojáři.</translation>
+        <source>Couldn&apos;t determine output parameters for the selected codec. This is a bug, please contact the developers.</source>
+        <translation type="vanished">Nepodařilo se určit výstupní parametry pro vybraný kodek. Toto je chyba. Spojte se, prosím, s vývojáři.</translation>
     </message>
     <message>
         <source>Advanced</source>
@@ -579,20 +580,20 @@
 <context>
     <name>Frei0rEffect</name>
     <message>
-        <source>Failed to load Frei0r plugin "%1": %2</source>
-        <translation>Nepodařilo se nahrát přídavný modul Frei0r "%1": %2</translation>
+        <source>Failed to load Frei0r plugin &quot;%1&quot;: %2</source>
+        <translation>Nepodařilo se nahrát přídavný modul Frei0r &quot;%1&quot;: %2</translation>
     </message>
     <message>
         <source>Error loading Frei0r plugin</source>
         <translation>Chyba při nahrávání přídavného modulu Frei0r</translation>
     </message>
     <message>
-        <source>Symbol f0r_init not found in "%1"</source>
-        <translation>Symbol f0r_init nebyl nalezen v "%1"</translation>
+        <source>Symbol f0r_init not found in &quot;%1&quot;</source>
+        <translation>Symbol f0r_init nebyl nalezen v &quot;%1&quot;</translation>
     </message>
     <message>
-        <source>Symbol f0r_get_plugin_info not found in "%1"</source>
-        <translation>Symbol f0r_get_plugin_info nebyl nalezen v "%1"</translation>
+        <source>Symbol f0r_get_plugin_info not found in &quot;%1&quot;</source>
+        <translation>Symbol f0r_get_plugin_info nebyl nalezen v &quot;%1&quot;</translation>
     </message>
 </context>
 <context>
@@ -700,8 +701,8 @@
         <translation>Nahrává se...</translation>
     </message>
     <message>
-        <source>Loading '%1'...</source>
-        <translation>Nahrává se '%1'...</translation>
+        <source>Loading &apos;%1&apos;...</source>
+        <translation>Nahrává se &apos;%1&apos;...</translation>
     </message>
 </context>
 <context>
@@ -723,8 +724,8 @@
         <translation>Chyba při nahrávání projektu</translation>
     </message>
     <message>
-        <source>Couldn't load '%1'. %2</source>
-        <translation>Nepodařilo se nahrát '%1'. %2</translation>
+        <source>Couldn&apos;t load &apos;%1&apos;. %2</source>
+        <translation>Nepodařilo se nahrát &apos;%1&apos;. %2</translation>
     </message>
     <message>
         <source>Version Mismatch</source>
@@ -1105,6 +1106,42 @@
         <source>Auto-Cut Silence</source>
         <translation>Ořezat ticho automaticky</translation>
     </message>
+    <message>
+        <source>Show Guides</source>
+        <translation>Zobrazit vodítka</translation>
+    </message>
+    <message>
+        <source>Guides</source>
+        <translation>Vodítka</translation>
+    </message>
+    <message>
+        <source>Delete Guide</source>
+        <translation>Smazat vodítko</translation>
+    </message>
+    <message>
+        <source>Toggle Mirror</source>
+        <translation>Přepnout zrcadlo</translation>
+    </message>
+    <message>
+        <source>Skip Backward</source>
+        <translation type="vanished">Přeskočit zpět</translation>
+    </message>
+    <message>
+        <source>Skip Forward</source>
+        <translation type="vanished">Přeskočit vpřed</translation>
+    </message>
+    <message>
+        <source>Jump Backward</source>
+        <translation>Přeskočit zpět</translation>
+    </message>
+    <message>
+        <source>Jump Forward</source>
+        <translation>Přeskočit vpřed</translation>
+    </message>
+    <message>
+        <source>Lock Guides</source>
+        <translation>Zamknout vodítka</translation>
+    </message>
 </context>
 <context>
     <name>Marker</name>
@@ -1199,8 +1236,8 @@ Rozložení zvuku: %6</translation>
         <translation>Alfa je předznásobena</translation>
     </message>
     <message>
-        <source>"%1" Properties</source>
-        <translation>"%1" Vlastnosti</translation>
+        <source>&quot;%1&quot; Properties</source>
+        <translation>&quot;%1&quot; Vlastnosti</translation>
     </message>
     <message>
         <source>Interlacing:</source>
@@ -1242,8 +1279,8 @@ Rozložení zvuku: %6</translation>
         <translation>Vnořovat</translation>
     </message>
     <message>
-        <source>The aspect ratio '%1' is invalid. Please try again.</source>
-        <translation>Poměr stran '%1' je neplatný. Zkuste to, prosím, znovu.</translation>
+        <source>The aspect ratio &apos;%1&apos; is invalid. Please try again.</source>
+        <translation>Poměr stran &apos;%1&apos; je neplatný. Zkuste to, prosím, znovu.</translation>
     </message>
     <message>
         <source>Cop&amp;y</source>
@@ -1353,8 +1390,8 @@ Rozložení zvuku: %6</translation>
         <translation>720p</translation>
     </message>
     <message>
-        <source>Editing "%1"</source>
-        <translation>Upravení "%1"</translation>
+        <source>Editing &quot;%1&quot;</source>
+        <translation>Upravení &quot;%1&quot;</translation>
     </message>
     <message>
         <source>1080p</source>
@@ -1460,8 +1497,8 @@ Rozložení zvuku: %6</translation>
         <translation>Žádný činný úryvek (sled záběrů)</translation>
     </message>
     <message>
-        <source>The project '%1' no longer exists. Would you like to remove it from the recent projects list?</source>
-        <translation>Projekt '%1' už neexistuje. Chcete jej odstranit ze seznamu nedávných projektů?</translation>
+        <source>The project &apos;%1&apos; no longer exists. Would you like to remove it from the recent projects list?</source>
+        <translation>Projekt &apos;%1&apos; už neexistuje. Chcete jej odstranit ze seznamu nedávných projektů?</translation>
     </message>
     <message>
         <source>Unsaved Project</source>
@@ -1472,8 +1509,8 @@ Rozložení zvuku: %6</translation>
         <translation>Chybí soubor projektu</translation>
     </message>
     <message>
-        <source>Specified project '%1' does not exist.</source>
-        <translation>Daný projekt '%1' neexistuje.</translation>
+        <source>Specified project &apos;%1&apos; does not exist.</source>
+        <translation>Daný projekt &apos;%1&apos; neexistuje.</translation>
     </message>
     <message>
         <source>Please open the sequence to perform this action.</source>
@@ -1492,7 +1529,7 @@ Rozložení zvuku: %6</translation>
         <translation>Projekt Amber %1</translation>
     </message>
     <message>
-        <source>Amber didn't close properly and an autorecovery file was detected. Would you like to open it?</source>
+        <source>Amber didn&apos;t close properly and an autorecovery file was detected. Would you like to open it?</source>
         <translation>Amber nebyl správně ukončen a byl nalezen soubor automatického obnovení. Chcete jej otevřít?</translation>
     </message>
 </context>
@@ -1686,8 +1723,8 @@ Rozložení zvuku: %6</translation>
         <translation>Využití paměti</translation>
     </message>
     <message>
-        <source>CSS file '%1' does not exist.</source>
-        <translation>Soubor CSS '%1' neexistuje.</translation>
+        <source>CSS file &apos;%1&apos; does not exist.</source>
+        <translation>Soubor CSS &apos;%1&apos; neexistuje.</translation>
     </message>
     <message>
         <source>Failed to open file for reading</source>
@@ -1817,6 +1854,14 @@ Rozložení zvuku: %6</translation>
         <source>Amber Light</source>
         <translation>Amber Světlý</translation>
     </message>
+    <message>
+        <source>Frame Skip Step:</source>
+        <translation type="vanished">Krok přeskočení snímku:</translation>
+    </message>
+    <message>
+        <source>Jump Step:</source>
+        <translation>Krok skoku:</translation>
+    </message>
 </context>
 <context>
     <name>PreviewGenerator</name>
@@ -1840,8 +1885,8 @@ Rozložení zvuku: %6</translation>
         <translation>Přeskočit</translation>
     </message>
     <message>
-        <source>The media '%1' is currently used in '%2'. Deleting it will remove all instances in the sequence. Are you sure you want to do this?</source>
-        <translation>Záznam '%1' se nyní používá v '%2'. Jeho smazání odstraní všechny instance v úryvku (sledu záběrů). Opravdu to chcete udělat?</translation>
+        <source>The media &apos;%1&apos; is currently used in &apos;%2&apos;. Deleting it will remove all instances in the sequence. Are you sure you want to do this?</source>
+        <translation>Záznam &apos;%1&apos; se nyní používá v &apos;%2&apos;. Jeho smazání odstraní všechny instance v úryvku (sledu záběrů). Opravdu to chcete udělat?</translation>
     </message>
     <message>
         <source>Delete media in use?</source>
@@ -1852,8 +1897,8 @@ Rozložení zvuku: %6</translation>
         <translation>Zjištěn obrázkový úryvek (sled záběrů)</translation>
     </message>
     <message>
-        <source>Rename '%1'</source>
-        <translation>Přejmenovat '%1'</translation>
+        <source>Rename &apos;%1&apos;</source>
+        <translation>Přejmenovat &apos;%1&apos;</translation>
     </message>
     <message>
         <source>Active sequence selected</source>
@@ -1892,8 +1937,8 @@ Rozložení zvuku: %6</translation>
         <translation>Žádný úryvek (sled záběrů) není činný. Otevřete, prosím, úryvek (sled záběrů), ve kterém chcete smazat záběry.</translation>
     </message>
     <message>
-        <source>Replace '%1'</source>
-        <translation>Nahradit '%1'</translation>
+        <source>Replace &apos;%1&apos;</source>
+        <translation>Nahradit &apos;%1&apos;</translation>
     </message>
     <message>
         <source>All Files</source>
@@ -1904,8 +1949,8 @@ Rozložení zvuku: %6</translation>
         <translation>Žádný úryvek (sled záběrů) není činný. Otevřete, prosím, úryvek (sled záběrů), ve kterém chcete nahradit záběry.</translation>
     </message>
     <message>
-        <source>The file '%1' appears to be part of an image sequence. Would you like to import it as such?</source>
-        <translation>Soubor '%1' se zdá být součástí obrázkového úryvku (sledu záběrů). Chcete jej zavést jako takový?</translation>
+        <source>The file &apos;%1&apos; appears to be part of an image sequence. Would you like to import it as such?</source>
+        <translation>Soubor &apos;%1&apos; se zdá být součástí obrázkového úryvku (sledu záběrů). Chcete jej zavést jako takový?</translation>
     </message>
     <message>
         <source>New</source>
@@ -1944,8 +1989,8 @@ Rozložení zvuku: %6</translation>
         <translation>Zavést projekt</translation>
     </message>
     <message>
-        <source>"%1" is an Olive project file. It will merge with this project. Do you wish to continue?</source>
-        <translation>"%1" je soubor s projektem Olive. Sloučí se s tímto projektem. Chcete pokračovat?</translation>
+        <source>&quot;%1&quot; is an Olive project file. It will merge with this project. Do you wish to continue?</source>
+        <translation>&quot;%1&quot; je soubor s projektem Olive. Sloučí se s tímto projektem. Chcete pokračovat?</translation>
     </message>
 </context>
 <context>
@@ -1971,8 +2016,8 @@ Rozložení zvuku: %6</translation>
         <translation>ProRes HQ</translation>
     </message>
     <message>
-        <source>The file "%1" already exists. Do you wish to replace it?</source>
-        <translation>Soubor "%1" již existuje. Chcete jej nahradit?</translation>
+        <source>The file &quot;%1&quot; already exists. Do you wish to replace it?</source>
+        <translation>Soubor &quot;%1&quot; již existuje. Chcete jej nahradit?</translation>
     </message>
     <message>
         <source>Dimensions:</source>
@@ -1987,8 +2032,8 @@ Rozložení zvuku: %6</translation>
         <translation>Umístění:</translation>
     </message>
     <message>
-        <source>Same as Source (in "%1" folder)</source>
-        <translation>Stejné jako zdroj (ve složce "%1")</translation>
+        <source>Same as Source (in &quot;%1&quot; folder)</source>
+        <translation>Stejné jako zdroj (ve složce &quot;%1&quot;)</translation>
     </message>
     <message>
         <source>Format:</source>
@@ -2014,8 +2059,8 @@ Rozložení zvuku: %6</translation>
 <context>
     <name>ProxyGenerator</name>
     <message>
-        <source>Finished generating proxy for "%1"</source>
-        <translation>Dokončeno vytvoření proxy pro "%1"</translation>
+        <source>Finished generating proxy for &quot;%1&quot;</source>
+        <translation>Dokončeno vytvoření proxy pro &quot;%1&quot;</translation>
     </message>
 </context>
 <context>
@@ -2037,7 +2082,7 @@ Rozložení zvuku: %6</translation>
         <translation>Zrušit</translation>
     </message>
     <message>
-        <source>Please select a media to replace with or click 'Cancel'.</source>
+        <source>Please select a media to replace with or click &apos;Cancel&apos;.</source>
         <translation>Vyberte, prosím, záznam k nahrazení nebo klepněte na Zrušit.</translation>
     </message>
     <message>
@@ -2057,19 +2102,19 @@ Rozložení zvuku: %6</translation>
         <translation>Složka vybrána</translation>
     </message>
     <message>
-        <source>You selected the same media that you're replacing. Please select a different one or click 'Cancel'.</source>
+        <source>You selected the same media that you&apos;re replacing. Please select a different one or click &apos;Cancel&apos;.</source>
         <translation>Vybral jste stejný záznam, jejž chcete nahradit. Vyberte, prosím, jiný nebo klepněte na Zrušit.</translation>
     </message>
     <message>
-        <source>Replace clips using "%1"</source>
-        <translation>Nahradit záběry pomocí "%1"</translation>
+        <source>Replace clips using &quot;%1&quot;</source>
+        <translation>Nahradit záběry pomocí &quot;%1&quot;</translation>
     </message>
     <message>
         <source>Keep the same media in-points</source>
         <translation>Zachovat stejné začáteční body záznamu</translation>
     </message>
     <message>
-        <source>Select which media you want to replace this media's clips with:</source>
+        <source>Select which media you want to replace this media&apos;s clips with:</source>
         <translation>Vyberte, kterým záznamem chcete nahradit záběry tohoto záznamu:</translation>
     </message>
 </context>
@@ -2312,12 +2357,12 @@ Rozložení zvuku: %6</translation>
         <translation>Ukázat v hledači</translation>
     </message>
     <message>
-        <source>Would you like to delete the proxy file "%1" as well?</source>
-        <translation>Chcete smazat i soubor proxy "%1"?</translation>
+        <source>Would you like to delete the proxy file &quot;%1&quot; as well?</source>
+        <translation>Chcete smazat i soubor proxy &quot;%1&quot;?</translation>
     </message>
     <message>
-        <source>You dropped a file onto '%1'. Would you like to replace it with the dropped file?</source>
-        <translation>Upustil jste soubor na '%1'. Chcete jej nahradit upuštěným souborem?</translation>
+        <source>You dropped a file onto &apos;%1&apos;. Would you like to replace it with the dropped file?</source>
+        <translation>Upustil jste soubor na &apos;%1&apos;. Chcete jej nahradit upuštěným souborem?</translation>
     </message>
 </context>
 <context>
@@ -2614,8 +2659,8 @@ Rozložení zvuku: %6</translation>
         <translation>Oddálit</translation>
     </message>
     <message>
-        <source>Clip '%1' already contains a '%2' effect. Would you like to replace it with the pasted one or add it as a separate effect?</source>
-        <translation>Záběr '%1' již obsahuje '%2' efekt. Chcete jej nahradit vloženým nebo jej přidat jako samostatný efekt?</translation>
+        <source>Clip &apos;%1&apos; already contains a &apos;%2&apos; effect. Would you like to replace it with the pasted one or add it as a separate effect?</source>
+        <translation>Záběr &apos;%1&apos; již obsahuje &apos;%2&apos; efekt. Chcete jej nahradit vloženým nebo jej přidat jako samostatný efekt?</translation>
     </message>
     <message>
         <source>Bars...</source>
@@ -2734,7 +2779,7 @@ Doba trvání: %4</translation>
         <translation>&amp;Rychlost/Doba trvání</translation>
     </message>
     <message>
-        <source>Couldn't locate media wrapper for sequence.</source>
+        <source>Couldn&apos;t locate media wrapper for sequence.</source>
         <translation>Nepodařilo se najít obal záznamu pro tento úryvek (sled záběrů).</translation>
     </message>
     <message>
@@ -2846,7 +2891,7 @@ Doba trvání: %4</translation>
         <translation>Chyba při nahrávání přídavného modulu VST</translation>
     </message>
     <message>
-        <source>Plugin's magic number is invalid</source>
+        <source>Plugin&apos;s magic number is invalid</source>
         <translation>Kouzelné číslo přídavného modulu je neplatné</translation>
     </message>
     <message>
@@ -2870,8 +2915,8 @@ Doba trvání: %4</translation>
         <translation>Nepodařilo se najít vstupní bod pro dynamickou knihovnu.</translation>
     </message>
     <message>
-        <source>Failed to load VST plugin "%1": %2</source>
-        <translation>Nepodařilo se nahrát přídavný modul "%1": %2</translation>
+        <source>Failed to load VST plugin &quot;%1&quot;: %2</source>
+        <translation>Nepodařilo se nahrát přídavný modul &quot;%1&quot;: %2</translation>
     </message>
 </context>
 <context>
@@ -2943,6 +2988,26 @@ Doba trvání: %4</translation>
         <source>Viewer Zoom</source>
         <translation>Zvětšení prohlížeče</translation>
     </message>
+    <message>
+        <source>Set Value...</source>
+        <translation>Nastavit hodnotu...</translation>
+    </message>
+    <message>
+        <source>Mirror</source>
+        <translation>Zrcadlo</translation>
+    </message>
+    <message>
+        <source>Delete Guide</source>
+        <translation>Smazat vodítko</translation>
+    </message>
+    <message>
+        <source>Set Guide Value</source>
+        <translation>Nastavit hodnotu vodítka</translation>
+    </message>
+    <message>
+        <source>Position (pixels):</source>
+        <translation>Pozice (pixely):</translation>
+    </message>
 </context>
 <context>
     <name>ViewerWindow</name>
@@ -2976,8 +3041,8 @@ Doba trvání: %4</translation>
         <translation>Neplatný přechod</translation>
     </message>
     <message>
-        <source>No candidate for transition '%1'. This transition may be corrupt. Try reinstalling it or Amber.</source>
-        <translation>Žádný kandidát pro přechod '%1'. Tento přechod může být poškozen. Zkuste ho přeinstalovat nebo Amber.</translation>
+        <source>No candidate for transition &apos;%1&apos;. This transition may be corrupt. Try reinstalling it or Amber.</source>
+        <translation>Žádný kandidát pro přechod &apos;%1&apos;. Tento přechod může být poškozen. Zkuste ho přeinstalovat nebo Amber.</translation>
     </message>
 </context>
 </TS>

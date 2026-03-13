@@ -21,31 +21,31 @@
 #ifndef VIEWERWIDGET_H
 #define VIEWERWIDGET_H
 
-#include <QOpenGLWidget>
 #include <QMatrix4x4>
-#include <QOpenGLTexture>
-#include <QTimer>
-#include <QThread>
 #include <QMutex>
-#include <QWaitCondition>
 #include <QOpenGLFunctions>
+#include <QOpenGLTexture>
+#include <QOpenGLWidget>
+#include <QThread>
+#include <QTimer>
+#include <QWaitCondition>
 
-#include "timeline/clip.h"
-#include "project/footage.h"
 #include "effects/effect.h"
-#include "ui/viewerwindow.h"
-#include "ui/viewercontainer.h"
+#include "project/footage.h"
 #include "rendering/renderthread.h"
+#include "timeline/clip.h"
+#include "timeline/guide.h"
+#include "ui/viewercontainer.h"
+#include "ui/viewerwindow.h"
 
 class Viewer;
 class QOpenGLFramebufferObject;
 struct GLTextureCoords;
 
-class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions
-{
+class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions {
   Q_OBJECT
-public:
-  ViewerWidget(QWidget *parent = nullptr);
+ public:
+  ViewerWidget(QWidget* parent = nullptr);
   ~ViewerWidget() override;
 
   void close_window();
@@ -65,21 +65,45 @@ public:
   void frame_update();
   RenderThread* get_renderer();
   void set_scroll(double x, double y);
-public slots:
+
+  void start_guide_creation(Guide::Orientation orientation, int video_pos);
+  void update_guide_creation(int video_pos);
+  void finish_guide_creation();
+  void cancel_guide_creation();
+  QAction* guide_delete_action_;
+  QAction* guide_mirror_action_;
+ public slots:
   void set_waveform_scroll(int s);
   void set_fullscreen(int screen = 0);
-protected:
-  void mousePressEvent(QMouseEvent *event) override;
-  void mouseMoveEvent(QMouseEvent *event) override;
-  void mouseReleaseEvent(QMouseEvent *event) override;
+
+ protected:
+  bool event(QEvent* e) override;
+  void keyPressEvent(QKeyEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseMoveEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
-private:
+
+ private:
   void draw_waveform_func();
   void draw_title_safe_area();
+  void draw_guides();
   void draw_gizmos();
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
-  void move_gizmos(QMouseEvent *event, bool done);
+  void move_gizmos(QMouseEvent* event, bool done);
+  int find_guide_at(int video_x, int video_y, bool* hit_mirror = nullptr) const;
+  void show_guide_context_menu(int guide_index, const QPoint& global_pos, bool on_mirror = false);
   bool dragging{false};
+  int dragging_guide_index_{-1};
+  int dragging_guide_old_pos_{0};
+  bool dragging_mirror_side_{false};
+  int hovered_guide_index_{-1};
+  bool hovered_mirror_side_{false};
+  void guide_action_delete();
+  void guide_action_mirror();
+  bool creating_guide_{false};
+  Guide::Orientation creating_guide_orientation_;
+  int creating_guide_pos_{0};
   void seek_from_click(int x);
   Effect* gizmos{nullptr};
   int drag_start_x;
@@ -91,10 +115,10 @@ private:
   ViewerWindow* window;
   double x_scroll{0};
   double y_scroll{0};
-public slots:
+ public slots:
   void queue_repaint();
 
-private slots:
+ private slots:
   void context_destroy();
   void retry();
   void show_context_menu();
@@ -102,7 +126,7 @@ private slots:
   void fullscreen_menu_action(QAction* action);
   void set_fit_zoom();
   void set_custom_zoom();
-  void set_menu_zoom(QAction *action);
+  void set_menu_zoom(QAction* action);
 };
 
-#endif // VIEWERWIDGET_H
+#endif  // VIEWERWIDGET_H

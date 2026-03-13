@@ -21,15 +21,16 @@
 #ifndef SEQUENCE_H
 #define SEQUENCE_H
 
-#include <memory>
 #include <QVector>
+#include <memory>
 
 #include "clip.h"
+#include "guide.h"
 #include "marker.h"
 #include "selection.h"
 
 class Sequence {
-public:
+ public:
   Sequence();
   ~Sequence();
   SequencePtr copy();
@@ -64,6 +65,7 @@ public:
   int save_id;
 
   QVector<Marker> markers;
+  QVector<Guide> guides;
   QVector<ClipPtr> clips;
 };
 
@@ -71,7 +73,7 @@ using SequencePtr = std::shared_ptr<Sequence>;
 
 // static variable for the currently active sequence
 namespace olive {
-  extern SequencePtr ActiveSequence;
+extern SequencePtr ActiveSequence;
 }
 
-#endif // SEQUENCE_H
+#endif  // SEQUENCE_H

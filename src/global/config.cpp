@@ -80,6 +80,8 @@ constexpr BoolEntry kBoolEntries[] = {
     {"NativeMenuStyling", &Config::use_native_menu_styling},
     {"LockedPanels", &Config::locked_panels},
     {"ShowWelcomeDialog", &Config::show_welcome_dialog},
+    {"ShowGuides", &Config::show_guides},
+    {"LockGuides", &Config::lock_guides},
 };
 
 constexpr IntEntry kIntEntries[] = {
@@ -250,6 +252,7 @@ void Config::save(QString path) {
   stream.writeTextElement("LockedPanels", QString::number(locked_panels));
   stream.writeTextElement("ShowWelcomeDialog", QString::number(show_welcome_dialog));
   stream.writeTextElement("FrameSkipStep", QString::number(frame_skip_step));
+  stream.writeTextElement("ShowGuides", QString::number(show_guides));
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc

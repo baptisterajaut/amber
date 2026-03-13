@@ -22,12 +22,12 @@
 
 #include <QCoreApplication>
 
-#include "panels/panels.h"
 #include "global/debug.h"
+#include "panels/panels.h"
 
-Sequence::Sequence() 
-  
-= default;
+Sequence::Sequence()
+
+    = default;
 
 Sequence::~Sequence() = default;
 
@@ -42,7 +42,7 @@ SequencePtr Sequence::copy() {
 
   // deep copy all of the sequence's clips
   s->clips.resize(clips.size());
-  for (int i=0;i<clips.size();i++) {
+  for (int i = 0; i < clips.size(); i++) {
     ClipPtr c = clips.at(i);
     if (c == nullptr) {
       s->clips[i] = nullptr;
@@ -53,8 +53,9 @@ SequencePtr Sequence::copy() {
     }
   }
 
-  // copy all of the sequence's markers
+  // copy all of the sequence's markers and guides
   s->markers = markers;
+  s->guides = guides;
 
   return s;
 }
@@ -69,21 +70,19 @@ long Sequence::getEndFrame() {
   return end;
 }
 
-void Sequence::RefreshClips(Media *m) {
+void Sequence::RefreshClips(Media* m) {
   for (auto c : clips) {
-    if (c != nullptr
-        && (m == nullptr || c->media() == m)) {
+    if (c != nullptr && (m == nullptr || c->media() == m)) {
       c->Close(true);
       c->refresh();
     }
   }
 }
 
-QVector<Clip *> Sequence::SelectedClips(bool containing)
-{
+QVector<Clip*> Sequence::SelectedClips(bool containing) {
   QVector<Clip*> selected_clips;
 
-  for (const auto & clip : clips) {
+  for (const auto& clip : clips) {
     Clip* c = clip.get();
     if (c != nullptr && IsClipSelected(c, containing)) {
       selected_clips.append(c);
@@ -93,11 +92,10 @@ QVector<Clip *> Sequence::SelectedClips(bool containing)
   return selected_clips;
 }
 
-QVector<int> Sequence::SelectedClipIndexes()
-{
+QVector<int> Sequence::SelectedClipIndexes() {
   QVector<int> selected_clips;
 
-  for (int i=0;i<clips.size();i++) {
+  for (int i = 0; i < clips.size(); i++) {
     Clip* c = clips.at(i).get();
     if (c != nullptr && IsClipSelected(c, true)) {
       selected_clips.append(i);
@@ -107,23 +105,19 @@ QVector<int> Sequence::SelectedClipIndexes()
   return selected_clips;
 }
 
-Effect *Sequence::GetSelectedGizmo()
-{
+Effect* Sequence::GetSelectedGizmo() {
   Effect* gizmo_ptr = nullptr;
 
-  for (const auto & clip : clips) {
+  for (const auto& clip : clips) {
     Clip* c = clip.get();
-    if (c != nullptr
-        && c->IsActiveAt(playhead)
-        && IsClipSelected(c, true)) {
+    if (c != nullptr && c->IsActiveAt(playhead) && IsClipSelected(c, true)) {
       // This clip is selected and currently active - we'll use this for gizmos
 
       if (!c->effects.isEmpty()) {
-
         // find which effect has gizmos selected, or default to the first gizmo effect we find if there is
         // none selected
 
-        for (const auto & effect : c->effects) {
+        for (const auto& effect : c->effects) {
           Effect* e = effect.get();
 
           // retrieve gizmo data from effect
@@ -148,24 +142,22 @@ Effect *Sequence::GetSelectedGizmo()
   return gizmo_ptr;
 }
 
-bool Sequence::IsClipSelected(int clip_index, bool containing)
-{
+bool Sequence::IsClipSelected(int clip_index, bool containing) {
   return IsClipSelected(clips.at(clip_index).get(), containing);
 }
 
-bool Sequence::IsClipSelected(Clip *clip, bool containing)
-{
-  for (const auto & s : selections) {
-    if (clip->track() == s.track && ((clip->timeline_in() >= s.in && clip->timeline_out() <= s.out)
-                                  || (!containing && !(clip->timeline_in() >= s.out || clip->timeline_out() <= s.in)))) {
+bool Sequence::IsClipSelected(Clip* clip, bool containing) {
+  for (const auto& s : selections) {
+    if (clip->track() == s.track &&
+        ((clip->timeline_in() >= s.in && clip->timeline_out() <= s.out) ||
+         (!containing && !(clip->timeline_in() >= s.out || clip->timeline_out() <= s.in)))) {
       return true;
     }
   }
   return false;
 }
 
-bool Sequence::IsTransitionSelected(Transition *t)
-{
+bool Sequence::IsTransitionSelected(Transition* t) {
   if (t == nullptr) {
     return false;
   }
@@ -195,10 +187,9 @@ bool Sequence::IsTransitionSelected(Transition *t)
   }
 
   // See if there's a selection matching this
-  for (const auto & selection : selections) {
-    if (selection.in <= transition_in_point
-        && selection.out >= transition_out_point
-        && selection.track == transition_track) {
+  for (const auto& selection : selections) {
+    if (selection.in <= transition_in_point && selection.out >= transition_out_point &&
+        selection.track == transition_track) {
       return true;
     }
   }
@@ -211,7 +202,7 @@ void Sequence::getTrackLimits(int* video_tracks, int* audio_tracks) {
   int at = 0;
   for (auto c : clips) {
     if (c != nullptr) {
-      if (c->track() < 0 && c->track() < vt) { // video clip
+      if (c->track() < 0 && c->track() < vt) {  // video clip
         vt = c->track();
       } else if (c->track() > at) {
         at = c->track();

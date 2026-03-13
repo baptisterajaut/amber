@@ -24,45 +24,48 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
-#include <QPainter>
+#include <QApplication>
 #include <QAudioSink>
-#include <QOpenGLShaderProgram>
-#include <QtMath>
-#include <QOpenGLFramebufferObject>
-#include <QMouseEvent>
-#include <QMimeData>
 #include <QDrag>
-#include <QOffscreenSurface>
 #include <QFileDialog>
+#include <QInputDialog>
+#include <QMenu>
+#include <QMessageBox>
+#include <QMimeData>
+#include <QMouseEvent>
+#include <QOffscreenSurface>
+#include <QOpenGLFramebufferObject>
+#include <QOpenGLShaderProgram>
+#include <QPainter>
 #include <QPolygon>
 #include <QRegularExpression>
-#include <QInputDialog>
-#include <QApplication>
 #include <QScreen>
-#include <QMessageBox>
+#include <QtMath>
 
-#include "panels/panels.h"
-#include "project/projectelements.h"
-#include "rendering/renderfunctions.h"
-#include "rendering/audio.h"
 #include "global/config.h"
 #include "global/debug.h"
 #include "global/math.h"
-#include "ui/collapsiblewidget.h"
-#include "undo/undo.h"
+#include "mainwindow.h"
+#include "panels/panels.h"
 #include "project/media.h"
-#include "ui/viewercontainer.h"
+#include "project/projectelements.h"
+#include "rendering/audio.h"
 #include "rendering/cacher.h"
-#include "ui/timelinewidget.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
-#include "ui/viewerwindow.h"
+#include "ui/collapsiblewidget.h"
 #include "ui/menu.h"
-#include "mainwindow.h"
+#include "ui/timelinewidget.h"
+#include "ui/viewercontainer.h"
+#include "ui/viewerwindow.h"
+#include "undo/comboaction.h"
+#include "undo/undo.h"
+#include "undo/undo_guide.h"
+#include "undo/undostack.h"
 
-ViewerWidget::ViewerWidget(QWidget *parent) :
-  QOpenGLWidget(parent)
-  
+ViewerWidget::ViewerWidget(QWidget* parent)
+    : QOpenGLWidget(parent)
+
 {
   setMouseTracking(true);
   setFocusPolicy(Qt::ClickFocus);
@@ -74,6 +77,21 @@ ViewerWidget::ViewerWidget(QWidget *parent) :
   renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ViewerWidget::queue_repaint);
   connect(renderer, &RenderThread::finished, renderer, &RenderThread::deleteLater);
+
+  // Guide shortcut actions — shortcuts stored on QAction for display + preferences editability.
+  // WidgetShortcut context without addAction() prevents Qt from registering them in QShortcutMap,
+  // avoiding ambiguity with global Del/M. Actual key interception via event(ShortcutOverride).
+  guide_delete_action_ = new QAction(this);
+  guide_delete_action_->setProperty("id", "guidedelete");
+  guide_delete_action_->setProperty("default", "Del");
+  guide_delete_action_->setShortcut(QKeySequence("Del"));
+  guide_delete_action_->setShortcutContext(Qt::WidgetShortcut);
+
+  guide_mirror_action_ = new QAction(this);
+  guide_mirror_action_->setProperty("id", "guidemirror");
+  guide_mirror_action_->setProperty("default", "M");
+  guide_mirror_action_->setShortcut(QKeySequence("M"));
+  guide_mirror_action_->setShortcutContext(Qt::WidgetShortcut);
 
   window = new ViewerWindow(this);
 }
@@ -112,11 +130,11 @@ void ViewerWidget::show_context_menu() {
   if (window->isVisible()) {
     fullscreen_menu->addAction(tr("Disable"));
   }
-  for (int i=0;i<screens.size();i++) {
-    QAction* screen_action = fullscreen_menu->addAction(tr("Screen %1: %2x%3").arg(
-                                                          QString::number(i),
-                                                          QString::number(screens.at(i)->size().width()),
-                                                          QString::number(screens.at(i)->size().height())));
+  for (int i = 0; i < screens.size(); i++) {
+    QAction* screen_action =
+        fullscreen_menu->addAction(tr("Screen %1: %2x%3")
+                                       .arg(QString::number(i), QString::number(screens.at(i)->size().width()),
+                                            QString::number(screens.at(i)->size().height())));
     screen_action->setData(i);
   }
   connect(fullscreen_menu, &QMenu::triggered, this, &ViewerWidget::fullscreen_menu_action);
@@ -149,12 +167,15 @@ void ViewerWidget::save_frame() {
   fd.setAcceptMode(QFileDialog::AcceptSave);
   fd.setFileMode(QFileDialog::AnyFile);
   fd.setWindowTitle(tr("Save Frame"));
-  fd.setNameFilter("Portable Network Graphic (*.png);;JPEG (*.jpg);;Windows Bitmap (*.bmp);;Portable Pixmap (*.ppm);;X11 Bitmap (*.xbm);;X11 Pixmap (*.xpm)");
+  fd.setNameFilter(
+      "Portable Network Graphic (*.png);;JPEG (*.jpg);;Windows Bitmap (*.bmp);;Portable Pixmap (*.ppm);;X11 Bitmap "
+      "(*.xbm);;X11 Pixmap (*.xpm)");
 
   if (fd.exec()) {
     QString fn = fd.selectedFiles().at(0);
-    QString selected_ext = fd.selectedNameFilter().mid(fd.selectedNameFilter().indexOf(QRegularExpression("\\*\\.[a-z][a-z][a-z]")) + 1, 4);
-    if (!fn.endsWith(selected_ext,  Qt::CaseInsensitive)) {
+    QString selected_ext = fd.selectedNameFilter().mid(
+        fd.selectedNameFilter().indexOf(QRegularExpression("\\*\\.[a-z][a-z][a-z]")) + 1, 4);
+    if (!fn.endsWith(selected_ext, Qt::CaseInsensitive)) {
       fn += selected_ext;
     }
 
@@ -162,11 +183,9 @@ void ViewerWidget::save_frame() {
   }
 }
 
-void ViewerWidget::queue_repaint() {
-  update();
-}
+void ViewerWidget::queue_repaint() { update(); }
 
-void ViewerWidget::fullscreen_menu_action(QAction *action) {
+void ViewerWidget::fullscreen_menu_action(QAction* action) {
   if (action->data().isNull()) {
     window->hide();
   } else {
@@ -181,13 +200,11 @@ void ViewerWidget::set_fit_zoom() {
 
 void ViewerWidget::set_custom_zoom() {
   bool ok;
-  double d = QInputDialog::getDouble(this,
-                                     tr("Viewer Zoom"),
-                                     tr("Set Custom Zoom Value:"),
-                                     container->zoom*100, 0, 2147483647, 2, &ok);
+  double d = QInputDialog::getDouble(this, tr("Viewer Zoom"), tr("Set Custom Zoom Value:"), container->zoom * 100, 0,
+                                     2147483647, 2, &ok);
   if (ok) {
     container->fit = false;
-    container->zoom = d*0.01;
+    container->zoom = d * 0.01;
     container->adjust();
   }
 }
@@ -201,9 +218,7 @@ void ViewerWidget::set_menu_zoom(QAction* action) {
   }
 }
 
-void ViewerWidget::retry() {
-  update();
-}
+void ViewerWidget::retry() { update(); }
 
 void ViewerWidget::initializeGL() {
   initializeOpenGLFunctions();
@@ -219,8 +234,8 @@ void ViewerWidget::frame_update() {
     } else {
       doneCurrent();
       bool scrubbing = !viewer->playing;
-      renderer->start_render(context(), viewer->seq.get(), viewer->get_playback_speed(),
-                             nullptr, nullptr, 0, 0, false, scrubbing);
+      renderer->start_render(context(), viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0, 0, false,
+                             scrubbing);
     }
 
     // render the audio
@@ -228,9 +243,7 @@ void ViewerWidget::frame_update() {
   }
 }
 
-RenderThread *ViewerWidget::get_renderer() {
-  return renderer;
-}
+RenderThread* ViewerWidget::get_renderer() { return renderer; }
 
 void ViewerWidget::set_scroll(double x, double y) {
   x_scroll = x;
@@ -238,9 +251,7 @@ void ViewerWidget::set_scroll(double x, double y) {
   update();
 }
 
-void ViewerWidget::seek_from_click(int x) {
-  viewer->seek(getFrameFromScreenPoint(waveform_zoom, x+waveform_scroll));
-}
+void ViewerWidget::seek_from_click(int x) { viewer->seek(getFrameFromScreenPoint(waveform_zoom, x + waveform_scroll)); }
 
 void ViewerWidget::context_destroy() {
   if (!isValid()) return;
@@ -255,48 +266,47 @@ void ViewerWidget::context_destroy() {
 EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
   if (gizmos != nullptr) {
     double multiplier = double(viewer->seq->width) / double(width());
-    QPoint mouse_pos(qRound(x*multiplier), qRound((height()-y)*multiplier));
+    QPoint mouse_pos(qRound(x * multiplier), qRound((height() - y) * multiplier));
     int dot_size = 2 * qRound(GIZMO_DOT_SIZE * multiplier);
     int target_size = 2 * qRound(GIZMO_TARGET_SIZE * multiplier);
-    for (int i=0;i<gizmos->gizmo_count();i++) {
+    for (int i = 0; i < gizmos->gizmo_count(); i++) {
       EffectGizmo* g = gizmos->gizmo(i);
 
       switch (g->get_type()) {
-      case GIZMO_TYPE_DOT:
-        if (mouse_pos.x() > g->screen_pos[0].x() - dot_size
-            && mouse_pos.y() > g->screen_pos[0].y() - dot_size
-            && mouse_pos.x() < g->screen_pos[0].x() + dot_size
-            && mouse_pos.y() < g->screen_pos[0].y() + dot_size) {
-          return g;
-        }
-        break;
-      case GIZMO_TYPE_POLY:
-        if (QPolygon(g->screen_pos).containsPoint(mouse_pos, Qt::OddEvenFill)) {
-          return g;
-        }
-        break;
-      case GIZMO_TYPE_TARGET:
-        if (mouse_pos.x() > g->screen_pos[0].x() - target_size
-            && mouse_pos.y() > g->screen_pos[0].y() - target_size
-            && mouse_pos.x() < g->screen_pos[0].x() + target_size
-            && mouse_pos.y() < g->screen_pos[0].y() + target_size) {
-          return g;
-        }
-        break;
+        case GIZMO_TYPE_DOT:
+          if (mouse_pos.x() > g->screen_pos[0].x() - dot_size && mouse_pos.y() > g->screen_pos[0].y() - dot_size &&
+              mouse_pos.x() < g->screen_pos[0].x() + dot_size && mouse_pos.y() < g->screen_pos[0].y() + dot_size) {
+            return g;
+          }
+          break;
+        case GIZMO_TYPE_POLY:
+          if (QPolygon(g->screen_pos).containsPoint(mouse_pos, Qt::OddEvenFill)) {
+            return g;
+          }
+          break;
+        case GIZMO_TYPE_TARGET:
+          if (mouse_pos.x() > g->screen_pos[0].x() - target_size &&
+              mouse_pos.y() > g->screen_pos[0].y() - target_size &&
+              mouse_pos.x() < g->screen_pos[0].x() + target_size &&
+              mouse_pos.y() < g->screen_pos[0].y() + target_size) {
+            return g;
+          }
+          break;
       }
     }
   }
   return nullptr;
 }
 
-void ViewerWidget::move_gizmos(QMouseEvent *event, bool done) {
+void ViewerWidget::move_gizmos(QMouseEvent* event, bool done) {
   if (selected_gizmo != nullptr) {
     double multiplier = double(viewer->seq->width) / double(width());
 
-    int x_movement = qRound((event->position().toPoint().x() - drag_start_x)*multiplier);
-    int y_movement = qRound((event->position().toPoint().y() - drag_start_y)*multiplier);
+    int x_movement = qRound((event->position().toPoint().x() - drag_start_x) * multiplier);
+    int y_movement = qRound((event->position().toPoint().y() - drag_start_y) * multiplier);
 
-    gizmos->gizmo_move(selected_gizmo, x_movement, y_movement, get_timecode(gizmos->parent_clip, gizmos->parent_clip->sequence->playhead), done);
+    gizmos->gizmo_move(selected_gizmo, x_movement, y_movement,
+                       get_timecode(gizmos->parent_clip, gizmos->parent_clip->sequence->playhead), done);
 
     gizmo_x_mvmt += x_movement;
     gizmo_y_mvmt += y_movement;
@@ -306,11 +316,71 @@ void ViewerWidget::move_gizmos(QMouseEvent *event, bool done) {
   }
 }
 
+bool ViewerWidget::event(QEvent* e) {
+  if (e->type() == QEvent::ShortcutOverride && hovered_guide_index_ >= 0 && !olive::CurrentConfig.lock_guides) {
+    auto* ke = static_cast<QKeyEvent*>(e);
+    QKeySequence pressed(ke->key() | ke->modifiers());
+    if (pressed == guide_delete_action_->shortcut() || pressed == guide_mirror_action_->shortcut()) {
+      e->accept();
+      return true;
+    }
+  }
+  return QOpenGLWidget::event(e);
+}
+
+void ViewerWidget::keyPressEvent(QKeyEvent* event) {
+  if (hovered_guide_index_ >= 0 && viewer->seq != nullptr && !olive::CurrentConfig.lock_guides) {
+    QKeySequence pressed(event->key() | event->modifiers());
+    if (pressed == guide_delete_action_->shortcut()) {
+      guide_action_delete();
+      return;
+    }
+    if (pressed == guide_mirror_action_->shortcut()) {
+      guide_action_mirror();
+      return;
+    }
+  }
+  QOpenGLWidget::keyPressEvent(event);
+}
+
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   if (waveform) {
     seek_from_click(qRound(event->position().x()));
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-    container->dragScrollPress(event->position().toPoint()*container->zoom);
+    container->dragScrollPress(event->position().toPoint() * container->zoom);
+  } else if (viewer->seq != nullptr && olive::CurrentConfig.show_guides && !olive::CurrentConfig.lock_guides) {
+    double multiplier = double(viewer->seq->width) / double(width());
+    int video_x = qRound(event->position().x() * multiplier);
+    int image_y = qRound(event->position().y() * multiplier);
+
+    if (event->buttons() & Qt::RightButton) {
+      bool hit_mirror = false;
+      int idx = find_guide_at(video_x, image_y, &hit_mirror);
+      if (idx >= 0) {
+        show_guide_context_menu(idx, event->globalPosition().toPoint(), hit_mirror);
+        setContextMenuPolicy(Qt::PreventContextMenu);
+        QTimer::singleShot(0, this, [this]() { setContextMenuPolicy(Qt::CustomContextMenu); });
+        return;
+      }
+    } else if (event->buttons() & Qt::LeftButton) {
+      bool hit_mirror = false;
+      int idx = find_guide_at(video_x, image_y, &hit_mirror);
+      if (idx >= 0) {
+        dragging_guide_index_ = idx;
+        dragging_guide_old_pos_ = viewer->seq->guides[idx].position;
+        dragging_mirror_side_ = hit_mirror;
+        dragging = true;
+        return;
+      }
+      // Fall through to gizmo handling
+      drag_start_x = event->position().toPoint().x();
+      drag_start_y = event->position().toPoint().y();
+
+      gizmo_x_mvmt = 0;
+      gizmo_y_mvmt = 0;
+
+      selected_gizmo = get_gizmo_from_mouse(event->position().toPoint().x(), event->position().toPoint().y());
+    }
   } else if (event->buttons() & Qt::LeftButton) {
     drag_start_x = event->position().toPoint().x();
     drag_start_y = event->position().toPoint().y();
@@ -328,11 +398,56 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
   if (panel_timeline->tool == TIMELINE_TOOL_HAND) {
     setCursor(Qt::OpenHandCursor);
   }
+
+  if (viewer->seq != nullptr && width() > 0) {
+    double multiplier = double(viewer->seq->width) / double(width());
+    int video_x = qRound(event->position().x() * multiplier);
+    int image_y = qRound(event->position().y() * multiplier);
+
+    if (dragging_guide_index_ >= 0) {
+      Guide& g = viewer->seq->guides[dragging_guide_index_];
+      int raw_pos = (g.orientation == Guide::Horizontal) ? image_y : video_x;
+      if (dragging_mirror_side_) {
+        int dim = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
+        g.position = dim - raw_pos;
+      } else {
+        g.position = raw_pos;
+      }
+      update();
+      return;
+    }
+
+    if (creating_guide_) {
+      creating_guide_pos_ = (creating_guide_orientation_ == Guide::Horizontal) ? image_y : video_x;
+      update();
+      return;
+    }
+
+    // Hover cursor for guides
+    if (!dragging && olive::CurrentConfig.show_guides && !olive::CurrentConfig.lock_guides) {
+      bool hit_mirror = false;
+      int idx = find_guide_at(video_x, image_y, &hit_mirror);
+      if (idx >= 0) {
+        hovered_guide_index_ = idx;
+        hovered_mirror_side_ = hit_mirror;
+
+        if (!hasFocus()) {
+          QWidget* fw = QApplication::focusWidget();
+          if (fw == nullptr || !fw->inherits("QLineEdit")) setFocus();
+        }
+        const Guide& g = viewer->seq->guides[idx];
+        setCursor(g.orientation == Guide::Horizontal ? Qt::SizeVerCursor : Qt::SizeHorCursor);
+        return;
+      }
+    }
+    hovered_guide_index_ = -1;
+  }
+
   if (dragging) {
     if (waveform) {
       seek_from_click(qRound(event->position().x()));
     } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-      container->dragScrollMove(event->position().toPoint()*container->zoom);
+      container->dragScrollMove(event->position().toPoint() * container->zoom);
     } else if (event->buttons() & Qt::LeftButton) {
       if (gizmos == nullptr) {
         viewer->initiate_drag(olive::timeline::kImportBoth);
@@ -351,28 +466,48 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
   }
 }
 
-void ViewerWidget::mouseReleaseEvent(QMouseEvent *event) {
-  if (dragging
-      && gizmos != nullptr
-      && event->button() == Qt::LeftButton
-      && panel_timeline->tool != TIMELINE_TOOL_HAND) {
+void ViewerWidget::mouseReleaseEvent(QMouseEvent* event) {
+  if (dragging_guide_index_ >= 0) {
+    if (viewer->seq != nullptr) {
+      Guide& g = viewer->seq->guides[dragging_guide_index_];
+      int max_val = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
+      if (g.position < 0 || g.position > max_val) {
+        // Dragged off-screen → restore then push delete action
+        g.position = dragging_guide_old_pos_;
+        olive::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), dragging_guide_index_));
+      } else if (g.position != dragging_guide_old_pos_) {
+        // Moved to a new position → restore then push move action
+        int new_pos = g.position;
+        g.position = dragging_guide_old_pos_;
+        olive::UndoStack.push(
+            new MoveGuideAction(viewer->seq.get(), dragging_guide_index_, dragging_guide_old_pos_, new_pos));
+      }
+    }
+    dragging_guide_index_ = -1;
+    dragging_mirror_side_ = false;
+    dragging = false;
+    update();
+    return;
+  }
+
+  if (creating_guide_) {
+    finish_guide_creation();
+    dragging = false;
+    return;
+  }
+
+  if (dragging && gizmos != nullptr && event->button() == Qt::LeftButton &&
+      panel_timeline->tool != TIMELINE_TOOL_HAND) {
     move_gizmos(event, true);
   }
   dragging = false;
 }
 
-void ViewerWidget::wheelEvent(QWheelEvent *event) {
-  container->parseWheelEvent(event);
-}
+void ViewerWidget::wheelEvent(QWheelEvent* event) { container->parseWheelEvent(event); }
 
-void ViewerWidget::close_window() {
-  window->hide();
-}
+void ViewerWidget::close_window() { window->hide(); }
 
-void ViewerWidget::wait_until_render_is_paused()
-{
-  renderer->wait_until_paused();
-}
+void ViewerWidget::wait_until_render_is_paused() { renderer->wait_until_paused(); }
 
 void ViewerWidget::draw_waveform_func() {
   QPainter p(this);
@@ -389,7 +524,8 @@ void ViewerWidget::draw_waveform_func() {
   wr.setX(wr.x() - waveform_scroll);
 
   p.setPen(Qt::green);
-  draw_waveform(waveform_clip, waveform_ms, waveform_clip->timeline_out(), &p, wr, waveform_scroll, width()+waveform_scroll, waveform_zoom);
+  draw_waveform(waveform_clip, waveform_ms, waveform_clip->timeline_out(), &p, wr, waveform_scroll,
+                width() + waveform_scroll, waveform_zoom);
   p.setPen(Qt::red);
   int playhead_x = getScreenPointFromFrame(waveform_zoom, viewer->seq->playhead) - waveform_scroll;
   p.drawLine(playhead_x, 0, playhead_x, height());
@@ -398,14 +534,14 @@ void ViewerWidget::draw_waveform_func() {
 void ViewerWidget::draw_title_safe_area() {
   double halfWidth = 0.5;
   double halfHeight = 0.5;
-  double viewportAr = (double) width() / (double) height();
-  double halfAr = viewportAr*0.5;
+  double viewportAr = (double)width() / (double)height();
+  double halfAr = viewportAr * 0.5;
 
   if (olive::CurrentConfig.use_custom_title_safe_ratio && olive::CurrentConfig.custom_title_safe_ratio > 0) {
     if (olive::CurrentConfig.custom_title_safe_ratio > viewportAr) {
-      halfHeight = (olive::CurrentConfig.custom_title_safe_ratio/viewportAr)*0.5;
+      halfHeight = (olive::CurrentConfig.custom_title_safe_ratio / viewportAr) * 0.5;
     } else {
-      halfWidth = (viewportAr/olive::CurrentConfig.custom_title_safe_ratio)*0.5;
+      halfWidth = (viewportAr / olive::CurrentConfig.custom_title_safe_ratio) * 0.5;
     }
   }
 
@@ -463,6 +599,62 @@ void ViewerWidget::draw_title_safe_area() {
   glEnd();
 }
 
+void ViewerWidget::draw_guides() {
+  if (viewer->seq == nullptr || !olive::CurrentConfig.show_guides) return;
+
+  double zoom_factor = container->zoom / (double(width()) / double(viewer->seq->width));
+
+  glPushMatrix();
+  glLoadIdentity();
+
+  glOrtho(0, viewer->seq->width, 0, viewer->seq->height, -1, 10);
+  glScaled(zoom_factor, zoom_factor, 0.0);
+  glTranslated(-(viewer->seq->width - (width() / container->zoom)) * x_scroll,
+               -((viewer->seq->height - (height() / container->zoom)) * (1.0 - y_scroll)), 0);
+
+  glColor4f(0.0f, 0.8f, 0.8f, 0.7f);
+  glBegin(GL_LINES);
+  for (const Guide& g : viewer->seq->guides) {
+    if (g.orientation == Guide::Horizontal) {
+      // Guide position is image-space Y (0=top), GL ortho has Y=0 at bottom → flip
+      int gl_y = viewer->seq->height - g.position;
+      glVertex2i(0, gl_y);
+      glVertex2i(viewer->seq->width, gl_y);
+      if (g.mirror) {
+        int mirror_gl_y = g.position;  // height - (height - pos) = pos
+        glVertex2i(0, mirror_gl_y);
+        glVertex2i(viewer->seq->width, mirror_gl_y);
+      }
+    } else {
+      glVertex2i(g.position, 0);
+      glVertex2i(g.position, viewer->seq->height);
+      if (g.mirror) {
+        int mirror_x = viewer->seq->width - g.position;
+        glVertex2i(mirror_x, 0);
+        glVertex2i(mirror_x, viewer->seq->height);
+      }
+    }
+  }
+  glEnd();
+
+  // Draw preview line for guide being created
+  if (creating_guide_) {
+    glColor4f(1.0f, 0.65f, 0.0f, 0.7f);
+    glBegin(GL_LINES);
+    if (creating_guide_orientation_ == Guide::Horizontal) {
+      int gl_y = viewer->seq->height - creating_guide_pos_;
+      glVertex2i(0, gl_y);
+      glVertex2i(viewer->seq->width, gl_y);
+    } else {
+      glVertex2i(creating_guide_pos_, 0);
+      glVertex2i(creating_guide_pos_, viewer->seq->height);
+    }
+    glEnd();
+  }
+
+  glPopMatrix();
+}
+
 void ViewerWidget::draw_gizmos() {
   float color[4];
   glGetFloatv(GL_CURRENT_COLOR, color);
@@ -470,66 +662,195 @@ void ViewerWidget::draw_gizmos() {
   double dot_size = GIZMO_DOT_SIZE / double(width()) * viewer->seq->width;
   double target_size = GIZMO_TARGET_SIZE / double(width()) * viewer->seq->width;
 
-  double zoom_factor = container->zoom/(double(width())/double(viewer->seq->width));
+  double zoom_factor = container->zoom / (double(width()) / double(viewer->seq->width));
 
   glPushMatrix();
   glLoadIdentity();
 
   glOrtho(0, viewer->seq->width, 0, viewer->seq->height, -1, 10);
   glScaled(zoom_factor, zoom_factor, 0.0);
-  glTranslated(-(viewer->seq->width-(width()/container->zoom))*x_scroll,
-               -((viewer->seq->height-(height()/container->zoom))*(1.0-y_scroll)),
-               0);
+  glTranslated(-(viewer->seq->width - (width() / container->zoom)) * x_scroll,
+               -((viewer->seq->height - (height() / container->zoom)) * (1.0 - y_scroll)), 0);
 
   float gizmo_z = 0.0f;
-  for (int j=0;j<gizmos->gizmo_count();j++) {
+  for (int j = 0; j < gizmos->gizmo_count(); j++) {
     EffectGizmo* g = gizmos->gizmo(j);
     glColor4d(g->color.redF(), g->color.greenF(), g->color.blueF(), 1.0);
     switch (g->get_type()) {
-    case GIZMO_TYPE_DOT: // draw dot
-      glBegin(GL_QUADS);
-      glVertex3f(g->screen_pos[0].x()-dot_size, g->screen_pos[0].y()-dot_size, gizmo_z);
-      glVertex3f(g->screen_pos[0].x()+dot_size, g->screen_pos[0].y()-dot_size, gizmo_z);
-      glVertex3f(g->screen_pos[0].x()+dot_size, g->screen_pos[0].y()+dot_size, gizmo_z);
-      glVertex3f(g->screen_pos[0].x()-dot_size, g->screen_pos[0].y()+dot_size, gizmo_z);
-      glEnd();
-      break;
-    case GIZMO_TYPE_POLY: // draw lines
-      glBegin(GL_LINES);
-      for (int k=1;k<g->get_point_count();k++) {
-        glVertex3f(g->screen_pos[k-1].x(), g->screen_pos[k-1].y(), gizmo_z);
-        glVertex3f(g->screen_pos[k].x(), g->screen_pos[k].y(), gizmo_z);
-      }
-      glVertex3f(g->screen_pos[g->get_point_count()-1].x(), g->screen_pos[g->get_point_count()-1].y(), gizmo_z);
-      glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y(), gizmo_z);
-      glEnd();
-      break;
-    case GIZMO_TYPE_TARGET: // draw target
-      glBegin(GL_LINES);
-      glVertex3f(g->screen_pos[0].x()-target_size, g->screen_pos[0].y()-target_size, gizmo_z);
-      glVertex3f(g->screen_pos[0].x()+target_size, g->screen_pos[0].y()-target_size, gizmo_z);
+      case GIZMO_TYPE_DOT:  // draw dot
+        glBegin(GL_QUADS);
+        glVertex3f(g->screen_pos[0].x() - dot_size, g->screen_pos[0].y() - dot_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() + dot_size, g->screen_pos[0].y() - dot_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() + dot_size, g->screen_pos[0].y() + dot_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() - dot_size, g->screen_pos[0].y() + dot_size, gizmo_z);
+        glEnd();
+        break;
+      case GIZMO_TYPE_POLY:  // draw lines
+        glBegin(GL_LINES);
+        for (int k = 1; k < g->get_point_count(); k++) {
+          glVertex3f(g->screen_pos[k - 1].x(), g->screen_pos[k - 1].y(), gizmo_z);
+          glVertex3f(g->screen_pos[k].x(), g->screen_pos[k].y(), gizmo_z);
+        }
+        glVertex3f(g->screen_pos[g->get_point_count() - 1].x(), g->screen_pos[g->get_point_count() - 1].y(), gizmo_z);
+        glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y(), gizmo_z);
+        glEnd();
+        break;
+      case GIZMO_TYPE_TARGET:  // draw target
+        glBegin(GL_LINES);
+        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y() - target_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y() - target_size, gizmo_z);
 
-      glVertex3f(g->screen_pos[0].x()+target_size, g->screen_pos[0].y()-target_size, gizmo_z);
-      glVertex3f(g->screen_pos[0].x()+target_size, g->screen_pos[0].y()+target_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y() - target_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y() + target_size, gizmo_z);
 
-      glVertex3f(g->screen_pos[0].x()+target_size, g->screen_pos[0].y()+target_size, gizmo_z);
-      glVertex3f(g->screen_pos[0].x()-target_size, g->screen_pos[0].y()+target_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y() + target_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y() + target_size, gizmo_z);
 
-      glVertex3f(g->screen_pos[0].x()-target_size, g->screen_pos[0].y()+target_size, gizmo_z);
-      glVertex3f(g->screen_pos[0].x()-target_size, g->screen_pos[0].y()-target_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y() + target_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y() - target_size, gizmo_z);
 
-      glVertex3f(g->screen_pos[0].x()-target_size, g->screen_pos[0].y(), gizmo_z);
-      glVertex3f(g->screen_pos[0].x()+target_size, g->screen_pos[0].y(), gizmo_z);
+        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y(), gizmo_z);
+        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y(), gizmo_z);
 
-      glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y()-target_size, gizmo_z);
-      glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y()+target_size, gizmo_z);
-      glEnd();
-      break;
+        glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y() - target_size, gizmo_z);
+        glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y() + target_size, gizmo_z);
+        glEnd();
+        break;
     }
   }
   glPopMatrix();
 
   glColor4f(color[0], color[1], color[2], color[3]);
+}
+
+int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {
+  if (viewer->seq == nullptr) return -1;
+  int threshold = qMax(3, int(5.0 * viewer->seq->width / width()));
+  for (int i = 0; i < viewer->seq->guides.size(); i++) {
+    const Guide& g = viewer->seq->guides[i];
+    if (g.orientation == Guide::Horizontal) {
+      if (qAbs(video_y - g.position) <= threshold) {
+        if (hit_mirror) *hit_mirror = false;
+        return i;
+      }
+      if (g.mirror) {
+        int mirror_pos = viewer->seq->height - g.position;
+        if (qAbs(video_y - mirror_pos) <= threshold) {
+          if (hit_mirror) *hit_mirror = true;
+          return i;
+        }
+      }
+    } else {
+      if (qAbs(video_x - g.position) <= threshold) {
+        if (hit_mirror) *hit_mirror = false;
+        return i;
+      }
+      if (g.mirror) {
+        int mirror_pos = viewer->seq->width - g.position;
+        if (qAbs(video_x - mirror_pos) <= threshold) {
+          if (hit_mirror) *hit_mirror = true;
+          return i;
+        }
+      }
+    }
+  }
+  return -1;
+}
+
+void ViewerWidget::guide_action_delete() {
+  if (hovered_guide_index_ < 0 || viewer->seq == nullptr) return;
+  olive::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), hovered_guide_index_));
+  hovered_guide_index_ = -1;
+  update();
+}
+
+void ViewerWidget::guide_action_mirror() {
+  if (hovered_guide_index_ < 0 || viewer->seq == nullptr) return;
+  const Guide& g = viewer->seq->guides[hovered_guide_index_];
+  bool was_mirrored = g.mirror;
+  if (was_mirrored && hovered_mirror_side_) {
+    int dim = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
+    int mirror_pos = dim - g.position;
+    auto* combo = new ComboAction();
+    combo->append(new MoveGuideAction(viewer->seq.get(), hovered_guide_index_, g.position, mirror_pos));
+    combo->append(new SetGuideMirrorAction(viewer->seq.get(), hovered_guide_index_, false));
+    olive::UndoStack.push(combo);
+  } else {
+    olive::UndoStack.push(new SetGuideMirrorAction(viewer->seq.get(), hovered_guide_index_, !was_mirrored));
+  }
+  update();
+}
+
+void ViewerWidget::show_guide_context_menu(int guide_index, const QPoint& global_pos, bool on_mirror) {
+  QMenu menu;
+  QAction* set_value = menu.addAction(tr("Set Value..."));
+  QAction* mirror_action = menu.addAction(tr("Mirror") + "\t" + guide_mirror_action_->shortcut().toString());
+  mirror_action->setCheckable(true);
+  mirror_action->setChecked(viewer->seq->guides[guide_index].mirror);
+  QAction* delete_guide = menu.addAction(tr("Delete Guide") + "\t" + guide_delete_action_->shortcut().toString());
+
+  QAction* selected = menu.exec(global_pos);
+  if (selected == set_value) {
+    const Guide& g = viewer->seq->guides[guide_index];
+    int dim = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
+    int display_pos = (on_mirror && g.mirror) ? (dim - g.position) : g.position;
+    bool ok;
+    int val = QInputDialog::getInt(this, tr("Set Guide Value"), tr("Position (pixels):"), display_pos, 0, dim, 1, &ok);
+    if (ok && val != display_pos) {
+      int new_primary = (on_mirror && g.mirror) ? (dim - val) : val;
+      olive::UndoStack.push(new MoveGuideAction(viewer->seq.get(), guide_index, g.position, new_primary));
+      update();
+    }
+  } else if (selected == mirror_action) {
+    const Guide& g = viewer->seq->guides[guide_index];
+    bool was_mirrored = g.mirror;
+    if (was_mirrored && on_mirror) {
+      // Unchecking mirror from the mirror side: move primary to mirror position, then disable mirror
+      int dim = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
+      int mirror_pos = dim - g.position;
+      auto* combo = new ComboAction();
+      combo->append(new MoveGuideAction(viewer->seq.get(), guide_index, g.position, mirror_pos));
+      combo->append(new SetGuideMirrorAction(viewer->seq.get(), guide_index, false));
+      olive::UndoStack.push(combo);
+    } else {
+      olive::UndoStack.push(new SetGuideMirrorAction(viewer->seq.get(), guide_index, !was_mirrored));
+    }
+    update();
+  } else if (selected == delete_guide) {
+    olive::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), guide_index));
+    update();
+  }
+}
+
+void ViewerWidget::start_guide_creation(Guide::Orientation orientation, int video_pos) {
+  creating_guide_ = true;
+  creating_guide_orientation_ = orientation;
+  creating_guide_pos_ = video_pos;
+  update();
+}
+
+void ViewerWidget::update_guide_creation(int video_pos) {
+  creating_guide_pos_ = video_pos;
+  update();
+}
+
+void ViewerWidget::finish_guide_creation() {
+  if (creating_guide_ && viewer->seq != nullptr) {
+    int max_val = (creating_guide_orientation_ == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
+    if (creating_guide_pos_ >= 0 && creating_guide_pos_ <= max_val) {
+      Guide g;
+      g.orientation = creating_guide_orientation_;
+      g.position = creating_guide_pos_;
+      olive::UndoStack.push(new AddGuideAction(viewer->seq.get(), g));
+    }
+  }
+  creating_guide_ = false;
+  update();
+}
+
+void ViewerWidget::cancel_guide_creation() {
+  creating_guide_ = false;
+  update();
 }
 
 void ViewerWidget::paintGL() {
@@ -562,15 +883,15 @@ void ViewerWidget::paintGL() {
 
     glBegin(GL_QUADS);
 
-    double zoom_factor = container->zoom/(double(width())/double(viewer->seq->width));
-    double zoom_size = (zoom_factor*2.0) - 2.0;
-    double zoom_left = -zoom_size*x_scroll - 1.0;
-    double zoom_right = zoom_size*(1.0-x_scroll) + 1.0;
-    double zoom_bottom = -zoom_size*(1.0-y_scroll) - 1.0;
-    double zoom_top = zoom_size*(y_scroll) + 1.0;
+    double zoom_factor = container->zoom / (double(width()) / double(viewer->seq->width));
+    double zoom_size = (zoom_factor * 2.0) - 2.0;
+    double zoom_left = -zoom_size * x_scroll - 1.0;
+    double zoom_right = zoom_size * (1.0 - x_scroll) + 1.0;
+    double zoom_bottom = -zoom_size * (1.0 - y_scroll) - 1.0;
+    double zoom_top = zoom_size * (y_scroll) + 1.0;
 
-    //zoom_left *= ar_diff;
-    //zoom_right *= ar_diff;
+    // zoom_left *= ar_diff;
+    // zoom_right *= ar_diff;
 
     glVertex2d(zoom_left, zoom_bottom);
     glTexCoord2d(0, 0);
@@ -590,6 +911,8 @@ void ViewerWidget::paintGL() {
       draw_title_safe_area();
     }
 
+    draw_guides();
+
     gizmos = renderer->gizmos;
     if (gizmos != nullptr) {
       draw_gizmos();
@@ -599,7 +922,7 @@ void ViewerWidget::paintGL() {
     glFinish();
 
     if (window->isVisible()) {
-      window->set_texture(tex, double(viewer->seq->width)/double(viewer->seq->height), tex_lock);
+      window->set_texture(tex, double(viewer->seq->width) / double(viewer->seq->height), tex_lock);
     }
 
     tex_lock->unlock();

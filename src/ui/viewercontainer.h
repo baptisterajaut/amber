@@ -22,48 +22,53 @@
 #define VIEWERCONTAINER_H
 
 #include <QWidget>
+
+#include "rulerwidget.h"
+
 class Viewer;
 class ViewerWidget;
 class QScrollBar;
 
-class ViewerContainer : public QWidget
-{
-	Q_OBJECT
-public:
-	explicit ViewerContainer(QWidget *parent = nullptr);
-	~ViewerContainer() override;
+class ViewerContainer : public QWidget {
+  Q_OBJECT
+ public:
+  explicit ViewerContainer(QWidget* parent = nullptr);
+  ~ViewerContainer() override;
 
-	bool fit{true};
-	double zoom;
+  bool fit{true};
+  double zoom;
 
-	void dragScrollPress(const QPoint&);
-	void dragScrollMove(const QPoint&);
-	void parseWheelEvent(QWheelEvent* event);
+  void dragScrollPress(const QPoint&);
+  void dragScrollMove(const QPoint&);
+  void parseWheelEvent(QWheelEvent* event);
 
-	Viewer* viewer;
-	ViewerWidget* child{nullptr};
-	void adjust();
+  Viewer* viewer;
+  ViewerWidget* child{nullptr};
+  RulerWidget* horizontal_ruler{nullptr};
+  RulerWidget* vertical_ruler{nullptr};
+  void adjust();
+  void set_rulers_visible(bool visible);
 
-	// manually moves scrollbars into the correct position
-	void adjust_scrollbars();
+  // manually moves scrollbars into the correct position
+  void adjust_scrollbars();
 
-protected:
-	void resizeEvent(QResizeEvent *event) override;
+ protected:
+  void resizeEvent(QResizeEvent* event) override;
 
-signals:
+ signals:
 
-public slots:
+ public slots:
 
-private slots:
-	void scroll_changed();
+ private slots:
+  void scroll_changed();
 
-private:
-	int drag_start_x;
-	int drag_start_y;
-	int horiz_start;
-	int vert_start;
-	QScrollBar* horizontal_scrollbar;
-	QScrollBar* vertical_scrollbar;
+ private:
+  int drag_start_x;
+  int drag_start_y;
+  int horiz_start;
+  int vert_start;
+  QScrollBar* horizontal_scrollbar;
+  QScrollBar* vertical_scrollbar;
 };
 
-#endif // VIEWERCONTAINER_H
+#endif  // VIEWERCONTAINER_H

@@ -264,6 +264,7 @@ set(OLIVE_SOURCES
   timeline/clip.cpp
   timeline/clip.h
   timeline/marker.cpp
+  timeline/guide.h
   timeline/marker.h
   timeline/mediaimportdata.cpp
   timeline/mediaimportdata.h
@@ -322,6 +323,8 @@ set(OLIVE_SOURCES
   ui/playbutton.h
   ui/rectangleselect.cpp
   ui/rectangleselect.h
+  ui/rulerwidget.cpp
+  ui/rulerwidget.h
   ui/resizablescrollbar.cpp
   ui/resizablescrollbar.h
   ui/scrollarea.cpp
@@ -357,6 +360,8 @@ set(OLIVE_SOURCES
   undo/undo_effect.h
   undo/undo_generic.cpp
   undo/undo_generic.h
+  undo/undo_guide.cpp
+  undo/undo_guide.h
   undo/undo_media.cpp
   undo/undo_media.h
   undo/undo_timeline.cpp

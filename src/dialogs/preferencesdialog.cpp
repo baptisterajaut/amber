@@ -666,7 +666,7 @@ void PreferencesDialog::setup_ui() {
   QWidget* frame_skip_row = new QWidget(behavior_tab);
   QHBoxLayout* frame_skip_layout = new QHBoxLayout(frame_skip_row);
   frame_skip_layout->setContentsMargins(0, 0, 0, 0);
-  frame_skip_layout->addWidget(new QLabel(tr("Frame Skip Step:"), behavior_tab));
+  frame_skip_layout->addWidget(new QLabel(tr("Jump Step:"), behavior_tab));
   frame_skip_step_field = new QSpinBox(behavior_tab);
   frame_skip_step_field->setMinimum(1);
   frame_skip_step_field->setMaximum(999);

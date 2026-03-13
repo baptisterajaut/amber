@@ -26,124 +26,124 @@
 #include "ui/styling.h"
 
 namespace olive {
-  /**
-   * @brief Version identifier for saved projects
-   *
-   * This constant is used to identify what version of Olive a project file was saved with. Every project file
-   * is saved with the current version number and the version is checked whenever an Olive project is loaded to
-   * determine how compatible it'll be with the current version.
-   *
-   * Sometimes this version identifier is used to invoke backwards compatibility in order to keep older project files
-   * able to load, but in this early rapidly developing stage, often backwards compatibility is abandoned. Ideally
-   * in the future, a class should be made that's able to "convert" an older project into one that the current
-   * loading system understands (so that the loading system doesn't get too bloated with backwards compatibility
-   * functions).
-   */
-  const int kSaveVersion = 190219; // YYMMDD
+/**
+ * @brief Version identifier for saved projects
+ *
+ * This constant is used to identify what version of Olive a project file was saved with. Every project file
+ * is saved with the current version number and the version is checked whenever an Olive project is loaded to
+ * determine how compatible it'll be with the current version.
+ *
+ * Sometimes this version identifier is used to invoke backwards compatibility in order to keep older project files
+ * able to load, but in this early rapidly developing stage, often backwards compatibility is abandoned. Ideally
+ * in the future, a class should be made that's able to "convert" an older project into one that the current
+ * loading system understands (so that the loading system doesn't get too bloated with backwards compatibility
+ * functions).
+ */
+const int kSaveVersion = 190219;  // YYMMDD
 
-  /**
-   * @brief Minimum project version that this version of Olive can open
-   *
-   * When loading a project, the project's version number is actually checked whether it is somewhere between
-   * kSaveVersion and this value (inclusive). This is used if the current version of Olive contains backwards
-   * compatibility functionality for older project versions, and is bumped up if such backwards compatibility is
-   * ever removed.
-   *
-   * As stated in kSaveVersion documentation, ideally in the future, a system would be in place to account for all
-   * project version differences and bring them up to date for the current loading algorithm. This means ideally, this
-   * constant stays the same forever, but in this early stage it's not strictly necessary.
-   */
-  const int kMinimumSaveVersion = 190219; // lowest compatible project version
+/**
+ * @brief Minimum project version that this version of Olive can open
+ *
+ * When loading a project, the project's version number is actually checked whether it is somewhere between
+ * kSaveVersion and this value (inclusive). This is used if the current version of Olive contains backwards
+ * compatibility functionality for older project versions, and is bumped up if such backwards compatibility is
+ * ever removed.
+ *
+ * As stated in kSaveVersion documentation, ideally in the future, a system would be in place to account for all
+ * project version differences and bring them up to date for the current loading algorithm. This means ideally, this
+ * constant stays the same forever, but in this early stage it's not strictly necessary.
+ */
+const int kMinimumSaveVersion = 190219;  // lowest compatible project version
 
-  /**
-   * @brief The TimecodeType enum
-   *
-   * Frame numbers can be displayed in various different ways. The timecode_to_frame() and frame_to_timecode()
-   * functions (which should be used for all frame <-> timecode conversions) respond to the timecode display type
-   * set in Config::timecode_view corresponding to a value from this enum.
-   */
-  enum TimecodeType : uint8_t {
-    /** Show frame number as a drop-frame timecode */
-    kTimecodeDrop,
+/**
+ * @brief The TimecodeType enum
+ *
+ * Frame numbers can be displayed in various different ways. The timecode_to_frame() and frame_to_timecode()
+ * functions (which should be used for all frame <-> timecode conversions) respond to the timecode display type
+ * set in Config::timecode_view corresponding to a value from this enum.
+ */
+enum TimecodeType : uint8_t {
+  /** Show frame number as a drop-frame timecode */
+  kTimecodeDrop,
 
-    /** Show frame number as a non-drop-frame timecode */
-    kTimecodeNonDrop,
+  /** Show frame number as a non-drop-frame timecode */
+  kTimecodeNonDrop,
 
-    /** Show frame number as-is with no modifications */
-    kTimecodeFrames,
+  /** Show frame number as-is with no modifications */
+  kTimecodeFrames,
 
-    /** Show frame number as milliseconds */
-    kTimecodeMilliseconds
-  };
+  /** Show frame number as milliseconds */
+  kTimecodeMilliseconds
+};
 
-  /**
-   * @brief The RecordingMode enum
-   *
-   * Olive currently supports recording mono or stereo and gives users the option of which mode to use when
-   * recording audio in-app. Audio recording responds to Config::recording_mode to a value from this enum.
-   */
-  enum RecordingMode : uint8_t {
-    /** Record all audio in mono */
-    RECORD_MODE_MONO,
+/**
+ * @brief The RecordingMode enum
+ *
+ * Olive currently supports recording mono or stereo and gives users the option of which mode to use when
+ * recording audio in-app. Audio recording responds to Config::recording_mode to a value from this enum.
+ */
+enum RecordingMode : uint8_t {
+  /** Record all audio in mono */
+  RECORD_MODE_MONO,
 
-    /** Record all audio in stereo */
-    RECORD_MODE_STEREO
-  };
+  /** Record all audio in stereo */
+  RECORD_MODE_STEREO
+};
 
-  /**
-   * @brief The AutoScrollMode enum
-   *
-   * The Timeline in Olive can automatically scroll to follow the playhead when the sequence is playing.
-   * The Timeline will respond to Config::autoscroll set to a value from this enum.
-   */
-  enum AutoScrollMode : uint8_t {
-    /** Don't auto-scroll, scrolling will not follow the playhead */
-    AUTOSCROLL_NO_SCROLL,
+/**
+ * @brief The AutoScrollMode enum
+ *
+ * The Timeline in Olive can automatically scroll to follow the playhead when the sequence is playing.
+ * The Timeline will respond to Config::autoscroll set to a value from this enum.
+ */
+enum AutoScrollMode : uint8_t {
+  /** Don't auto-scroll, scrolling will not follow the playhead */
+  AUTOSCROLL_NO_SCROLL,
 
-    /** Page auto-scroll (default), if the playhead goes off-screen while playing, the scroll will jump ahead
-     * one "page" to follow it */
-    AUTOSCROLL_PAGE_SCROLL,
+  /** Page auto-scroll (default), if the playhead goes off-screen while playing, the scroll will jump ahead
+   * one "page" to follow it */
+  AUTOSCROLL_PAGE_SCROLL,
 
-    /** Smooth auto-scroll, Olive will scroll to keep the playhead in the center of the screen at all times while
-     * playing */
-    AUTOSCROLL_SMOOTH_SCROLL
-  };
+  /** Smooth auto-scroll, Olive will scroll to keep the playhead in the center of the screen at all times while
+   * playing */
+  AUTOSCROLL_SMOOTH_SCROLL
+};
 
-  /**
-   * @brief The ProjectView enum
-   *
-   * The media in the Project panel can be displayed as a tree hierarchy or as an icon view. The Project panel
-   * responds to Config::project_view_type set to a value from this enum.
-   */
-  enum ProjectView : uint8_t {
-    /** Display project media in tree hierarchy */
-    PROJECT_VIEW_TREE,
+/**
+ * @brief The ProjectView enum
+ *
+ * The media in the Project panel can be displayed as a tree hierarchy or as an icon view. The Project panel
+ * responds to Config::project_view_type set to a value from this enum.
+ */
+enum ProjectView : uint8_t {
+  /** Display project media in tree hierarchy */
+  PROJECT_VIEW_TREE,
 
-    /** Display project media in icon browser */
-    PROJECT_VIEW_ICON,
+  /** Display project media in icon browser */
+  PROJECT_VIEW_ICON,
 
-    /** Display project media in list browser */
-    PROJECT_VIEW_LIST
-  };
+  /** Display project media in list browser */
+  PROJECT_VIEW_LIST
+};
 
-  /**
-   * @brief The FrameQueueType enum
-   *
-   * Olive keeps a "frame queue" in memory to allow smoother playback/seeking. In order to give users control over
-   * the amount of memory consumption vs. playback performance, they can control how many frames are cached into
-   * memory. For extra fidelity, they can choose this value as a metric of either frames or seconds.
-   *
-   * The playback engine (playback/playback.h) responds to both Config::previous_queue_type and
-   * Config::upcoming_queue_type set to a value from this enum.
-   */
-  enum FrameQueueType : uint8_t {
-    /** Queue size value is in frames */
-    FRAME_QUEUE_TYPE_FRAMES,
+/**
+ * @brief The FrameQueueType enum
+ *
+ * Olive keeps a "frame queue" in memory to allow smoother playback/seeking. In order to give users control over
+ * the amount of memory consumption vs. playback performance, they can control how many frames are cached into
+ * memory. For extra fidelity, they can choose this value as a metric of either frames or seconds.
+ *
+ * The playback engine (playback/playback.h) responds to both Config::previous_queue_type and
+ * Config::upcoming_queue_type set to a value from this enum.
+ */
+enum FrameQueueType : uint8_t {
+  /** Queue size value is in frames */
+  FRAME_QUEUE_TYPE_FRAMES,
 
-    /** Queue size value is in seconds */
-    FRAME_QUEUE_TYPE_SECONDS
-  };
-}
+  /** Queue size value is in seconds */
+  FRAME_QUEUE_TYPE_SECONDS
+};
+}  // namespace olive
 
 /**
  * @brief The Config struct
@@ -581,9 +581,19 @@ struct Config {
   /**
    * @brief Frame skip step size
    *
-   * Number of frames to skip when using the "Skip Forward" / "Skip Backward" shortcuts.
+   * Number of frames to skip when using the "Jump Forward" / "Jump Backward" shortcuts.
    */
   int frame_skip_step{5};
+
+  /**
+   * @brief Show ruler guides in the sequence viewer
+   */
+  bool show_guides{false};
+
+  /**
+   * @brief Lock guides to prevent creation, dragging, and context menu interaction
+   */
+  bool lock_guides{false};
 
   /**
    * @brief Load config from file
@@ -648,6 +658,6 @@ struct RuntimeConfig {
 namespace olive {
 extern Config CurrentConfig;
 extern RuntimeConfig CurrentRuntimeConfig;
-}
+}  // namespace olive
 
-#endif // CONFIG_H
+#endif  // CONFIG_H
