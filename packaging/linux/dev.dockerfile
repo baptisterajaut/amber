@@ -69,7 +69,7 @@ CMD ["bash", "-c", "\
     rm -rf /tmp/AppDir && \
     DESTDIR=/tmp/AppDir make install && \
     rm -f ${Qt6_DIR}/plugins/multimedia/libffmpegmediaplugin.so && \
-    VERSION=${VERSION:-1.0.1} \
+    VERSION=${VERSION:-1.1.0} \
     QMAKE=${Qt6_DIR}/bin/qmake \
     linuxdeploy \
       --appdir /tmp/AppDir \

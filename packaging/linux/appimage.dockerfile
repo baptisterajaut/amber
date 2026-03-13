@@ -6,7 +6,7 @@
 #     --build-arg GIT_HASH=$(git rev-parse --short HEAD) .
 #   docker run --rm -v ./out:/out amber-appimage
 
-ARG VERSION=1.0.1
+ARG VERSION=1.1.0
 
 FROM ubuntu:24.04
 
