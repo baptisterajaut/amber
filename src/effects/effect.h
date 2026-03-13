@@ -127,6 +127,9 @@ struct GLTextureCoords {
 
   int blendmode;
   float opacity;
+
+  // Accumulated CoordsFlag transform (replaces glTranslate/glRotate/glScale on GL matrix stack)
+  QMatrix4x4 transform;
 };
 
 const EffectMeta* get_meta_from_name(const QString& input);
@@ -173,6 +176,7 @@ public:
   void open();
   void close();
   bool is_glsl_linked();
+  QOpenGLShaderProgram* program() const { return glslProgram; }
   virtual void startEffect();
   virtual void endEffect();
 
@@ -198,7 +202,7 @@ public:
 
   virtual void gizmo_draw(double timecode, GLTextureCoords& coords);
   void gizmo_move(EffectGizmo* sender, int x_movement, int y_movement, double timecode, bool done);
-  void gizmo_world_to_screen();
+  void gizmo_world_to_screen(const QMatrix4x4& mvp = QMatrix4x4());
   bool are_gizmos_enabled();
 
   template <typename T>

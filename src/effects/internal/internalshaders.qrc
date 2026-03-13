@@ -4,6 +4,8 @@
         <file>common.vert</file>
         <file>cornerpin.frag</file>
         <file>cornerpin.vert</file>
+        <file>passthrough.vert</file>
+        <file>passthrough.frag</file>
         <file>premultiply.frag</file>
         <file>dropshadow.frag</file>
         <file>yuv2rgb.frag</file>

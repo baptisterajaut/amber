@@ -51,6 +51,8 @@ extern "C" {
 #include "project/projectelements.h"
 #include "rendering/audio.h"
 #include "rendering/cacher.h"
+#include "rendering/matrixutil.h"
+#include "rendering/quadbuffer.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
 #include "ui/collapsiblewidget.h"
@@ -222,6 +224,13 @@ void ViewerWidget::retry() { update(); }
 
 void ViewerWidget::initializeGL() {
   initializeOpenGLFunctions();
+
+  passthrough_program_ = new QOpenGLShaderProgram(this);
+  passthrough_program_->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/passthrough.vert");
+  passthrough_program_->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/passthrough.frag");
+  passthrough_program_->bindAttributeLocation("a_position", 0);
+  passthrough_program_->bindAttributeLocation("a_texcoord", 1);
+  passthrough_program_->link();
 
   connect(context(), &QOpenGLContext::aboutToBeDestroyed, this, &ViewerWidget::context_destroy, Qt::DirectConnection);
 }
@@ -532,195 +541,175 @@ void ViewerWidget::draw_waveform_func() {
 }
 
 void ViewerWidget::draw_title_safe_area() {
-  double halfWidth = 0.5;
-  double halfHeight = 0.5;
-  double viewportAr = (double)width() / (double)height();
-  double halfAr = viewportAr * 0.5;
+  QPainter p(this);
+  p.beginNativePainting();
+  p.endNativePainting();
+
+  int w = width();
+  int h = height();
+
+  // Compute effective area (respecting custom aspect ratio)
+  double viewportAr = double(w) / double(h);
+  double areaW = w;
+  double areaH = h;
+  double offsetX = 0;
+  double offsetY = 0;
 
   if (olive::CurrentConfig.use_custom_title_safe_ratio && olive::CurrentConfig.custom_title_safe_ratio > 0) {
     if (olive::CurrentConfig.custom_title_safe_ratio > viewportAr) {
-      halfHeight = (olive::CurrentConfig.custom_title_safe_ratio / viewportAr) * 0.5;
+      areaH = w / olive::CurrentConfig.custom_title_safe_ratio;
+      offsetY = (h - areaH) * 0.5;
     } else {
-      halfWidth = (viewportAr / olive::CurrentConfig.custom_title_safe_ratio) * 0.5;
+      areaW = h * olive::CurrentConfig.custom_title_safe_ratio;
+      offsetX = (w - areaW) * 0.5;
     }
   }
 
-  glLoadIdentity();
-  glOrtho(-halfWidth, halfWidth, halfHeight, -halfHeight, 0, 1);
+  double cx = offsetX + areaW * 0.5;
+  double cy = offsetY + areaH * 0.5;
 
-  glColor4f(0.66f, 0.66f, 0.66f, 1.0f);
-  glBegin(GL_LINES);
+  QPen pen(QColor(168, 168, 168));
+  pen.setWidth(1);
+  p.setPen(pen);
 
-  // action safe rectangle
-  glVertex2d(-0.45, -0.45);
-  glVertex2d(0.45, -0.45);
-  glVertex2d(0.45, -0.45);
-  glVertex2d(0.45, 0.45);
-  glVertex2d(0.45, 0.45);
-  glVertex2d(-0.45, 0.45);
-  glVertex2d(-0.45, 0.45);
-  glVertex2d(-0.45, -0.45);
+  // action safe (90%)
+  double a = 0.45;
+  p.drawRect(QRectF(cx - areaW * a, cy - areaH * a, areaW * a * 2, areaH * a * 2));
 
-  // title safe rectangle
-  glVertex2d(-0.4, -0.4);
-  glVertex2d(0.4, -0.4);
-  glVertex2d(0.4, -0.4);
-  glVertex2d(0.4, 0.4);
-  glVertex2d(0.4, 0.4);
-  glVertex2d(-0.4, 0.4);
-  glVertex2d(-0.4, 0.4);
-  glVertex2d(-0.4, -0.4);
+  // title safe (80%)
+  double t = 0.40;
+  p.drawRect(QRectF(cx - areaW * t, cy - areaH * t, areaW * t * 2, areaH * t * 2));
 
-  // horizontal centers
-  glVertex2d(-0.45, 0);
-  glVertex2d(-0.375, 0);
-  glVertex2d(0.45, 0);
-  glVertex2d(0.375, 0);
-
-  // vertical centers
-  glVertex2d(0, -0.45);
-  glVertex2d(0, -0.375);
-  glVertex2d(0, 0.45);
-  glVertex2d(0, 0.375);
-
-  glEnd();
+  // center markers
+  double tick = areaW * 0.075;
+  double tickV = areaH * 0.075;
+  p.drawLine(QPointF(cx - areaW * a, cy), QPointF(cx - areaW * a + tick, cy));
+  p.drawLine(QPointF(cx + areaW * a, cy), QPointF(cx + areaW * a - tick, cy));
+  p.drawLine(QPointF(cx, cy - areaH * a), QPointF(cx, cy - areaH * a + tickV));
+  p.drawLine(QPointF(cx, cy + areaH * a), QPointF(cx, cy + areaH * a - tickV));
 
   // center cross
-  glLoadIdentity();
-  glOrtho(-halfAr, halfAr, 0.5, -0.5, -1, 1);
+  double cross = qMin(areaW, areaH) * 0.05;
+  p.drawLine(QPointF(cx - cross, cy), QPointF(cx + cross, cy));
+  p.drawLine(QPointF(cx, cy - cross), QPointF(cx, cy + cross));
 
-  glBegin(GL_LINES);
-
-  glVertex2d(-0.05, 0);
-  glVertex2d(0.05, 0);
-  glVertex2d(0, -0.05);
-  glVertex2d(0, 0.05);
-
-  glEnd();
+  p.end();
 }
 
 void ViewerWidget::draw_guides() {
   if (viewer->seq == nullptr || !olive::CurrentConfig.show_guides) return;
 
-  double zoom_factor = container->zoom / (double(width()) / double(viewer->seq->width));
+  QPainter p(this);
+  p.beginNativePainting();
+  p.endNativePainting();
 
-  glPushMatrix();
-  glLoadIdentity();
+  // Compute image→widget coordinate transform
+  // container->zoom maps image-space pixels to widget-space pixels directly
+  double scale = container->zoom;
+  double tx = (viewer->seq->width - (width() / container->zoom)) * x_scroll;
+  double ty = (viewer->seq->height - (height() / container->zoom)) * (1.0 - y_scroll);
 
-  glOrtho(0, viewer->seq->width, 0, viewer->seq->height, -1, 10);
-  glScaled(zoom_factor, zoom_factor, 0.0);
-  glTranslated(-(viewer->seq->width - (width() / container->zoom)) * x_scroll,
-               -((viewer->seq->height - (height() / container->zoom)) * (1.0 - y_scroll)), 0);
+  auto toWidget = [&](double ix, double iy) -> QPointF {
+    // image-space (0=top-left, Y down) → widget-space
+    return QPointF((ix - tx) * scale, (iy - ty) * scale);
+  };
 
-  glColor4f(0.0f, 0.8f, 0.8f, 0.7f);
-  glBegin(GL_LINES);
+  QPen guidePen(QColor(0, 204, 204, 178));
+  guidePen.setWidth(1);
+  p.setPen(guidePen);
+
   for (const Guide& g : viewer->seq->guides) {
     if (g.orientation == Guide::Horizontal) {
-      // Guide position is image-space Y (0=top), GL ortho has Y=0 at bottom → flip
-      int gl_y = viewer->seq->height - g.position;
-      glVertex2i(0, gl_y);
-      glVertex2i(viewer->seq->width, gl_y);
+      QPointF left = toWidget(0, g.position);
+      QPointF right = toWidget(viewer->seq->width, g.position);
+      p.drawLine(left, right);
       if (g.mirror) {
-        int mirror_gl_y = g.position;  // height - (height - pos) = pos
-        glVertex2i(0, mirror_gl_y);
-        glVertex2i(viewer->seq->width, mirror_gl_y);
+        int mirror_pos = viewer->seq->height - g.position;
+        p.drawLine(toWidget(0, mirror_pos), toWidget(viewer->seq->width, mirror_pos));
       }
     } else {
-      glVertex2i(g.position, 0);
-      glVertex2i(g.position, viewer->seq->height);
+      QPointF top = toWidget(g.position, 0);
+      QPointF bottom = toWidget(g.position, viewer->seq->height);
+      p.drawLine(top, bottom);
       if (g.mirror) {
-        int mirror_x = viewer->seq->width - g.position;
-        glVertex2i(mirror_x, 0);
-        glVertex2i(mirror_x, viewer->seq->height);
+        int mirror_pos = viewer->seq->width - g.position;
+        p.drawLine(toWidget(mirror_pos, 0), toWidget(mirror_pos, viewer->seq->height));
       }
     }
   }
-  glEnd();
 
   // Draw preview line for guide being created
   if (creating_guide_) {
-    glColor4f(1.0f, 0.65f, 0.0f, 0.7f);
-    glBegin(GL_LINES);
+    QPen createPen(QColor(255, 165, 0, 178));
+    createPen.setWidth(1);
+    p.setPen(createPen);
     if (creating_guide_orientation_ == Guide::Horizontal) {
-      int gl_y = viewer->seq->height - creating_guide_pos_;
-      glVertex2i(0, gl_y);
-      glVertex2i(viewer->seq->width, gl_y);
+      p.drawLine(toWidget(0, creating_guide_pos_), toWidget(viewer->seq->width, creating_guide_pos_));
     } else {
-      glVertex2i(creating_guide_pos_, 0);
-      glVertex2i(creating_guide_pos_, viewer->seq->height);
+      p.drawLine(toWidget(creating_guide_pos_, 0), toWidget(creating_guide_pos_, viewer->seq->height));
     }
-    glEnd();
   }
 
-  glPopMatrix();
+  p.end();
 }
 
 void ViewerWidget::draw_gizmos() {
-  float color[4];
-  glGetFloatv(GL_CURRENT_COLOR, color);
+  double dot_size_px = GIZMO_DOT_SIZE;
+  double target_size_px = GIZMO_TARGET_SIZE;
 
-  double dot_size = GIZMO_DOT_SIZE / double(width()) * viewer->seq->width;
-  double target_size = GIZMO_TARGET_SIZE / double(width()) * viewer->seq->width;
+  // container->zoom maps image-space pixels to widget-space pixels directly
+  double scale = container->zoom;
+  double tx = (viewer->seq->width - (width() / container->zoom)) * x_scroll;
+  double ty = (viewer->seq->height - (height() / container->zoom)) * (1.0 - y_scroll);
 
-  double zoom_factor = container->zoom / (double(width()) / double(viewer->seq->width));
+  // Gizmo screen_pos is in image-space with Y=0 at bottom. Convert to widget-space (Y=0 at top).
+  auto toWidget = [&](double ix, double iy) -> QPointF {
+    double iy_topdown = viewer->seq->height - iy;
+    return QPointF((ix - tx) * scale, (iy_topdown - ty) * scale);
+  };
 
-  glPushMatrix();
-  glLoadIdentity();
+  QPainter p(this);
+  p.beginNativePainting();
+  p.endNativePainting();
+  p.setRenderHint(QPainter::Antialiasing, true);
 
-  glOrtho(0, viewer->seq->width, 0, viewer->seq->height, -1, 10);
-  glScaled(zoom_factor, zoom_factor, 0.0);
-  glTranslated(-(viewer->seq->width - (width() / container->zoom)) * x_scroll,
-               -((viewer->seq->height - (height() / container->zoom)) * (1.0 - y_scroll)), 0);
-
-  float gizmo_z = 0.0f;
   for (int j = 0; j < gizmos->gizmo_count(); j++) {
     EffectGizmo* g = gizmos->gizmo(j);
-    glColor4d(g->color.redF(), g->color.greenF(), g->color.blueF(), 1.0);
+    QPen pen(g->color);
+    pen.setWidth(1);
+    p.setPen(pen);
+    p.setBrush(Qt::NoBrush);
+
     switch (g->get_type()) {
-      case GIZMO_TYPE_DOT:  // draw dot
-        glBegin(GL_QUADS);
-        glVertex3f(g->screen_pos[0].x() - dot_size, g->screen_pos[0].y() - dot_size, gizmo_z);
-        glVertex3f(g->screen_pos[0].x() + dot_size, g->screen_pos[0].y() - dot_size, gizmo_z);
-        glVertex3f(g->screen_pos[0].x() + dot_size, g->screen_pos[0].y() + dot_size, gizmo_z);
-        glVertex3f(g->screen_pos[0].x() - dot_size, g->screen_pos[0].y() + dot_size, gizmo_z);
-        glEnd();
+      case GIZMO_TYPE_DOT: {
+        QPointF center = toWidget(g->screen_pos[0].x(), g->screen_pos[0].y());
+        p.setBrush(g->color);
+        p.drawRect(QRectF(center.x() - dot_size_px, center.y() - dot_size_px,
+                          dot_size_px * 2, dot_size_px * 2));
+        p.setBrush(Qt::NoBrush);
         break;
-      case GIZMO_TYPE_POLY:  // draw lines
-        glBegin(GL_LINES);
-        for (int k = 1; k < g->get_point_count(); k++) {
-          glVertex3f(g->screen_pos[k - 1].x(), g->screen_pos[k - 1].y(), gizmo_z);
-          glVertex3f(g->screen_pos[k].x(), g->screen_pos[k].y(), gizmo_z);
+      }
+      case GIZMO_TYPE_POLY: {
+        QPolygonF poly;
+        for (int k = 0; k < g->get_point_count(); k++) {
+          poly << toWidget(g->screen_pos[k].x(), g->screen_pos[k].y());
         }
-        glVertex3f(g->screen_pos[g->get_point_count() - 1].x(), g->screen_pos[g->get_point_count() - 1].y(), gizmo_z);
-        glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y(), gizmo_z);
-        glEnd();
+        poly << poly.first(); // close
+        p.drawPolyline(poly);
         break;
-      case GIZMO_TYPE_TARGET:  // draw target
-        glBegin(GL_LINES);
-        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y() - target_size, gizmo_z);
-        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y() - target_size, gizmo_z);
-
-        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y() - target_size, gizmo_z);
-        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y() + target_size, gizmo_z);
-
-        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y() + target_size, gizmo_z);
-        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y() + target_size, gizmo_z);
-
-        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y() + target_size, gizmo_z);
-        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y() - target_size, gizmo_z);
-
-        glVertex3f(g->screen_pos[0].x() - target_size, g->screen_pos[0].y(), gizmo_z);
-        glVertex3f(g->screen_pos[0].x() + target_size, g->screen_pos[0].y(), gizmo_z);
-
-        glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y() - target_size, gizmo_z);
-        glVertex3f(g->screen_pos[0].x(), g->screen_pos[0].y() + target_size, gizmo_z);
-        glEnd();
+      }
+      case GIZMO_TYPE_TARGET: {
+        QPointF center = toWidget(g->screen_pos[0].x(), g->screen_pos[0].y());
+        double ts = target_size_px;
+        p.drawRect(QRectF(center.x() - ts, center.y() - ts, ts * 2, ts * 2));
+        p.drawLine(QPointF(center.x() - ts, center.y()), QPointF(center.x() + ts, center.y()));
+        p.drawLine(QPointF(center.x(), center.y() - ts), QPointF(center.x(), center.y() + ts));
         break;
+      }
     }
   }
-  glPopMatrix();
 
-  glColor4f(color[0], color[1], color[2], color[3]);
+  p.end();
 }
 
 int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {
@@ -859,6 +848,7 @@ void ViewerWidget::paintGL() {
   } else {
     const GLuint tex = renderer->get_texture();
     QMutex* tex_lock = renderer->get_texture_mutex();
+    QOpenGLFunctions* f = context()->functions();
 
     tex_lock->lock();
 
@@ -866,22 +856,9 @@ void ViewerWidget::paintGL() {
     glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // set color multipler to straight white
-    glColor4f(1.0, 1.0, 1.0, 1.0);
-
-    glEnable(GL_TEXTURE_2D);
-
-    // set screen coords to widget size
-    glLoadIdentity();
-    glOrtho(-1, 1, -1, 1, -1, 1);
-
     // draw texture from render thread
-
     glBindTexture(GL_TEXTURE_2D, tex);
-
-    context()->functions()->glGenerateMipmap(GL_TEXTURE_2D);
-
-    glBegin(GL_QUADS);
+    f->glGenerateMipmap(GL_TEXTURE_2D);
 
     double zoom_factor = container->zoom / (double(width()) / double(viewer->seq->width));
     double zoom_size = (zoom_factor * 2.0) - 2.0;
@@ -890,19 +867,29 @@ void ViewerWidget::paintGL() {
     double zoom_bottom = -zoom_size * (1.0 - y_scroll) - 1.0;
     double zoom_top = zoom_size * (y_scroll) + 1.0;
 
-    // zoom_left *= ar_diff;
-    // zoom_right *= ar_diff;
+    QMatrix4x4 mvp = MatrixUtil::ortho(-1, 1, -1, 1);
 
-    glVertex2d(zoom_left, zoom_bottom);
-    glTexCoord2d(0, 0);
-    glVertex2d(zoom_left, zoom_top);
-    glTexCoord2d(1, 0);
-    glVertex2d(zoom_right, zoom_top);
-    glTexCoord2d(1, 1);
-    glVertex2d(zoom_right, zoom_bottom);
-    glTexCoord2d(0, 1);
+    passthrough_program_->bind();
+    passthrough_program_->setUniformValue("mvp_matrix", mvp);
+    passthrough_program_->setUniformValue("tex", 0);
+    passthrough_program_->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
 
-    glEnd();
+    float coords[8] = {
+      float(zoom_left), float(zoom_bottom),
+      float(zoom_left), float(zoom_top),
+      float(zoom_right), float(zoom_top),
+      float(zoom_right), float(zoom_bottom),
+    };
+    // FBO texture is Y-inverted: texcoord Y is flipped to compensate
+    float texcoords[8] = {
+      0, 1,
+      0, 0,
+      1, 0,
+      1, 1,
+    };
+    QuadBuffer::draw(f, coords, texcoords);
+
+    passthrough_program_->release();
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -918,7 +905,6 @@ void ViewerWidget::paintGL() {
       draw_gizmos();
     }
 
-    glDisable(GL_TEXTURE_2D);
     glFinish();
 
     if (window->isVisible()) {

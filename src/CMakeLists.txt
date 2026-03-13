@@ -257,6 +257,9 @@ set(OLIVE_SOURCES
   rendering/exportthread.h
   rendering/framebufferobject.cpp
   rendering/framebufferobject.h
+  rendering/matrixutil.h
+  rendering/quadbuffer.cpp
+  rendering/quadbuffer.h
   rendering/renderfunctions.cpp
   rendering/renderfunctions.h
   rendering/renderthread.cpp

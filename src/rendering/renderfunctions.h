@@ -171,6 +171,8 @@ struct ComposeSequenceParams {
      */
     QOpenGLShaderProgram* yuv_program;
 
+    QOpenGLShaderProgram* passthrough_program;
+
     /**
      * @brief The OpenGL framebuffer object that the final texture to be shown is rendered to.
      *

@@ -552,12 +552,13 @@ void ExportThread::Export()
   disconnect(renderer, &RenderThread::ready, this, &ExportThread::wake);
   connect(renderer, &RenderThread::ready, panel_sequence_viewer->viewer_widget, &ViewerWidget::queue_repaint);
 
+  // Always clean up clip/rendering state, even on cancel
+  olive::Global->set_rendering_state(false);
+  close_active_clips(olive::ActiveSequence.get());
+
   if (interrupt_) {
     return;
   }
-
-  olive::Global->set_rendering_state(false);
-  close_active_clips(olive::ActiveSequence.get());
 
   // If audio is enabled, flush the rest of the audio out of swresample
   if (params_.audio_enabled) {

@@ -22,6 +22,7 @@
 #define VIEWERWINDOW_H
 
 #include <QOpenGLWidget>
+#include <QOpenGLShaderProgram>
 #include <QTimer>
 
 class QMutex;
@@ -39,8 +40,10 @@ protected:
   void mousePressEvent(QMouseEvent*) override;
   void mouseMoveEvent(QMouseEvent*) override;
 
+  void initializeGL() override;
   void paintGL() override;
 private:
+  QOpenGLShaderProgram* passthrough_program_{nullptr};
   GLuint texture{0};
   double ar;
   QMutex* mutex{nullptr};

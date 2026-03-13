@@ -44,6 +44,8 @@ namespace OCIO = OCIO_NAMESPACE;
 #include "ui/collapsiblewidget.h"
 
 #include "rendering/audio.h"
+#include "rendering/matrixutil.h"
+#include "rendering/quadbuffer.h"
 
 #include "global/math.h"
 #include "global/config.h"
@@ -59,29 +61,19 @@ void PrepareToDraw(QOpenGLFunctions* f) {
   f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 }
 
-void full_blit() {
-  PrepareToDraw(QOpenGLContext::currentContext()->functions());
+// MVP for fullscreen blit — identity for the [-1,1] default quad
+static QMatrix4x4 blit_mvp() {
+  return MatrixUtil::ortho(-1, 1, -1, 1);
+}
 
-  glPushMatrix();
-  glLoadIdentity();
-  glOrtho(0, 1, 0, 1, -1, 1);
-
-  glBegin(GL_QUADS);
-  glTexCoord2f(0, 0); // top left
-  glVertex2f(0, 0); // top left
-  glTexCoord2f(1, 0); // top right
-  glVertex2f(1, 0); // top right
-  glTexCoord2f(1, 1); // bottom right
-  glVertex2f(1, 1); // bottom right
-  glTexCoord2f(0, 1); // bottom left
-  glVertex2f(0, 1); // bottom left
-  glEnd();
-
-  glPopMatrix();
+void full_blit(QOpenGLFunctions* f) {
+  PrepareToDraw(f);
+  QuadBuffer::draw(f);
 }
 
 void draw_clip(QOpenGLContext* ctx, GLuint fbo, GLuint texture, bool clear) {
-  ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+  QOpenGLFunctions* f = ctx->functions();
+  f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
 
   if (clear) {
     glClear(GL_COLOR_BUFFER_BIT);
@@ -89,14 +81,15 @@ void draw_clip(QOpenGLContext* ctx, GLuint fbo, GLuint texture, bool clear) {
 
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  full_blit();
+  full_blit(f);
 
   glBindTexture(GL_TEXTURE_2D, 0);
 
-  ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+  f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 }
 
 GLuint draw_clip(QOpenGLFramebufferObject* fbo, GLuint texture, bool clear) {
+  QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
   fbo->bind();
 
   if (clear) {
@@ -105,7 +98,7 @@ GLuint draw_clip(QOpenGLFramebufferObject* fbo, GLuint texture, bool clear) {
 
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  full_blit();
+  full_blit(f);
 
   glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -121,7 +114,8 @@ void process_effect(Clip* c,
                     GLuint& composite_texture,
                     bool& fbo_switcher,
                     bool& texture_failed,
-                    int data) {
+                    int data,
+                    QOpenGLShaderProgram* passthrough) {
   if (e->IsEnabled()) {
     if (e->Flags() & Effect::CoordsFlag) {
       e->process_coords(timecode, coords, data);
@@ -129,7 +123,15 @@ void process_effect(Clip* c,
     bool can_process_shaders = ((e->Flags() & Effect::ShaderFlag) && olive::CurrentRuntimeConfig.shaders_are_enabled);
     if (can_process_shaders || (e->Flags() & Effect::SuperimposeFlag)) {
       e->startEffect();
-      if (can_process_shaders && e->is_glsl_linked()) {
+
+      bool has_shader = can_process_shaders && e->is_glsl_linked();
+
+      // Set blit MVP on whichever shader is bound (draw_clip always does fullscreen blit)
+      if (has_shader) {
+        e->program()->setUniformValue("mvp_matrix", blit_mvp());
+      }
+
+      if (has_shader) {
         for (int i=0;i<e->getIterations();i++) {
           e->process_shader(timecode, coords, i);
           composite_texture = draw_clip(c->fbo[fbo_switcher], composite_texture, true);
@@ -137,24 +139,32 @@ void process_effect(Clip* c,
         }
       }
       if (e->Flags() & Effect::SuperimposeFlag) {
+        // If no effect shader is bound, use passthrough for blitting
+        bool need_passthrough = !has_shader;
+        if (need_passthrough) {
+          passthrough->bind();
+          passthrough->setUniformValue("mvp_matrix", blit_mvp());
+          passthrough->setUniformValue("tex", 0);
+          passthrough->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
+        }
+
         GLuint superimpose_texture = e->process_superimpose(timecode);
 
         if (superimpose_texture == 0) {
           qWarning() << "Superimpose texture was nullptr, retrying...";
           texture_failed = true;
         } else if (composite_texture == 0) {
-          // if there is no previous texture, just return the superimposes texture
-          // UNLESS this is a shader-extended superimpose effect in which case,
-          // we'll need to draw it below
           composite_texture = superimpose_texture;
         } else {
-          // if the source texture is not already a framebuffer texture,
-          // we'll need to make it one before drawing a superimpose effect on it
           if (composite_texture != c->fbo[0]->texture() && composite_texture != c->fbo[1]->texture()) {
             draw_clip(c->fbo[!fbo_switcher], composite_texture, true);
           }
 
           composite_texture = draw_clip(c->fbo[!fbo_switcher], superimpose_texture, false);
+        }
+
+        if (need_passthrough) {
+          passthrough->release();
         }
       }
       e->endEffect();
@@ -282,18 +292,16 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
     }
   }
 
+  QMatrix4x4 sequence_ortho;
+  int half_width = 0;
+  int half_height = 0;
+
   if (params.video) {
-
-    // set default coordinates based on the sequence, with 0 in the direct center
-    glPushMatrix();
-    glLoadIdentity();
-
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-    int half_width = s->width/2;
-    int half_height = s->height/2;
-    glOrtho(-half_width, half_width, -half_height, half_height, -1, 10);
-
+    half_width = s->width/2;
+    half_height = s->height/2;
+    sequence_ortho = MatrixUtil::ortho(-half_width, half_width, -half_height, half_height, -1, 10);
   }
 
   // loop through current clips
@@ -312,8 +320,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
       // if clip is a video clip
       if (c->track() < 0) {
 
-        // reset OpenGL to full color
-        glColor4f(1.0, 1.0, 1.0, 1.0);
+        // (color_mult is set per-draw via passthrough shader uniform)
 
         // textureID variable contains texture to be drawn on screen at the end
         GLuint textureID = 0;
@@ -353,7 +360,6 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
         // if clip should actually be shown on screen in this frame
         if (playhead >= c->timeline_in(true)
             && playhead < c->timeline_out(true)) {
-          glPushMatrix();
 
           // simple bool for switching between the two framebuffers
           bool fbo_switcher = false;
@@ -380,6 +386,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
               if (textureID > 0 && !c->media()->to_footage()->alpha_is_premultiplied) {
                 // alpha is not premultiplied, we'll need to multiply it for the rest of the pipeline
                 params.premultiply_program->bind();
+                params.premultiply_program->setUniformValue("mvp_matrix", blit_mvp());
 
                 textureID = draw_clip(c->fbo[0], textureID, true);
 
@@ -423,7 +430,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
           for (int j=0;j<c->effects.size();j++) {
 
             Effect* e = c->effects.at(j).get();
-            process_effect(c, e, timecode, coords, textureID, fbo_switcher, params.texture_failed, kTransitionNone);
+            process_effect(c, e, timecode, coords, textureID, fbo_switcher, params.texture_failed, kTransitionNone, params.passthrough_program);
 
           }
 
@@ -431,7 +438,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
           if (c->opening_transition != nullptr) {
             int transition_progress = playhead - c->timeline_in(true);
             if (transition_progress < c->opening_transition->get_length()) {
-              process_effect(c, c->opening_transition.get(), double(transition_progress)/double(c->opening_transition->get_length()), coords, textureID, fbo_switcher, params.texture_failed, kTransitionOpening);
+              process_effect(c, c->opening_transition.get(), double(transition_progress)/double(c->opening_transition->get_length()), coords, textureID, fbo_switcher, params.texture_failed, kTransitionOpening, params.passthrough_program);
             }
           }
 
@@ -439,27 +446,29 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
           if (c->closing_transition != nullptr) {
             int transition_progress = playhead - (c->timeline_out(true) - c->closing_transition->get_length());
             if (transition_progress >= 0 && transition_progress < c->closing_transition->get_length()) {
-              process_effect(c, c->closing_transition.get(), double(transition_progress)/double(c->closing_transition->get_length()), coords, textureID, fbo_switcher, params.texture_failed, kTransitionClosing);
+              process_effect(c, c->closing_transition.get(), double(transition_progress)/double(c->closing_transition->get_length()), coords, textureID, fbo_switcher, params.texture_failed, kTransitionClosing, params.passthrough_program);
             }
           }
 
           // == EFFECT CODE END ==
 
 
-          // Check whether the parent clip is auto-scaledc
+          // Build per-clip MVP: sequence ortho * coords.transform * optional autoscale
+          QMatrix4x4 clip_mvp = sequence_ortho;
+          clip_mvp *= coords.transform;
           if (c->autoscaled()
               && (video_width != s->width
                   && video_height != s->height)) {
             float width_multiplier = float(s->width) / float(video_width);
             float height_multiplier = float(s->height) / float(video_height);
             float scale_multiplier = qMin(width_multiplier, height_multiplier);
-            glScalef(scale_multiplier, scale_multiplier, 1);
+            clip_mvp.scale(scale_multiplier, scale_multiplier, 1);
           }
 
           // Configure effect gizmos if they exist
           if (params.gizmos != nullptr) {
             params.gizmos->gizmo_draw(timecode, coords); // set correct gizmo coords
-            params.gizmos->gizmo_world_to_screen(); // convert gizmo coords to screen coords
+            params.gizmos->gizmo_world_to_screen(clip_mvp); // convert gizmo coords to screen coords
           }
 
 
@@ -488,8 +497,10 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
               backend_tex_2 = params.backend_attachment2;
             }
 
+            QOpenGLFunctions* f = params.ctx->functions();
+
             // render a backbuffer
-            params.ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, back_buffer_1);
+            f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, back_buffer_1);
 
             glClearColor(0.0, 0.0, 0.0, 0.0);
             glClear(GL_COLOR_BUFFER_BIT);
@@ -498,26 +509,35 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
             glBindTexture(GL_TEXTURE_2D, textureID);
 
             // set texture filter to bilinear
-            PrepareToDraw(params.ctx->functions());
+            PrepareToDraw(f);
 
             // draw clip on screen according to gl coordinates
-            glBegin(GL_QUADS);
+            params.passthrough_program->bind();
+            params.passthrough_program->setUniformValue("mvp_matrix", clip_mvp);
+            params.passthrough_program->setUniformValue("tex", 0);
+            params.passthrough_program->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
 
-            glTexCoord2f(coords.textureTopLeftX, coords.textureTopLeftY); // top left
-            glVertex2f(coords.vertexTopLeftX, coords.vertexTopLeftY); // top left
-            glTexCoord2f(coords.textureTopRightX, coords.textureTopRightY); // top right
-            glVertex2f(coords.vertexTopRightX, coords.vertexTopRightY); // top right
-            glTexCoord2f(coords.textureBottomRightX, coords.textureBottomRightY); // bottom right
-            glVertex2f(coords.vertexBottomRightX, coords.vertexBottomRightY); // bottom right
-            glTexCoord2f(coords.textureBottomLeftX, coords.textureBottomLeftY); // bottom left
-            glVertex2f(coords.vertexBottomLeftX, coords.vertexBottomLeftY); // bottom left
+            float quad_coords[8] = {
+              float(coords.vertexTopLeftX), float(coords.vertexTopLeftY),
+              float(coords.vertexTopRightX), float(coords.vertexTopRightY),
+              float(coords.vertexBottomRightX), float(coords.vertexBottomRightY),
+              float(coords.vertexBottomLeftX), float(coords.vertexBottomLeftY),
+            };
+            float quad_texcoords[8] = {
+              float(coords.textureTopLeftX), float(coords.textureTopLeftY),
+              float(coords.textureTopRightX), float(coords.textureTopRightY),
+              float(coords.textureBottomRightX), float(coords.textureBottomRightY),
+              float(coords.textureBottomLeftX), float(coords.textureBottomLeftY),
+            };
 
-            glEnd();
+            QuadBuffer::draw(f, quad_coords, quad_texcoords);
+
+            params.passthrough_program->release();
 
             // release final clip texture
             glBindTexture(GL_TEXTURE_2D, 0);
 
-            params.ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
 
 
@@ -535,11 +555,18 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
 
             // copy front buffer to back buffer (only if we're using blending modes - which we usually will be)
             if (!olive::CurrentRuntimeConfig.disable_blending) {
+              params.passthrough_program->bind();
+              params.passthrough_program->setUniformValue("mvp_matrix", blit_mvp());
+              params.passthrough_program->setUniformValue("tex", 0);
+              params.passthrough_program->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
+
               if (params.nests.size() > 0) {
                 draw_clip(params.ctx, params.nests.last()->fbo[2]->handle(), params.nests.last()->fbo[0]->texture(), true);
               } else {
                 draw_clip(params.ctx, params.backend_buffer2, params.main_attachment, true);
               }
+
+              params.passthrough_program->release();
             }
 
 
@@ -550,53 +577,24 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
 
 
             // bind front buffer as draw buffer
-            params.ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, final_fbo);
+            f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, final_fbo);
 
-//            if (olive::CurrentRuntimeConfig.disable_blending) {
-              // some GPUs don't like the blending shader, so we provide a pure GL fallback here
+            f->glBindTexture(GL_TEXTURE_2D, backend_tex_1);
 
-              params.ctx->functions()->glBindTexture(GL_TEXTURE_2D, backend_tex_1);
+            params.passthrough_program->bind();
+            params.passthrough_program->setUniformValue("mvp_matrix", blit_mvp());
+            params.passthrough_program->setUniformValue("tex", 0);
+            params.passthrough_program->setUniformValue("color_mult",
+                QVector4D(coords.opacity, coords.opacity, coords.opacity, coords.opacity));
 
-              glColor4f(coords.opacity, coords.opacity, coords.opacity, coords.opacity);
+            full_blit(f);
 
-              full_blit();
+            params.passthrough_program->release();
 
-              params.ctx->functions()->glBindTexture(GL_TEXTURE_2D, 0);
-              /*
-            } else {
-              // load background texture into texture unit 0
-              params.ctx->functions()->glActiveTexture(GL_TEXTURE0 + 0); // Texture unit 0
-              params.ctx->functions()->glBindTexture(GL_TEXTURE_2D, backend_tex_2);
-
-              // load foreground texture into texture unit 1
-              params.ctx->functions()->glActiveTexture(GL_TEXTURE0 + 1); // Texture unit 1
-              params.ctx->functions()->glBindTexture(GL_TEXTURE_2D, backend_tex_1);
-
-              // bind and configure blending mode shader
-              params.blend_mode_program->bind();
-              params.blend_mode_program->setUniformValue("blendmode", coords.blendmode);
-              params.blend_mode_program->setUniformValue("opacity", coords.opacity);
-              params.blend_mode_program->setUniformValue("background", 0);
-              params.blend_mode_program->setUniformValue("foreground", 1);
-
-              glClear(GL_COLOR_BUFFER_BIT);
-
-              full_blit();
-
-              // release blend mode shader
-              params.blend_mode_program->release();
-
-              // unbind texture from texture unit 1
-              params.ctx->functions()->glBindTexture(GL_TEXTURE_2D, 0);
-
-              // unbind texture from texture unit 0
-              params.ctx->functions()->glActiveTexture(GL_TEXTURE0 + 0); // Texture unit 0
-              params.ctx->functions()->glBindTexture(GL_TEXTURE_2D, 0);
-            }
-            */
+            f->glBindTexture(GL_TEXTURE_2D, 0);
 
             // unbind framebuffer
-            params.ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
 
 
@@ -604,7 +602,6 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
             // == END FINAL DRAW ON SEQUENCE BUFFER ==
           }
 
-          glPopMatrix();
         }
       } else {
         if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
@@ -648,9 +645,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
     WakeAudioWakeObject();
   }
 
-  if (params.video) {
-    glPopMatrix();
-  }
+  // (no glPopMatrix needed — matrix is local QMatrix4x4)
 
 //  qDebug() << "compose sequence took" << QDateTime::currentMSecsSinceEpoch() - time;
 

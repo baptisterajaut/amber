@@ -27,6 +27,8 @@
 #include "project/footage.h"
 #include "global/config.h"
 #include "rendering/cacher.h"
+#include "rendering/matrixutil.h"
+#include "rendering/quadbuffer.h"
 #include "rendering/renderfunctions.h"
 #include "panels/project.h"
 #include "timeline/sequence.h"
@@ -649,16 +651,8 @@ bool Clip::Retrieve(QOpenGLShaderProgram* yuv_program)
         yuv_program->setUniformValue("format_type", is_nv12 ? 1 : 0);
 
         // Fullscreen quad (textures already bound to units 0/1/2)
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, 1, 0, 1, -1, 1);
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 0); glVertex2f(0, 0);
-        glTexCoord2f(1, 0); glVertex2f(1, 0);
-        glTexCoord2f(1, 1); glVertex2f(1, 1);
-        glTexCoord2f(0, 1); glVertex2f(0, 1);
-        glEnd();
-        glPopMatrix();
+        yuv_program->setUniformValue("mvp_matrix", MatrixUtil::ortho(-1, 1, -1, 1));
+        QuadBuffer::draw(f);
 
         yuv_program->release();
         yuv_fbo->release();

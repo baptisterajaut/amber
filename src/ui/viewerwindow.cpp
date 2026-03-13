@@ -32,6 +32,8 @@
 #include <QDebug>
 
 #include "mainwindow.h"
+#include "rendering/matrixutil.h"
+#include "rendering/quadbuffer.h"
 
 ViewerWindow::ViewerWindow(QWidget *parent) :
   QOpenGLWidget(parent, Qt::Window)
@@ -105,21 +107,26 @@ void ViewerWindow::mouseMoveEvent(QMouseEvent *) {
   }
 }
 
+void ViewerWindow::initializeGL() {
+  passthrough_program_ = new QOpenGLShaderProgram(this);
+  passthrough_program_->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/passthrough.vert");
+  passthrough_program_->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/passthrough.frag");
+  passthrough_program_->bindAttributeLocation("a_position", 0);
+  passthrough_program_->bindAttributeLocation("a_texcoord", 1);
+  passthrough_program_->link();
+
+}
+
 void ViewerWindow::paintGL() {
   if (texture > 0) {
     if (mutex != nullptr) mutex->lock();
 
+    QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
+
     glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glEnable(GL_TEXTURE_2D);
-
     glBindTexture(GL_TEXTURE_2D, texture);
-
-    glLoadIdentity();
-    glOrtho(0, 1, 0, 1, -1, 1);
-
-    glBegin(GL_QUADS);
 
     double top = 0;
     double left = 0;
@@ -129,29 +136,38 @@ void ViewerWindow::paintGL() {
     double widget_ar = double(width()) / double(height());
 
     if (widget_ar > ar) {
-      double width = 1.0 * ar / widget_ar;
-      left = (1.0 - width)*0.5;
-      right = left + width;
+      double w = 1.0 * ar / widget_ar;
+      left = (1.0 - w)*0.5;
+      right = left + w;
     } else {
-      double height = 1.0 / ar * widget_ar;
-      top = (1.0 - height)*0.5;
-      bottom = top + height;
+      double h = 1.0 / ar * widget_ar;
+      top = (1.0 - h)*0.5;
+      bottom = top + h;
     }
 
-    glVertex2d(left, top);
-    glTexCoord2d(0, 0);
-    glVertex2d(left, bottom);
-    glTexCoord2d(1, 0);
-    glVertex2d(right, bottom);
-    glTexCoord2d(1, 1);
-    glVertex2d(right, top);
-    glTexCoord2d(0, 1);
+    passthrough_program_->bind();
+    passthrough_program_->setUniformValue("mvp_matrix", MatrixUtil::ortho(0, 1, 0, 1));
+    passthrough_program_->setUniformValue("tex", 0);
+    passthrough_program_->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
 
-    glEnd();
+    float coords[8] = {
+      float(left), float(top),
+      float(left), float(bottom),
+      float(right), float(bottom),
+      float(right), float(top),
+    };
+    // FBO texture is Y-inverted: texcoord Y is flipped to compensate
+    float texcoords[8] = {
+      0, 1,
+      0, 0,
+      1, 0,
+      1, 1,
+    };
+    QuadBuffer::draw(f, coords, texcoords);
+
+    passthrough_program_->release();
 
     glBindTexture(GL_TEXTURE_2D, 0);
-
-    glDisable(GL_TEXTURE_2D);
 
     if (mutex != nullptr) mutex->unlock();
   }

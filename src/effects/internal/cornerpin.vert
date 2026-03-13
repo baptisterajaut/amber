@@ -1,19 +1,23 @@
 #version 130
 
+uniform mat4 mvp_matrix;
 uniform bool perspective;
 uniform vec2 p0;
 uniform vec2 p1;
 uniform vec2 p2;
 uniform vec2 p3;
 
-varying vec2 q;
-varying vec2 b1;
-varying vec2 b2;
-varying vec2 b3;
-varying vec2 vTexCoord;
+in vec2 a_position;
+in vec2 a_texcoord;
+
+out vec2 q;
+out vec2 b1;
+out vec2 b2;
+out vec2 b3;
+out vec2 vTexCoord;
 
 void main() {
-    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+    gl_Position = mvp_matrix * vec4(a_position, 0.0, 1.0);
 
     if (perspective) {
         float m1 = (p3.y - p0.y)/(p3.x - p0.x);
@@ -44,10 +48,10 @@ void main() {
         gl_Position[1] *= q;
         gl_Position[3] = q;
 
-        vTexCoord = gl_MultiTexCoord0.xy;
+        vTexCoord = a_texcoord;
     } else {
         vec2 pos;
-        
+
         if (gl_VertexID == 0) { // top left
             pos = p2;
         } else if (gl_VertexID == 1) { // top right

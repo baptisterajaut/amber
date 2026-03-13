@@ -725,6 +725,8 @@ void Effect::open() {
         }
       }
       if (glsl_compiled) {
+        glslProgram->bindAttributeLocation("a_position", 0);
+        glslProgram->bindAttributeLocation("a_texcoord", 1);
         if (glslProgram->link()) {
           qInfo() << "Shader program linked successfully";
         } else {
@@ -937,22 +939,16 @@ void Effect::gizmo_move(EffectGizmo* gizmo, int x_movement, int y_movement, doub
   }
 }
 
-void Effect::gizmo_world_to_screen() {
-  GLfloat view_val[16];
-  GLfloat projection_val[16];
-  glGetFloatv(GL_MODELVIEW_MATRIX, view_val);
-  glGetFloatv(GL_PROJECTION_MATRIX, projection_val);
-
-  QMatrix4x4 view_matrix(view_val);
-  QMatrix4x4 projection_matrix(projection_val);
-
+void Effect::gizmo_world_to_screen(const QMatrix4x4& mvp) {
   for (auto g : gizmos) {
     for (int j = 0; j < g->get_point_count(); j++) {
-      QVector4D screen_pos =
-          QVector4D(g->world_pos[j].x(), g->world_pos[j].y(), 0, 1.0) * (view_matrix * projection_matrix);
+      QVector4D screen_pos = mvp * QVector4D(g->world_pos[j].x(), g->world_pos[j].y(), 0, 1.0);
 
-      int adjusted_sx1 = qRound(((screen_pos.x() * 0.5f) + 0.5f) * parent_clip->sequence->width);
-      int adjusted_sy1 = qRound((1.0f - ((screen_pos.y() * 0.5f) + 0.5f)) * parent_clip->sequence->height);
+      float w = screen_pos.w();
+      if (qFuzzyIsNull(w)) w = 1.0f;
+
+      int adjusted_sx1 = qRound(((screen_pos.x() / w * 0.5f) + 0.5f) * parent_clip->sequence->width);
+      int adjusted_sy1 = qRound((1.0f - ((screen_pos.y() / w * 0.5f) + 0.5f)) * parent_clip->sequence->height);
 
       g->screen_pos[j] = QPoint(adjusted_sx1, adjusted_sy1);
     }

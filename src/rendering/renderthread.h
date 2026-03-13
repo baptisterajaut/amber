@@ -98,6 +98,7 @@ private:
   QOpenGLShaderProgram* blend_mode_program{nullptr};
   QOpenGLShaderProgram* premultiply_program{nullptr};
   QOpenGLShaderProgram* yuv_program{nullptr};
+  QOpenGLShaderProgram* passthrough_program{nullptr};
 
   FramebufferObject back_buffer_1;
   FramebufferObject back_buffer_2;

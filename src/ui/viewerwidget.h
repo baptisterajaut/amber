@@ -111,6 +111,7 @@ class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions {
   int gizmo_x_mvmt;
   int gizmo_y_mvmt;
   EffectGizmo* selected_gizmo{nullptr};
+  QOpenGLShaderProgram* passthrough_program_{nullptr};
   RenderThread* renderer;
   ViewerWindow* window;
   double x_scroll{0};

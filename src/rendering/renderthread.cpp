@@ -93,17 +93,31 @@ void RenderThread::run() {
           blend_mode_program = new QOpenGLShaderProgram();
           blend_mode_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/common.vert");
           blend_mode_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/blending.frag");
+          blend_mode_program->bindAttributeLocation("a_position", 0);
+          blend_mode_program->bindAttributeLocation("a_texcoord", 1);
           blend_mode_program->link();
 
           premultiply_program = new QOpenGLShaderProgram();
           premultiply_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/common.vert");
           premultiply_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/premultiply.frag");
+          premultiply_program->bindAttributeLocation("a_position", 0);
+          premultiply_program->bindAttributeLocation("a_texcoord", 1);
           premultiply_program->link();
 
           yuv_program = new QOpenGLShaderProgram();
           yuv_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/common.vert");
           yuv_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/yuv2rgb.frag");
+          yuv_program->bindAttributeLocation("a_position", 0);
+          yuv_program->bindAttributeLocation("a_texcoord", 1);
           yuv_program->link();
+
+          passthrough_program = new QOpenGLShaderProgram();
+          passthrough_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/passthrough.vert");
+          passthrough_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/passthrough.frag");
+          passthrough_program->bindAttributeLocation("a_position", 0);
+          passthrough_program->bindAttributeLocation("a_texcoord", 1);
+          passthrough_program->link();
+
         }
 
         // draw frame
@@ -151,6 +165,7 @@ void RenderThread::paint() {
   params.blend_mode_program = blend_mode_program;
   params.premultiply_program = premultiply_program;
   params.yuv_program = yuv_program;
+  params.passthrough_program = passthrough_program;
   params.backend_buffer1 = back_buffer_1.buffer();
   params.backend_buffer2 = back_buffer_2.buffer();
   params.backend_attachment1 = back_buffer_1.texture();
@@ -168,14 +183,9 @@ void RenderThread::paint() {
   // bind framebuffer for drawing
   ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, params.main_buffer);
 
-  glLoadIdentity();
-
   glClearColor(0.0, 0.0, 0.0, 0.0);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  glMatrixMode(GL_MODELVIEW);
-
-  glEnable(GL_TEXTURE_2D);
   glEnable(GL_BLEND);
 
   olive::rendering::compose_sequence(params);
@@ -222,7 +232,6 @@ void RenderThread::paint() {
   }
 
   glDisable(GL_BLEND);
-  glDisable(GL_TEXTURE_2D);
 
   // release
   ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -316,6 +325,9 @@ void RenderThread::delete_shaders() {
 
   delete yuv_program;
   yuv_program = nullptr;
+
+  delete passthrough_program;
+  passthrough_program = nullptr;
 }
 
 void RenderThread::delete_ctx() {
