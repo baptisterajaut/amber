@@ -559,6 +559,11 @@ void MainWindow::setup_menus() {
   setedit_marker_ =
       MenuHelper::create_menu_action(edit_menu, "marker", &olive::FocusFilter, SLOT(set_marker()), QKeySequence("M"));
 
+  edit_menu->addSeparator();
+
+  preferences_action_ = MenuHelper::create_menu_action(edit_menu, "prefs", olive::Global.get(),
+                                                       SLOT(open_preferences()), QKeySequence("Ctrl+,"));
+
   // INITIALIZE VIEW MENU
 
   view_menu = MenuHelper::create_submenu(menuBar, this, SLOT(viewMenu_About_To_Be_Shown()));
@@ -869,9 +874,7 @@ void MainWindow::setup_menus() {
   autoscroll_group->addAction(smooth_autoscroll);
 
   tools_menu->addSeparator();
-
-  preferences_action_ = MenuHelper::create_menu_action(tools_menu, "prefs", olive::Global.get(),
-                                                       SLOT(open_preferences()), QKeySequence("Ctrl+,"));
+  tools_menu->addAction(preferences_action_);
 
 #ifdef QT_DEBUG
   clear_undo_action_ =

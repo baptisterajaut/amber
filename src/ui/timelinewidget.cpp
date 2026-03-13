@@ -597,6 +597,10 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event) {
                 }
                 olive::ActiveSequence->selections.append(s);
               }
+
+              if (olive::CurrentConfig.select_also_seeks) {
+                panel_sequence_viewer->seek(panel_timeline->drag_frame_start);
+              }
             } else {
 
               // if the clip is not already selected
@@ -639,7 +643,7 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event) {
 
               // if the config is set to also seek with selections, do so now
               if (olive::CurrentConfig.select_also_seeks) {
-                panel_sequence_viewer->seek(clip->timeline_in());
+                panel_sequence_viewer->seek(panel_timeline->drag_frame_start);
               }
 
               // if alt is not down, select links (provided we're not selecting transitions)
