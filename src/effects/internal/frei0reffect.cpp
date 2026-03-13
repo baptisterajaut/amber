@@ -118,6 +118,8 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
 }
 
 Frei0rEffect::~Frei0rEffect() {
+  destruct_module();
+
   if (handle.isLoaded()) {
     f0rDeinitFunc deinit = reinterpret_cast<f0rDeinitFunc>(handle.resolve("f0r_deinit"));
     if (deinit != nullptr) deinit();
@@ -202,7 +204,7 @@ void Frei0rEffect::refresh() {
 void Frei0rEffect::destruct_module() {
   if (open) {
     f0rDestructFunc destruct = reinterpret_cast<f0rDestructFunc>(handle.resolve("f0r_destruct"));
-    destruct(instance);
+    if (destruct != nullptr) destruct(instance);
 
     open = false;
   }
@@ -213,6 +215,7 @@ void Frei0rEffect::construct_module() {
   instance_height = parent_clip->media_height();
 
   f0rConstructFunc construct = reinterpret_cast<f0rConstructFunc>(handle.resolve("f0r_construct"));
+  if (construct == nullptr) return;
   instance = construct(instance_width, instance_height);
 
   open = true;

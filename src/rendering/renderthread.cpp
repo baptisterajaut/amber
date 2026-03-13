@@ -332,8 +332,14 @@ void RenderThread::delete_shaders() {
 
 void RenderThread::delete_ctx() {
   if (ctx != nullptr) {
-    delete_shaders();
-    delete_buffers();
+    // The context must be current to free GL resources.  If makeCurrent
+    // fails (surface already gone during shutdown) we skip the GL cleanup
+    // — the driver will reclaim the resources when the context is deleted.
+    if (ctx->makeCurrent(&surface)) {
+      delete_shaders();
+      delete_buffers();
+      ctx->doneCurrent();
+    }
   }
 
   delete ctx;
