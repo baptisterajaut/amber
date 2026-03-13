@@ -41,6 +41,8 @@
 #include "dialogs/loaddialog.h"
 #include "dialogs/autocutsilencedialog.h"
 #include "project/loadthread.h"
+#include "project/projectmodel.h"
+#include "ui/menuhelper.h"
 #include "timeline/sequence.h"
 #include "ui/mediaiconservice.h"
 #include "ui/mainwindow.h"
@@ -229,6 +231,15 @@ void OliveGlobal::ImportProject(const QString &fn)
 }
 
 void OliveGlobal::new_project() {
+  if (olive::project_model.childCount() == 0 && !is_modified()) {
+    QString shortcut = olive::MenuHelper.new_sequence_action()->shortcut().toString(QKeySequence::NativeText);
+    QMessageBox::information(
+        olive::MainWindow,
+        tr("Project Already Empty"),
+        tr("You already have a bare project. If you're trying to activate the timeline, "
+           "you need to create a new sequence (File > New > Sequence, or %1).").arg(shortcut));
+    return;
+  }
   if (can_close_project()) {
     ClearProject();
   }

@@ -20,6 +20,10 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x`, por
 - OpenGL fixed-function pipeline eliminated (VBO + explicit shaders + CPU matrices; prepares for future RHI migration)
 - Various bug fixes (first-export audio corruption, race conditions, null pointers, memory leaks, Frei0r init, phantom audio on pause, waveform crash, VU meter thread safety, …)
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for planned versions (1.2 RHI port → 2.0 GPU-native effects). Previous versions stay supported.
+
 ## Packages
 
 Pre-built packages for Windows, Linux (AppImage, Ubuntu .deb) and macOS are available on the [Releases](https://github.com/baptisterajaut/amber/releases) page. Arch Linux users: see the AUR. Tested on Arch Linux only; other builds are best-effort.

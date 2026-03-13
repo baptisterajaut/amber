@@ -136,9 +136,9 @@ void MainWindow::setup_layout(bool reset) {
 
     addDockWidget(Qt::TopDockWidgetArea, panel_project);
     addDockWidget(Qt::TopDockWidgetArea, panel_graph_editor);
-    addDockWidget(Qt::TopDockWidgetArea, panel_footage_viewer);
-    tabifyDockWidget(panel_footage_viewer, panel_effect_controls);
-    panel_footage_viewer->raise();
+    addDockWidget(Qt::TopDockWidgetArea, panel_effect_controls);
+    tabifyDockWidget(panel_effect_controls, panel_footage_viewer);
+    panel_effect_controls->raise();
     addDockWidget(Qt::TopDockWidgetArea, panel_sequence_viewer);
     addDockWidget(Qt::BottomDockWidgetArea, panel_timeline);
 

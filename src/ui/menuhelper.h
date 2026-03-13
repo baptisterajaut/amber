@@ -201,6 +201,8 @@ public slots:
    */
   void create_effect_paste_action(QMenu *menu);
 
+  QAction* new_sequence_action() const { return new_sequence_; }
+
 private:
   QAction* new_project_;
   QAction* new_sequence_;

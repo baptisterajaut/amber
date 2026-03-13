@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Amber Video Editor — fork of Olive 0.1.x, free open-source non-linear video editor (GPLv3). C++11, Qt 6, FFmpeg, OpenGL.
+Amber Video Editor — fork of Olive 0.1.x, free open-source non-linear video editor (GPLv3). C++11, Qt 6, FFmpeg, OpenGL. Targets performance on modest hardware (sub-3 MB binary, ~70 MB idle RAM).
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md). 1.x: RHI port, Oak backports, warnings cleanup (order TBD). 2.0: GPU-native effects, new editing features, .amb format. 1.x stays supported after 2.0.
 
 ## Build
 
