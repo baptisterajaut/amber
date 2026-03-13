@@ -42,19 +42,20 @@ QCursor load_cursor(const QString& file, int hotX = -1, int hotY = -1, bool righ
   // load specified file into a pixmap
   QSvgRenderer renderer(file);
 
-  int cursor_size_dpiaware = cursor_size * QGuiApplication::primaryScreen()->devicePixelRatio();
+  qreal dpr = QGuiApplication::primaryScreen()->devicePixelRatio();
+  int cursor_size_dpiaware = cursor_size * dpr;
   QPixmap pixmap(cursor_size_dpiaware, cursor_size_dpiaware);
+  pixmap.setDevicePixelRatio(dpr);
   pixmap.fill(Qt::transparent);
 
   QPainter painter(&pixmap);
-  renderer.render(&painter, pixmap.rect());
+  renderer.render(&painter, QRectF(0, 0, cursor_size, cursor_size));
 
-  // set cursor's horizontal hotspot
+  // hotspots are in logical coordinates for Qt
   if (right_aligned) {
-    hotX = pixmap.width() - hotX;
+    hotX = cursor_size - hotX;
   }
 
-  // return cursor
   return QCursor(pixmap, hotX, hotY);
 }
 
