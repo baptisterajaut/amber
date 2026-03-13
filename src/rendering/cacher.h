@@ -438,7 +438,7 @@ private:
    *
    * Set by AudioReset() and read by CacheAudioWorker() when the audio state needs to be interrupted and reset.
    */
-  bool audio_reset_;
+  std::atomic<bool> audio_reset_;
 
   /**
    * @brief Internal reverse target variable

@@ -147,6 +147,7 @@ void RenderThread::paint() {
   params.texture_failed = false;
   params.wait_for_mutexes = true;
   params.playback_speed = playback_speed_;
+  params.scrubbing = scrubbing_;
   params.blend_mode_program = blend_mode_program;
   params.premultiply_program = premultiply_program;
   params.yuv_program = yuv_program;
@@ -234,12 +235,14 @@ void RenderThread::start_render(QOpenGLContext *share,
                                 GLvoid* pixels,
                                 int pixel_linesize,
                                 int idivider,
-                                bool wait) {
+                                bool wait,
+                                bool scrubbing) {
   Q_UNUSED(idivider)
 
   seq = s;
 
   playback_speed_ = playback_speed;
+  scrubbing_ = scrubbing;
 
   // stall any dependent actions
   texture_failed = true;

@@ -587,6 +587,10 @@ AVFrame *Cacher::Retrieve()
 
   // check if there's a frame ready to be shown by the cacher
 
+  // When scrubbing, use a shorter timeout to keep the UI responsive
+  const int timeout_ms = scrubbing_ ? 250 : 500;
+  const int max_attempts = scrubbing_ ? 1 : 4;
+
   int attempts = 0;
   while (retrieved_frame == nullptr) {
 
@@ -601,9 +605,13 @@ AVFrame *Cacher::Retrieve()
 
       // cacher is running, wait for it to give a frame (with timeout to avoid deadlock
       // when the cacher finishes without producing a frame, e.g. missing/corrupt media)
-      if (!retrieve_wait_.wait(&retrieve_lock_, 500)) {
-        if (++attempts >= 4) {
-          qWarning() << "Timed out waiting for frame from cacher on clip" << clip->name();
+      if (!retrieve_wait_.wait(&retrieve_lock_, timeout_ms)) {
+        if (++attempts >= max_attempts) {
+          if (scrubbing_) {
+            qDebug() << "Scrub: skipping frame on clip" << clip->name();
+          } else {
+            qWarning() << "Timed out waiting for frame from cacher on clip" << clip->name();
+          }
           break;
         }
       }

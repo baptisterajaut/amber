@@ -151,6 +151,7 @@ void Cacher::CacheAudioWorker() {
         frame_sample_index_ = 0;
         if (audio_buffer_write == 0) {
           audio_buffer_write = get_buffer_offset_from_frame(last_fr, qMax(timeline_in, target_frame));
+          if (audio_buffer_write < 0) break;  // buffer not ready yet after seek
         }
         int offset = audio_ibuffer_read - audio_buffer_write;
         if (offset > 0) {
@@ -351,11 +352,14 @@ void Cacher::CacheAudioWorker() {
 #endif
         if (audio_buffer_write == 0) {
           audio_buffer_write = get_buffer_offset_from_frame(last_fr, qMax(timeline_in, target_frame));
+          if (audio_buffer_write < 0) break;  // buffer not ready yet after seek
 
           if (frame_skip > 0) {
             int target = get_buffer_offset_from_frame(last_fr, qMax(timeline_in + frame_skip, target_frame));
-            frame_sample_index_ += (target - audio_buffer_write);
-            audio_buffer_write = target;
+            if (target >= 0) {
+              frame_sample_index_ += (target - audio_buffer_write);
+              audio_buffer_write = target;
+            }
           }
         }
 
@@ -390,6 +394,7 @@ void Cacher::CacheAudioWorker() {
       break;
     } else {
       qint64 buffer_timeline_out = get_buffer_offset_from_frame(clip->sequence->frame_rate, timeline_out);
+      if (buffer_timeline_out < 0) break;  // buffer not ready yet after seek
 
       audio_write_lock.lock();
 

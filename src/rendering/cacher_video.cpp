@@ -341,7 +341,7 @@ void Cacher::CacheVideoWorker() {
   // If we couldn't find the exact target frame, fall back to the closest available frame
   if (retrieved_frame == nullptr) {
     if (!queue_.isEmpty()) {
-      qWarning() << "Exact frame not found, using closest available frame from queue";
+      qDebug() << "Exact frame not found, using closest available frame from queue";
       SetRetrievedFrame(queue_.last());
     } else {
       qCritical() << "Couldn't retrieve an appropriate frame. This is an error and may mean this media is corrupt.";

@@ -169,7 +169,7 @@ qint64 get_buffer_offset_from_frame(double framerate, long frame) {
     return static_cast<qint64>(qFloor((double(frame - audio_ibuffer_frame)/framerate)*current_audio_freq()))*multiplier;
   } else {
     qWarning() << "Invalid values passed to get_buffer_offset_from_frame" << frame << "<" << audio_ibuffer_frame;
-    return 0;
+    return -1;
   }
 }
 

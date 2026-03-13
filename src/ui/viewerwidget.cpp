@@ -218,7 +218,9 @@ void ViewerWidget::frame_update() {
       update();
     } else {
       doneCurrent();
-      renderer->start_render(context(), viewer->seq.get(), viewer->get_playback_speed());
+      bool scrubbing = !viewer->playing;
+      renderer->start_render(context(), viewer->seq.get(), viewer->get_playback_speed(),
+                             nullptr, nullptr, 0, 0, false, scrubbing);
     }
 
     // render the audio

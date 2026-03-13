@@ -735,7 +735,7 @@ bool Clip::Retrieve(QOpenGLShaderProgram* yuv_program)
         ret = true;
       }
     } else {
-      qCritical() << "Failed to retrieve frame for clip" << name();
+      qWarning() << "Failed to retrieve frame for clip" << name();
     }
 
     cacher.queue()->unlock();

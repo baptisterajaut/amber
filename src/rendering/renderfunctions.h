@@ -130,6 +130,13 @@ struct ComposeSequenceParams {
     int playback_speed;
 
     /**
+     * @brief Whether the viewer is scrubbing (not playing back)
+     *
+     * Used to reduce cacher timeouts during interactive seeking.
+     */
+    bool scrubbing{false};
+
+    /**
      * @brief Blending mode shader
      *
      * Used only for video rendering. Never accessed with audio rendering.

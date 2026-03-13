@@ -326,7 +326,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
         if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
 
           // retrieve video frame from cache and store it in texture
-          c->Cache(qMax(playhead, c->timeline_in()), false, params.nests, params.playback_speed);
+          c->Cache(qMax(playhead, c->timeline_in()), params.scrubbing, params.nests, params.playback_speed);
           if (!c->Retrieve(params.yuv_program)) {
             params.texture_failed = true;
           } else {
@@ -334,7 +334,7 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
           }
 
           if (textureID == 0) {
-            qWarning() << "Failed to create texture";
+            qDebug() << "Failed to create texture";
           }
         }
 
@@ -671,6 +671,7 @@ void olive::rendering::compose_audio(Viewer* viewer, Sequence* seq, int playback
   params.gizmos = nullptr;
   params.wait_for_mutexes = wait_for_mutexes;
   params.playback_speed = playback_speed;
+  params.scrubbing = (viewer != nullptr && !viewer->playing);
   params.blend_mode_program = nullptr;
   compose_sequence(params);
 }

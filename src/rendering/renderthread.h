@@ -59,7 +59,8 @@ public:
                     GLvoid *pixels = nullptr,
                     int pixel_linesize = 0,
                     int idivider = 0,
-                    bool wait = false);
+                    bool wait = false,
+                    bool scrubbing = false);
   bool did_texture_fail();
   void cancel();
   void wait_until_paused();
@@ -112,6 +113,7 @@ private:
   int tex_height{-1};
   QAtomicInt queued;
   bool texture_failed{false};
+  bool scrubbing_{false};
   bool running{true};
   QString save_fn;
   GLvoid *pixel_buffer;
