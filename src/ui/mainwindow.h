@@ -292,6 +292,8 @@ private:
   QAction* play_in_to_out_;
   QAction* next_frame_;
   QAction* go_to_end_;
+  QAction* previous_frames_;
+  QAction* next_frames_;
   QAction* go_to_prev_cut_;
   QAction* go_to_next_cut_;
   QAction* go_to_in_point_;

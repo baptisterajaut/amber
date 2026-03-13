@@ -268,6 +268,7 @@ void PreferencesDialog::accept() {
   olive::CurrentConfig.audio_rate = audio_sample_rate->currentData().toInt();
 
   olive::CurrentConfig.effect_textbox_lines = effect_textbox_lines_field->value();
+  olive::CurrentConfig.frame_skip_step = frame_skip_step_field->value();
   olive::CurrentConfig.language_file = language_combobox->currentData().toString();
 
   olive::CurrentConfig.default_sequence_width = default_sequence.width;
@@ -661,6 +662,18 @@ void PreferencesDialog::setup_ui() {
   QCheckBox* set_name_and_marker = new QCheckBox(tr("Ask For Name When Setting Marker"));
   AddBoolPair(set_name_and_marker, &olive::CurrentConfig.set_name_with_marker);
   behavior_tab_layout->Add(set_name_and_marker);
+
+  QWidget* frame_skip_row = new QWidget(behavior_tab);
+  QHBoxLayout* frame_skip_layout = new QHBoxLayout(frame_skip_row);
+  frame_skip_layout->setContentsMargins(0, 0, 0, 0);
+  frame_skip_layout->addWidget(new QLabel(tr("Frame Skip Step:"), behavior_tab));
+  frame_skip_step_field = new QSpinBox(behavior_tab);
+  frame_skip_step_field->setMinimum(1);
+  frame_skip_step_field->setMaximum(999);
+  frame_skip_step_field->setValue(olive::CurrentConfig.frame_skip_step);
+  frame_skip_layout->addWidget(frame_skip_step_field);
+  frame_skip_layout->addStretch();
+  behavior_tab_layout->Add(frame_skip_row);
 
   // Appearance
   QWidget* appearance_tab = new QWidget(this);

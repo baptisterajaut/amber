@@ -98,6 +98,7 @@ constexpr IntEntry kIntEntries[] = {
     {"DefaultSequenceHeight", &Config::default_sequence_height},
     {"DefaultSequenceAudioFrequency", &Config::default_sequence_audio_frequency},
     {"DefaultSequenceAudioLayout", &Config::default_sequence_audio_channel_layout},
+    {"FrameSkipStep", &Config::frame_skip_step},
 };
 
 constexpr DoubleEntry kDoubleEntries[] = {
@@ -248,6 +249,7 @@ void Config::save(QString path) {
   stream.writeTextElement("DefaultSequenceAudioLayout", QString::number(default_sequence_audio_channel_layout));
   stream.writeTextElement("LockedPanels", QString::number(locked_panels));
   stream.writeTextElement("ShowWelcomeDialog", QString::number(show_welcome_dialog));
+  stream.writeTextElement("FrameSkipStep", QString::number(frame_skip_step));
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc

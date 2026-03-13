@@ -656,6 +656,11 @@ void MainWindow::setup_menus() {
 
   playback_menu->addSeparator();
 
+  previous_frames_ = MenuHelper::create_menu_action(playback_menu, "prevframes", &olive::FocusFilter, SLOT(prev_frames()), QKeySequence("Ctrl+["));
+  next_frames_ = MenuHelper::create_menu_action(playback_menu, "nextframes", &olive::FocusFilter, SLOT(next_frames()), QKeySequence("Ctrl+]"));
+
+  playback_menu->addSeparator();
+
   go_to_prev_cut_ = MenuHelper::create_menu_action(playback_menu, "prevcut", panel_timeline, SLOT(previous_cut()), QKeySequence("Up"));
   go_to_next_cut_ = MenuHelper::create_menu_action(playback_menu, "nextcut", panel_timeline, SLOT(next_cut()), QKeySequence("Down"));
 
@@ -872,6 +877,9 @@ void MainWindow::Retranslate()
   play_in_to_out_->setText(tr("Play In to Out"));
   next_frame_->setText(tr("Next Frame"));
   go_to_end_->setText(tr("Go to End"));
+
+  previous_frames_->setText(tr("Skip Backward"));
+  next_frames_->setText(tr("Skip Forward"));
 
   go_to_prev_cut_->setText(tr("Go to Previous Cut"));
   go_to_next_cut_->setText(tr("Go to Next Cut"));

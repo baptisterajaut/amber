@@ -82,6 +82,24 @@ void FocusFilter::next_frame() {
   }
 }
 
+void FocusFilter::prev_frames() {
+  QDockWidget* focused_panel = get_focused_panel();
+  if (focused_panel == panel_footage_viewer) {
+    panel_footage_viewer->previous_frames();
+  } else {
+    panel_sequence_viewer->previous_frames();
+  }
+}
+
+void FocusFilter::next_frames() {
+  QDockWidget* focused_panel = get_focused_panel();
+  if (focused_panel == panel_footage_viewer) {
+    panel_footage_viewer->next_frames();
+  } else {
+    panel_sequence_viewer->next_frames();
+  }
+}
+
 void FocusFilter::go_to_end() {
   QDockWidget* focused_panel = get_focused_panel();
   if (focused_panel == panel_footage_viewer) {

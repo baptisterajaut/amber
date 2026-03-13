@@ -116,6 +116,8 @@ public slots:
   void increase_speed();
   void decrease_speed();
   void next_frame();
+  void previous_frames();
+  void next_frames();
   void go_to_out();
   void go_to_end();
   void close_media();

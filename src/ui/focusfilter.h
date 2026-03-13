@@ -137,6 +137,20 @@ public slots:
   void next_frame();
 
   /**
+     * @brief Skip backward by multiple frames
+     *
+     * Calls previous_frames() on Media Viewer if focused. Otherwise calls it on Sequence Viewer.
+     */
+  void prev_frames();
+
+  /**
+     * @brief Skip forward by multiple frames
+     *
+     * Calls next_frames() on Media Viewer if focused. Otherwise calls it on Sequence Viewer.
+     */
+  void next_frames();
+
+  /**
      * @brief Go to End
      *
      * Calls go_to_end() on Media Viewer it's focused. Otherwise calls it on Sequence Viewer.

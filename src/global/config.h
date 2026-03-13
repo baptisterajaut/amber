@@ -579,6 +579,13 @@ struct Config {
   bool show_welcome_dialog{true};
 
   /**
+   * @brief Frame skip step size
+   *
+   * Number of frames to skip when using the "Skip Forward" / "Skip Backward" shortcuts.
+   */
+  int frame_skip_step{5};
+
+  /**
    * @brief Load config from file
    *
    * Load configuration parameters from file

@@ -213,6 +213,8 @@ private:
    */
   QSpinBox* effect_textbox_lines_field;
 
+  QSpinBox* frame_skip_step_field;
+
   /**
    * @brief UI widget for selecting the output audio device
    */

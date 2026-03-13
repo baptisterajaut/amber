@@ -315,6 +315,14 @@ void Viewer::next_frame() {
   if (seq != nullptr) seek(seq->playhead + 1);
 }
 
+void Viewer::previous_frames() {
+  if (seq != nullptr) seek(qMax(0L, seq->playhead - olive::CurrentConfig.frame_skip_step));
+}
+
+void Viewer::next_frames() {
+  if (seq != nullptr) seek(seq->playhead + olive::CurrentConfig.frame_skip_step);
+}
+
 void Viewer::go_to_out() {
   if (seq != nullptr) {
     if (seq->using_workarea) {
