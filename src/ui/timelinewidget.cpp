@@ -198,9 +198,16 @@ void TimelineWidget::wheelEvent(QWheelEvent *event) {
   // "Scroll Zooms" true  + Control down: not zooming
   bool zooming = (olive::CurrentConfig.scroll_zooms != ctrl);
 
+  // Trackpads provide native 2D scrolling (pixelDelta is non-zero) — never
+  // auto-swap axes for them, only honor explicit Shift toggle.
+  // Mouse wheels only have vertical scroll, so the config swap maps vertical
+  // scroll to horizontal timeline panning (the common case).
+  bool is_trackpad = !event->pixelDelta().isNull();
+  bool cfg_swap = is_trackpad ? false : olive::CurrentConfig.invert_timeline_scroll_axes;
+
   // Allow shift for axis swap, but don't swap on zoom... Unless
   // we need to override Qt's axis swap via Alt
-  bool swap_hv = ((shift != olive::CurrentConfig.invert_timeline_scroll_axes) &
+  bool swap_hv = ((shift != cfg_swap) &
                   !zooming) | (alt & !shift & zooming);
 
   int delta_h = swap_hv ? event->angleDelta().y() : event->angleDelta().x();
