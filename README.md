@@ -30,7 +30,7 @@ Amber is designed to run on modest hardware — sub-3 MB binary, ~70 MB idle RAM
 - **GPU:** OpenGL 3.2 or newer (Intel HD Graphics / Sandy Bridge 2011+, any discrete GPU from the last 15 years). Vulkan, Metal, or D3D12 are used when available but not required.
 - **CPU:** any x86-64 processor.
 - **RAM:** 512 MB free is enough for simple edits; more helps with long timelines and high-res footage.
-- **Linux:** Debian 13+ natively (.deb). Older distros: use the AppImage (it bundles Qt 6.10).
+- **Linux:** Arch Linux natively (PKGBUILD). Everything else: use the AppImage (it bundles Qt 6.10). No .deb — Debian 13 and Ubuntu 24.04 ship Qt 6.4/6.8 which lack the QRhi private APIs we need. Ubuntu 26.04 will likely work natively.
 - **Windows:** Windows 10 or newer (Qt 6 requirement).
 - **macOS:** all Apple Silicon machines work. Intel Macs probably too, but untested.
 
@@ -42,7 +42,7 @@ See [ROADMAP.md](ROADMAP.md) for planned work (1.x Oak backports & cleanup → 2
 
 ## Packages
 
-Pre-built packages for Windows, Linux (AppImage, Debian .deb) and macOS are available on the [Releases](https://github.com/baptisterajaut/amber/releases) page. Arch Linux users: see the AUR. Tested on Arch Linux only; other builds are best-effort.
+Pre-built packages for Windows, Linux (AppImage) and macOS are available on the [Releases](https://github.com/baptisterajaut/amber/releases) page. Arch Linux users: build from the PKGBUILD in `packaging/linux/`. Tested on Arch Linux only; other builds are best-effort.
 
 Build scripts in `packaging/linux/` (Dockerfiles, PKGBUILD) and `packaging/windows/` (cross-compile Dockerfile, NSIS).
 
@@ -60,9 +60,6 @@ cmake --build build -j$(nproc)
 ```bash
 # AppImage (Qt 6.10 + PipeWire audio — covers Ubuntu 24.04+)
 docker buildx build -f packaging/linux/appimage.dockerfile --output type=local,dest=./out .
-
-# Debian 13 .deb
-docker buildx build -f packaging/linux/debian.dockerfile --target package --output type=local,dest=./out .
 
 # Windows NSIS installer (cross-compiled from Fedora)
 docker build -f packaging/windows/cross-compile.dockerfile --target package -t amber-win64 .

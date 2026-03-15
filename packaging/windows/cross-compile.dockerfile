@@ -7,6 +7,7 @@ RUN dnf install -y \
     mingw64-qt6-qtsvg \
     mingw64-qt6-qttools \
     mingw64-qt6-qtmultimedia \
+    mingw64-qt6-qtshadertools \
     qt6-qttools \
     cmake \
     make \

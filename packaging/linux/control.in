@@ -1,9 +1,0 @@
-Package: amber-editor
-Version: ${VERSION}-${REVISION}
-Section: video
-Priority: optional
-Architecture: ${ARCH}
-Depends: libqt6multimedia6, libqt6openglwidgets6, libqt6shadertools6, libqt6svg6, libavformat61, libavcodec61, libavutil59, libswscale8, libswresample5, libavfilter10, libgl1
-Conflicts: olive-editor
-Maintainer: Baptiste Rajaut <https://github.com/baptisterajaut>
-Description: Professional open-source non-linear video editor

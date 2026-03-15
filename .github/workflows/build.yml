@@ -9,30 +9,6 @@ permissions:
   contents: write
 
 jobs:
-  debian-deb:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Extract version
-        run: echo "VERSION=$(sed -n 's/.*project(.*VERSION \([0-9.]*\).*/\1/p' src/CMakeLists.txt)" >> "$GITHUB_ENV"
-
-      - name: Build .deb
-        run: |
-          docker build \
-            -f packaging/linux/debian.dockerfile \
-            --build-arg VERSION=${{ env.VERSION }} \
-            --build-arg GIT_HASH=$(git rev-parse --short HEAD) \
-            --target package \
-            --output type=local,dest=./out \
-            .
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: debian-deb
-          path: out/
-
   appimage:
     runs-on: ubuntu-latest
     steps:
@@ -154,7 +130,7 @@ jobs:
           path: build/Amber-*.dmg
 
   release:
-    needs: [debian-deb, appimage, windows, macos]
+    needs: [appimage, windows, macos]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     steps:
@@ -172,7 +148,6 @@ jobs:
           tag_name: ${{ github.event.release.tag_name }}
           prerelease: ${{ github.event.release.prerelease }}
           files: |
-            amber-editor_*.deb
             Amber-*.AppImage
             amber-setup.exe
             Amber-*.dmg

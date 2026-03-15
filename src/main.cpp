@@ -25,6 +25,9 @@
 #if QT_CONFIG(vulkan)
 #include <QVulkanInstance>
 #endif
+#if QT_CONFIG(vulkan) && defined(VK_VERSION_1_0)
+#define AMBER_HAS_VULKAN 1
+#endif
 
 #include "global/debug.h"
 #include "global/config.h"
@@ -38,7 +41,7 @@ extern "C" {
 #include <libavfilter/avfilter.h>
 }
 
-#if QT_CONFIG(vulkan)
+#if AMBER_HAS_VULKAN
 static QVulkanInstance s_vulkanInstance;
 #endif
 
@@ -150,7 +153,7 @@ int main(int argc, char *argv[]) {
   a.setWindowIcon(QIcon(":/icons/amber64.png"));
 
   // Create Vulkan instance (needed by both QRhiWidget and offscreen QRhi when using Vulkan)
-#if QT_CONFIG(vulkan)
+#if AMBER_HAS_VULKAN
   {
     RhiBackend b = olive::CurrentRuntimeConfig.rhi_backend;
     bool want_vulkan = (b == RhiBackend::Auto || b == RhiBackend::Vulkan);
@@ -166,7 +169,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   // Probe: verify Vulkan QRhi actually works (instance can create without usable GPU)
-#if QT_CONFIG(vulkan)
+#if AMBER_HAS_VULKAN
   if (olive::CurrentRuntimeConfig.vulkan_instance != nullptr) {
     QRhiVulkanInitParams probeParams;
     probeParams.inst = &s_vulkanInstance;
@@ -221,7 +224,7 @@ int main(int argc, char *argv[]) {
   MainWindow w(nullptr);
 
   // Associate Vulkan instance with the main window (required for QRhiWidget Vulkan backend)
-#if QT_CONFIG(vulkan)
+#if AMBER_HAS_VULKAN
   if (s_vulkanInstance.isValid()) {
     w.winId();  // force native window handle creation
     if (w.windowHandle()) {

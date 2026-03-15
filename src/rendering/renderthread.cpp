@@ -25,8 +25,15 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QFile>
+// Qt may set QT_CONFIG(vulkan) even without a real Vulkan SDK (e.g. macOS
+// Homebrew Qt with MoltenVK headers but no SDK on the build machine).
+// After including <QVulkanInstance>, check for VK_VERSION_1_0 to know if
+// the real vulkan.h was found — without it, QVulkanInstance is stub-only.
 #if QT_CONFIG(vulkan)
 #include <QVulkanInstance>
+#endif
+#if QT_CONFIG(vulkan) && defined(VK_VERSION_1_0)
+#define AMBER_HAS_VULKAN 1
 #endif
 
 #include "global/config.h"
@@ -93,7 +100,7 @@ void RenderThread::run() {
       RhiBackend backend = olive::CurrentRuntimeConfig.rhi_backend;
 
       switch (backend) {
-#if QT_CONFIG(vulkan)
+#if AMBER_HAS_VULKAN
         case RhiBackend::Vulkan: {
           auto* vi = static_cast<QVulkanInstance*>(olive::CurrentRuntimeConfig.vulkan_instance);
           if (vi && vi->isValid()) {

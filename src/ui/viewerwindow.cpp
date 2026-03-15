@@ -31,6 +31,9 @@
 #if QT_CONFIG(vulkan)
 #include <QVulkanInstance>
 #endif
+#if QT_CONFIG(vulkan) && defined(VK_VERSION_1_0)
+#define AMBER_HAS_VULKAN 1
+#endif
 
 #include "global/config.h"
 #include "mainwindow.h"
@@ -46,7 +49,7 @@ ViewerWindow::ViewerWindow(QWidget* parent) : QRhiWidget(parent) {
     default: setApi(Api::OpenGL); break;
   }
 
-#if QT_CONFIG(vulkan)
+#if AMBER_HAS_VULKAN
   if (olive::CurrentRuntimeConfig.rhi_backend == RhiBackend::Vulkan) {
     auto* vi = static_cast<QVulkanInstance*>(olive::CurrentRuntimeConfig.vulkan_instance);
     if (vi) {

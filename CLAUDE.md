@@ -26,15 +26,16 @@ No test suite exists in this branch.
 All packages at https://github.com/baptisterajaut/amber/releases
 
 Docker builds (build stage compiles, package stage produces artifact via `FROM scratch` + `--output`):
-- `packaging/linux/debian.dockerfile` — Debian 13 `.deb` (`--target package`)
 - `packaging/linux/appimage.dockerfile` — AppImage (Qt 6.10 via aqtinstall, native PipeWire audio, covers Ubuntu 24.04+)
 - `packaging/linux/dev.dockerfile` — dev iterative AppImage build (volume mounts, cmake cache persistence)
 - `packaging/windows/cross-compile.dockerfile` — Windows NSIS installer via Fedora mingw64 (`--target package`)
 - `packaging/linux/PKGBUILD` — Arch, run with `makepkg` natively
 
+No .deb — Debian 13 and Ubuntu 24.04 ship Qt 6.4/6.8 which lack Qt6ShaderToolsPrivate (needed for QShaderBaker runtime shader compilation). AppImage covers these distros.
+
 ## Platform support
 
-Tested on Arch Linux only. Debian, AppImage and Windows builds are best-effort.
+Tested on Arch Linux only. AppImage, Windows and macOS builds are best-effort.
 
 ## Known issues
 
