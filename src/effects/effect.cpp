@@ -27,11 +27,12 @@
 #include <QGridLayout>
 #include <QMenu>
 #include <QMessageBox>
-#include <QOpenGLContext>
 #include <QPainter>
+#include <QStandardPaths>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QtMath>
+#include <rhi/qshaderbaker.h>
 
 #include "global/config.h"
 #include "global/debug.h"
@@ -307,23 +308,7 @@ Effect::Effect(Clip* c, const EffectMeta* em)
                 setIterations(attr.value().toInt());
               }
             }
-          } /* else if (reader.name() == QLatin1String("superimpose") && reader.isStartElement()) {
-             enable_superimpose = true;
-             const QXmlStreamAttributes& attributes = reader.attributes();
-             for (int i=0;i<attributes.size();i++) {
-               const QXmlStreamAttribute& attr = attributes.at(i);
-               if (attr.name() == QLatin1String("script")) {
-                 QFile script_file(get_effects_dir() + "/" + attr.value().toString());
-                 if (script_file.open(QFile::ReadOnly)) {
-                   script = script_file.readAll();
-                 } else {
-                   qCritical() << "Failed to open superimpose script file for" << em->filename;
-                   enable_superimpose = false;
-                 }
-                 break;
-               }
-             }
-           }*/
+          }
           reader.readNext();
         }
 
@@ -696,48 +681,88 @@ void Effect::validate_meta_path() {
   }
 }
 
+QShader Effect::bakeOrLoadCached(const QString& path, QShader::Stage stage) {
+  QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/shaders";
+  QDir().mkpath(cacheDir);
+
+  QFile src(path);
+  if (!src.open(QIODevice::ReadOnly)) {
+    qWarning() << "Failed to open shader source:" << path;
+    return {};
+  }
+  QByteArray source = src.readAll();
+
+  QString hash = QString::number(qHash(source), 16);
+  QString cachePath = cacheDir + "/" + hash + ".qsb";
+
+  // Try loading from cache
+  QFile cacheFile(cachePath);
+  if (cacheFile.open(QIODevice::ReadOnly)) {
+    QShader cached = QShader::fromSerialized(cacheFile.readAll());
+    if (cached.isValid()) return cached;
+  }
+
+  // Bake from source
+  QShaderBaker baker;
+  baker.setSourceString(source, stage);
+  baker.setGeneratedShaderVariants({QShader::StandardShader});
+  baker.setGeneratedShaders({
+      {QShader::SpirvShader, QShaderVersion(100)},
+      {QShader::GlslShader, QShaderVersion(150)},
+  });
+  QShader result = baker.bake();
+  if (!result.isValid()) {
+    qWarning() << "Shader bake failed:" << path << baker.errorMessage();
+    return {};
+  }
+
+  // Write to cache
+  QFile writeFile(cachePath);
+  if (writeFile.open(QIODevice::WriteOnly)) {
+    writeFile.write(result.serialized());
+  }
+  return result;
+}
+
 void Effect::open() {
   if (isOpen) {
     qWarning() << "Tried to open an effect that was already open";
     close();
   }
   if (olive::CurrentRuntimeConfig.shaders_are_enabled && (Flags() & ShaderFlag)) {
-    if (QOpenGLContext::currentContext() == nullptr) {
-      qWarning() << "No current context to create a shader program for - will retry next repaint";
-    } else {
-      glslProgram = new QOpenGLShaderProgram();
-      validate_meta_path();
-      bool glsl_compiled = true;
-      if (!vertPath.isEmpty()) {
-        if (glslProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, meta->path + "/" + vertPath)) {
-          qInfo() << "Vertex shader added successfully";
-        } else {
-          glsl_compiled = false;
-          qWarning() << "Vertex shader could not be added";
+    validate_meta_path();
+    if (!vertPath.isEmpty()) {
+      vertexShader_ = bakeOrLoadCached(meta->path + "/" + vertPath, QShader::VertexStage);
+      if (vertexShader_.isValid()) {
+        QShaderDescription desc = vertexShader_.description();
+        for (const auto& block : desc.uniformBlocks()) {
+          if (block.binding == 1) {
+            vertUboSize_ = block.size;
+            for (const auto& member : block.members) {
+              vertUniformEntries_.append({member.name, member.offset, int(member.size)});
+            }
+            break;
+          }
         }
       }
-      if (!fragPath.isEmpty()) {
-        if (glslProgram->addShaderFromSourceFile(QOpenGLShader::Fragment, meta->path + "/" + fragPath)) {
-          qInfo() << "Fragment shader added successfully";
-        } else {
-          glsl_compiled = false;
-          qWarning() << "Fragment shader could not be added";
-        }
-      }
-      if (glsl_compiled) {
-        glslProgram->bindAttributeLocation("a_position", 0);
-        glslProgram->bindAttributeLocation("a_texcoord", 1);
-        if (glslProgram->link()) {
-          qInfo() << "Shader program linked successfully";
-        } else {
-          qWarning() << "Shader program failed to link";
-        }
-      }
-      isOpen = true;
     }
-  } else {
-    isOpen = true;
+    if (!fragPath.isEmpty()) {
+      fragmentShader_ = bakeOrLoadCached(meta->path + "/" + fragPath, QShader::FragmentStage);
+      if (fragmentShader_.isValid()) {
+        QShaderDescription desc = fragmentShader_.description();
+        for (const auto& block : desc.uniformBlocks()) {
+          if (block.binding == 1) {
+            fragUboSize_ = block.size;
+            for (const auto& member : block.members) {
+              uniformEntries_.append({member.name, member.offset, int(member.size)});
+            }
+            break;
+          }
+        }
+      }
+    }
   }
+  isOpen = true;
 }
 
 void Effect::close() {
@@ -745,32 +770,27 @@ void Effect::close() {
     qWarning() << "Tried to close an effect that was already closed";
   }
   delete_texture();
-  if (glslProgram != nullptr) {
-    delete glslProgram;
-    glslProgram = nullptr;
-  }
+  vertexShader_ = {};
+  fragmentShader_ = {};
+  uniformEntries_.clear();
+  vertUniformEntries_.clear();
+  fragUboSize_ = 0;
+  vertUboSize_ = 0;
   isOpen = false;
 }
 
-bool Effect::is_glsl_linked() { return glslProgram != nullptr && glslProgram->isLinked(); }
+bool Effect::is_glsl_linked() { return is_shader_valid(); }
+
+bool Effect::is_shader_valid() { return vertexShader_.isValid() && fragmentShader_.isValid(); }
 
 void Effect::startEffect() {
   if (!isOpen) {
     open();
     qWarning() << "Tried to start a closed effect - opening";
   }
-  if (olive::CurrentRuntimeConfig.shaders_are_enabled && (Flags() & Effect::ShaderFlag) && glslProgram != nullptr &&
-      glslProgram->isLinked()) {
-    bound = glslProgram->bind();
-  }
 }
 
-void Effect::endEffect() {
-  if (bound) {
-    glslProgram->release();
-  }
-  bound = false;
-}
+void Effect::endEffect() {}
 
 int Effect::Flags() { return flags_; }
 
@@ -789,41 +809,61 @@ EffectPtr Effect::copy(Clip* c) {
   return copy;
 }
 
-void Effect::process_shader(double timecode, GLTextureCoords&, int iteration) {
-  glslProgram->setUniformValue("resolution", parent_clip->media_width(), parent_clip->media_height());
-  glslProgram->setUniformValue("time", GLfloat(timecode));
-  glslProgram->setUniformValue("iteration", iteration);
+void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData) {
+  if (uboData.size() < fragUboSize_) uboData.resize(fragUboSize_);
 
-  for (auto row : rows) {
-    for (int j = 0; j < row->FieldCount(); j++) {
-      EffectField* field = row->Field(j);
-      if (!field->id().isEmpty()) {
-        switch (field->type()) {
-          case EffectField::EFFECT_FIELD_DOUBLE: {
-            DoubleField* double_field = static_cast<DoubleField*>(field);
-            glslProgram->setUniformValue(double_field->id().toUtf8().constData(),
-                                         GLfloat(double_field->GetDoubleAt(timecode)));
-          } break;
-          case EffectField::EFFECT_FIELD_COLOR: {
-            ColorField* color_field = static_cast<ColorField*>(field);
-            glslProgram->setUniformValue(color_field->id().toUtf8().constData(),
-                                         GLfloat(color_field->GetColorAt(timecode).redF()),
-                                         GLfloat(color_field->GetColorAt(timecode).greenF()),
-                                         GLfloat(color_field->GetColorAt(timecode).blueF()));
-          } break;
-          case EffectField::EFFECT_FIELD_BOOL:
-            glslProgram->setUniformValue(field->id().toUtf8().constData(), field->GetValueAt(timecode).toBool());
-            break;
-          case EffectField::EFFECT_FIELD_COMBO:
-            glslProgram->setUniformValue(field->id().toUtf8().constData(), field->GetValueAt(timecode).toInt());
-            break;
+  // Set automatic uniforms by looking up their entries
+  for (const auto& entry : uniformEntries_) {
+    if (entry.name == QLatin1String("resolution")) {
+      float res[2] = {float(parent_clip->media_width()), float(parent_clip->media_height())};
+      memcpy(uboData.data() + entry.offset, res, qMin(entry.size, 8));
+    } else if (entry.name == QLatin1String("resolution_x")) {
+      float v = float(parent_clip->media_width());
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("resolution_y")) {
+      float v = float(parent_clip->media_height());
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("time")) {
+      float v = float(timecode);
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("iteration")) {
+      int v = iteration;
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    }
+  }
 
-            // can you even send a string to a uniform value?
-          case EffectField::EFFECT_FIELD_STRING:
-          case EffectField::EFFECT_FIELD_FONT:
-          case EffectField::EFFECT_FIELD_FILE:
-          case EffectField::EFFECT_FIELD_UI:
-            break;
+  // Set field uniforms by name lookup
+  for (int r = 0; r < row_count(); r++) {
+    EffectRow* erow = row(r);
+    for (int j = 0; j < erow->FieldCount(); j++) {
+      EffectField* field = erow->Field(j);
+      if (field->id().isEmpty()) continue;
+      // Find matching uniform entry
+      for (const auto& entry : uniformEntries_) {
+        if (entry.name == field->id()) {
+          switch (field->type()) {
+            case EffectField::EFFECT_FIELD_DOUBLE: {
+              float v = float(static_cast<DoubleField*>(field)->GetDoubleAt(timecode));
+              memcpy(uboData.data() + entry.offset, &v, 4);
+            } break;
+            case EffectField::EFFECT_FIELD_COLOR: {
+              ColorField* cf = static_cast<ColorField*>(field);
+              float rgb[3] = {float(cf->GetColorAt(timecode).redF()), float(cf->GetColorAt(timecode).greenF()),
+                              float(cf->GetColorAt(timecode).blueF())};
+              memcpy(uboData.data() + entry.offset, rgb, qMin(entry.size, 12));
+            } break;
+            case EffectField::EFFECT_FIELD_BOOL: {
+              int v = field->GetValueAt(timecode).toBool() ? 1 : 0;  // GLSL bool = 4 bytes
+              memcpy(uboData.data() + entry.offset, &v, 4);
+            } break;
+            case EffectField::EFFECT_FIELD_COMBO: {
+              int v = field->GetValueAt(timecode).toInt();
+              memcpy(uboData.data() + entry.offset, &v, 4);
+            } break;
+            default:
+              break;
+          }
+          break;  // found matching entry
         }
       }
     }
@@ -832,7 +872,7 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration) {
 
 void Effect::process_coords(double, GLTextureCoords&, int) {}
 
-GLuint Effect::process_superimpose(double timecode) {
+QRhiTexture* Effect::process_superimpose(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode) {
   bool dimensions_changed = false;
   bool redrew_image = false;
 
@@ -849,24 +889,20 @@ GLuint Effect::process_superimpose(double timecode) {
     redrew_image = true;
   }
 
-  if (texture == nullptr || texture->width() != img.width() || texture->height() != img.height()) {
-    delete_texture();
-
-    texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
-    texture->setSize(img.width(), img.height());
-    texture->setFormat(QOpenGLTexture::RGBA8_UNorm);
-    texture->setMipLevels(texture->maximumMipLevels());
-    texture->setMinMagFilters(QOpenGLTexture::Linear, QOpenGLTexture::Linear);
-    texture->allocateStorage(QOpenGLTexture::RGBA, QOpenGLTexture::UInt8);
-
+  if (superimposeTex_ == nullptr || dimensions_changed) {
+    delete superimposeTex_;
+    superimposeTex_ = rhi->newTexture(QRhiTexture::RGBA8, QSize(width, height));
+    superimposeTex_->create();
     redrew_image = true;
   }
 
   if (redrew_image) {
-    texture->setData(0, QOpenGLTexture::RGBA, QOpenGLTexture::UInt8, img.constBits());
+    QRhiTextureSubresourceUploadDescription desc(img.constBits(), int(img.sizeInBytes()));
+    desc.setSourceSize(QSize(width, height));
+    u->uploadTexture(superimposeTex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
   }
 
-  return texture->textureId();
+  return superimposeTex_;
 }
 
 void Effect::process_audio(double, double, quint8*, int, int) {}
@@ -877,9 +913,6 @@ void Effect::gizmo_move(EffectGizmo* gizmo, int x_movement, int y_movement, doub
   // Loop through each gizmo to find `gizmo`
   for (auto i : gizmos) {
     if (i == gizmo) {
-      // If (!done && gizmo_dragging_actions_.isEmpty()), that means the drag just started and we're going to save
-      // the current state of the attach fields' keyframes in KeyframeDataChange objects to make the changes undoable
-      // by the user later.
       if (!done && gizmo_dragging_actions_.isEmpty()) {
         if (gizmo->x_field1 != nullptr) {
           gizmo_dragging_actions_.append(new KeyframeDataChange(gizmo->x_field1));
@@ -913,20 +946,11 @@ void Effect::gizmo_move(EffectGizmo* gizmo, int x_movement, int y_movement, doub
                                     gizmo->y_field2->GetDoubleAt(timecode) + y_movement * gizmo->y_field_multi2);
       }
 
-      // If (done && !gizmo_dragging_actions_.isEmpty()), that means the drag just ended and we're going to save
-      // the new state of the attach fields' keyframes in KeyframeDataChange objects to make the changes undoable
-      // by the user later.
       if (done && !gizmo_dragging_actions_.isEmpty()) {
-        // Store all the KeyframeDataChange objects into a ComboAction to send to the undo stack (makes them all
-        // undoable together rather than having to be undone individually).
         ComboAction* ca = new ComboAction();
 
         for (auto gizmo_dragging_action : gizmo_dragging_actions_) {
-          // Set the current state of the keyframes as the "new" keyframes (the old values were set earlier when the
-          // KeyframeDataChange object was constructed).
           gizmo_dragging_action->SetNewKeyframes();
-
-          // Add this KeyframeDataChange object to the ComboAction
           ca->append(gizmo_dragging_action);
         }
 
@@ -957,49 +981,7 @@ void Effect::gizmo_world_to_screen(const QMatrix4x4& mvp) {
 
 bool Effect::are_gizmos_enabled() { return (gizmos.size() > 0); }
 
-void Effect::redraw(double) {
-  /*
-  // run javascript
-  QPainter p(&img);
-  painter_wrapper.img = &img;
-  painter_wrapper.painter = &p;
-
-  jsEngine.globalObject().setProperty("painter", wrapper_obj);
-  jsEngine.globalObject().setProperty("width", parent_clip->media_width());
-  jsEngine.globalObject().setProperty("height", parent_clip->media_height());
-
-  for (int i=0;i<rows.size();i++) {
-    EffectRow* row = rows.at(i);
-    for (int j=0;j<row->fieldCount();j++) {
-      EffectField* field = row->field(j);
-      if (!field->id.isEmpty()) {
-        switch (field->type) {
-        case EFFECT_FIELD_DOUBLE:
-          jsEngine.globalObject().setProperty(field->id, field->get_double_value(timecode));
-          break;
-        case EFFECT_FIELD_COLOR:
-          jsEngine.globalObject().setProperty(field->id, field->get_color_value(timecode).name());
-          break;
-        case EFFECT_FIELD_STRING:
-          jsEngine.globalObject().setProperty(field->id, field->get_string_value(timecode));
-          break;
-        case EFFECT_FIELD_BOOL:
-          jsEngine.globalObject().setProperty(field->id, field->get_bool_value(timecode));
-          break;
-        case EFFECT_FIELD_COMBO:
-          jsEngine.globalObject().setProperty(field->id, field->get_combo_index(timecode));
-          break;
-        case EFFECT_FIELD_FONT:
-          jsEngine.globalObject().setProperty(field->id, field->get_font_name(timecode));
-          break;
-        }
-      }
-    }
-  }
-
-  jsEngine.evaluate(script);
-  */
-}
+void Effect::redraw(double) {}
 
 bool Effect::valueHasChanged(double timecode) {
   if (cachedValues.size() == 0) {
@@ -1030,8 +1012,8 @@ bool Effect::valueHasChanged(double timecode) {
 }
 
 void Effect::delete_texture() {
-  delete texture;
-  texture = nullptr;
+  delete superimposeTex_;
+  superimposeTex_ = nullptr;
 }
 
 const EffectMeta* get_meta_from_name(const QString& input) {

@@ -247,7 +247,10 @@ double Media::get_frame_rate(int stream) {
   case MEDIA_TYPE_FOOTAGE:
   {
     Footage* f = to_footage();
-    if (stream < 0) return f->video_tracks.at(0).video_frame_rate * f->speed;
+    if (stream < 0) {
+      if (f->video_tracks.isEmpty()) return 0;
+      return f->video_tracks.at(0).video_frame_rate * f->speed;
+    }
     return f->get_stream_from_file_index(true, stream)->video_frame_rate * f->speed;
   }
   case MEDIA_TYPE_SEQUENCE: return to_sequence()->frame_rate;
@@ -260,7 +263,10 @@ int Media::get_sampling_rate(int stream) {
   case MEDIA_TYPE_FOOTAGE:
   {
     Footage* f = to_footage();
-    if (stream < 0) return f->audio_tracks.at(0).audio_frequency * f->speed;
+    if (stream < 0) {
+      if (f->audio_tracks.isEmpty()) return 0;
+      return f->audio_tracks.at(0).audio_frequency * f->speed;
+    }
     return to_footage()->get_stream_from_file_index(false, stream)->audio_frequency * f->speed;
   }
   case MEDIA_TYPE_SEQUENCE: return to_sequence()->audio_frequency;

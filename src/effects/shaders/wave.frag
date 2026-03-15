@@ -1,12 +1,13 @@
-#version 110
-
-uniform float frequency;
-uniform float intensity;
-uniform float evolution;
-uniform bool vertical;
-
-uniform sampler2D myTexture;
-varying vec2 vTexCoord;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    float frequency;
+    float intensity;
+    float evolution;
+    bool vertical;
+};
+layout(binding = 2) uniform sampler2D myTexture;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
 	float x = vTexCoord.x;
@@ -21,12 +22,12 @@ void main(void) {
 	if (y < 0.0 || y > 1.0 || x < 0.0 || x > 1.0) {
 		discard;
 	} else {
-		vec4 textureColor = texture2D(myTexture, vec2(x, y));
-		gl_FragColor = vec4(
+		vec4 textureColor = texture(myTexture, vec2(x, y));
+		fragColor = vec4(
 			textureColor.r,
 			textureColor.g,
 			textureColor.b,
 			textureColor.a
 		);
-	}	
+	}
 }

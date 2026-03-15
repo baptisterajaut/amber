@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  ubuntu-deb:
+  debian-deb:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -20,16 +20,17 @@ jobs:
       - name: Build .deb
         run: |
           docker build \
-            -f packaging/linux/ubuntu.dockerfile \
+            -f packaging/linux/debian.dockerfile \
             --build-arg VERSION=${{ env.VERSION }} \
             --build-arg GIT_HASH=$(git rev-parse --short HEAD) \
+            --target package \
             --output type=local,dest=./out \
             .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ubuntu-deb
+          name: debian-deb
           path: out/
 
   appimage:
@@ -153,7 +154,7 @@ jobs:
           path: build/Amber-*.dmg
 
   release:
-    needs: [ubuntu-deb, appimage, windows, macos]
+    needs: [debian-deb, appimage, windows, macos]
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     steps:

@@ -21,43 +21,62 @@
 #ifndef VIEWERWINDOW_H
 #define VIEWERWINDOW_H
 
-#include <QOpenGLWidget>
-#include <QOpenGLShaderProgram>
+#include <QByteArray>
+#include <QRhiWidget>
 #include <QTimer>
+#include <rhi/qrhi.h>
 
-class QMutex;
 class QMenu;
 class QShortcut;
+class QLabel;
 
-class ViewerWindow : public QOpenGLWidget {
+class ViewerWindow : public QRhiWidget {
   Q_OBJECT
-public:
-  ViewerWindow(QWidget *parent);
-  void set_texture(GLuint t, double iar, QMutex *imutex);
-protected:
+ public:
+  ViewerWindow(QWidget* parent);
+  void set_frame(const char* data, int w, int h);
+
+ protected:
   void showEvent(QShowEvent*) override;
   void keyPressEvent(QKeyEvent*) override;
   void mousePressEvent(QMouseEvent*) override;
   void mouseMoveEvent(QMouseEvent*) override;
+  void resizeEvent(QResizeEvent*) override;
 
-  void initializeGL() override;
-  void paintGL() override;
-private:
-  QOpenGLShaderProgram* passthrough_program_{nullptr};
-  GLuint texture{0};
-  double ar;
-  QMutex* mutex{nullptr};
+  void initialize(QRhiCommandBuffer* cb) override;
+  void render(QRhiCommandBuffer* cb) override;
+  void releaseResources() override;
+
+ private:
+  // CPU frame data (copied from RenderThread)
+  QByteArray frame_data_;
+  int frame_w_{0};
+  int frame_h_{0};
+  double ar{1.0};
+
+  // RHI pipeline
+  QRhi* rhi_{nullptr};
+  bool rhi_initialized_{false};
+  QRhiBuffer* vbuf_{nullptr};
+  QRhiBuffer* vert_ubuf_{nullptr};
+  QRhiBuffer* frag_ubuf_{nullptr};
+  QRhiSampler* sampler_{nullptr};
+  QRhiTexture* frame_tex_{nullptr};
+  QRhiShaderResourceBindings* srb_{nullptr};
+  QRhiGraphicsPipeline* pipeline_{nullptr};
+  int cached_tex_w_{0};
+  int cached_tex_h_{0};
 
   // shortcuts
   void shortcut_copier(QVector<QShortcut*>& shortcuts, QMenu* menu);
   QVector<QShortcut*> shortcuts_;
 
   // exit full screen message
+  QLabel* fullscreen_msg_label_;
   QTimer fullscreen_msg_timer;
-  bool show_fullscreen_msg{false};
-  QRect fullscreen_msg_rect;
-private slots:
+  void position_fullscreen_msg();
+ private slots:
   void fullscreen_msg_timeout();
 };
 
-#endif // VIEWERWINDOW_H
+#endif  // VIEWERWINDOW_H

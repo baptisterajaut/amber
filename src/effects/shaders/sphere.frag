@@ -1,16 +1,16 @@
-#version 110
-
-varying vec2 vTexCoord;
-
-uniform vec2 resolution; // Screen resolution
-uniform sampler2D tex0; // scene buffer
-
-uniform float xoff;
-uniform float yoff;
-uniform float scale;
-uniform bool tile;
-uniform bool hide_edges;
-uniform bool stretch;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    vec2 resolution; // Screen resolution
+    float xoff;
+    float yoff;
+    float scale;
+    bool tile;
+    bool hide_edges;
+    bool stretch;
+};
+layout(binding = 2) uniform sampler2D tex0; // scene buffer
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
 	vec2 texCoord = vTexCoord;
@@ -30,7 +30,7 @@ void main(void) {
 	vec2 p = 2.0 * texCoord - offset;
 	vec2 adj_tc = 2.0 * vTexCoord - 1.0;
 	float r = dot(p,p);
-	if (r > 1.0) discard; 
+	if (r > 1.0) discard;
 	float f = (1.0-sqrt(1.0-r))/(r);
 	vec2 uv;
 	uv.x = (adj_tc.x*(1.5-scale*0.01))*f+0.5-(xoff*0.01);
@@ -41,5 +41,5 @@ void main(void) {
 	} else if (hide_edges && (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)) {
 		discard;
 	}
-	gl_FragColor = vec4(texture2D(tex0,uv));
+	fragColor = vec4(texture(tex0,uv));
 }

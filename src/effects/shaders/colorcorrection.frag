@@ -1,20 +1,21 @@
-#version 110
-
-uniform float temperature;
-uniform float tint;
-uniform float exposure;
-uniform float contrast;
-uniform float highlights;
-uniform float shadows;
-uniform float whites;
-uniform float blacks;
-uniform float saturation;
-
-uniform sampler2D myTexture;
-varying vec2 vTexCoord;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    float temperature;
+    float tint;
+    float exposure;
+    float contrast;
+    float highlights;
+    float shadows;
+    float whites;
+    float blacks;
+    float saturation;
+};
+layout(binding = 2) uniform sampler2D myTexture;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
-	vec4 textureColor = texture2D(myTexture, vTexCoord);
+	vec4 textureColor = texture(myTexture, vTexCoord);
 
 	vec3 rgb = textureColor.rgb;
 
@@ -59,13 +60,13 @@ void main(void) {
 	// blacks
 	float black_val = 2.0-(blacks*0.01);
 	rgb = (rgb*black_val)-(black_val-1.0);
-	
+
 	// saturation
 	const vec3 W = vec3(0.2125, 0.7154, 0.0721);
 	vec3 intensity = vec3(dot(rgb, W));
 	rgb = mix(intensity, rgb, saturation*0.01);
 
-	gl_FragColor = vec4(
+	fragColor = vec4(
 		rgb.r,
 		rgb.g,
 		rgb.b,

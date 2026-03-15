@@ -22,7 +22,6 @@
 
 #include <QGridLayout>
 #include <QLabel>
-#include <QOpenGLTexture>
 #include <QTextEdit>
 #include <QPainter>
 #include <QPainterPath>

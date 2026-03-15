@@ -36,7 +36,7 @@ public:
 	void set_in_point(long p);
 	void set_out_point(long p);
 
-	Viewer* viewer;
+	Viewer* viewer{nullptr};
 
 	bool snapping{true};
 

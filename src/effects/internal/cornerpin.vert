@@ -1,20 +1,21 @@
-#version 130
-
-uniform mat4 mvp_matrix;
-uniform bool perspective;
-uniform vec2 p0;
-uniform vec2 p1;
-uniform vec2 p2;
-uniform vec2 p3;
-
-in vec2 a_position;
-in vec2 a_texcoord;
-
-out vec2 q;
-out vec2 b1;
-out vec2 b2;
-out vec2 b3;
-out vec2 vTexCoord;
+#version 440
+layout(std140, binding = 0) uniform VertexUniforms {
+    mat4 mvp_matrix;
+};
+layout(std140, binding = 1) uniform CornerPinParams {
+    vec2 p0;
+    vec2 p1;
+    vec2 p2;
+    vec2 p3;
+    bool perspective;
+};
+layout(location = 0) in vec2 a_position;
+layout(location = 1) in vec2 a_texcoord;
+layout(location = 0) out vec2 q;
+layout(location = 1) out vec2 b1;
+layout(location = 2) out vec2 b2;
+layout(location = 3) out vec2 b3;
+layout(location = 4) out vec2 vTexCoord;
 
 void main() {
     gl_Position = mvp_matrix * vec4(a_position, 0.0, 1.0);

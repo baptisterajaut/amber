@@ -2,18 +2,21 @@
 Based on Edward Cannon's Simple Chroma Key (adaptation by Olive Team)
 Feel free to modify and use at will */
 
-uniform sampler2D tex;
-varying vec2 vTexCoord;
-
-uniform float loc;
-uniform float hic;
-uniform bool invert;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    float loc;
+    float hic;
+    bool invert;
+};
+layout(binding = 2) uniform sampler2D tex;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
-	vec4 texture_color = texture2D(tex,vTexCoord);
+	vec4 texture_color = texture(tex,vTexCoord);
 
 	float luma = max(max(texture_color.r,texture_color.g), texture_color.b) + min(min(texture_color.r,texture_color.g), texture_color.b);
-	
+
 	luma /= 2.0;
 
 	if (luma > hic/100.0) {
@@ -23,7 +26,7 @@ void main(void) {
     } else {
         texture_color.a = (invert ? 1.0-luma : luma);
     }
-	
+
 	texture_color.rgb *= texture_color.a;
-	gl_FragColor = texture_color; 
+	fragColor = texture_color;
 }

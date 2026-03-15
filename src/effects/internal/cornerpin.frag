@@ -1,13 +1,18 @@
-#version 130
-
-uniform sampler2D tex;
-uniform bool perspective;
-
-varying vec2 q;
-varying vec2 b1;
-varying vec2 b2;
-varying vec2 b3;
-varying vec2 vTexCoord;
+#version 440
+layout(std140, binding = 1) uniform CornerPinParams {
+    vec2 p0;
+    vec2 p1;
+    vec2 p2;
+    vec2 p3;
+    bool perspective;
+};
+layout(binding = 2) uniform sampler2D tex;
+layout(location = 0) in vec2 q;
+layout(location = 1) in vec2 b1;
+layout(location = 2) in vec2 b2;
+layout(location = 3) in vec2 b3;
+layout(location = 4) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 float Wedge2D(vec2 v, vec2 w) {
 	return (v.x*w.y) - (v.y*w.x);
@@ -15,7 +20,7 @@ float Wedge2D(vec2 v, vec2 w) {
 
 void main(void) {
 	if (perspective) {
-		gl_FragColor = texture2D(tex, vTexCoord);
+		fragColor = texture(tex, vTexCoord);
 	} else {
 		float A = Wedge2D(b2, b3);
 		float B = Wedge2D(b3, q) - Wedge2D(b1, b2);
@@ -41,6 +46,6 @@ void main(void) {
 
 		uv.y = 1.0 - uv.y;
 
-		gl_FragColor = texture2D(tex, uv);
+		fragColor = texture(tex, uv);
 	}
 }

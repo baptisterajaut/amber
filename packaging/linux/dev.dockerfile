@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev libavcodec-dev libavutil-dev \
     libswscale-dev libswresample-dev libavfilter-dev \
     frei0r-plugins-dev \
+    libvulkan-dev \
     curl file libfuse2 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -35,7 +36,7 @@ RUN apt-get update && apt-get install -y \
 RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED && \
     pip install aqtinstall && \
     aqt install-qt linux desktop 6.10.2 linux_gcc_64 \
-      -m qtmultimedia \
+      -m qtmultimedia qtshadertools \
       --outputdir /opt/qt && \
     pip uninstall -y aqtinstall && \
     rm -rf /root/.cache/pip
@@ -69,7 +70,7 @@ CMD ["bash", "-c", "\
     rm -rf /tmp/AppDir && \
     DESTDIR=/tmp/AppDir make install && \
     rm -f ${Qt6_DIR}/plugins/multimedia/libffmpegmediaplugin.so && \
-    VERSION=${VERSION:-1.1.0} \
+    VERSION=${VERSION:-1.2.0} \
     QMAKE=${Qt6_DIR}/bin/qmake \
     linuxdeploy \
       --appdir /tmp/AppDir \

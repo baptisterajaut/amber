@@ -64,3 +64,4 @@ out/
 .cache/
 squashfs-root/
 aqtinstall.log
+.worktrees/

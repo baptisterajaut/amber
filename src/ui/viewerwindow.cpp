@@ -20,35 +20,66 @@
 
 #include "viewerwindow.h"
 
-#include <QMutex>
-#include <QKeyEvent>
-#include <QPainter>
 #include <QApplication>
+#include <QFile>
+#include <QKeyEvent>
+#include <QLabel>
 #include <QMenuBar>
 #include <QShortcut>
-#include <QOpenGLFunctions>
-#include <QOpenGLContext>
+#include <QWindow>
 
-#include <QDebug>
+#if QT_CONFIG(vulkan)
+#include <QVulkanInstance>
+#endif
 
+#include "global/config.h"
 #include "mainwindow.h"
-#include "rendering/matrixutil.h"
-#include "rendering/quadbuffer.h"
 
-ViewerWindow::ViewerWindow(QWidget *parent) :
-  QOpenGLWidget(parent, Qt::Window)
-  
-{
+ViewerWindow::ViewerWindow(QWidget* parent) : QRhiWidget(parent) {
+  setWindowFlags(Qt::Window);
+
+  switch (olive::CurrentRuntimeConfig.rhi_backend) {
+    case RhiBackend::Vulkan: setApi(Api::Vulkan); break;
+    case RhiBackend::Metal: setApi(Api::Metal); break;
+    case RhiBackend::D3D12: setApi(Api::Direct3D12); break;
+    case RhiBackend::D3D11: setApi(Api::Direct3D11); break;
+    default: setApi(Api::OpenGL); break;
+  }
+
+#if QT_CONFIG(vulkan)
+  if (olive::CurrentRuntimeConfig.rhi_backend == RhiBackend::Vulkan) {
+    auto* vi = static_cast<QVulkanInstance*>(olive::CurrentRuntimeConfig.vulkan_instance);
+    if (vi) {
+      winId();
+      if (windowHandle()) {
+        windowHandle()->setVulkanInstance(vi);
+      }
+    }
+  }
+#endif
+
   setMouseTracking(true);
 
   fullscreen_msg_timer.setInterval(2000);
   connect(&fullscreen_msg_timer, &QTimer::timeout, this, &ViewerWindow::fullscreen_msg_timeout);
+
+  // Overlay label for "Exit Fullscreen" message (replaces QPainter which doesn't work on QRhiWidget)
+  fullscreen_msg_label_ = new QLabel(tr("Exit Fullscreen"), this);
+  fullscreen_msg_label_->setAlignment(Qt::AlignCenter);
+  fullscreen_msg_label_->setStyleSheet(
+      "QLabel { color: white; background-color: rgba(0, 0, 0, 128);"
+      " font-size: 24pt; padding: 8px; }");
+  fullscreen_msg_label_->setVisible(false);
+  fullscreen_msg_label_->adjustSize();
 }
 
-void ViewerWindow::set_texture(GLuint t, double iar, QMutex* imutex) {
-  texture = t;
-  ar = iar;
-  mutex = imutex;
+void ViewerWindow::set_frame(const char* data, int w, int h) {
+  int bytes = w * h * 4;
+  if (frame_data_.size() != bytes) frame_data_.resize(bytes);
+  memcpy(frame_data_.data(), data, bytes);
+  frame_w_ = w;
+  frame_h_ = h;
+  ar = double(w) / double(h);
   update();
 }
 
@@ -66,153 +97,227 @@ void ViewerWindow::shortcut_copier(QVector<QShortcut*>& shortcuts, QMenu* menu) 
   }
 }
 
-void ViewerWindow::showEvent(QShowEvent *)
-{
-  // Here, we copy all shortcuts from the MainWindow to this window. I don't like this solution, but messing around
-  // with Qt's event system proved fruitless. Also setting the shortcuts to ApplicationShortcut rather than
-  // WindowShortcut caused issues elsewhere (shortcuts being picked up in comboboxes and dialog boxes - we only
-  // want the shortcuts to be shared to this window). Therefore, this and shortcut_copier() are so far the best
-  // solutions I can find.
-
-  // Clear any existing shortcuts in case they've changed since the last showing
+void ViewerWindow::showEvent(QShowEvent*) {
   for (auto shortcut : shortcuts_) {
     delete shortcut;
   }
   shortcuts_.clear();
 
-  // Recursively copy all shortcuts from MainWindow to this window
   QList<QAction*> menubar_actions = olive::MainWindow->menuBar()->actions();
   for (auto menubar_action : menubar_actions) {
     shortcut_copier(shortcuts_, menubar_action->menu());
   }
 }
 
-void ViewerWindow::keyPressEvent(QKeyEvent *e) {
+void ViewerWindow::keyPressEvent(QKeyEvent* e) {
   if (e->key() == Qt::Key_Escape) {
     hide();
   }
 }
 
-void ViewerWindow::mousePressEvent(QMouseEvent *e) {
-  if (show_fullscreen_msg && fullscreen_msg_rect.contains(e->position().toPoint())) {
+void ViewerWindow::mousePressEvent(QMouseEvent* e) {
+  if (fullscreen_msg_label_->isVisible() && fullscreen_msg_label_->geometry().contains(e->position().toPoint())) {
     hide();
   }
 }
 
-void ViewerWindow::mouseMoveEvent(QMouseEvent *) {
+void ViewerWindow::mouseMoveEvent(QMouseEvent*) {
   fullscreen_msg_timer.start();
-  if (!show_fullscreen_msg) {
-    show_fullscreen_msg = true;
-    update();
+  if (!fullscreen_msg_label_->isVisible()) {
+    fullscreen_msg_label_->setVisible(true);
+    position_fullscreen_msg();
   }
 }
 
-void ViewerWindow::initializeGL() {
-  passthrough_program_ = new QOpenGLShaderProgram(this);
-  passthrough_program_->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/passthrough.vert");
-  passthrough_program_->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/passthrough.frag");
-  passthrough_program_->bindAttributeLocation("a_position", 0);
-  passthrough_program_->bindAttributeLocation("a_texcoord", 1);
-  passthrough_program_->link();
-
+void ViewerWindow::resizeEvent(QResizeEvent* e) {
+  QRhiWidget::resizeEvent(e);
+  if (fullscreen_msg_label_->isVisible()) {
+    position_fullscreen_msg();
+  }
 }
 
-void ViewerWindow::paintGL() {
-  if (texture > 0) {
-    if (mutex != nullptr) mutex->lock();
+void ViewerWindow::position_fullscreen_msg() {
+  fullscreen_msg_label_->adjustSize();
+  int x = (width() - fullscreen_msg_label_->width()) / 2;
+  int y = fullscreen_msg_label_->height();
+  fullscreen_msg_label_->move(x, y);
+}
 
-    QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
+void ViewerWindow::initialize(QRhiCommandBuffer* cb) {
+  Q_UNUSED(cb)
 
-    glClearColor(0.0, 0.0, 0.0, 0.0);
-    glClear(GL_COLOR_BUFFER_BIT);
+  if (rhi_ != rhi()) {
+    releaseResources();
+  }
+  if (rhi_initialized_) return;
+  rhi_ = rhi();
 
-    glBindTexture(GL_TEXTURE_2D, texture);
+  QFile vsFile(QStringLiteral(":/shaders/common.vert.qsb"));
+  if (!vsFile.open(QIODevice::ReadOnly)) {
+    qCritical() << "ViewerWindow: failed to load vertex shader";
+  }
+  QShader vs = QShader::fromSerialized(vsFile.readAll());
 
-    double top = 0;
-    double left = 0;
-    double right = 1;
-    double bottom = 1;
+  QFile fsFile(QStringLiteral(":/shaders/passthrough.frag.qsb"));
+  if (!fsFile.open(QIODevice::ReadOnly)) {
+    qCritical() << "ViewerWindow: failed to load fragment shader";
+  }
+  QShader fs = QShader::fromSerialized(fsFile.readAll());
 
+  vbuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+  vbuf_->create();
+
+  vert_ubuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
+  vert_ubuf_->create();
+
+  frag_ubuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
+  frag_ubuf_->create();
+
+  sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
+                               QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
+  sampler_->create();
+
+  frame_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(1, 1));
+  frame_tex_->create();
+
+  srb_ = rhi_->newShaderResourceBindings();
+  srb_->setBindings({
+      QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, vert_ubuf_),
+      QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, frag_ubuf_),
+      QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, frame_tex_, sampler_),
+  });
+  srb_->create();
+
+  pipeline_ = rhi_->newGraphicsPipeline();
+  pipeline_->setShaderStages({
+      {QRhiShaderStage::Vertex, vs},
+      {QRhiShaderStage::Fragment, fs},
+  });
+
+  QRhiVertexInputLayout inputLayout;
+  inputLayout.setBindings({{4 * sizeof(float)}});
+  inputLayout.setAttributes({
+      {0, 0, QRhiVertexInputAttribute::Float2, 0},
+      {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
+  });
+  pipeline_->setVertexInputLayout(inputLayout);
+  pipeline_->setTopology(QRhiGraphicsPipeline::TriangleStrip);
+
+  // Blend: alpha-composite RGB, keep alpha=1 from clear (Wayland fix)
+  QRhiGraphicsPipeline::TargetBlend blend;
+  blend.enable = true;
+  blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+  blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+  blend.srcAlpha = QRhiGraphicsPipeline::Zero;
+  blend.dstAlpha = QRhiGraphicsPipeline::One;
+  pipeline_->setTargetBlends({blend});
+
+  pipeline_->setShaderResourceBindings(srb_);
+  pipeline_->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+  pipeline_->create();
+
+  rhi_initialized_ = true;
+}
+
+void ViewerWindow::render(QRhiCommandBuffer* cb) {
+  bool has_frame = !frame_data_.isEmpty();
+
+  // Upload CPU frame data as QRhiTexture
+  QRhiResourceUpdateBatch* u = rhi_->nextResourceUpdateBatch();
+  if (has_frame) {
+    if (frame_w_ != cached_tex_w_ || frame_h_ != cached_tex_h_) {
+      delete frame_tex_;
+      frame_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(frame_w_, frame_h_));
+      frame_tex_->create();
+
+      srb_->setBindings({
+          QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, vert_ubuf_),
+          QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, frag_ubuf_),
+          QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, frame_tex_, sampler_),
+      });
+      srb_->create();
+
+      cached_tex_w_ = frame_w_;
+      cached_tex_h_ = frame_h_;
+    }
+    QRhiTextureSubresourceUploadDescription desc(frame_data_.constData(), frame_data_.size());
+    desc.setSourceSize(QSize(frame_w_, frame_h_));
+    u->uploadTexture(frame_tex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+  }
+
+  // Compute letterbox coordinates in [0,1] range
+  float top = 0.0f, left = 0.0f, right = 1.0f, bottom = 1.0f;
+  if (has_frame && width() > 0 && height() > 0) {
     double widget_ar = double(width()) / double(height());
-
     if (widget_ar > ar) {
-      double w = 1.0 * ar / widget_ar;
-      left = (1.0 - w)*0.5;
-      right = left + w;
+      double w = ar / widget_ar;
+      left = float((1.0 - w) * 0.5);
+      right = float(left + w);
     } else {
       double h = 1.0 / ar * widget_ar;
-      top = (1.0 - h)*0.5;
-      bottom = top + h;
+      top = float((1.0 - h) * 0.5);
+      bottom = float(top + h);
     }
-
-    passthrough_program_->bind();
-    passthrough_program_->setUniformValue("mvp_matrix", MatrixUtil::ortho(0, 1, 0, 1));
-    passthrough_program_->setUniformValue("tex", 0);
-    passthrough_program_->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
-
-    float coords[8] = {
-      float(left), float(top),
-      float(left), float(bottom),
-      float(right), float(bottom),
-      float(right), float(top),
-    };
-    // FBO texture is Y-inverted: texcoord Y is flipped to compensate
-    float texcoords[8] = {
-      0, 1,
-      0, 0,
-      1, 0,
-      1, 1,
-    };
-    QuadBuffer::draw(f, coords, texcoords);
-
-    passthrough_program_->release();
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    if (mutex != nullptr) mutex->unlock();
   }
 
-  if (show_fullscreen_msg) {
-    QPainter p(this);
+  // TriangleStrip: BL, TL, BR, TR — texcoords Y-flipped (glReadPixels is bottom-to-top)
+  float vertexData[] = {
+      left, top, 0.0f, 1.0f,
+      left, bottom, 0.0f, 0.0f,
+      right, top, 1.0f, 1.0f,
+      right, bottom, 1.0f, 0.0f,
+  };
 
-    QFont f = p.font();
-    f.setPointSize(24);
-    p.setFont(f);
+  QMatrix4x4 mvp = rhi_->clipSpaceCorrMatrix();
+  mvp.ortho(0.0f, 1.0f, 0.0f, 1.0f, -1.0f, 1.0f);
 
-    QFontMetrics fm(f);
+  float colorMult[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-    QString fs_str = tr("Exit Fullscreen");
+  u->updateDynamicBuffer(vbuf_, 0, sizeof(vertexData), vertexData);
+  u->updateDynamicBuffer(vert_ubuf_, 0, 64, mvp.constData());
+  u->updateDynamicBuffer(frag_ubuf_, 0, 16, colorMult);
 
-    p.setPen(Qt::white);
-    p.setBrush(QColor(0, 0, 0, 128));
+  const QColor clearColor(0, 0, 0, 255);
+  cb->beginPass(renderTarget(), clearColor, {1.0f, 0}, u);
 
-    int text_width = fm.horizontalAdvance(fs_str);
-    int text_x = (width()/2)-(text_width/2);
-    int text_y = fm.height()+fm.ascent();
-
-    int rect_padding = 8;
-
-    fullscreen_msg_rect = QRect(text_x-rect_padding,
-                                fm.height()-rect_padding,
-                                text_width+rect_padding+rect_padding,
-                                fm.height()+rect_padding+rect_padding);
-
-    p.drawRect(fullscreen_msg_rect);
-
-    p.drawText(text_x, text_y, fs_str);
+  if (has_frame) {
+    const QSize outputSize = renderTarget()->pixelSize();
+    cb->setGraphicsPipeline(pipeline_);
+    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+    cb->setShaderResources(srb_);
+    const QRhiCommandBuffer::VertexInput vbufBinding(vbuf_, 0);
+    cb->setVertexInput(0, 1, &vbufBinding);
+    cb->draw(4);
   }
 
-  // Force alpha to 1.0 so Wayland compositing doesn't show through transparent pixels
-  glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
-  glClearColor(0, 0, 0, 1);
-  glClear(GL_COLOR_BUFFER_BIT);
-  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  cb->endPass();
+}
+
+void ViewerWindow::releaseResources() {
+  delete pipeline_;
+  pipeline_ = nullptr;
+  delete srb_;
+  srb_ = nullptr;
+  delete frame_tex_;
+  frame_tex_ = nullptr;
+  delete sampler_;
+  sampler_ = nullptr;
+  delete frag_ubuf_;
+  frag_ubuf_ = nullptr;
+  delete vert_ubuf_;
+  vert_ubuf_ = nullptr;
+  delete vbuf_;
+  vbuf_ = nullptr;
+
+  cached_tex_w_ = 0;
+  cached_tex_h_ = 0;
+
+  rhi_initialized_ = false;
 }
 
 void ViewerWindow::fullscreen_msg_timeout() {
   fullscreen_msg_timer.stop();
-  if (show_fullscreen_msg) {
-    show_fullscreen_msg = false;
-    update();
+  if (fullscreen_msg_label_->isVisible()) {
+    fullscreen_msg_label_->setVisible(false);
   }
 }

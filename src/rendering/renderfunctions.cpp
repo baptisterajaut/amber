@@ -24,15 +24,10 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
-#include <QOpenGLFramebufferObject>
 #include <QApplication>
 #include <QScreen>
 #include <QDebug>
-
-#ifdef OLIVE_OCIO
-#include <OpenColorIO/OpenColorIO.h>
-namespace OCIO = OCIO_NAMESPACE;
-#endif
+#include <utility>
 
 #include "timeline/clip.h"
 #include "timeline/sequence.h"
@@ -44,8 +39,6 @@ namespace OCIO = OCIO_NAMESPACE;
 #include "ui/collapsiblewidget.h"
 
 #include "rendering/audio.h"
-#include "rendering/matrixutil.h"
-#include "rendering/quadbuffer.h"
 
 #include "global/math.h"
 #include "global/config.h"
@@ -53,69 +46,240 @@ namespace OCIO = OCIO_NAMESPACE;
 #include "panels/timeline.h"
 #include "panels/viewer.h"
 
-void PrepareToDraw(QOpenGLFunctions* f) {
-  f->glGenerateMipmap(GL_TEXTURE_2D);
-  f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-  f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-  f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+// Depth-only correction for intermediate offscreen passes (no Y-flip).
+// Remaps OpenGL depth range [-1,1] to [0,1] for Vulkan/Metal/D3D.
+static QMatrix4x4 depthCorrMatrix(QRhi* rhi) {
+  QMatrix4x4 m;
+  if (rhi->isClipDepthZeroToOne()) {
+    m(2, 2) = 0.5f;
+    m(2, 3) = 0.5f;
+  }
+  return m;
 }
 
-// MVP for fullscreen blit — identity for the [-1,1] default quad
-static QMatrix4x4 blit_mvp() {
-  return MatrixUtil::ortho(-1, 1, -1, 1);
-}
+// Helper: create a temporary pipeline, draw a fullscreen blit, then destroy the pipeline.
+// This replaces the old draw_clip() / full_blit() pattern.
+static void rhi_blit(ComposeSequenceParams& params,
+                     QRhiTextureRenderTarget* target,
+                     QRhiRenderPassDescriptor* rpd,
+                     QRhiTexture* srcTex,
+                     const QShader& vertShader,
+                     const QShader& fragShader,
+                     const QMatrix4x4& mvp,
+                     const QByteArray& fragUboData,
+                     int fragUboSize,
+                     int texBindingCount = 1,
+                     QRhiTexture* extraTex1 = nullptr,
+                     QRhiTexture* extraTex2 = nullptr,
+                     bool skipClipSpaceCorr = false) {
+  QRhi* rhi = params.rhi;
+  QRhiCommandBuffer* cb = params.cb;
 
-void full_blit(QOpenGLFunctions* f) {
-  PrepareToDraw(f);
-  QuadBuffer::draw(f);
-}
-
-void draw_clip(QOpenGLContext* ctx, GLuint fbo, GLuint texture, bool clear) {
-  QOpenGLFunctions* f = ctx->functions();
-  f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
-
-  if (clear) {
-    glClear(GL_COLOR_BUFFER_BIT);
+  // Create fragment UBO (skip if shader has no fragment uniforms)
+  QRhiBuffer* fragUbo = nullptr;
+  if (fragUboSize > 0) {
+    fragUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, fragUboSize);
+    fragUbo->create();
   }
 
-  glBindTexture(GL_TEXTURE_2D, texture);
-
-  full_blit(f);
-
-  glBindTexture(GL_TEXTURE_2D, 0);
-
-  f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-}
-
-GLuint draw_clip(QOpenGLFramebufferObject* fbo, GLuint texture, bool clear) {
-  QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
-  fbo->bind();
-
-  if (clear) {
-    glClear(GL_COLOR_BUFFER_BIT);
+  // Build SRB
+  QVector<QRhiShaderResourceBinding> bindings;
+  bindings.append(QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, params.vertUbo));
+  if (fragUboSize > 0) {
+    bindings.append(
+        QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, fragUbo));
+  }
+  bindings.append(
+      QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, srcTex, params.sampler));
+  if (texBindingCount >= 2 && extraTex1) {
+    bindings.append(QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage, extraTex1,
+                                                               params.sampler));
+  }
+  if (texBindingCount >= 3 && extraTex2) {
+    bindings.append(QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage, extraTex2,
+                                                               params.sampler));
   }
 
-  glBindTexture(GL_TEXTURE_2D, texture);
+  QRhiShaderResourceBindings* srb = rhi->newShaderResourceBindings();
+  srb->setBindings(bindings.cbegin(), bindings.cend());
+  srb->create();
 
-  full_blit(f);
+  // Build pipeline
+  QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
+  pipeline->setShaderStages({{QRhiShaderStage::Vertex, vertShader}, {QRhiShaderStage::Fragment, fragShader}});
+  QRhiVertexInputLayout inputLayout;
+  inputLayout.setBindings({{4 * sizeof(float)}});
+  inputLayout.setAttributes({
+      {0, 0, QRhiVertexInputAttribute::Float2, 0},
+      {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
+  });
+  pipeline->setVertexInputLayout(inputLayout);
+  pipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
+  QRhiGraphicsPipeline::TargetBlend noBlend;
+  noBlend.enable = false;
+  pipeline->setTargetBlends({noBlend});
+  pipeline->setShaderResourceBindings(srb);
+  pipeline->setRenderPassDescriptor(rpd);
+  if (!pipeline->create()) {
+    qWarning() << "[RHI-PIPELINE] rhi_blit pipeline creation FAILED";
+  }
 
-  glBindTexture(GL_TEXTURE_2D, 0);
+  // Fullscreen quad vertex data
+  float blitQuad[] = {
+      -1, -1, 0, 0,  // BL
+      -1, 1, 0, 1,   // TL
+      1, -1, 1, 0,    // BR
+      1, 1, 1, 1,     // TR
+  };
 
-  fbo->release();
+  // Final compositing passes: full clipSpaceCorrMatrix (Y-flip + depth remap).
+  // Intermediate passes: depth-only correction (no Y-flip to avoid accumulated flips).
+  QMatrix4x4 corrected_mvp = (skipClipSpaceCorr ? depthCorrMatrix(rhi) : rhi->clipSpaceCorrMatrix()) * mvp;
 
-  return fbo->texture();
+  QRhiResourceUpdateBatch* u = rhi->nextResourceUpdateBatch();
+  u->updateDynamicBuffer(params.vbuf, 0, sizeof(blitQuad), blitQuad);
+  u->updateDynamicBuffer(params.vertUbo, 0, 64, corrected_mvp.constData());
+  if (fragUboSize > 0 && !fragUboData.isEmpty()) {
+    u->updateDynamicBuffer(fragUbo, 0, fragUboSize, fragUboData.constData());
+  }
+
+  QSize sz = target->pixelSize();
+  QColor clearColor(0, 0, 0, 0);
+  cb->beginPass(target, clearColor, {1.0f, 0}, u);
+  cb->setGraphicsPipeline(pipeline);
+  cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
+  cb->setShaderResources(srb);
+  const QRhiCommandBuffer::VertexInput vbufBinding(params.vbuf, 0);
+  cb->setVertexInput(0, 1, &vbufBinding);
+  cb->draw(4);
+  cb->endPass();
+
+  // Defer cleanup — resources must survive until endOffscreenFrame()
+  params.transientResources.append(pipeline);
+  params.transientResources.append(srb);
+  if (fragUbo) params.transientResources.append(fragUbo);
 }
 
-void process_effect(Clip* c,
-                    Effect* e,
-                    double timecode,
-                    GLTextureCoords& coords,
-                    GLuint& composite_texture,
-                    bool& fbo_switcher,
-                    bool& texture_failed,
-                    int data,
-                    QOpenGLShaderProgram* passthrough) {
+// Blit with hardware SrcOver alpha blending (One/OneMinusSrcAlpha for premultiplied sources).
+// Target MUST have PreserveColorContents so existing content acts as background.
+static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTarget* target,
+                              QRhiRenderPassDescriptor* rpd, QRhiTexture* srcTex, float opacity = 1.0f) {
+  QRhi* rhi = params.rhi;
+  QRhiCommandBuffer* cb = params.cb;
+
+  QRhiBuffer* fragUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
+  fragUbo->create();
+
+  QRhiShaderResourceBindings* srb = rhi->newShaderResourceBindings();
+  srb->setBindings({
+      QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, params.vertUbo),
+      QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, fragUbo),
+      QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, srcTex, params.sampler),
+  });
+  srb->create();
+
+  QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
+  pipeline->setShaderStages({{QRhiShaderStage::Vertex, params.passthroughVert},
+                              {QRhiShaderStage::Fragment, params.passthroughFrag}});
+  QRhiVertexInputLayout inputLayout;
+  inputLayout.setBindings({{4 * sizeof(float)}});
+  inputLayout.setAttributes({
+      {0, 0, QRhiVertexInputAttribute::Float2, 0},
+      {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
+  });
+  pipeline->setVertexInputLayout(inputLayout);
+  pipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
+
+  // SrcOver for premultiplied alpha: result = src + dst * (1 - srcAlpha)
+  QRhiGraphicsPipeline::TargetBlend blend;
+  blend.enable = true;
+  blend.srcColor = QRhiGraphicsPipeline::One;
+  blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+  blend.srcAlpha = QRhiGraphicsPipeline::One;
+  blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+  pipeline->setTargetBlends({blend});
+
+  pipeline->setShaderResourceBindings(srb);
+  pipeline->setRenderPassDescriptor(rpd);
+  if (!pipeline->create()) {
+    qWarning() << "[RHI-PIPELINE] rhi_blit_srcover pipeline creation FAILED";
+  }
+
+  float blitQuad[] = {
+      -1, -1, 0, 0,
+      -1, 1, 0, 1,
+      1, -1, 1, 0,
+      1, 1, 1, 1,
+  };
+
+  QMatrix4x4 mvp;
+  mvp.ortho(-1, 1, -1, 1, -1, 1);
+  QMatrix4x4 corrected_mvp = rhi->clipSpaceCorrMatrix() * mvp;
+
+  float colorMult[4] = {opacity, opacity, opacity, opacity};
+
+  QRhiResourceUpdateBatch* u = rhi->nextResourceUpdateBatch();
+  u->updateDynamicBuffer(params.vbuf, 0, sizeof(blitQuad), blitQuad);
+  u->updateDynamicBuffer(params.vertUbo, 0, 64, corrected_mvp.constData());
+  u->updateDynamicBuffer(fragUbo, 0, 16, colorMult);
+
+  QSize sz = target->pixelSize();
+  QColor clearColor(0, 0, 0, 0);
+  cb->beginPass(target, clearColor, {1.0f, 0}, u);
+  cb->setGraphicsPipeline(pipeline);
+  cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
+  cb->setShaderResources(srb);
+  const QRhiCommandBuffer::VertexInput vbufBinding(params.vbuf, 0);
+  cb->setVertexInput(0, 1, &vbufBinding);
+  cb->draw(4);
+  cb->endPass();
+
+  params.transientResources.append(pipeline);
+  params.transientResources.append(srb);
+  params.transientResources.append(fragUbo);
+}
+
+// Simplified blit: passthrough shader, identity MVP
+// Clearing is determined by the render target's PreserveColorContents flag.
+static void rhi_blit_passthrough(ComposeSequenceParams& params, QRhiTextureRenderTarget* target,
+                                 QRhiRenderPassDescriptor* rpd, QRhiTexture* srcTex,
+                                 float opacity = 1.0f, bool skipClipSpaceCorr = false) {
+  QMatrix4x4 mvp;
+  mvp.ortho(-1, 1, -1, 1, -1, 1);
+
+  float colorMult[4] = {opacity, opacity, opacity, opacity};
+  QByteArray fragData(reinterpret_cast<const char*>(colorMult), 16);
+
+  rhi_blit(params, target, rpd, srcTex, params.passthroughVert, params.passthroughFrag, mvp, fragData, 16,
+           1, nullptr, nullptr, skipClipSpaceCorr);
+}
+
+// Helper: create clip's ping-pong QRhiTexture + render target pairs (replaces QOpenGLFramebufferObject)
+static ClipRhiResources* get_or_create_clip_resources(Clip* c, QRhi* rhi, int width, int height) {
+  // We store the ClipRhiResources in c->fbo_rhi (a void* field we'll add to Clip)
+  if (c->fbo_rhi == nullptr) {
+    int fbo_count = (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) ? 3 : 2;
+    ClipRhiResources* res = new ClipRhiResources();
+    res->count = fbo_count;
+    for (int j = 0; j < fbo_count; j++) {
+      res->tex[j] = rhi->newTexture(QRhiTexture::RGBA8, QSize(width, height),
+                                     1, QRhiTexture::RenderTarget);
+      res->tex[j]->create();
+      res->rt[j] = rhi->newTextureRenderTarget({res->tex[j]});
+      if (j == 0) {
+        res->rpd = res->rt[j]->newCompatibleRenderPassDescriptor();
+      }
+      res->rt[j]->setRenderPassDescriptor(res->rpd);
+      res->rt[j]->create();
+    }
+    c->fbo_rhi = res;
+  }
+  return static_cast<ClipRhiResources*>(c->fbo_rhi);
+}
+
+static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords& coords,
+                           QRhiTexture*& composite_texture, bool& fbo_switcher, bool& texture_failed, int data,
+                           ComposeSequenceParams& params) {
   if (e->IsEnabled()) {
     if (e->Flags() & Effect::CoordsFlag) {
       e->process_coords(timecode, coords, data);
@@ -126,45 +290,57 @@ void process_effect(Clip* c,
 
       bool has_shader = can_process_shaders && e->is_glsl_linked();
 
-      // Set blit MVP on whichever shader is bound (draw_clip always does fullscreen blit)
       if (has_shader) {
-        e->program()->setUniformValue("mvp_matrix", blit_mvp());
-      }
+        ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
+        QMatrix4x4 blitMvp;
+        blitMvp.ortho(-1, 1, -1, 1, -1, 1);
 
-      if (has_shader) {
-        for (int i=0;i<e->getIterations();i++) {
-          e->process_shader(timecode, coords, i);
-          composite_texture = draw_clip(c->fbo[fbo_switcher], composite_texture, true);
+        for (int i = 0; i < e->getIterations(); i++) {
+          // Fill UBO data via the effect's process_shader
+          QByteArray uboData;
+          uboData.resize(qMax(e->fragUboSize(), e->vertUboSize()));
+          uboData.fill(0);
+          e->process_shader(timecode, coords, i, uboData);
+
+          // Blit through effect shader into the next FBO (skip clipSpaceCorr — intermediate pass)
+          rhi_blit(params, res->rt[fbo_switcher], res->rpd, composite_texture, e->vertexShader(),
+                   e->fragmentShader(), blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()),
+                   1, nullptr, nullptr, /*skipClipSpaceCorr=*/true);
+          composite_texture = res->tex[fbo_switcher];
           fbo_switcher = !fbo_switcher;
         }
       }
+
       if (e->Flags() & Effect::SuperimposeFlag) {
-        // If no effect shader is bound, use passthrough for blitting
-        bool need_passthrough = !has_shader;
-        if (need_passthrough) {
-          passthrough->bind();
-          passthrough->setUniformValue("mvp_matrix", blit_mvp());
-          passthrough->setUniformValue("tex", 0);
-          passthrough->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
-        }
+        QRhiResourceUpdateBatch* upload = params.rhi->nextResourceUpdateBatch();
+        QRhiTexture* superimpose_texture = e->process_superimpose(params.rhi, upload, timecode);
+        // Submit upload in a dummy pass
+        ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
 
-        GLuint superimpose_texture = e->process_superimpose(timecode);
-
-        if (superimpose_texture == 0) {
+        if (superimpose_texture == nullptr) {
           qWarning() << "Superimpose texture was nullptr, retrying...";
           texture_failed = true;
-        } else if (composite_texture == 0) {
+          upload->release();
+        } else if (composite_texture == nullptr) {
+          // No existing composite — just submit upload and use superimpose directly
+          QColor clearColor(0, 0, 0, 0);
+          params.cb->beginPass(res->rt[!fbo_switcher], clearColor, {1.0f, 0}, upload);
+          params.cb->endPass();
           composite_texture = superimpose_texture;
         } else {
-          if (composite_texture != c->fbo[0]->texture() && composite_texture != c->fbo[1]->texture()) {
-            draw_clip(c->fbo[!fbo_switcher], composite_texture, true);
+          // Composite: blit existing texture, then overlay superimpose
+          // First submit the texture upload
+          QColor clearColor(0, 0, 0, 0);
+          params.cb->beginPass(res->rt[!fbo_switcher], clearColor, {1.0f, 0}, upload);
+          params.cb->endPass();
+
+          // Copy composite to fbo if not already there
+          if (composite_texture != res->tex[0] && composite_texture != res->tex[1]) {
+            rhi_blit_passthrough(params, res->rt[!fbo_switcher], res->rpd, composite_texture);
           }
-
-          composite_texture = draw_clip(c->fbo[!fbo_switcher], superimpose_texture, false);
-        }
-
-        if (need_passthrough) {
-          passthrough->release();
+          // Overlay superimpose (no clear — preserves existing content with alpha)
+          rhi_blit_passthrough(params, res->rt[!fbo_switcher], res->rpd, superimpose_texture);
+          composite_texture = res->tex[!fbo_switcher];
         }
       }
       e->endEffect();
@@ -172,10 +348,9 @@ void process_effect(Clip* c,
   }
 }
 
-GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
-//  qint64 time = QDateTime::currentMSecsSinceEpoch();
-
-  GLuint final_fbo = params.main_buffer;
+QRhiTexture* olive::rendering::compose_sequence(ComposeSequenceParams& params) {
+  QRhiTextureRenderTarget* final_target = params.main_target;
+  QRhiTexture* final_tex = params.main_tex;
 
   Sequence* s = params.seq;
   long playhead = s->playhead;
@@ -187,10 +362,14 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
       playhead = rescale_frame_number(playhead, nest->sequence->frame_rate, s->frame_rate);
     }
 
-    if (params.video && params.nests.last()->fbo != nullptr) {
-      params.nests.last()->fbo[0]->bind();
-      glClear(GL_COLOR_BUFFER_BIT);
-      final_fbo = params.nests.last()->fbo[0]->handle();
+    if (params.video && params.nests.last()->fbo_rhi != nullptr) {
+      ClipRhiResources* nestRes = static_cast<ClipRhiResources*>(params.nests.last()->fbo_rhi);
+      // Clear nest FBO[0]
+      QColor clearColor(0, 0, 0, 0);
+      params.cb->beginPass(nestRes->rt[0], clearColor, {1.0f, 0});
+      params.cb->endPass();
+      final_target = nestRes->rt[0];
+      final_tex = nestRes->tex[0];
     }
   }
 
@@ -199,62 +378,34 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
   QVector<Clip*> current_clips;
 
   // loop through clips, find currently active, and sort by track
-  for (const auto & clip : s->clips) {
-
+  for (const auto& clip : s->clips) {
     Clip* c = clip.get();
-
     if (c != nullptr) {
-
-      // if clip is video and we're processing video
       if ((c->track() < 0) == params.video) {
-
         bool clip_is_active = false;
 
-        // is the clip a "footage" clip?
         if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
           Footage* m = c->media()->to_footage();
-
-          // does the clip have a valid media source?
           if (!m->invalid && !(c->track() >= 0 && !is_audio_device_set())) {
-
-            // is the media process and ready?
             if (m->ready) {
               const FootageStream* ms = c->media_stream();
-
-              // does the media have a valid media stream source and is it active?
               if (ms != nullptr && c->IsActiveAt(playhead)) {
-
-                // reopen if cacher format needs to change (e.g. ImageFlag effect added/removed)
                 if (c->NeedsCacherReconfigure()) {
                   c->Close(false);
                 }
-
-                // open if not open
                 if (!c->IsOpen()) {
                   c->Open();
                 }
-
                 clip_is_active = true;
-
-                // increment audio track count
                 if (c->track() >= 0) audio_track_count++;
-
               } else if (c->IsOpen()) {
-
-                // close the clip if it isn't active anymore
                 c->Close(false);
-
               }
             } else {
-
-              // media wasn't ready, schedule a redraw
               params.texture_failed = true;
-
             }
           }
         } else {
-          // if the clip is a nested sequence or null clip, just open it
-
           if (c->IsActiveAt(playhead)) {
             if (!c->IsOpen()) {
               c->Open();
@@ -265,25 +416,17 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
           }
         }
 
-        // if the clip is active, added it to "current_clips", sorted by track
         if (clip_is_active) {
           bool added = false;
-
-          // track sorting is only necessary for video clips
-          // audio clips are mixed equally, so we skip sorting for those
           if (params.video) {
-
-            // insertion sort by track
-            for (int j=0;j<current_clips.size();j++) {
+            for (int j = 0; j < current_clips.size(); j++) {
               if (current_clips.at(j)->track() < c->track()) {
                 current_clips.insert(j, c);
                 added = true;
                 break;
               }
             }
-
           }
-
           if (!added) {
             current_clips.append(c);
           }
@@ -297,320 +440,248 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
   int half_height = 0;
 
   if (params.video) {
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-    half_width = s->width/2;
-    half_height = s->height/2;
-    sequence_ortho = MatrixUtil::ortho(-half_width, half_width, -half_height, half_height, -1, 10);
+    half_width = s->width / 2;
+    half_height = s->height / 2;
+    sequence_ortho.setToIdentity();
+    sequence_ortho.ortho(-half_width, half_width, -half_height, half_height, -1, 10);
   }
 
   // loop through current clips
-
   for (auto c : current_clips) {
     bool got_mutex = true;
 
     if (params.wait_for_mutexes) {
-      // wait for clip to finish opening
       c->state_change_lock.lock();
     } else {
       got_mutex = c->state_change_lock.tryLock();
     }
 
     if (got_mutex && c->IsOpen()) {
-      // if clip is a video clip
       if (c->track() < 0) {
+        QRhiTexture* textureID = nullptr;
 
-        // (color_mult is set per-draw via passthrough shader uniform)
-
-        // textureID variable contains texture to be drawn on screen at the end
-        GLuint textureID = 0;
-
-        // store video source dimensions
         int video_width = c->media_width();
         int video_height = c->media_height();
 
-        // if media is footage
         if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
-
-          // retrieve video frame from cache and store it in texture
           c->Cache(qMax(playhead, c->timeline_in()), params.scrubbing, params.nests, params.playback_speed);
-          if (!c->Retrieve(params.yuv_program)) {
+          if (!c->Retrieve(params.rhi, params.cb, &params)) {
             params.texture_failed = true;
           } else {
-            textureID = c->cached_texture_id;
-          }
-
-          if (textureID == 0) {
-            qDebug() << "Failed to create texture";
+            textureID = c->cached_rhi_tex;
           }
         }
 
-        // prepare framebuffers for backend drawing operations
-        if (c->fbo == nullptr) {
-          // create 3 fbos for nested sequences, 2 for most clips
-          int fbo_count = (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) ? 3 : 2;
-
-          c->fbo = new QOpenGLFramebufferObject* [size_t(fbo_count)];
-
-          for (int j=0;j<fbo_count;j++) {
-            c->fbo[j] = new QOpenGLFramebufferObject(video_width, video_height);
-          }
+        // Create clip FBO resources if needed
+        if (c->fbo_rhi == nullptr) {
+          get_or_create_clip_resources(c, params.rhi, video_width, video_height);
         }
 
-        // if clip should actually be shown on screen in this frame
-        if (playhead >= c->timeline_in(true)
-            && playhead < c->timeline_out(true)) {
-
-          // simple bool for switching between the two framebuffers
+        if (playhead >= c->timeline_in(true) && playhead < c->timeline_out(true)) {
           bool fbo_switcher = false;
-
-          glViewport(0, 0, video_width, video_height);
+          ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
 
           if (c->media() != nullptr) {
             if (c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
-              // for a nested sequence, run this function again on that sequence and retrieve the texture
-
-              // add nested sequence to nest list
               params.nests.append(c);
-
-              // compose sequence
               textureID = compose_sequence(params);
-
-              // remove sequence from nest list
               params.nests.removeLast();
-
-              // compose_sequence() would have written to this clip's fbo[0], so we switch to fbo[1]
               fbo_switcher = true;
             } else if (c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
-
-              if (textureID > 0 && !c->media()->to_footage()->alpha_is_premultiplied) {
-                // alpha is not premultiplied, we'll need to multiply it for the rest of the pipeline
-                params.premultiply_program->bind();
-                params.premultiply_program->setUniformValue("mvp_matrix", blit_mvp());
-
-                textureID = draw_clip(c->fbo[0], textureID, true);
-
-                params.premultiply_program->release();
-
+              if (textureID != nullptr && !c->media()->to_footage()->alpha_is_premultiplied) {
+                QMatrix4x4 blitMvp;
+                blitMvp.ortho(-1, 1, -1, 1, -1, 1);
+                QByteArray emptyFrag;  // premultiply.frag has no UBO (only sampler)
+                rhi_blit(params, res->rt[0], res->rpd, textureID, params.passthroughVert, params.premultiplyFrag,
+                         blitMvp, emptyFrag, 0);
+                textureID = res->tex[0];
                 fbo_switcher = true;
               }
-
-#ifdef OLIVE_OCIO
-              // convert to linear colorspace
-              bool linear_convert = true;
-              if (linear_convert)
-              {
-
-              }
-#endif
-
             }
           }
 
-          // set up default coordinates for drawing the clip
+          // set up default coordinates
           GLTextureCoords coords;
           coords.grid_size = 1;
-          coords.vertexTopLeftX = coords.vertexBottomLeftX = -video_width/2;
-          coords.vertexTopLeftY = coords.vertexTopRightY = -video_height/2;
-          coords.vertexTopRightX = coords.vertexBottomRightX = video_width/2;
-          coords.vertexBottomLeftY = coords.vertexBottomRightY = video_height/2;
+          coords.vertexTopLeftX = coords.vertexBottomLeftX = -video_width / 2;
+          coords.vertexTopLeftY = coords.vertexTopRightY = -video_height / 2;
+          coords.vertexTopRightX = coords.vertexBottomRightX = video_width / 2;
+          coords.vertexBottomLeftY = coords.vertexBottomRightY = video_height / 2;
           coords.vertexBottomLeftZ = coords.vertexBottomRightZ = coords.vertexTopLeftZ = coords.vertexTopRightZ = 1;
           coords.textureTopLeftY = coords.textureTopRightY = coords.textureTopLeftX = coords.textureBottomLeftX = 0.0;
-          coords.textureBottomLeftY = coords.textureBottomRightY = coords.textureTopRightX = coords.textureBottomRightX = 1.0;
+          coords.textureBottomLeftY = coords.textureBottomRightY = coords.textureTopRightX =
+              coords.textureBottomRightX = 1.0;
           coords.textureTopLeftQ = coords.textureTopRightQ = coords.textureTopLeftQ = coords.textureBottomLeftQ = 1;
           coords.blendmode = -1;
           coords.opacity = 1.0;
 
-          // == EFFECT CODE START ==
-
-          // get current sequence time in seconds (used for effects)
           double timecode = get_timecode(c, playhead);
 
-          // run through all of the clip's effects
-          for (int j=0;j<c->effects.size();j++) {
-
+          for (int j = 0; j < c->effects.size(); j++) {
             Effect* e = c->effects.at(j).get();
-            process_effect(c, e, timecode, coords, textureID, fbo_switcher, params.texture_failed, kTransitionNone, params.passthrough_program);
-
+            process_effect(c, e, timecode, coords, textureID, fbo_switcher, params.texture_failed, kTransitionNone,
+                           params);
           }
 
-          // if the clip has an opening transition, process that now
           if (c->opening_transition != nullptr) {
             int transition_progress = playhead - c->timeline_in(true);
             if (transition_progress < c->opening_transition->get_length()) {
-              process_effect(c, c->opening_transition.get(), double(transition_progress)/double(c->opening_transition->get_length()), coords, textureID, fbo_switcher, params.texture_failed, kTransitionOpening, params.passthrough_program);
+              process_effect(c, c->opening_transition.get(),
+                             double(transition_progress) / double(c->opening_transition->get_length()), coords,
+                             textureID, fbo_switcher, params.texture_failed, kTransitionOpening, params);
             }
           }
 
-          // if the clip has a closing transition, process that now
           if (c->closing_transition != nullptr) {
             int transition_progress = playhead - (c->timeline_out(true) - c->closing_transition->get_length());
             if (transition_progress >= 0 && transition_progress < c->closing_transition->get_length()) {
-              process_effect(c, c->closing_transition.get(), double(transition_progress)/double(c->closing_transition->get_length()), coords, textureID, fbo_switcher, params.texture_failed, kTransitionClosing, params.passthrough_program);
+              process_effect(c, c->closing_transition.get(),
+                             double(transition_progress) / double(c->closing_transition->get_length()), coords,
+                             textureID, fbo_switcher, params.texture_failed, kTransitionClosing, params);
             }
           }
 
-          // == EFFECT CODE END ==
-
-
-          // Build per-clip MVP: sequence ortho * coords.transform * optional autoscale
+          // Build per-clip MVP
           QMatrix4x4 clip_mvp = sequence_ortho;
           clip_mvp *= coords.transform;
-          if (c->autoscaled()
-              && (video_width != s->width
-                  && video_height != s->height)) {
+          if (c->autoscaled() && (video_width != s->width && video_height != s->height)) {
             float width_multiplier = float(s->width) / float(video_width);
             float height_multiplier = float(s->height) / float(video_height);
             float scale_multiplier = qMin(width_multiplier, height_multiplier);
             clip_mvp.scale(scale_multiplier, scale_multiplier, 1);
           }
 
-          // Configure effect gizmos if they exist
-          if (params.gizmos != nullptr) {
-            params.gizmos->gizmo_draw(timecode, coords); // set correct gizmo coords
-            params.gizmos->gizmo_world_to_screen(clip_mvp); // convert gizmo coords to screen coords
+          if (params.gizmos != nullptr && params.gizmos->parent_clip == c) {
+            params.gizmos->gizmo_draw(timecode, coords);
+            params.gizmos->gizmo_world_to_screen(clip_mvp);
           }
 
-
-
-          if (textureID > 0) {
-            // set viewport to sequence size
-            params.ctx->functions()->glViewport(0, 0, s->width, s->height);
-
-
-
-            // == START RENDER CLIP IN CONTEXT OF SEQUENCE ==
-
-
-
-            // use clip textures for nested sequences, otherwise use main frame buffers
-            GLuint back_buffer_1;
-            GLuint backend_tex_1;
-            GLuint backend_tex_2;
+          if (textureID != nullptr) {
+            // Determine backend targets for this clip
+            QRhiTextureRenderTarget* back_target1;
+            QRhiTexture* back_tex1;
+            QRhiRenderPassDescriptor* back_rpd;
             if (params.nests.size() > 0) {
-              back_buffer_1 = params.nests.last()->fbo[1]->handle();
-              backend_tex_1 = params.nests.last()->fbo[1]->texture();
-              backend_tex_2 = params.nests.last()->fbo[2]->texture();
+              ClipRhiResources* nestRes = static_cast<ClipRhiResources*>(params.nests.last()->fbo_rhi);
+              back_target1 = nestRes->rt[1];
+              back_tex1 = nestRes->tex[1];
+              back_rpd = nestRes->rpd;
             } else {
-              back_buffer_1 = params.backend_buffer1;
-              backend_tex_1 = params.backend_attachment1;
-              backend_tex_2 = params.backend_attachment2;
+              back_target1 = params.backend_target1;
+              back_tex1 = params.backend_tex1;
+              back_rpd = params.backend_rpd;
             }
 
-            QOpenGLFunctions* f = params.ctx->functions();
+            // On Vulkan/Metal/D3D, the YUV→RGB pass applies clipSpaceCorrMatrix (which flips Y),
+            // but the CPU RGBA path uploads directly without a flip. Compensate by flipping
+            // texture coords so both paths produce the same orientation.
+            if (!params.rhi->isYUpInNDC() && c->NeedsCpuRgba()) {
+              std::swap(coords.textureTopLeftY, coords.textureBottomLeftY);
+              std::swap(coords.textureTopRightY, coords.textureBottomRightY);
+            }
 
-            // render a backbuffer
-            f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, back_buffer_1);
+            // Render clip into back buffer 1 with clip_mvp transform
+            {
+              float quad_verts[] = {
+                  float(coords.vertexTopLeftX),     float(coords.vertexTopLeftY),
+                  float(coords.textureTopLeftX),    float(coords.textureTopLeftY),
+                  float(coords.vertexTopRightX),    float(coords.vertexTopRightY),
+                  float(coords.textureTopRightX),   float(coords.textureTopRightY),
+                  float(coords.vertexBottomLeftX),  float(coords.vertexBottomLeftY),
+                  float(coords.textureBottomLeftX), float(coords.textureBottomLeftY),
+                  float(coords.vertexBottomRightX), float(coords.vertexBottomRightY),
+                  float(coords.textureBottomRightX), float(coords.textureBottomRightY),
+              };
 
-            glClearColor(0.0, 0.0, 0.0, 0.0);
-            glClear(GL_COLOR_BUFFER_BIT);
+              float colorMult[4] = {1, 1, 1, 1};
 
-            // bind final clip texture
-            glBindTexture(GL_TEXTURE_2D, textureID);
+              // Dedicated buffers per pass — QRhi dynamic buffers are NOT snapshotted at
+              // record time, so sharing params.vertUbo/vbuf with rhi_blit_passthrough causes
+              // both passes to see the last-written values at endOffscreenFrame().
+              QRhiBuffer* clipVbuf =
+                  params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, sizeof(quad_verts));
+              clipVbuf->create();
+              QRhiBuffer* clipVertUbo =
+                  params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
+              clipVertUbo->create();
+              QRhiBuffer* clipFragUbo =
+                  params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
+              clipFragUbo->create();
 
-            // set texture filter to bilinear
-            PrepareToDraw(f);
+              QRhiShaderResourceBindings* srb = params.rhi->newShaderResourceBindings();
+              srb->setBindings({
+                  QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, clipVertUbo),
+                  QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, clipFragUbo),
+                  QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, textureID,
+                                                             params.sampler),
+              });
+              srb->create();
 
-            // draw clip on screen according to gl coordinates
-            params.passthrough_program->bind();
-            params.passthrough_program->setUniformValue("mvp_matrix", clip_mvp);
-            params.passthrough_program->setUniformValue("tex", 0);
-            params.passthrough_program->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
-
-            float quad_coords[8] = {
-              float(coords.vertexTopLeftX), float(coords.vertexTopLeftY),
-              float(coords.vertexTopRightX), float(coords.vertexTopRightY),
-              float(coords.vertexBottomRightX), float(coords.vertexBottomRightY),
-              float(coords.vertexBottomLeftX), float(coords.vertexBottomLeftY),
-            };
-            float quad_texcoords[8] = {
-              float(coords.textureTopLeftX), float(coords.textureTopLeftY),
-              float(coords.textureTopRightX), float(coords.textureTopRightY),
-              float(coords.textureBottomRightX), float(coords.textureBottomRightY),
-              float(coords.textureBottomLeftX), float(coords.textureBottomLeftY),
-            };
-
-            QuadBuffer::draw(f, quad_coords, quad_texcoords);
-
-            params.passthrough_program->release();
-
-            // release final clip texture
-            glBindTexture(GL_TEXTURE_2D, 0);
-
-            f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
-
-
-            // == END RENDER CLIP IN CONTEXT OF SEQUENCE ==
-
-
-
-            //
-            //
-            // PROCESS POST-SHADERS
-            //
-            //
-
-
-
-            // copy front buffer to back buffer (only if we're using blending modes - which we usually will be)
-            if (!olive::CurrentRuntimeConfig.disable_blending) {
-              params.passthrough_program->bind();
-              params.passthrough_program->setUniformValue("mvp_matrix", blit_mvp());
-              params.passthrough_program->setUniformValue("tex", 0);
-              params.passthrough_program->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
-
-              if (params.nests.size() > 0) {
-                draw_clip(params.ctx, params.nests.last()->fbo[2]->handle(), params.nests.last()->fbo[0]->texture(), true);
-              } else {
-                draw_clip(params.ctx, params.backend_buffer2, params.main_attachment, true);
+              QRhiGraphicsPipeline* pipeline = params.rhi->newGraphicsPipeline();
+              pipeline->setShaderStages(
+                  {{QRhiShaderStage::Vertex, params.passthroughVert},
+                   {QRhiShaderStage::Fragment, params.passthroughFrag}});
+              QRhiVertexInputLayout inputLayout;
+              inputLayout.setBindings({{4 * sizeof(float)}});
+              inputLayout.setAttributes({
+                  {0, 0, QRhiVertexInputAttribute::Float2, 0},
+                  {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
+              });
+              pipeline->setVertexInputLayout(inputLayout);
+              pipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
+              QRhiGraphicsPipeline::TargetBlend noBlend;
+              noBlend.enable = false;
+              pipeline->setTargetBlends({noBlend});
+              pipeline->setShaderResourceBindings(srb);
+              pipeline->setRenderPassDescriptor(back_rpd);
+              if (!pipeline->create()) {
+                qWarning() << "[RHI-PIPELINE] clip rendering pipeline FAILED";
               }
 
-              params.passthrough_program->release();
+              // Apply clip-space correction (Y-flip + depth remap for Vulkan/Metal/D3D)
+              QMatrix4x4 corrected_clip_mvp = params.rhi->clipSpaceCorrMatrix() * clip_mvp;
+
+              QRhiResourceUpdateBatch* u = params.rhi->nextResourceUpdateBatch();
+              u->updateDynamicBuffer(clipVbuf, 0, sizeof(quad_verts), quad_verts);
+              u->updateDynamicBuffer(clipVertUbo, 0, 64, corrected_clip_mvp.constData());
+              u->updateDynamicBuffer(clipFragUbo, 0, 16, colorMult);
+
+              QSize sz = back_target1->pixelSize();
+              QColor clearColor(0, 0, 0, 0);
+              params.cb->beginPass(back_target1, clearColor, {1.0f, 0}, u);
+              params.cb->setGraphicsPipeline(pipeline);
+              params.cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
+              params.cb->setShaderResources(srb);
+              const QRhiCommandBuffer::VertexInput vbufBinding(clipVbuf, 0);
+              params.cb->setVertexInput(0, 1, &vbufBinding);
+              params.cb->draw(4);
+              params.cb->endPass();
+
+              // Defer cleanup — resources must survive until endOffscreenFrame()
+              params.transientResources.append(pipeline);
+              params.transientResources.append(srb);
+              params.transientResources.append(clipVbuf);
+              params.transientResources.append(clipVertUbo);
+              params.transientResources.append(clipFragUbo);
             }
 
-
-
-            // == START FINAL DRAW ON SEQUENCE BUFFER ==
-
-
-
-
-            // bind front buffer as draw buffer
-            f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, final_fbo);
-
-            f->glBindTexture(GL_TEXTURE_2D, backend_tex_1);
-
-            params.passthrough_program->bind();
-            params.passthrough_program->setUniformValue("mvp_matrix", blit_mvp());
-            params.passthrough_program->setUniformValue("tex", 0);
-            params.passthrough_program->setUniformValue("color_mult",
-                QVector4D(coords.opacity, coords.opacity, coords.opacity, coords.opacity));
-
-            full_blit(f);
-
-            params.passthrough_program->release();
-
-            f->glBindTexture(GL_TEXTURE_2D, 0);
-
-            // unbind framebuffer
-            f->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
-
-
-
-            // == END FINAL DRAW ON SEQUENCE BUFFER ==
+            // Composite foreground (clip in back_tex1) onto main target using SrcOver blending.
+            // The main target has PreserveColorContents, so existing content is the background.
+            // For non-normal blend modes, we'd need the blending shader (TODO).
+            if (!olive::CurrentRuntimeConfig.disable_blending) {
+              rhi_blit_srcover(params, final_target, params.main_rpd, back_tex1, coords.opacity);
+            } else {
+              rhi_blit_passthrough(params, final_target, params.main_rpd, back_tex1, coords.opacity);
+            }
           }
-
         }
       } else {
+        // Audio track
         if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
           params.nests.append(c);
           compose_sequence(params);
           params.nests.removeLast();
         } else {
-          // Check whether cacher is currently active, if not activate it now
-
           bool got_mutex2 = false;
 
           if (params.wait_for_mutexes) {
@@ -621,14 +692,9 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
           }
 
           if (got_mutex2) {
-
             c->cache_lock.unlock();
-
-            c->Cache(playhead,
-                     (params.viewer != nullptr && !params.viewer->playing),
-                     params.nests,
+            c->Cache(playhead, (params.viewer != nullptr && !params.viewer->playing), params.nests,
                      params.playback_speed);
-
           }
         }
       }
@@ -645,38 +711,34 @@ GLuint olive::rendering::compose_sequence(ComposeSequenceParams &params) {
     WakeAudioWakeObject();
   }
 
-  // (no glPopMatrix needed — matrix is local QMatrix4x4)
-
-//  qDebug() << "compose sequence took" << QDateTime::currentMSecsSinceEpoch() - time;
-
-  if (!params.nests.isEmpty() && params.nests.last()->fbo != nullptr) {
-    // returns nested clip's texture
-    return params.nests.last()->fbo[0]->texture();
+  if (!params.nests.isEmpty() && params.nests.last()->fbo_rhi != nullptr) {
+    ClipRhiResources* nestRes = static_cast<ClipRhiResources*>(params.nests.last()->fbo_rhi);
+    return nestRes->tex[0];
   }
 
-  return 0;
+  return nullptr;
 }
 
 void olive::rendering::compose_audio(Viewer* viewer, Sequence* seq, int playback_speed, bool wait_for_mutexes) {
   ComposeSequenceParams params;
   params.viewer = viewer;
-  params.ctx = nullptr;
+  params.rhi = nullptr;
+  params.cb = nullptr;
   params.seq = seq;
   params.video = false;
   params.gizmos = nullptr;
   params.wait_for_mutexes = wait_for_mutexes;
   params.playback_speed = playback_speed;
   params.scrubbing = (viewer != nullptr && !viewer->playing);
-  params.blend_mode_program = nullptr;
   compose_sequence(params);
 }
 
 long rescale_frame_number(long framenumber, double source_frame_rate, double target_frame_rate) {
-  return qRound((double(framenumber)/source_frame_rate)*target_frame_rate);
+  return qRound((double(framenumber) / source_frame_rate) * target_frame_rate);
 }
 
 double get_timecode(Clip* c, long playhead) {
-  return double(playhead_to_clip_frame(c, playhead))/c->sequence->frame_rate;
+  return double(playhead_to_clip_frame(c, playhead)) / c->sequence->frame_rate;
 }
 
 long playhead_to_clip_frame(Clip* c, long playhead) {
@@ -684,14 +746,13 @@ long playhead_to_clip_frame(Clip* c, long playhead) {
 }
 
 double playhead_to_clip_seconds(Clip* c, long playhead) {
-  // returns time in seconds
   long clip_frame = playhead_to_clip_frame(c, playhead);
 
   if (c->reversed()) {
     clip_frame = c->media_length() - clip_frame - 1;
   }
 
-  double secs = (double(clip_frame)/c->sequence->frame_rate)*c->speed().value;
+  double secs = (double(clip_frame) / c->sequence->frame_rate) * c->speed().value;
   if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
     secs *= c->media()->to_footage()->speed;
   }
@@ -699,17 +760,15 @@ double playhead_to_clip_seconds(Clip* c, long playhead) {
   return secs;
 }
 
-int64_t seconds_to_timestamp(Clip *c, double seconds) {
+int64_t seconds_to_timestamp(Clip* c, double seconds) {
   return qRound64(seconds * av_q2d(av_inv_q(c->time_base())));
 }
 
-int64_t playhead_to_timestamp(Clip* c, long playhead) {
-  return seconds_to_timestamp(c, playhead_to_clip_seconds(c, playhead));
-}
+int64_t playhead_to_timestamp(Clip* c, long playhead) { return seconds_to_timestamp(c, playhead_to_clip_seconds(c, playhead)); }
 
 void close_active_clips(Sequence* s) {
   if (s != nullptr) {
-    for (const auto & clip : s->clips) {
+    for (const auto& clip : s->clips) {
       Clip* c = clip.get();
       if (c != nullptr) {
         c->Close(true);

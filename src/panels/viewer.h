@@ -93,7 +93,7 @@ public:
 
   Media* media{nullptr};
   SequencePtr seq;
-  QVector<Marker>* marker_ref;
+  QVector<Marker>* marker_ref{nullptr};
 
   void set_marker();
 

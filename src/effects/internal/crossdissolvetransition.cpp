@@ -20,8 +20,6 @@
 
 #include "crossdissolvetransition.h"
 
-#include <QOpenGLFunctions>
-
 CrossDissolveTransition::CrossDissolveTransition(Clip* c, Clip* s, const EffectMeta* em) : Transition(c, s, em) {
   SetFlags(Effect::CoordsFlag);
 }

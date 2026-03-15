@@ -1,4 +1,4 @@
-﻿/***
+/***
 
     Olive - Non-Linear Video Editor
     Copyright (C) 2019  Olive Team
@@ -26,19 +26,11 @@
 #include <QMutex>
 #include <QWaitCondition>
 #include <QOffscreenSurface>
-#include <QOpenGLContext>
-#include <QOpenGLFramebufferObject>
-#include <QOpenGLShaderProgram>
+#include <rhi/qrhi.h>
+#include <rhi/qshader.h>
 
 #include "timeline/sequence.h"
 #include "effects/effect.h"
-#include "rendering/framebufferobject.h"
-
-// copied from source code to OCIODisplay
-const int LUT3D_EDGE_SIZE = 32;
-
-// copied from source code to OCIODisplay, expanded from 3*LUT3D_EDGE_SIZE*LUT3D_EDGE_SIZE*LUT3D_EDGE_SIZE
-const int NUM_3D_ENTRIES = 98304;
 
 class RenderThread : public QThread {
   Q_OBJECT
@@ -48,15 +40,18 @@ public:
   void run() override;
 
   QMutex* get_texture_mutex();
-  const GLuint& get_texture();
+
+  // CPU bridge: pixel data read back after compositing
+  const char* get_frame_data() const;
+  int get_frame_width() const;
+  int get_frame_height() const;
 
   Effect* gizmos{nullptr};
   void paint();
-  void start_render(QOpenGLContext* share,
-                    Sequence *s,
+  void start_render(Sequence* s,
                     int playback_speed,
-                    const QString &save = nullptr,
-                    GLvoid *pixels = nullptr,
+                    const QString& save = nullptr,
+                    void* pixels = nullptr,
                     int pixel_linesize = 0,
                     int idivider = 0,
                     bool wait = false,
@@ -65,26 +60,53 @@ public:
   void cancel();
   void wait_until_paused();
 
+  // Queue a QRhi resource for deferred deletion on the render thread.
+  // Safe to call from any thread.
+  static void DeferRhiResourceDeletion(QRhiResource* res);
+  static void DeferRhiResourceDeletion(const QVector<QRhiResource*>& resources);
+
 public slots:
-  // cleanup functions
   void delete_ctx();
 signals:
   void ready();
 private:
-  // cleanup functions
+  static QMutex deferred_delete_mutex_;
+  static QVector<QRhiResource*> deferred_delete_queue_;
+  void drainDeferredDeletes();
+
   void delete_buffers();
-  void delete_shaders();
 
-  void set_up_ocio();
-  void destroy_ocio();
+  // RHI resources
+  QRhi* rhi_{nullptr};
+  QOffscreenSurface* fallbackSurface_{nullptr};
 
-  FramebufferObject front_buffer_1;
+  // Core shaders loaded from QRC .qsb files
+  QShader passthroughVert_;
+  QShader passthroughFrag_;
+  QShader blendingFrag_;
+  QShader premultiplyFrag_;
+  QShader yuvFrag_;
+
+  // Shared vertex buffer and UBO
+  QRhiBuffer* vbuf_{nullptr};
+  QRhiBuffer* vertUbo_{nullptr};
+  QRhiSampler* sampler_{nullptr};
+
+  // Main compositing target (double-buffered)
+  QRhiTexture* front_tex_[2] = {};
+  QRhiTextureRenderTarget* front_rt_[2] = {};        // PreserveColorContents (for multi-clip compositing)
+  QRhiTextureRenderTarget* front_rt_clear_[2] = {};  // No preserve (for initial clear)
+  QRhiRenderPassDescriptor* front_rpd_{nullptr};
+  QRhiRenderPassDescriptor* front_clear_rpd_{nullptr};
+
   QMutex front_mutex1;
-
-  FramebufferObject front_buffer_2;
   QMutex front_mutex2;
-
   std::atomic<bool> front_buffer_switcher;
+
+  // Backend target (single — used for clip→main compositing)
+  QRhiTexture* back_tex_{nullptr};
+  QRhiTextureRenderTarget* back_rt_{nullptr};
+  QRhiRenderPassDescriptor* back_rpd_{nullptr};
 
   QWaitCondition wait_cond_;
   QMutex wait_lock_;
@@ -92,24 +114,8 @@ private:
   QWaitCondition main_thread_wait_cond_;
   QMutex main_thread_lock_;
 
-  QOffscreenSurface surface;
-  QOpenGLContext* share_ctx{nullptr};
-  QOpenGLContext* ctx{nullptr};
-  QOpenGLShaderProgram* blend_mode_program{nullptr};
-  QOpenGLShaderProgram* premultiply_program{nullptr};
-  QOpenGLShaderProgram* yuv_program{nullptr};
-  QOpenGLShaderProgram* passthrough_program{nullptr};
-
-  FramebufferObject back_buffer_1;
-  FramebufferObject back_buffer_2;
-
-  float ocio_lut_data[NUM_3D_ENTRIES];
-  GLuint ocio_lut_texture;
-  QOpenGLShaderProgram* ocio_shader;
-
   Sequence* seq{nullptr};
   int playback_speed_;
-  int divider;
   int tex_width{-1};
   int tex_height{-1};
   QAtomicInt queued;
@@ -117,8 +123,11 @@ private:
   bool scrubbing_{false};
   bool running{true};
   QString save_fn;
-  GLvoid *pixel_buffer;
+  void* pixel_buffer;
   int pixel_buffer_linesize;
+
+  // CPU bridge: double-buffered pixel readback
+  QByteArray cpu_frame_[2];
 };
 
 #endif // RENDERTHREAD_H

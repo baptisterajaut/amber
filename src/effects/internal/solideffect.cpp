@@ -20,7 +20,6 @@
 
 #include "solideffect.h"
 
-#include <QOpenGLTexture>
 #include <QPainter>
 #include <QtMath>
 #include <QVariant>

@@ -23,7 +23,6 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QtMath>
-#include <QOpenGLFunctions>
 
 #include "ui/labelslider.h"
 #include "ui/collapsiblewidget.h"

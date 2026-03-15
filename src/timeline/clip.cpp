@@ -27,9 +27,8 @@
 #include "project/footage.h"
 #include "global/config.h"
 #include "rendering/cacher.h"
-#include "rendering/matrixutil.h"
-#include "rendering/quadbuffer.h"
 #include "rendering/renderfunctions.h"
+#include "rendering/renderthread.h"
 #include "panels/project.h"
 #include "timeline/sequence.h"
 #include "panels/timeline.h"
@@ -38,39 +37,21 @@
 #include "undo/undo.h"
 #include "global/debug.h"
 
-#include <QOpenGLContext>
-#include <QOpenGLFunctions>
-#include <QOpenGLShaderProgram>
-
 extern "C" {
 #include <libavutil/pixfmt.h>
 }
 
-#ifndef GL_R8
-#define GL_R8 0x8229
-#endif
-#ifndef GL_RG8
-#define GL_RG8 0x822B
-#endif
-#ifndef GL_RED
-#define GL_RED 0x1903
-#endif
-#ifndef GL_RG
-#define GL_RG 0x8227
-#endif
-
 const int kRGBAComponentCount = 4;
 
-Clip::Clip(Sequence* s) :
-  sequence(s),
-  cacher(this),
-  
-  autoscale_(olive::CurrentConfig.autoscale_by_default),
-  opening_transition(nullptr),
-  closing_transition(nullptr)
-  
+Clip::Clip(Sequence* s)
+    : sequence(s),
+      cacher(this),
+
+      autoscale_(olive::CurrentConfig.autoscale_by_default),
+      opening_transition(nullptr),
+      closing_transition(nullptr)
+
 {
-  yuv_textures[0] = yuv_textures[1] = yuv_textures[2] = 0;
 }
 
 ClipPtr Clip::copy(Sequence* s) {
@@ -88,7 +69,7 @@ ClipPtr Clip::copy(Sequence* s) {
   copy->set_speed(speed());
   copy->set_reversed(reversed());
 
-  for (const auto & effect : effects) {
+  for (const auto& effect : effects) {
     copy->effects.append(effect->copy(copy.get()));
   }
 
@@ -99,24 +80,17 @@ ClipPtr Clip::copy(Sequence* s) {
   return copy;
 }
 
-bool Clip::IsActiveAt(long timecode)
-{
+bool Clip::IsActiveAt(long timecode) {
   if (this->sequence == nullptr) return false;
 
-  // these buffers allow clips to be opened and prepared well before they're displayed
-  // as well as closed a little after they're not needed anymore
-  int open_buffer = qCeil(this->sequence->frame_rate*2);
+  int open_buffer = qCeil(this->sequence->frame_rate * 2);
   int close_buffer = qCeil(this->sequence->frame_rate);
 
-
-  return enabled()
-      && timeline_in(true) < timecode + open_buffer
-      && timeline_out(true) > timecode - close_buffer
-      && timecode - timeline_in(true) + clip_in(true) < media_length();
+  return enabled() && timeline_in(true) < timecode + open_buffer && timeline_out(true) > timecode - close_buffer &&
+         timecode - timeline_in(true) + clip_in(true) < media_length();
 }
 
-bool Clip::IsSelected(bool containing)
-{
+bool Clip::IsSelected(bool containing) {
   if (this->sequence == nullptr) {
     return false;
   }
@@ -124,88 +98,52 @@ bool Clip::IsSelected(bool containing)
   return this->sequence->IsClipSelected(this, containing);
 }
 
-const QColor &Clip::color()
-{
-  return color_;
-}
+const QColor& Clip::color() { return color_; }
 
-void Clip::set_color(int r, int g, int b)
-{
+void Clip::set_color(int r, int g, int b) {
   color_.setRed(r);
   color_.setGreen(g);
   color_.setBlue(b);
 }
 
-void Clip::set_color(const QColor &c)
-{
-  color_ = c;
-}
+void Clip::set_color(const QColor& c) { color_ = c; }
 
-Media *Clip::media()
-{
-  return media_;
-}
+Media* Clip::media() { return media_; }
 
-FootageStream *Clip::media_stream()
-{
-  if (media() != nullptr
-      && media()->get_type() == MEDIA_TYPE_FOOTAGE) {
+FootageStream* Clip::media_stream() {
+  if (media() != nullptr && media()->get_type() == MEDIA_TYPE_FOOTAGE) {
     return media()->to_footage()->get_stream_from_file_index(track() < 0, media_stream_index());
   }
 
   return nullptr;
 }
 
-int Clip::media_stream_index()
-{
-  return media_stream_;
-}
+int Clip::media_stream_index() { return media_stream_; }
 
-void Clip::set_media(Media *m, int s)
-{
+void Clip::set_media(Media* m, int s) {
   media_ = m;
   media_stream_ = s;
 }
 
-bool Clip::enabled()
-{
-  return enabled_;
-}
+bool Clip::enabled() { return enabled_; }
 
-void Clip::set_enabled(bool e)
-{
-  enabled_ = e;
-}
+void Clip::set_enabled(bool e) { enabled_ = e; }
 
-void Clip::move(ComboAction* ca, long iin, long iout, long iclip_in, int itrack, bool verify_transitions, bool relative)
-{
+void Clip::move(ComboAction* ca, long iin, long iout, long iclip_in, int itrack, bool verify_transitions,
+                bool relative) {
   ca->append(new MoveClipAction(this, iin, iout, iclip_in, itrack, relative));
 
   if (verify_transitions) {
-
-    // if this is a shared transition, and the corresponding clip will be moved away somehow
-    if (opening_transition != nullptr
-        && opening_transition->secondary_clip != nullptr
-        && opening_transition->secondary_clip->timeline_out() != iin) {
-      // separate transition
+    if (opening_transition != nullptr && opening_transition->secondary_clip != nullptr &&
+        opening_transition->secondary_clip->timeline_out() != iin) {
       ca->append(new SetPointer(reinterpret_cast<void**>(&opening_transition->secondary_clip), nullptr));
-      ca->append(new AddTransitionCommand(nullptr,
-                                          opening_transition->secondary_clip,
-                                          opening_transition,
-                                          nullptr,
-                                          0));
+      ca->append(new AddTransitionCommand(nullptr, opening_transition->secondary_clip, opening_transition, nullptr, 0));
     }
 
-    if (closing_transition != nullptr
-        && closing_transition->secondary_clip != nullptr
-        && closing_transition->parent_clip->timeline_in() != iout) {
-      // separate transition
+    if (closing_transition != nullptr && closing_transition->secondary_clip != nullptr &&
+        closing_transition->parent_clip->timeline_in() != iout) {
       ca->append(new SetPointer(reinterpret_cast<void**>(&closing_transition->secondary_clip), nullptr));
-      ca->append(new AddTransitionCommand(nullptr,
-                                          this,
-                                          closing_transition,
-                                          nullptr,
-                                          0));
+      ca->append(new AddTransitionCommand(nullptr, this, closing_transition, nullptr, 0));
     }
   }
 }
@@ -216,7 +154,7 @@ void Clip::reset_audio() {
   }
   if (media() != nullptr && media()->get_type() == MEDIA_TYPE_SEQUENCE) {
     Sequence* nested_sequence = media()->to_sequence().get();
-    for (const auto & clip : nested_sequence->clips) {
+    for (const auto& clip : nested_sequence->clips) {
       Clip* c = clip.get();
       if (c != nullptr) {
         c->reset_audio();
@@ -226,11 +164,10 @@ void Clip::reset_audio() {
 }
 
 void Clip::refresh() {
-  // validates media if it was replaced
   if (replaced && media() != nullptr && media()->get_type() == MEDIA_TYPE_FOOTAGE) {
     Footage* m = media()->to_footage();
 
-    if (track() < 0 && m->video_tracks.size() > 0)  {
+    if (track() < 0 && m->video_tracks.size() > 0) {
       set_media(media(), m->video_tracks.at(0).file_index);
     } else if (track() >= 0 && m->audio_tracks.size() > 0) {
       set_media(media(), m->audio_tracks.at(0).file_index);
@@ -238,22 +175,20 @@ void Clip::refresh() {
   }
   replaced = false;
 
-  // reinitializes all effects... just in case
-  for (const auto & effect : effects) {
+  for (const auto& effect : effects) {
     effect->refresh();
   }
 }
 
-QVector<Marker> &Clip::get_markers() {
+QVector<Marker>& Clip::get_markers() {
   if (media() != nullptr) {
     return media()->get_markers();
   }
   return markers;
 }
 
-int Clip::IndexOfEffect(Effect *e)
-{
-  for (int i=0;i<effects.size();i++) {
+int Clip::IndexOfEffect(Effect* e) {
+  for (int i = 0; i < effects.size(); i++) {
     if (effects.at(i).get() == e) {
       return i;
     }
@@ -266,118 +201,87 @@ Clip::~Clip() {
     Close(true);
   }
 
+  // Safety net: queue any remaining QRhi resources for deferred deletion.
+  // If Close() succeeded, these are already nullptr (no-op).
+  QVector<QRhiResource*> to_delete;
+  if (yuv_rt) to_delete.append(yuv_rt);
+  if (yuv_rpd) to_delete.append(yuv_rpd);
+  if (yuv_tex_y) to_delete.append(yuv_tex_y);
+  if (yuv_tex_u) to_delete.append(yuv_tex_u);
+  if (yuv_tex_v) to_delete.append(yuv_tex_v);
+  if (yuv_converted_tex) to_delete.append(yuv_converted_tex);
+  if (rgba_tex) to_delete.append(rgba_tex);
+  if (fbo_rhi != nullptr) {
+    ClipRhiResources* res = static_cast<ClipRhiResources*>(fbo_rhi);
+    for (int j = 0; j < res->count; j++) {
+      if (res->rt[j]) to_delete.append(res->rt[j]);
+      if (res->tex[j]) to_delete.append(res->tex[j]);
+    }
+    if (res->rpd) to_delete.append(res->rpd);
+    delete res;
+  }
+  if (!to_delete.isEmpty()) {
+    RenderThread::DeferRhiResourceDeletion(to_delete);
+  }
+
   effects.clear();
 }
 
 long Clip::clip_in(bool with_transition) {
   if (with_transition && opening_transition != nullptr && opening_transition->secondary_clip != nullptr) {
-    // we must be the secondary clip, so return (timeline in - length)
     return clip_in_ - opening_transition->get_true_length();
   }
   return clip_in_;
 }
 
-void Clip::set_clip_in(long c)
-{
-  clip_in_ = c;
-}
+void Clip::set_clip_in(long c) { clip_in_ = c; }
 
 long Clip::timeline_in(bool with_transition) {
   if (with_transition && opening_transition != nullptr && opening_transition->secondary_clip != nullptr) {
-    // we must be the secondary clip, so return (timeline in - length)
     return timeline_in_ - opening_transition->get_true_length();
   }
   return timeline_in_;
 }
 
-void Clip::set_timeline_in(long t)
-{
-  timeline_in_ = t;
-}
+void Clip::set_timeline_in(long t) { timeline_in_ = t; }
 
 long Clip::timeline_out(bool with_transitions) {
   if (with_transitions && closing_transition != nullptr && closing_transition->secondary_clip != nullptr) {
-    // we must be the primary clip, so return (timeline out + length2)
     return timeline_out_ + closing_transition->get_true_length();
   } else {
     return timeline_out_;
   }
 }
 
-void Clip::set_timeline_out(long t)
-{
-  timeline_out_ = t;
-}
+void Clip::set_timeline_out(long t) { timeline_out_ = t; }
 
-bool Clip::reversed()
-{
-  return reverse_;
-}
+bool Clip::reversed() { return reverse_; }
 
-void Clip::set_reversed(bool r)
-{
-  reverse_ = r;
-}
+void Clip::set_reversed(bool r) { reverse_ = r; }
 
-bool Clip::autoscaled()
-{
-  return autoscale_;
-}
+bool Clip::autoscaled() { return autoscale_; }
 
-void Clip::set_autoscaled(bool b)
-{
-  autoscale_ = b;
-}
+void Clip::set_autoscaled(bool b) { autoscale_ = b; }
 
-double Clip::cached_frame_rate()
-{
-  return cached_fr_;
-}
+double Clip::cached_frame_rate() { return cached_fr_; }
 
-void Clip::set_cached_frame_rate(double d)
-{
-  cached_fr_ = d;
-}
+void Clip::set_cached_frame_rate(double d) { cached_fr_ = d; }
 
-const QString &Clip::name()
-{
-  return name_;
-}
+const QString& Clip::name() { return name_; }
 
-void Clip::set_name(const QString &s)
-{
-  name_ = s;
-}
+void Clip::set_name(const QString& s) { name_ = s; }
 
-const ClipSpeed& Clip::speed()
-{
-  return speed_;
-}
+const ClipSpeed& Clip::speed() { return speed_; }
 
-void Clip::set_speed(const ClipSpeed& d)
-{
-  speed_ = d;
-}
+void Clip::set_speed(const ClipSpeed& d) { speed_ = d; }
 
-AVRational Clip::time_base()
-{
-  return cacher.media_time_base();
-}
+AVRational Clip::time_base() { return cacher.media_time_base(); }
 
-int Clip::track()
-{
-  return track_;
-}
+int Clip::track() { return track_; }
 
-void Clip::set_track(int t)
-{
-  track_ = t;
-}
+void Clip::set_track(int t) { track_ = t; }
 
-// timeline functions
-long Clip::length() {
-  return timeline_out_ - timeline_in_;
-}
+long Clip::length() { return timeline_out_ - timeline_in_; }
 
 double Clip::media_frame_rate() {
   Q_ASSERT(track_ < 0);
@@ -399,21 +303,19 @@ long Clip::media_length() {
       return LONG_MAX;
     } else {
       switch (media_->get_type()) {
-      case MEDIA_TYPE_FOOTAGE:
-      {
-        Footage* m = media_->to_footage();
-        const FootageStream* ms = m->get_stream_from_file_index(track_ < 0, media_stream_index());
-        if (ms != nullptr && ms->infinite_length) {
-          return LONG_MAX;
-        } else {
-          return m->get_length_in_frames(fr);
+        case MEDIA_TYPE_FOOTAGE: {
+          Footage* m = media_->to_footage();
+          const FootageStream* ms = m->get_stream_from_file_index(track_ < 0, media_stream_index());
+          if (ms != nullptr && ms->infinite_length) {
+            return LONG_MAX;
+          } else {
+            return m->get_length_in_frames(fr);
+          }
         }
-      }
-      case MEDIA_TYPE_SEQUENCE:
-      {
-        Sequence* s = media_->to_sequence().get();
-        return rescale_frame_number(s->getEndFrame(), s->frame_rate, fr);
-      }
+        case MEDIA_TYPE_SEQUENCE: {
+          Sequence* s = media_->to_sequence().get();
+          return rescale_frame_number(s->getEndFrame(), s->frame_rate, fr);
+        }
       }
     }
   }
@@ -423,18 +325,16 @@ long Clip::media_length() {
 int Clip::media_width() {
   if (media_ == nullptr) return (sequence != nullptr) ? sequence->width : 0;
   switch (media_->get_type()) {
-  case MEDIA_TYPE_FOOTAGE:
-  {
-    const FootageStream* ms = media_stream();
-    if (ms != nullptr) return ms->video_width;
-    if (sequence != nullptr) return sequence->width;
-    break;
-  }
-  case MEDIA_TYPE_SEQUENCE:
-  {
-    Sequence* s = media_->to_sequence().get();
-    return s->width;
-  }
+    case MEDIA_TYPE_FOOTAGE: {
+      const FootageStream* ms = media_stream();
+      if (ms != nullptr) return ms->video_width;
+      if (sequence != nullptr) return sequence->width;
+      break;
+    }
+    case MEDIA_TYPE_SEQUENCE: {
+      Sequence* s = media_->to_sequence().get();
+      return s->width;
+    }
   }
   return 0;
 }
@@ -442,38 +342,31 @@ int Clip::media_width() {
 int Clip::media_height() {
   if (media_ == nullptr) return (sequence != nullptr) ? sequence->height : 0;
   switch (media_->get_type()) {
-  case MEDIA_TYPE_FOOTAGE:
-  {
-    const FootageStream* ms = media_stream();
-    if (ms != nullptr) return ms->video_height;
-    if (sequence != nullptr) return sequence->height;
-  }
-    break;
-  case MEDIA_TYPE_SEQUENCE:
-  {
-    Sequence* s = media_->to_sequence().get();
-    return s->height;
-  }
+    case MEDIA_TYPE_FOOTAGE: {
+      const FootageStream* ms = media_stream();
+      if (ms != nullptr) return ms->video_height;
+      if (sequence != nullptr) return sequence->height;
+    } break;
+    case MEDIA_TYPE_SEQUENCE: {
+      Sequence* s = media_->to_sequence().get();
+      return s->height;
+    }
   }
   return 0;
 }
 
 void Clip::refactor_frame_rate(ComboAction* ca, double multiplier, bool change_timeline_points) {
   if (change_timeline_points) {
-    this->move(ca,
-               qRound(double(timeline_in_) * multiplier),
-               qRound(double(timeline_out_) * multiplier),
-               qRound(double(clip_in_) * multiplier),
-               track_);
+    this->move(ca, qRound(double(timeline_in_) * multiplier), qRound(double(timeline_out_) * multiplier),
+               qRound(double(clip_in_) * multiplier), track_);
   }
 
-  // move keyframes
   for (auto e : effects) {
-    for (int j=0;j<e->row_count();j++) {
+    for (int j = 0; j < e->row_count(); j++) {
       EffectRow* r = e->row(j);
-      for (int l=0;l<r->FieldCount();l++) {
+      for (int l = 0; l < r->FieldCount(); l++) {
         EffectField* f = r->Field(l);
-        for (auto & keyframe : f->keyframes) {
+        for (auto& keyframe : f->keyframes) {
           ca->append(new SetLong(&keyframe.time, keyframe.time, qRound(keyframe.time * multiplier)));
         }
       }
@@ -486,25 +379,21 @@ void Clip::Open() {
     open_ = true;
     cacher_uses_rgba_ = NeedsCpuRgba();
 
-    for (const auto & effect : effects) {
+    for (const auto& effect : effects) {
       effect->open();
     }
 
-    // reset variable used to optimize uploading frame data
     texture_frame = -1;
 
     if (UsesCacher()) {
-      // cacher will unlock open_lock
       cacher.Open();
     } else {
-      // this media doesn't use a cacher, so we unlock here
       state_change_lock.unlock();
     }
   }
 }
 
 void Clip::Close(bool wait) {
-  // thread safety, prevents Close() running from two separate threads simultaneously
   if (open_ && state_change_lock.tryLock()) {
     open_ = false;
 
@@ -512,38 +401,43 @@ void Clip::Close(bool wait) {
       close_active_clips(media()->to_sequence().get());
     }
 
-    // destroy YUV conversion resources
-    delete yuv_fbo;
-    yuv_fbo = nullptr;
-    if (yuv_textures[0] != 0) {
-      glDeleteTextures(3, yuv_textures);
-      yuv_textures[0] = yuv_textures[1] = yuv_textures[2] = 0;
+    // Queue YUV conversion resources for deferred deletion on the render thread
+    QVector<QRhiResource*> to_delete;
+    if (yuv_rt) to_delete.append(yuv_rt);
+    if (yuv_rpd) to_delete.append(yuv_rpd);
+    if (yuv_tex_y) to_delete.append(yuv_tex_y);
+    if (yuv_tex_u) to_delete.append(yuv_tex_u);
+    if (yuv_tex_v) to_delete.append(yuv_tex_v);
+    if (yuv_converted_tex) to_delete.append(yuv_converted_tex);
+    if (rgba_tex) to_delete.append(rgba_tex);
+
+    if (fbo_rhi != nullptr) {
+      ClipRhiResources* res = static_cast<ClipRhiResources*>(fbo_rhi);
+      for (int j = 0; j < res->count; j++) {
+        if (res->rt[j]) to_delete.append(res->rt[j]);
+        if (res->tex[j]) to_delete.append(res->tex[j]);
+      }
+      if (res->rpd) to_delete.append(res->rpd);
+      delete res;  // Plain C++ struct, not a QRhiResource — safe from any thread
+      fbo_rhi = nullptr;
     }
-    cached_texture_id = 0;
 
-    // destroy opengl texture in main thread
-    delete texture;
-    texture = nullptr;
+    RenderThread::DeferRhiResourceDeletion(to_delete);
 
-    // close all effects
-    for (const auto & effect : effects) {
+    yuv_rt = nullptr;
+    yuv_rpd = nullptr;
+    yuv_tex_y = nullptr;
+    yuv_tex_u = nullptr;
+    yuv_tex_v = nullptr;
+    yuv_converted_tex = nullptr;
+    cached_rhi_tex = nullptr;
+    rgba_tex = nullptr;
+
+    // Close all effects
+    for (const auto& effect : effects) {
       if (effect->is_open()) {
         effect->close();
       }
-    }
-
-    // delete framebuffers
-    if (fbo != nullptr) {
-      // delete 3 fbos for nested sequences, 2 for most clips
-      int fbo_count = (media() != nullptr && media()->get_type() == MEDIA_TYPE_SEQUENCE) ? 3 : 2;
-
-      for (int j=0;j<fbo_count;j++) {
-        delete fbo[j];
-      }
-
-      delete [] fbo;
-
-      fbo = nullptr;
     }
 
     if (UsesCacher()) {
@@ -554,178 +448,240 @@ void Clip::Close(bool wait) {
   }
 }
 
-bool Clip::IsOpen()
-{
-  return open_;
-}
+bool Clip::IsOpen() { return open_; }
 
 void Clip::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed) {
   cacher.Cache(playhead, scrubbing, nests, playback_speed);
   cacher_frame = playhead;
 }
 
-bool Clip::Retrieve(QOpenGLShaderProgram* yuv_program)
-{
+bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* params) {
   bool ret = false;
 
   if (UsesCacher()) {
-
-    // Retrieve the frame from the cacher that we requested in Cache().
     AVFrame* frame = cacher.Retrieve();
 
-    // Wait for exclusive control of the queue to avoid any threading collisions
     cacher.queue()->lock();
 
-    // Check if we retrieved a frame (nullptr) and if the queue still contains this frame.
-    //
-    // `nullptr` is returned if the cacher failed to get any sort of frame and is uncommon, but we do need
-    // to handle it.
-    //
-    // We check the queue because in some situations (e.g. intensive scrubbing), in the time it took to gain
-    // exclusive control of the queue, the cacher may have deleted the frame.
-    // Therefore we check to ensure the queue still contains the frame now that we have exclusive control,
-    // to avoid any attempt to utilize now-freed memory.
-
     if (frame != nullptr && cacher.queue()->contains(frame)) {
-
       bool is_yuv420p = (frame->format == AV_PIX_FMT_YUV420P);
       bool is_nv12 = (frame->format == AV_PIX_FMT_NV12);
 
-      if (yuv_program != nullptr && (is_yuv420p || is_nv12)) {
-        // GPU YUV→RGB path: upload plane textures and convert via shader
+      if (rhi != nullptr && (is_yuv420p || is_nv12)) {
+        // GPU YUV->RGB path: upload plane textures and convert via shader
         int w = cacher.media_width();
         int h = cacher.media_height();
 
-        if (yuv_textures[0] == 0) {
-          glGenTextures(3, yuv_textures);
+        // Create/recreate plane textures if needed
+        if (yuv_tex_y == nullptr) {
+          yuv_tex_y = rhi->newTexture(QRhiTexture::R8, QSize(w, h));
+          yuv_tex_y->create();
+        }
+        if (yuv_tex_u == nullptr) {
+          if (is_nv12) {
+            yuv_tex_u = rhi->newTexture(QRhiTexture::RG8, QSize(w / 2, h / 2));
+          } else {
+            yuv_tex_u = rhi->newTexture(QRhiTexture::R8, QSize(w / 2, h / 2));
+          }
+          yuv_tex_u->create();
+        }
+        if (yuv_tex_v == nullptr && is_yuv420p) {
+          yuv_tex_v = rhi->newTexture(QRhiTexture::R8, QSize(w / 2, h / 2));
+          yuv_tex_v->create();
+        }
+        if (yuv_converted_tex == nullptr) {
+          yuv_converted_tex = rhi->newTexture(QRhiTexture::RGBA8, QSize(w, h),
+                                              1, QRhiTexture::RenderTarget);
+          yuv_converted_tex->create();
+          yuv_rt = rhi->newTextureRenderTarget({yuv_converted_tex});
+          yuv_rpd = yuv_rt->newCompatibleRenderPassDescriptor();
+          yuv_rt->setRenderPassDescriptor(yuv_rpd);
+          yuv_rt->create();
         }
 
-        if (yuv_fbo == nullptr) {
-          yuv_fbo = new QOpenGLFramebufferObject(w, h);
+        // Upload plane data
+        QRhiResourceUpdateBatch* u = rhi->nextResourceUpdateBatch();
+
+        // Y plane
+        {
+          QByteArray yData(reinterpret_cast<const char*>(frame->data[0]), frame->linesize[0] * h);
+          QRhiTextureSubresourceUploadDescription desc(yData);
+          desc.setSourceSize(QSize(w, h));
+          desc.setDataStride(frame->linesize[0]);
+          u->uploadTexture(yuv_tex_y, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
         }
 
-        QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
-
-        // Upload Y plane (full resolution, GL_R8)
-        f->glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, yuv_textures[0]);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[0]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, frame->data[0]);
-
-        // Upload U/UV plane (half resolution)
-        f->glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, yuv_textures[1]);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        if (is_nv12) {
-          glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[1] / 2);
-          glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, w / 2, h / 2, 0, GL_RG, GL_UNSIGNED_BYTE, frame->data[1]);
-        } else {
-          glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[1]);
-          glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, frame->data[1]);
+        // U/UV plane
+        {
+          int uv_h = h / 2;
+          if (is_nv12) {
+            QByteArray uvData(reinterpret_cast<const char*>(frame->data[1]), frame->linesize[1] * uv_h);
+            QRhiTextureSubresourceUploadDescription desc(uvData);
+            desc.setSourceSize(QSize(w / 2, uv_h));
+            desc.setDataStride(frame->linesize[1]);
+            u->uploadTexture(yuv_tex_u, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+          } else {
+            QByteArray uData(reinterpret_cast<const char*>(frame->data[1]), frame->linesize[1] * uv_h);
+            QRhiTextureSubresourceUploadDescription desc(uData);
+            desc.setSourceSize(QSize(w / 2, uv_h));
+            desc.setDataStride(frame->linesize[1]);
+            u->uploadTexture(yuv_tex_u, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+          }
         }
 
-        // Upload V plane (YUV420P only)
+        // V plane (YUV420P only)
         if (is_yuv420p) {
-          f->glActiveTexture(GL_TEXTURE2);
-          glBindTexture(GL_TEXTURE_2D, yuv_textures[2]);
-          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-          glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[2]);
-          glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, frame->data[2]);
+          int v_h = h / 2;
+          QByteArray vData(reinterpret_cast<const char*>(frame->data[2]), frame->linesize[2] * v_h);
+          QRhiTextureSubresourceUploadDescription desc(vData);
+          desc.setSourceSize(QSize(w / 2, v_h));
+          desc.setDataStride(frame->linesize[2]);
+          u->uploadTexture(yuv_tex_v, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
         }
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        // YUV->RGB conversion pass (dedicated buffers to avoid shared dynamic buffer hazard)
+        {
+          int format_type = is_nv12 ? 1 : 0;
+          QByteArray fragData(16, 0);
+          memcpy(fragData.data(), &format_type, 4);
 
-        // Render YUV→RGB conversion into yuv_fbo
-        yuv_fbo->bind();
-        glViewport(0, 0, w, h);
-        glClear(GL_COLOR_BUFFER_BIT);
+          QRhiBuffer* yuvVbuf =
+              rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+          yuvVbuf->create();
+          QRhiBuffer* yuvVertUbo =
+              rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
+          yuvVertUbo->create();
+          QRhiBuffer* yuvFragUbo =
+              rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
+          yuvFragUbo->create();
 
-        yuv_program->bind();
-        yuv_program->setUniformValue("y_tex", 0);
-        yuv_program->setUniformValue("u_tex", 1);
-        yuv_program->setUniformValue("v_tex", 2);
-        yuv_program->setUniformValue("format_type", is_nv12 ? 1 : 0);
+          QRhiSampler* sampler = params->sampler;
+          QRhiTexture* vTex = yuv_tex_v ? yuv_tex_v : yuv_tex_u;
 
-        // Fullscreen quad (textures already bound to units 0/1/2)
-        yuv_program->setUniformValue("mvp_matrix", MatrixUtil::ortho(-1, 1, -1, 1));
-        QuadBuffer::draw(f);
+          QRhiShaderResourceBindings* srb = rhi->newShaderResourceBindings();
+          srb->setBindings({
+              QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, yuvVertUbo),
+              QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, yuvFragUbo),
+              QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, yuv_tex_y,
+                                                         sampler),
+              QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage, yuv_tex_u,
+                                                         sampler),
+              QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage, vTex, sampler),
+          });
+          srb->create();
 
-        yuv_program->release();
-        yuv_fbo->release();
+          QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
+          pipeline->setShaderStages(
+              {{QRhiShaderStage::Vertex, params->passthroughVert}, {QRhiShaderStage::Fragment, params->yuvFrag}});
+          QRhiVertexInputLayout inputLayout;
+          inputLayout.setBindings({{4 * sizeof(float)}});
+          inputLayout.setAttributes({
+              {0, 0, QRhiVertexInputAttribute::Float2, 0},
+              {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
+          });
+          pipeline->setVertexInputLayout(inputLayout);
+          pipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
+          QRhiGraphicsPipeline::TargetBlend noBlend;
+          noBlend.enable = false;
+          pipeline->setTargetBlends({noBlend});
+          pipeline->setShaderResourceBindings(srb);
+          pipeline->setRenderPassDescriptor(yuv_rpd);
+          pipeline->create();
 
-        // Reset texture state
-        f->glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        f->glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        f->glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, 0);
+          float blitQuad[] = {
+              -1, -1, 0, 0, -1, 1, 0, 1, 1, -1, 1, 0, 1, 1, 1, 1,
+          };
+          QMatrix4x4 mvp = rhi->clipSpaceCorrMatrix();
+          mvp.ortho(-1, 1, -1, 1, -1, 1);
 
-        cached_texture_id = yuv_fbo->texture();
+          u->updateDynamicBuffer(yuvVbuf, 0, sizeof(blitQuad), blitQuad);
+          u->updateDynamicBuffer(yuvVertUbo, 0, 64, mvp.constData());
+          u->updateDynamicBuffer(yuvFragUbo, 0, 16, fragData.constData());
+
+          cb->beginPass(yuv_rt, QColor(0, 0, 0, 0), {1.0f, 0}, u);
+          cb->setGraphicsPipeline(pipeline);
+          cb->setViewport({0, 0, float(w), float(h)});
+          cb->setShaderResources(srb);
+          const QRhiCommandBuffer::VertexInput vbufBinding(yuvVbuf, 0);
+          cb->setVertexInput(0, 1, &vbufBinding);
+          cb->draw(4);
+          cb->endPass();
+
+          params->transientResources.append(pipeline);
+          params->transientResources.append(srb);
+          params->transientResources.append(yuvVbuf);
+          params->transientResources.append(yuvVertUbo);
+          params->transientResources.append(yuvFragUbo);
+        }
+
+        cached_rhi_tex = yuv_converted_tex;
         ret = true;
       } else {
-        // CPU RGBA path (original code)
+        // CPU RGBA path
+        int w = cacher.media_width();
+        int h = cacher.media_height();
 
-        // check if the opengl texture exists yet, create it if not
-        if (texture == nullptr) {
-          texture = new QOpenGLTexture(QOpenGLTexture::Target2D);
-
-          // the raw frame size may differ from the one we're using (e.g. a lower resolution proxy), so we make sure
-          // the texture is using the correct dimensions, but then treat it as if it's the original resolution in the
-          // composition
-          texture->setSize(cacher.media_width(), cacher.media_height());
-
-          texture->setFormat(QOpenGLTexture::RGBA8_UNorm);
-          texture->setMipLevels(texture->maximumMipLevels());
-          texture->setMinMagFilters(QOpenGLTexture::LinearMipMapLinear, QOpenGLTexture::Linear);
-          texture->allocateStorage(QOpenGLTexture::RGBA, QOpenGLTexture::UInt8);
+        if (rgba_tex == nullptr) {
+          rgba_tex = rhi->newTexture(QRhiTexture::RGBA8, QSize(w, h));
+          rgba_tex->create();
         }
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[0]/kRGBAComponentCount);
-
-        // 2 data buffers to ping-pong between
+        // Process image effects on CPU
         bool using_db_1 = true;
         uint8_t* data_buffer_1 = frame->data[0];
         uint8_t* data_buffer_2 = nullptr;
+        int frame_size = frame->linesize[0] * frame->height;
 
-        int frame_size = frame->linesize[0]*frame->height;
-
-        for (const auto & effect : effects) {
+        for (const auto& effect : effects) {
           Effect* e = effect.get();
           if ((e->Flags() & Effect::ImageFlag) && e->IsEnabled()) {
             if (data_buffer_1 == frame->data[0]) {
               data_buffer_1 = new uint8_t[frame_size];
               data_buffer_2 = new uint8_t[frame_size];
-
               memcpy(data_buffer_1, frame->data[0], frame_size);
             }
 
-            e->process_image(get_timecode(this, cacher_frame),
-                             using_db_1 ? data_buffer_1 : data_buffer_2,
-                             using_db_1 ? data_buffer_2 : data_buffer_1,
-                             frame_size
-                             );
+            e->process_image(get_timecode(this, cacher_frame), using_db_1 ? data_buffer_1 : data_buffer_2,
+                             using_db_1 ? data_buffer_2 : data_buffer_1, frame_size);
 
             using_db_1 = !using_db_1;
           }
         }
 
-        texture->setData(QOpenGLTexture::RGBA,
-                            QOpenGLTexture::UInt8,
-                            const_cast<const uint8_t*>(using_db_1 ? data_buffer_1 : data_buffer_2));
+        // Upload to QRhiTexture
+        QRhiResourceUpdateBatch* u = rhi->nextResourceUpdateBatch();
+        const uint8_t* uploadData = using_db_1 ? data_buffer_1 : data_buffer_2;
+        int stride = frame->linesize[0];
+        QByteArray texData(reinterpret_cast<const char*>(uploadData), stride * h);
+        QRhiTextureSubresourceUploadDescription desc(texData);
+        desc.setSourceSize(QSize(w, h));
+        desc.setDataStride(stride);
+        u->uploadTexture(rgba_tex, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
 
-        if (data_buffer_1 != frame->data[0]) {
-          delete [] data_buffer_1;
-          delete [] data_buffer_2;
+        // Submit upload in a dummy pass (no rendering needed)
+        // Actually just pass it to next beginPass
+        // For now, do a minimal pass to flush the upload
+        if (fbo_rhi != nullptr) {
+          ClipRhiResources* res = static_cast<ClipRhiResources*>(fbo_rhi);
+          QColor clearColor(0, 0, 0, 0);
+          cb->beginPass(res->rt[0], clearColor, {1.0f, 0}, u);
+          cb->endPass();
+        } else {
+          // No FBO yet — submit via main target
+          // The upload batch will be consumed by the next beginPass in compose_sequence
+          // We can't submit it without a render target, so we need a workaround
+          // Use the params main target
+          QColor clearColor(0, 0, 0, 0);
+          cb->beginPass(params->main_target, clearColor, {1.0f, 0}, u);
+          cb->endPass();
         }
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        if (data_buffer_1 != frame->data[0]) {
+          delete[] data_buffer_1;
+          delete[] data_buffer_2;
+        }
 
-        cached_texture_id = texture->textureId();
+        cached_rhi_tex = rgba_tex;
         ret = true;
       }
     } else {
@@ -738,14 +694,10 @@ bool Clip::Retrieve(QOpenGLShaderProgram* yuv_program)
   return ret;
 }
 
-bool Clip::UsesCacher()
-{
-  return track() >= 0 || (media() != nullptr && media()->get_type() == MEDIA_TYPE_FOOTAGE);
-}
+bool Clip::UsesCacher() { return track() >= 0 || (media() != nullptr && media()->get_type() == MEDIA_TYPE_FOOTAGE); }
 
-bool Clip::NeedsCpuRgba() const
-{
-  for (const auto & effect : effects) {
+bool Clip::NeedsCpuRgba() const {
+  for (const auto& effect : effects) {
     if ((effect->Flags() & Effect::ImageFlag) && effect->IsEnabled()) {
       return true;
     }
@@ -753,11 +705,8 @@ bool Clip::NeedsCpuRgba() const
   return false;
 }
 
-bool Clip::NeedsCacherReconfigure() const
-{
-  return open_ && (NeedsCpuRgba() != cacher_uses_rgba_);
-}
+bool Clip::NeedsCacherReconfigure() const { return open_ && (NeedsCpuRgba() != cacher_uses_rgba_); }
 
-ClipSpeed::ClipSpeed() 
-  
-= default;
+ClipSpeed::ClipSpeed()
+
+    = default;

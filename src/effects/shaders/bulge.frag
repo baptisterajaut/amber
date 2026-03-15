@@ -1,13 +1,15 @@
-#version 120
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    vec2 resolution;
+    float amount;
+    float xoff;
+    float yoff;
+};
+layout(binding = 2) uniform sampler2D tex0;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
-uniform sampler2D tex0;
-varying vec2 vTexCoord;
 const float PI = 3.1415926535;
-
-uniform vec2 resolution;
-uniform float amount;
-uniform float xoff;
-uniform float yoff;
 
 vec2 distort(vec2 p, vec2 offset) {
     float theta  = atan(p.y, p.x);
@@ -25,8 +27,8 @@ void main(void) {
 	float d = length(xy);
 	uv = distort(xy, offset);
 	if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-		gl_FragColor = texture2D(tex0, uv);
+		fragColor = texture(tex0, uv);
 	} else {
 		discard;
-	}	
+	}
 }

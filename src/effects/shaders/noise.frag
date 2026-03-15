@@ -1,18 +1,18 @@
-#version 110
-
-uniform vec2 resolution;
-uniform float time;
-
-uniform float amount;
-uniform bool color;
-uniform bool blend;
-
-uniform sampler2D myTexture;
-varying vec2 vTexCoord;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    vec2 resolution;
+    float time;
+    float amount;
+    bool color;
+    bool blend;
+};
+layout(binding = 2) uniform sampler2D myTexture;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 // precision lowp    float;
 
-float PHI = 1.61803398874989484820459 * 00000.1; // Golden Ratio   
+float PHI = 1.61803398874989484820459 * 00000.1; // Golden Ratio
 float PI  = 3.14159265358979323846264 * 00000.1; // PI
 float SQ2 = 1.41421356237309504880169 * 10000.0; // Square Root of Two
 
@@ -31,17 +31,17 @@ void main(void) {
 	if (blend) {
 		noise = (noise - vec3(amount*0.005))*vec3(2.0);
 
-		vec4 textureColor = texture2D(myTexture, vec2(vTexCoord.x, vTexCoord.y));
-		gl_FragColor = vec4(textureColor.rgb+noise, textureColor.a);
+		vec4 textureColor = texture(myTexture, vec2(vTexCoord.x, vTexCoord.y));
+		fragColor = vec4(textureColor.rgb+noise, textureColor.a);
 	} else {
-		gl_FragColor = vec4(noise, 1.0);
+		fragColor = vec4(noise, 1.0);
 	}
 }
 
 /*void main(void) {
-	vec4 textureColor = texture2D(myTexture, vec2(vTexCoord.x, vTexCoord.y));
+	vec4 textureColor = texture(myTexture, vec2(vTexCoord.x, vTexCoord.y));
 	textureColor.r += gold_noise(resolution);
 	textureColor.g += gold_noise(resolution);
 	textureColor.b += gold_noise(resolution);
-	gl_FragColor = textureColor;
+	fragColor = textureColor;
 }*/

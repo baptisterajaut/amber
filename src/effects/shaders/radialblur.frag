@@ -1,13 +1,15 @@
-#version 110
+#version 440
 
 #define M_PI 3.1415926535897932384626433832795
 
-uniform sampler2D image;
-uniform float radius;
-uniform float center_x;
-uniform float center_y;
-
-uniform vec2 resolution;
+layout(std140, binding = 1) uniform FragParams {
+    vec2 resolution;
+    float radius;
+    float center_x;
+    float center_y;
+};
+layout(binding = 2) uniform sampler2D image;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
 	if (radius > 0.0) {
@@ -28,10 +30,10 @@ void main(void) {
 		for (float i=-limit+0.5;i<=limit;i+=2.0) {
 			float y = sin_angle * i;
 			float x = cos_angle * i;
-			color += texture2D(image, vec2(gl_FragCoord.x+x, gl_FragCoord.y+y)/resolution)*(divider);
+			color += texture(image, vec2(gl_FragCoord.x+x, gl_FragCoord.y+y)/resolution)*(divider);
 		}
-		gl_FragColor = color;
+		fragColor = color;
 	} else {
-		gl_FragColor = texture2D(image, gl_FragCoord.xy/resolution);
+		fragColor = texture(image, gl_FragCoord.xy/resolution);
 	}
 }

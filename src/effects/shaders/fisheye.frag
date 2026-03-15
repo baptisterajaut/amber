@@ -1,9 +1,12 @@
-#version 120
-uniform sampler2D tex0;
-varying vec2 vTexCoord;
-#define M_PI 3.1415926535897932384626433832795
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    float size;
+};
+layout(binding = 2) uniform sampler2D tex0;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
-uniform float size;
+#define M_PI 3.1415926535897932384626433832795
 
 void main(void) {
 	float maxFactor = 2.0 - (size * 0.01);
@@ -16,12 +19,12 @@ void main(void) {
 		float z = sqrt(1.0 - d * d);
 		float r = atan(d, z) / M_PI;
 		float phi = atan(xy.y, xy.x);
-		
+
 		uv.x = r * cos(phi) + 0.5;
 		uv.y = r * sin(phi) + 0.5;
 	} else {
 		uv = vTexCoord;
 	}
-	vec4 c = texture2D(tex0, uv);
-	gl_FragColor = c;
+	vec4 c = texture(tex0, uv);
+	fragColor = c;
 }

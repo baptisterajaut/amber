@@ -1,20 +1,22 @@
-#version 110
-
-varying vec2 vTexCoord;
-uniform sampler2D texture;
-uniform float pixels_x;
-uniform float pixels_y;
-uniform bool bypass;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    float pixels_x;
+    float pixels_y;
+    bool bypass;
+};
+layout(binding = 2) uniform sampler2D input_tex;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
 	if (bypass) {
-		gl_FragColor = texture2D(texture, vTexCoord);
+		fragColor = texture(input_tex, vTexCoord);
 	} else {
 		vec2 p = vTexCoord;
 
 		p.x -= mod(p.x, 1.0 / pixels_x);
 		p.y -= mod(p.y, 1.0 / pixels_y);
 
-		gl_FragColor = texture2D(texture, p);
-	}  	
+		fragColor = texture(input_tex, p);
+	}
 }

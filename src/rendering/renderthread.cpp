@@ -22,30 +22,59 @@
 
 #include <QApplication>
 #include <QImage>
-#include <QOpenGLFunctions>
 #include <QDateTime>
 #include <QDebug>
-#ifdef OLIVE_OCIO
-#include <OpenColorIO/OpenColorIO.h>
-namespace OCIO = OCIO_NAMESPACE;
+#include <QFile>
+#if QT_CONFIG(vulkan)
+#include <QVulkanInstance>
 #endif
 
+#include "global/config.h"
 #include "rendering/renderfunctions.h"
 #include "timeline/sequence.h"
 
-RenderThread::RenderThread() :
-  
-  front_buffer_switcher(false),
-  
-  queued(false)
-  
-{
-  surface.create();
+static QShader loadQsb(const QString& path) {
+  QFile f(path);
+  if (!f.open(QIODevice::ReadOnly)) {
+    qCritical() << "Failed to load shader:" << path;
+    return {};
+  }
+  QShader s = QShader::fromSerialized(f.readAll());
+  if (!s.isValid()) {
+    qCritical() << "Invalid .qsb shader:" << path;
+  }
+  return s;
 }
 
-RenderThread::~RenderThread() {
-  surface.destroy();
+QMutex RenderThread::deferred_delete_mutex_;
+QVector<QRhiResource*> RenderThread::deferred_delete_queue_;
+
+void RenderThread::DeferRhiResourceDeletion(QRhiResource* res) {
+  if (res == nullptr) return;
+  QMutexLocker lock(&deferred_delete_mutex_);
+  deferred_delete_queue_.append(res);
 }
+
+void RenderThread::DeferRhiResourceDeletion(const QVector<QRhiResource*>& resources) {
+  QMutexLocker lock(&deferred_delete_mutex_);
+  for (auto* res : resources) {
+    if (res) deferred_delete_queue_.append(res);
+  }
+}
+
+void RenderThread::drainDeferredDeletes() {
+  QMutexLocker lock(&deferred_delete_mutex_);
+  qDeleteAll(deferred_delete_queue_);
+  deferred_delete_queue_.clear();
+}
+
+RenderThread::RenderThread()
+    : front_buffer_switcher(false), queued(false) {
+  // Must be created on the GUI thread (QOffscreenSurface wraps a QWindow internally)
+  fallbackSurface_ = QRhiGles2InitParams::newFallbackSurface();
+}
+
+RenderThread::~RenderThread() {}
 
 void RenderThread::run() {
   wait_lock_.lock();
@@ -59,74 +88,140 @@ void RenderThread::run() {
     }
     queued = false;
 
-    if (share_ctx != nullptr) {
-      if (ctx != nullptr) {
-        ctx->makeCurrent(&surface);
+    // Create QRhi if not yet initialized
+    if (rhi_ == nullptr) {
+      RhiBackend backend = olive::CurrentRuntimeConfig.rhi_backend;
 
-        // if the sequence size has changed, we'll need to reinitialize the textures
-        if (seq->width != tex_width || seq->height != tex_height) {
-          delete_buffers();
-
-          // cache sequence values for future checks
-          tex_width = seq->width;
-          tex_height = seq->height;
+      switch (backend) {
+#if QT_CONFIG(vulkan)
+        case RhiBackend::Vulkan: {
+          auto* vi = static_cast<QVulkanInstance*>(olive::CurrentRuntimeConfig.vulkan_instance);
+          if (vi && vi->isValid()) {
+            QRhiVulkanInitParams vkParams;
+            vkParams.inst = vi;
+            rhi_ = QRhi::create(QRhi::Vulkan, &vkParams);
+          }
+          if (!rhi_) qWarning() << "Vulkan QRhi creation failed, falling back to OpenGL";
+          break;
         }
-
-        // create any buffers that don't yet exist
-        if (!front_buffer_1.IsCreated()) {
-          front_buffer_1.Create(ctx, seq->width, seq->height);
+#endif
+#if defined(Q_OS_MACOS) || defined(Q_OS_IOS)
+        case RhiBackend::Metal: {
+          QRhiMetalInitParams mtlParams;
+          rhi_ = QRhi::create(QRhi::Metal, &mtlParams);
+          if (!rhi_) qWarning() << "Metal QRhi creation failed, falling back to OpenGL";
+          break;
         }
-        if (!front_buffer_2.IsCreated()) {
-          front_buffer_2.Create(ctx, seq->width, seq->height);
+#endif
+#if defined(Q_OS_WIN)
+        case RhiBackend::D3D12: {
+          QRhiD3D12InitParams d3d12Params;
+          rhi_ = QRhi::create(QRhi::D3D12, &d3d12Params);
+          if (!rhi_) {
+            qWarning() << "D3D12 QRhi creation failed, trying D3D11";
+            QRhiD3D11InitParams d3d11Params;
+            rhi_ = QRhi::create(QRhi::D3D11, &d3d11Params);
+            if (!rhi_) qWarning() << "D3D11 also failed, falling back to OpenGL";
+          }
+          break;
         }
-        if (!back_buffer_1.IsCreated()) {
-          back_buffer_1.Create(ctx, seq->width, seq->height);
+        case RhiBackend::D3D11: {
+          QRhiD3D11InitParams d3d11Params;
+          rhi_ = QRhi::create(QRhi::D3D11, &d3d11Params);
+          if (!rhi_) qWarning() << "D3D11 QRhi creation failed, falling back to OpenGL";
+          break;
         }
-        if (!back_buffer_2.IsCreated()) {
-          back_buffer_2.Create(ctx, seq->width, seq->height);
-        }
-
-        if (blend_mode_program == nullptr) {
-          // create shader program to make blending modes work
-          delete_shaders();
-
-          blend_mode_program = new QOpenGLShaderProgram();
-          blend_mode_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/common.vert");
-          blend_mode_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/blending.frag");
-          blend_mode_program->bindAttributeLocation("a_position", 0);
-          blend_mode_program->bindAttributeLocation("a_texcoord", 1);
-          blend_mode_program->link();
-
-          premultiply_program = new QOpenGLShaderProgram();
-          premultiply_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/common.vert");
-          premultiply_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/premultiply.frag");
-          premultiply_program->bindAttributeLocation("a_position", 0);
-          premultiply_program->bindAttributeLocation("a_texcoord", 1);
-          premultiply_program->link();
-
-          yuv_program = new QOpenGLShaderProgram();
-          yuv_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/common.vert");
-          yuv_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/yuv2rgb.frag");
-          yuv_program->bindAttributeLocation("a_position", 0);
-          yuv_program->bindAttributeLocation("a_texcoord", 1);
-          yuv_program->link();
-
-          passthrough_program = new QOpenGLShaderProgram();
-          passthrough_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/passthrough.vert");
-          passthrough_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/passthrough.frag");
-          passthrough_program->bindAttributeLocation("a_position", 0);
-          passthrough_program->bindAttributeLocation("a_texcoord", 1);
-          passthrough_program->link();
-
-        }
-
-        // draw frame
-        paint();
-
-        front_buffer_switcher = !front_buffer_switcher;
-
-        emit ready();
+#endif
+        default:
+          break;
       }
+
+      // OpenGL fallback
+      if (!rhi_) {
+        QRhiGles2InitParams glParams;
+        glParams.fallbackSurface = fallbackSurface_;
+        rhi_ = QRhi::create(QRhi::OpenGLES2, &glParams);
+      }
+
+      if (!rhi_) {
+        qCritical() << "Failed to create QRhi with any backend";
+        continue;
+      }
+      qInfo() << "QRhi initialized, backend:" << rhi_->backendName()
+              << "driver:" << rhi_->driverInfo().deviceName;
+
+      // Load core shaders from QRC
+      passthroughVert_ = loadQsb(QStringLiteral(":/shaders/common.vert.qsb"));
+      passthroughFrag_ = loadQsb(QStringLiteral(":/shaders/passthrough.frag.qsb"));
+      blendingFrag_ = loadQsb(QStringLiteral(":/shaders/blending.frag.qsb"));
+      premultiplyFrag_ = loadQsb(QStringLiteral(":/shaders/premultiply.frag.qsb"));
+      yuvFrag_ = loadQsb(QStringLiteral(":/shaders/yuv2rgb.frag.qsb"));
+
+      // Shared vertex buffer: 4 verts * 4 floats
+      vbuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+      vbuf_->create();
+
+      // Vertex UBO: mat4 = 64 bytes
+      vertUbo_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
+      vertUbo_->create();
+
+      // Sampler
+      sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
+                                   QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
+      sampler_->create();
+    }
+
+    if (rhi_ != nullptr) {
+      // Recreate buffers if sequence size changed
+      if (seq->width != tex_width || seq->height != tex_height) {
+        delete_buffers();
+        tex_width = seq->width;
+        tex_height = seq->height;
+      }
+
+      // Create front buffers (double-buffered compositing targets)
+      if (front_tex_[0] == nullptr) {
+        for (int i = 0; i < 2; i++) {
+          front_tex_[i] = rhi_->newTexture(QRhiTexture::RGBA8, QSize(tex_width, tex_height),
+                                           1, QRhiTexture::RenderTarget | QRhiTexture::UsedAsTransferSource);
+          front_tex_[i]->create();
+
+          // Compositing RT: preserves contents between clips
+          front_rt_[i] = rhi_->newTextureRenderTarget(
+              {front_tex_[i]}, QRhiTextureRenderTarget::PreserveColorContents);
+          if (i == 0) {
+            front_rpd_ = front_rt_[i]->newCompatibleRenderPassDescriptor();
+          }
+          front_rt_[i]->setRenderPassDescriptor(front_rpd_);
+          front_rt_[i]->create();
+
+          // Clear RT: same texture, no PreserveColorContents (beginPass actually clears)
+          front_rt_clear_[i] = rhi_->newTextureRenderTarget({front_tex_[i]});
+          if (i == 0) {
+            front_clear_rpd_ = front_rt_clear_[i]->newCompatibleRenderPassDescriptor();
+          }
+          front_rt_clear_[i]->setRenderPassDescriptor(front_clear_rpd_);
+          front_rt_clear_[i]->create();
+        }
+      }
+
+      // Create back buffer (single — used for clip→main compositing)
+      if (back_tex_ == nullptr) {
+        back_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(tex_width, tex_height),
+                                     1, QRhiTexture::RenderTarget);
+        back_tex_->create();
+        back_rt_ = rhi_->newTextureRenderTarget({back_tex_});
+        back_rpd_ = back_rt_->newCompatibleRenderPassDescriptor();
+        back_rt_->setRenderPassDescriptor(back_rpd_);
+        back_rt_->create();
+      }
+
+      // Draw frame
+      paint();
+
+      front_buffer_switcher = !front_buffer_switcher;
+
+      emit ready();
     }
   }
 
@@ -135,113 +230,125 @@ void RenderThread::run() {
   wait_lock_.unlock();
 }
 
-QMutex *RenderThread::get_texture_mutex()
-{
-  // return the mutex for the opposite texture being drawn to by the renderer
+QMutex* RenderThread::get_texture_mutex() {
   return front_buffer_switcher ? &front_mutex2 : &front_mutex1;
 }
 
-const GLuint &RenderThread::get_texture()
-{
-  // return the opposite texture to the texture being drawn to by the renderer
-  return front_buffer_switcher ? front_buffer_2.texture() : front_buffer_1.texture();
+const char* RenderThread::get_frame_data() const {
+  const QByteArray& buf = cpu_frame_[front_buffer_switcher ? 1 : 0];
+  return buf.isEmpty() ? nullptr : buf.constData();
 }
 
-void RenderThread::set_up_ocio()
-{
-}
+int RenderThread::get_frame_width() const { return tex_width; }
+int RenderThread::get_frame_height() const { return tex_height; }
 
 void RenderThread::paint() {
-  // set up compose_sequence() parameters
+  int active_idx = front_buffer_switcher ? 0 : 1;
+
+  QMutex& active_mutex = front_buffer_switcher ? front_mutex1 : front_mutex2;
+  active_mutex.lock();
+
+  QRhiCommandBuffer* cb;
+  rhi_->beginOffscreenFrame(&cb);
+
+  // Clear the main target (use non-PreserveColorContents RT so clear actually happens)
+  {
+    QColor clearColor(0, 0, 0, 0);
+    cb->beginPass(front_rt_clear_[active_idx], clearColor, {1.0f, 0});
+    cb->endPass();
+  }
+
+  // Set up compose_sequence() parameters
   ComposeSequenceParams params;
   params.viewer = nullptr;
-  params.ctx = ctx;
+  params.rhi = rhi_;
+  params.cb = cb;
   params.seq = seq;
   params.video = true;
   params.texture_failed = false;
   params.wait_for_mutexes = true;
   params.playback_speed = playback_speed_;
   params.scrubbing = scrubbing_;
-  params.blend_mode_program = blend_mode_program;
-  params.premultiply_program = premultiply_program;
-  params.yuv_program = yuv_program;
-  params.passthrough_program = passthrough_program;
-  params.backend_buffer1 = back_buffer_1.buffer();
-  params.backend_buffer2 = back_buffer_2.buffer();
-  params.backend_attachment1 = back_buffer_1.texture();
-  params.backend_attachment2 = back_buffer_2.texture();
-  params.main_buffer = front_buffer_switcher ? front_buffer_1.buffer() : front_buffer_2.buffer();
-  params.main_attachment = front_buffer_switcher ? front_buffer_1.texture() : front_buffer_2.texture();
 
-  // get currently selected gizmos
+  params.vbuf = vbuf_;
+  params.vertUbo = vertUbo_;
+  params.sampler = sampler_;
+
+  params.passthroughVert = passthroughVert_;
+  params.passthroughFrag = passthroughFrag_;
+  params.blendingFrag = blendingFrag_;
+  params.premultiplyFrag = premultiplyFrag_;
+  params.yuvFrag = yuvFrag_;
+
+  params.main_tex = front_tex_[active_idx];
+  params.main_target = front_rt_[active_idx];
+  params.main_rpd = front_rpd_;
+
+  params.backend_tex1 = back_tex_;
+  params.backend_target1 = back_rt_;
+  params.backend_rpd = back_rpd_;
+
   gizmos = seq->GetSelectedGizmo();
   params.gizmos = gizmos;
 
-  QMutex& active_mutex = front_buffer_switcher ? front_mutex1 : front_mutex2;
-  active_mutex.lock();
-
-  // bind framebuffer for drawing
-  ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, params.main_buffer);
-
-  glClearColor(0.0, 0.0, 0.0, 0.0);
-  glClear(GL_COLOR_BUFFER_BIT);
-
-  glEnable(GL_BLEND);
-
   olive::rendering::compose_sequence(params);
 
-  // flush changes
-  ctx->functions()->glFinish();
+  // CPU readback
+  {
+    QRhiReadbackResult readback;
+    QRhiResourceUpdateBatch* u = rhi_->nextResourceUpdateBatch();
+    u->readBackTexture(QRhiReadbackDescription(front_tex_[active_idx]), &readback);
+    QColor clearColor(0, 0, 0, 0);
+    cb->beginPass(front_rt_[active_idx], clearColor, {1.0f, 0});
+    cb->endPass(u);
 
-  texture_failed = params.texture_failed;
+    rhi_->endOffscreenFrame();
+
+    qDeleteAll(params.transientResources);
+    params.transientResources.clear();
+
+    // Drain deferred deletes from other threads (e.g. Clip::Close on main thread)
+    drainDeferredDeletes();
+
+    QByteArray& dst = cpu_frame_[active_idx];
+    dst = readback.data;
+  }
 
   active_mutex.unlock();
 
+  texture_failed = params.texture_failed;
+
+  // Save frame if requested
   if (!save_fn.isEmpty()) {
     if (texture_failed) {
-      // texture failed, try again
       queued = true;
     } else {
-      ctx->functions()->glBindFramebuffer(GL_READ_FRAMEBUFFER, params.main_buffer);
-      QImage img(tex_width, tex_height, QImage::Format_RGBA8888);
-      glReadPixels(0, 0, tex_width, tex_height, GL_RGBA, GL_UNSIGNED_BYTE, img.bits());
-      img.save(save_fn);
-      ctx->functions()->glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      QByteArray& data = cpu_frame_[active_idx];
+      if (!data.isEmpty()) {
+        QImage img(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height,
+                   QImage::Format_RGBA8888);
+        img.save(save_fn);
+      }
       save_fn = "";
     }
   }
 
+  // Export pixel buffer if requested
   if (pixel_buffer != nullptr) {
-
-    // set main framebuffer to the current read buffer
-    ctx->functions()->glBindFramebuffer(GL_READ_FRAMEBUFFER, params.main_buffer);
-
-    // store pixels in buffer
-    glReadPixels(0,
-                 0,
-                 pixel_buffer_linesize == 0 ? tex_width : pixel_buffer_linesize,
-                 tex_height,
-                 GL_RGBA,
-                 GL_UNSIGNED_BYTE,
-                 pixel_buffer);
-
-    // release current read buffer
-    ctx->functions()->glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-
+    QByteArray& data = cpu_frame_[active_idx];
+    if (!data.isEmpty()) {
+      int copy_width = pixel_buffer_linesize == 0 ? tex_width : pixel_buffer_linesize;
+      int bytes = copy_width * tex_height * 4;
+      memcpy(pixel_buffer, data.constData(), qMin(bytes, int(data.size())));
+    }
     pixel_buffer = nullptr;
   }
-
-  glDisable(GL_BLEND);
-
-  // release
-  ctx->functions()->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 }
 
-void RenderThread::start_render(QOpenGLContext *share,
-                                Sequence* s,
+void RenderThread::start_render(Sequence* s,
                                 int playback_speed,
                                 const QString& save,
-                                GLvoid* pixels,
+                                void* pixels,
                                 int pixel_linesize,
                                 int idivider,
                                 bool wait,
@@ -255,16 +362,6 @@ void RenderThread::start_render(QOpenGLContext *share,
 
   // stall any dependent actions
   texture_failed = true;
-
-  if (share != nullptr && (ctx == nullptr || ctx->shareContext() != share_ctx)) {
-    share_ctx = share;
-    delete_ctx();
-    ctx = new QOpenGLContext();
-    ctx->setFormat(share_ctx->format());
-    ctx->setShareContext(share_ctx);
-    ctx->create();
-    ctx->moveToThread(this);
-  }
 
   save_fn = save;
   pixel_buffer = pixels;
@@ -283,9 +380,7 @@ void RenderThread::start_render(QOpenGLContext *share,
   }
 }
 
-bool RenderThread::did_texture_fail() {
-  return texture_failed;
-}
+bool RenderThread::did_texture_fail() { return texture_failed; }
 
 void RenderThread::cancel() {
   running = false;
@@ -293,13 +388,7 @@ void RenderThread::cancel() {
   wait();
 }
 
-void RenderThread::wait_until_paused()
-{
-
-  // Wait for thread to finish whatever it's doing before proceeding.
-  //
-  // FIXME: This is slow. Perhaps there's a better way...
-
+void RenderThread::wait_until_paused() {
   if (wait_lock_.tryLock()) {
     wait_lock_.unlock();
     return;
@@ -310,38 +399,40 @@ void RenderThread::wait_until_paused()
 }
 
 void RenderThread::delete_buffers() {
-  front_buffer_1.Destroy();
-  front_buffer_2.Destroy();
-  back_buffer_1.Destroy();
-  back_buffer_2.Destroy();
-}
-
-void RenderThread::delete_shaders() {
-  delete blend_mode_program;
-  blend_mode_program = nullptr;
-
-  delete premultiply_program;
-  premultiply_program = nullptr;
-
-  delete yuv_program;
-  yuv_program = nullptr;
-
-  delete passthrough_program;
-  passthrough_program = nullptr;
+  for (int i = 0; i < 2; i++) {
+    delete front_rt_clear_[i];
+    front_rt_clear_[i] = nullptr;
+    delete front_rt_[i];
+    front_rt_[i] = nullptr;
+    delete front_tex_[i];
+    front_tex_[i] = nullptr;
+  }
+  delete front_clear_rpd_;
+  front_clear_rpd_ = nullptr;
+  delete front_rpd_;
+  front_rpd_ = nullptr;
+  delete back_rt_;
+  back_rt_ = nullptr;
+  delete back_tex_;
+  back_tex_ = nullptr;
+  delete back_rpd_;
+  back_rpd_ = nullptr;
 }
 
 void RenderThread::delete_ctx() {
-  if (ctx != nullptr) {
-    // The context must be current to free GL resources.  If makeCurrent
-    // fails (surface already gone during shutdown) we skip the GL cleanup
-    // — the driver will reclaim the resources when the context is deleted.
-    if (ctx->makeCurrent(&surface)) {
-      delete_shaders();
-      delete_buffers();
-      ctx->doneCurrent();
-    }
-  }
+  drainDeferredDeletes();  // Clean up anything queued before shutdown
+  delete_buffers();
 
-  delete ctx;
-  ctx = nullptr;
+  delete sampler_;
+  sampler_ = nullptr;
+  delete vertUbo_;
+  vertUbo_ = nullptr;
+  delete vbuf_;
+  vbuf_ = nullptr;
+
+  delete rhi_;
+  rhi_ = nullptr;
+
+  delete fallbackSurface_;
+  fallbackSurface_ = nullptr;
 }

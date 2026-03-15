@@ -1,11 +1,10 @@
-#version 110
-
-uniform mat4 mvp_matrix;
-
-attribute vec2 a_position;
-attribute vec2 a_texcoord;
-
-varying vec2 vTexCoord;
+#version 440
+layout(std140, binding = 0) uniform VertexUniforms {
+    mat4 mvp_matrix;
+};
+layout(location = 0) in vec2 a_position;
+layout(location = 1) in vec2 a_texcoord;
+layout(location = 0) out vec2 vTexCoord;
 
 void main() {
     vTexCoord = a_texcoord;

@@ -1,14 +1,15 @@
-#version 110
-
+#version 440
 // Swirl effect parameters
-uniform float radius;
-uniform float angle;
-uniform float center_x;
-uniform float center_y;
-uniform vec2 resolution;
-
-uniform sampler2D myTexture;
-varying vec2 vTexCoord;
+layout(std140, binding = 1) uniform FragParams {
+    vec2 resolution;
+    float radius;
+    float angle;
+    float center_x;
+    float center_y;
+};
+layout(binding = 2) uniform sampler2D myTexture;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
 	vec2 center = vec2((resolution.x*0.5)+center_x, (resolution.y*0.5)+center_y);
@@ -26,5 +27,5 @@ void main(void) {
 		tc = vec2(dot(tc, vec2(c, -s)), dot(tc, vec2(s, c)));
 	}
 	tc += center;
-	gl_FragColor = texture2D(myTexture, tc / resolution);
+	fragColor = texture(myTexture, tc / resolution);
 }

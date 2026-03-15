@@ -10,11 +10,10 @@ Amber inherits Olive 0.1's greatest strength: everything is where you expect it.
 
 ## 1.x — Stable
 
-Order TBD — these are independent and will ship as they're ready.
+The Qt RHI port is complete (1.2.0) — no raw OpenGL remains. Remaining 1.x work:
 
-- **OpenGL to Qt RHI** — Port the rendering pipeline from legacy OpenGL to Qt RHI (Vulkan, Metal, D3D12, OpenGL fallback). Dual-mode compositing: direct (default, main thread) and threaded (CPU bridge, for heavy timelines). No user-visible changes — same features, modern GPU backends.
 - **Oak backports** — Cherry-pick QoL features from Olive 0.2 (Oak) that fit the 0.1.x architecture.
-- **Complexity reduction** — Reduce cyclomatic complexity flagged by Lizard, simplify high-CC functions.
+- **Code cleanup & refactoring** — Reduce cyclomatic complexity flagged by Lizard, simplify high-CC functions. Exporting amber pipeline as a library? That'll let us add tests.
 
 ## 2.0
 

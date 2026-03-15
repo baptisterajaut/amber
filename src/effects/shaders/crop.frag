@@ -1,18 +1,19 @@
-#version 110
-
-uniform float left;
-uniform float top;
-uniform float right;
-uniform float bottom;
-uniform float feather;
-uniform bool invert;
-
-uniform mediump float amount_val;
-uniform sampler2D myTexture;
-varying vec2 vTexCoord;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    float left;
+    float top;
+    float right;
+    float bottom;
+    float feather;
+    float amount_val;
+    bool invert;
+};
+layout(binding = 2) uniform sampler2D myTexture;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
-	vec4 textureColor = texture2D(myTexture, vec2(vTexCoord.x, vTexCoord.y));
+	vec4 textureColor = texture(myTexture, vec2(vTexCoord.x, vTexCoord.y));
 	float alpha = textureColor.a;
 	if (feather == 0.0) {
 		if (vTexCoord.x < (left*0.01) || vTexCoord.y < (top*0.01) || vTexCoord.x > (1.0-(right*0.01)) || vTexCoord.y > (1.0-(bottom*0.01))) {
@@ -27,14 +28,14 @@ void main(void) {
 	}
 
 	if (invert)
-	{gl_FragColor = vec4(
+	{fragColor = vec4(
 		textureColor.r*(1.0 - alpha),
 		textureColor.g*(1.0 - alpha),
 		textureColor.b*(1.0 - alpha),
 		1.0 - alpha
 	);}
 	else{
-		gl_FragColor = vec4(
+		fragColor = vec4(
 		textureColor.r*(alpha),
 		textureColor.g*(alpha),
 		textureColor.b*(alpha),

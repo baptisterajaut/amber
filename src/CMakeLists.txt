@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
-project(amber-editor VERSION 1.1.0 LANGUAGES CXX)
+project(amber-editor VERSION 1.2.0 LANGUAGES CXX)
 
 option(BUILD_DOXYGEN "Build Doxygen documentation" OFF)
 
@@ -25,10 +25,13 @@ find_package(Qt6 REQUIRED
   COMPONENTS
   Core
   Gui
+  GuiPrivate
   Widgets
   Multimedia
   OpenGL
   OpenGLWidgets
+  ShaderTools
+  ShaderToolsPrivate
   Svg
   LinguistTools
 )
@@ -138,7 +141,6 @@ set(OLIVE_SOURCES
   effects/fields/stringfield.h
   effects/internal/audionoiseeffect.cpp
   effects/internal/audionoiseeffect.h
-  effects/internal/blending.frag
   effects/internal/common.vert
   effects/internal/cornerpin.frag
   effects/internal/cornerpin.vert
@@ -161,10 +163,8 @@ set(OLIVE_SOURCES
   effects/internal/linearfadetransition.h
   effects/internal/logarithmicfadetransition.cpp
   effects/internal/logarithmicfadetransition.h
-  effects/internal/ocio.frag
   effects/internal/paneffect.cpp
   effects/internal/paneffect.h
-  effects/internal/premultiply.frag
   effects/internal/richtexteffect.cpp
   effects/internal/richtexteffect.h
   effects/internal/shakeeffect.cpp
@@ -255,11 +255,6 @@ set(OLIVE_SOURCES
   rendering/clipqueue.h
   rendering/exportthread.cpp
   rendering/exportthread.h
-  rendering/framebufferobject.cpp
-  rendering/framebufferobject.h
-  rendering/matrixutil.h
-  rendering/quadbuffer.cpp
-  rendering/quadbuffer.h
   rendering/renderfunctions.cpp
   rendering/renderfunctions.h
   rendering/renderthread.cpp
@@ -475,6 +470,20 @@ add_executable(${OLIVE_TARGET}
   ${OLIVE_QM_FILES}
 )
 
+qt_add_shaders(${OLIVE_TARGET} "amber_shaders"
+  PREFIX "/shaders"
+  GLSL "150"
+  NOHLSL
+  NOMSL
+  BASE "rendering/shaders"
+  FILES
+    rendering/shaders/common.vert
+    rendering/shaders/passthrough.frag
+    rendering/shaders/yuv2rgb.frag
+    rendering/shaders/blending.frag
+    rendering/shaders/premultiply.frag
+)
+
 target_compile_definitions(${OLIVE_TARGET} PRIVATE ${OLIVE_DEFINITIONS})
 
 if(APPLE)
@@ -488,10 +497,12 @@ target_link_libraries(${OLIVE_TARGET}
   OpenGL::GL
   Qt6::Core
   Qt6::Gui
+  Qt6::GuiPrivate
   Qt6::Widgets
   Qt6::Multimedia
   Qt6::OpenGL
   Qt6::OpenGLWidgets
+  Qt6::ShaderToolsPrivate
   Qt6::Svg
   FFMPEG::avutil
   FFMPEG::avcodec

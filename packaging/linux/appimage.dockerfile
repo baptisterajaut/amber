@@ -6,7 +6,7 @@
 #     --build-arg GIT_HASH=$(git rev-parse --short HEAD) .
 #   docker run --rm -v ./out:/out amber-appimage
 
-ARG VERSION=1.1.0
+ARG VERSION=1.2.0
 
 FROM ubuntu:24.04
 
@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev libavcodec-dev libavutil-dev \
     libswscale-dev libswresample-dev libavfilter-dev \
     frei0r-plugins-dev \
+    libvulkan-dev \
     curl file libfuse2 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -35,7 +36,7 @@ RUN apt-get update && apt-get install -y \
 RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED && \
     pip install aqtinstall && \
     aqt install-qt linux desktop 6.10.2 linux_gcc_64 \
-      -m qtmultimedia \
+      -m qtmultimedia qtshadertools \
       --outputdir /opt/qt && \
     pip uninstall -y aqtinstall && \
     rm -rf /root/.cache/pip

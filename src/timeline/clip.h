@@ -25,8 +25,7 @@
 #include <QWaitCondition>
 #include <QMutex>
 #include <QVector>
-#include <QOpenGLFramebufferObject>
-#include <QOpenGLTexture>
+#include <rhi/qrhi.h>
 
 #include "rendering/cacher.h"
 
@@ -51,7 +50,7 @@ struct ClipSpeed {
 
 using ClipPtr = std::shared_ptr<Clip>;
 
-class QOpenGLShaderProgram;
+struct ComposeSequenceParams;
 class Sequence;
 
 class Clip {
@@ -137,7 +136,7 @@ public:
   // playback functions
   void Open();
   void Cache(long playhead, bool scrubbing, QVector<Clip*> &nests, int playback_speed);
-  bool Retrieve(QOpenGLShaderProgram* yuv_program = nullptr);
+  bool Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* params);
   void Close(bool wait);
   bool IsOpen();
 
@@ -155,12 +154,21 @@ public:
   [[nodiscard]] bool NeedsCpuRgba() const;
   [[nodiscard]] bool NeedsCacherReconfigure() const;
 
-  // video playback variables
-  QOpenGLFramebufferObject** fbo{nullptr};
-  QOpenGLTexture* texture{nullptr};
-  GLuint yuv_textures[3];
-  QOpenGLFramebufferObject* yuv_fbo{nullptr};
-  GLuint cached_texture_id{0};
+  // video playback variables (QRhi)
+  void* fbo_rhi{nullptr};  // ClipRhiResources* — opaque to avoid circular includes
+  QRhiTexture* cached_rhi_tex{nullptr};
+
+  // YUV plane textures (uploaded per-frame, converted via yuv2rgb shader)
+  QRhiTexture* yuv_tex_y{nullptr};
+  QRhiTexture* yuv_tex_u{nullptr};
+  QRhiTexture* yuv_tex_v{nullptr};
+  QRhiTexture* yuv_converted_tex{nullptr};
+  QRhiTextureRenderTarget* yuv_rt{nullptr};
+  QRhiRenderPassDescriptor* yuv_rpd{nullptr};
+
+  // RGBA texture (CPU path)
+  QRhiTexture* rgba_tex{nullptr};
+
   long texture_frame;
 
 private:

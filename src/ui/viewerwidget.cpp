@@ -33,9 +33,7 @@ extern "C" {
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
-#include <QOffscreenSurface>
-#include <QOpenGLFramebufferObject>
-#include <QOpenGLShaderProgram>
+#include <QFile>
 #include <QPainter>
 #include <QPolygon>
 #include <QRegularExpression>
@@ -51,8 +49,6 @@ extern "C" {
 #include "project/projectelements.h"
 #include "rendering/audio.h"
 #include "rendering/cacher.h"
-#include "rendering/matrixutil.h"
-#include "rendering/quadbuffer.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
 #include "ui/collapsiblewidget.h"
@@ -66,9 +62,17 @@ extern "C" {
 #include "undo/undostack.h"
 
 ViewerWidget::ViewerWidget(QWidget* parent)
-    : QOpenGLWidget(parent)
+    : QRhiWidget(parent)
 
 {
+  switch (olive::CurrentRuntimeConfig.rhi_backend) {
+    case RhiBackend::Vulkan: setApi(Api::Vulkan); break;
+    case RhiBackend::Metal: setApi(Api::Metal); break;
+    case RhiBackend::D3D12: setApi(Api::Direct3D12); break;
+    case RhiBackend::D3D11: setApi(Api::Direct3D11); break;
+    default: setApi(Api::OpenGL); break;
+  }
+  setMinimumSize(1, 1);  // Prevent 0-height from QDockWidget — QRhiWidget never recovers from size 0 on Vulkan
   setMouseTracking(true);
   setFocusPolicy(Qt::ClickFocus);
 
@@ -96,6 +100,9 @@ ViewerWidget::ViewerWidget(QWidget* parent)
   guide_mirror_action_->setShortcutContext(Qt::WidgetShortcut);
 
   window = new ViewerWindow(this);
+
+  // Overlay created by ViewerContainer as sibling — child QWidget over
+  // QRhiWidget breaks Vulkan compositing in Amber's widget hierarchy.
 }
 
 ViewerWidget::~ViewerWidget() {
@@ -181,11 +188,14 @@ void ViewerWidget::save_frame() {
       fn += selected_ext;
     }
 
-    renderer->start_render(context(), viewer->seq.get(), 1, fn);
+    renderer->start_render(viewer->seq.get(), 1, fn);
   }
 }
 
-void ViewerWidget::queue_repaint() { update(); }
+void ViewerWidget::queue_repaint() {
+  update();
+  if (overlay_) overlay_->update();
+}
 
 void ViewerWidget::fullscreen_menu_action(QAction* action) {
   if (action->data().isNull()) {
@@ -222,32 +232,121 @@ void ViewerWidget::set_menu_zoom(QAction* action) {
 
 void ViewerWidget::retry() { update(); }
 
-void ViewerWidget::initializeGL() {
-  initializeOpenGLFunctions();
+void ViewerWidget::initialize(QRhiCommandBuffer *cb) {
+  if (rhi_ != rhi()) {
+    releaseResources();
+  }
 
-  passthrough_program_ = new QOpenGLShaderProgram(this);
-  passthrough_program_->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/internalshaders/passthrough.vert");
-  passthrough_program_->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/internalshaders/passthrough.frag");
-  passthrough_program_->bindAttributeLocation("a_position", 0);
-  passthrough_program_->bindAttributeLocation("a_texcoord", 1);
-  passthrough_program_->link();
+  rhi_ = rhi();
 
-  connect(context(), &QOpenGLContext::aboutToBeDestroyed, this, &ViewerWidget::context_destroy, Qt::DirectConnection);
+  if (!rhi_initialized_) {
+    QFile vsFile(QStringLiteral(":/shaders/common.vert.qsb"));
+    if (!vsFile.open(QIODevice::ReadOnly)) {
+      qCritical() << "Failed to load vertex shader";
+      return;
+    }
+    QShader vs = QShader::fromSerialized(vsFile.readAll());
+
+    QFile fsFile(QStringLiteral(":/shaders/passthrough.frag.qsb"));
+    if (!fsFile.open(QIODevice::ReadOnly)) {
+      qCritical() << "Failed to load fragment shader";
+      return;
+    }
+    QShader fs = QShader::fromSerialized(fsFile.readAll());
+
+    vbuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+    vbuf_->create();
+
+    vert_ubuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
+    vert_ubuf_->create();
+
+    frag_ubuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
+    frag_ubuf_->create();
+
+    sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
+                                 QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
+    sampler_->create();
+
+    // Placeholder 1x1 texture — replaced by actual frame data in render()
+    frame_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(1, 1));
+    frame_tex_->create();
+
+    srb_ = rhi_->newShaderResourceBindings();
+    srb_->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, vert_ubuf_),
+        QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, frag_ubuf_),
+        QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, frame_tex_, sampler_),
+    });
+    srb_->create();
+
+    pipeline_ = rhi_->newGraphicsPipeline();
+    pipeline_->setShaderStages({
+        {QRhiShaderStage::Vertex, vs},
+        {QRhiShaderStage::Fragment, fs},
+    });
+
+    QRhiVertexInputLayout inputLayout;
+    inputLayout.setBindings({{4 * sizeof(float)}});
+    inputLayout.setAttributes({
+        {0, 0, QRhiVertexInputAttribute::Float2, 0},
+        {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
+    });
+    pipeline_->setVertexInputLayout(inputLayout);
+    pipeline_->setTopology(QRhiGraphicsPipeline::TriangleStrip);
+
+    QRhiGraphicsPipeline::TargetBlend blend;
+    blend.enable = true;
+    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+    blend.srcAlpha = QRhiGraphicsPipeline::Zero;
+    blend.dstAlpha = QRhiGraphicsPipeline::One;
+    pipeline_->setTargetBlends({blend});
+
+    pipeline_->setShaderResourceBindings(srb_);
+    pipeline_->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+    pipeline_->create();
+
+    rhi_initialized_ = true;
+  }
+}
+
+void ViewerWidget::releaseResources() {
+  delete pipeline_;
+  pipeline_ = nullptr;
+  delete srb_;
+  srb_ = nullptr;
+  delete frame_tex_;
+  frame_tex_ = nullptr;
+  delete sampler_;
+  sampler_ = nullptr;
+  delete frag_ubuf_;
+  frag_ubuf_ = nullptr;
+  delete vert_ubuf_;
+  vert_ubuf_ = nullptr;
+  delete vbuf_;
+  vbuf_ = nullptr;
+
+  cached_tex_w_ = 0;
+  cached_tex_h_ = 0;
+
+  rhi_initialized_ = false;
+}
+
+void ViewerWidget::resizeEvent(QResizeEvent* event) {
+  QRhiWidget::resizeEvent(event);
+  if (overlay_) overlay_->setGeometry(geometry());  // overlay is sibling in ViewerContainer
 }
 
 void ViewerWidget::frame_update() {
   if (viewer->seq != nullptr) {
-    // send context to other thread for drawing
     if (waveform) {
       update();
     } else {
-      doneCurrent();
       bool scrubbing = !viewer->playing;
-      renderer->start_render(context(), viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0, 0, false,
-                             scrubbing);
+      renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(),
+                             nullptr, nullptr, 0, 0, false, scrubbing);
     }
 
-    // render the audio
     olive::rendering::compose_audio(viewer, viewer->seq.get(), viewer->get_playback_speed(), false);
   }
 }
@@ -258,18 +357,16 @@ void ViewerWidget::set_scroll(double x, double y) {
   x_scroll = x;
   y_scroll = y;
   update();
+  if (overlay_) overlay_->update();
 }
 
 void ViewerWidget::seek_from_click(int x) { viewer->seek(getFrameFromScreenPoint(waveform_zoom, x + waveform_scroll)); }
 
 void ViewerWidget::context_destroy() {
-  if (!isValid()) return;
-  makeCurrent();
   if (viewer->seq != nullptr) {
     close_active_clips(viewer->seq.get());
   }
   renderer->delete_ctx();
-  doneCurrent();
 }
 
 EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
@@ -334,7 +431,7 @@ bool ViewerWidget::event(QEvent* e) {
       return true;
     }
   }
-  return QOpenGLWidget::event(e);
+  return QRhiWidget::event(e);
 }
 
 void ViewerWidget::keyPressEvent(QKeyEvent* event) {
@@ -349,7 +446,7 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
       return;
     }
   }
-  QOpenGLWidget::keyPressEvent(event);
+  QRhiWidget::keyPressEvent(event);
 }
 
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
@@ -518,8 +615,7 @@ void ViewerWidget::close_window() { window->hide(); }
 
 void ViewerWidget::wait_until_render_is_paused() { renderer->wait_until_paused(); }
 
-void ViewerWidget::draw_waveform_func() {
-  QPainter p(this);
+void ViewerWidget::draw_waveform_func(QPainter& p) {
   if (viewer->seq->using_workarea) {
     int in_x = getScreenPointFromFrame(waveform_zoom, viewer->seq->workarea_in) - waveform_scroll;
     int out_x = getScreenPointFromFrame(waveform_zoom, viewer->seq->workarea_out) - waveform_scroll;
@@ -540,11 +636,7 @@ void ViewerWidget::draw_waveform_func() {
   p.drawLine(playhead_x, 0, playhead_x, height());
 }
 
-void ViewerWidget::draw_title_safe_area() {
-  QPainter p(this);
-  p.beginNativePainting();
-  p.endNativePainting();
-
+void ViewerWidget::draw_title_safe_area(QPainter& p) {
   int w = width();
   int h = height();
 
@@ -592,16 +684,10 @@ void ViewerWidget::draw_title_safe_area() {
   double cross = qMin(areaW, areaH) * 0.05;
   p.drawLine(QPointF(cx - cross, cy), QPointF(cx + cross, cy));
   p.drawLine(QPointF(cx, cy - cross), QPointF(cx, cy + cross));
-
-  p.end();
 }
 
-void ViewerWidget::draw_guides() {
+void ViewerWidget::draw_guides(QPainter& p) {
   if (viewer->seq == nullptr || !olive::CurrentConfig.show_guides) return;
-
-  QPainter p(this);
-  p.beginNativePainting();
-  p.endNativePainting();
 
   // Compute image→widget coordinate transform
   // container->zoom maps image-space pixels to widget-space pixels directly
@@ -649,11 +735,9 @@ void ViewerWidget::draw_guides() {
       p.drawLine(toWidget(creating_guide_pos_, 0), toWidget(creating_guide_pos_, viewer->seq->height));
     }
   }
-
-  p.end();
 }
 
-void ViewerWidget::draw_gizmos() {
+void ViewerWidget::draw_gizmos(QPainter& p) {
   double dot_size_px = GIZMO_DOT_SIZE;
   double target_size_px = GIZMO_TARGET_SIZE;
 
@@ -668,9 +752,6 @@ void ViewerWidget::draw_gizmos() {
     return QPointF((ix - tx) * scale, (iy_topdown - ty) * scale);
   };
 
-  QPainter p(this);
-  p.beginNativePainting();
-  p.endNativePainting();
   p.setRenderHint(QPainter::Antialiasing, true);
 
   for (int j = 0; j < gizmos->gizmo_count(); j++) {
@@ -842,87 +923,134 @@ void ViewerWidget::cancel_guide_creation() {
   update();
 }
 
-void ViewerWidget::paintGL() {
+void ViewerWidget::render(QRhiCommandBuffer *cb) {
   if (waveform) {
-    draw_waveform_func();
-  } else {
-    const GLuint tex = renderer->get_texture();
-    QMutex* tex_lock = renderer->get_texture_mutex();
-    QOpenGLFunctions* f = context()->functions();
-
-    tex_lock->lock();
-
-    // clear to solid black
-    glClearColor(0.0, 0.0, 0.0, 0.0);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // draw texture from render thread
-    glBindTexture(GL_TEXTURE_2D, tex);
-    f->glGenerateMipmap(GL_TEXTURE_2D);
-
-    double zoom_factor = container->zoom / (double(width()) / double(viewer->seq->width));
-    double zoom_size = (zoom_factor * 2.0) - 2.0;
-    double zoom_left = -zoom_size * x_scroll - 1.0;
-    double zoom_right = zoom_size * (1.0 - x_scroll) + 1.0;
-    double zoom_bottom = -zoom_size * (1.0 - y_scroll) - 1.0;
-    double zoom_top = zoom_size * (y_scroll) + 1.0;
-
-    QMatrix4x4 mvp = MatrixUtil::ortho(-1, 1, -1, 1);
-
-    passthrough_program_->bind();
-    passthrough_program_->setUniformValue("mvp_matrix", mvp);
-    passthrough_program_->setUniformValue("tex", 0);
-    passthrough_program_->setUniformValue("color_mult", QVector4D(1, 1, 1, 1));
-
-    float coords[8] = {
-      float(zoom_left), float(zoom_bottom),
-      float(zoom_left), float(zoom_top),
-      float(zoom_right), float(zoom_top),
-      float(zoom_right), float(zoom_bottom),
-    };
-    // FBO texture is Y-inverted: texcoord Y is flipped to compensate
-    float texcoords[8] = {
-      0, 1,
-      0, 0,
-      1, 0,
-      1, 1,
-    };
-    QuadBuffer::draw(f, coords, texcoords);
-
-    passthrough_program_->release();
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // draw title/action safe area
-    if (olive::CurrentConfig.show_title_safe_area) {
-      draw_title_safe_area();
-    }
-
-    draw_guides();
-
-    gizmos = renderer->gizmos;
-    if (gizmos != nullptr) {
-      draw_gizmos();
-    }
-
-    glFinish();
-
-    if (window->isVisible()) {
-      window->set_texture(tex, double(viewer->seq->width) / double(viewer->seq->height), tex_lock);
-    }
-
-    tex_lock->unlock();
-
-    if (renderer->did_texture_fail() && !viewer->playing) {
-      doneCurrent();
-      renderer->start_render(context(), viewer->seq.get(), viewer->get_playback_speed());
-      makeCurrent();
-    }
+    const QColor clearColor(0, 0, 0, 255);
+    cb->beginPass(renderTarget(), clearColor, {1.0f, 0});
+    cb->endPass();
+    return;
   }
 
-  // Force alpha to 1.0 so Wayland compositing doesn't show through transparent pixels
-  glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
-  glClearColor(0, 0, 0, 1);
-  glClear(GL_COLOR_BUFFER_BIT);
-  glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+  // --- CPU bridge: get frame pixels from RenderThread ---
+  QMutex *frame_lock = renderer->get_texture_mutex();
+  frame_lock->lock();
+
+  const char* frame_data = renderer->get_frame_data();
+  int fw = renderer->get_frame_width();
+  int fh = renderer->get_frame_height();
+  bool has_frame = (frame_data != nullptr && fw > 0 && fh > 0 && viewer->seq != nullptr);
+
+  QRhiResourceUpdateBatch *u = rhi_->nextResourceUpdateBatch();
+  if (has_frame) {
+    if (fw != cached_tex_w_ || fh != cached_tex_h_) {
+      delete frame_tex_;
+      frame_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(fw, fh));
+      frame_tex_->create();
+
+      srb_->setBindings({
+          QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, vert_ubuf_),
+          QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, frag_ubuf_),
+          QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, frame_tex_, sampler_),
+      });
+      srb_->create();
+
+      pipeline_->setShaderResourceBindings(srb_);
+      pipeline_->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+      pipeline_->create();
+
+      cached_tex_w_ = fw;
+      cached_tex_h_ = fh;
+    }
+
+    QRhiTextureSubresourceUploadDescription desc(reinterpret_cast<const uchar*>(frame_data), fw * fh * 4);
+    u->uploadTexture(frame_tex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+  }
+
+  // Update gizmo tracking — detect stale gizmo (user selected a different clip while paused)
+  gizmos = renderer->gizmos;
+  if (viewer->seq != nullptr && gizmos != viewer->seq->GetSelectedGizmo()) {
+    gizmos = nullptr;
+    QTimer::singleShot(0, this, &ViewerWidget::frame_update);
+  }
+
+  // Pass frame to fullscreen window (copies data)
+  if (has_frame && window->isVisible()) {
+    window->set_frame(frame_data, fw, fh);
+  }
+
+  frame_lock->unlock();
+  // --- end CPU bridge ---
+
+  // Compute zoom/scroll quad in NDC
+  float zoom_left = -1.0f, zoom_right = 1.0f, zoom_bottom = -1.0f, zoom_top = 1.0f;
+  if (viewer->seq != nullptr) {
+    double zoom_factor = container->zoom / (double(width()) / double(viewer->seq->width));
+    double zoom_size = (zoom_factor * 2.0) - 2.0;
+    zoom_left = float(-zoom_size * x_scroll - 1.0);
+    zoom_right = float(zoom_size * (1.0 - x_scroll) + 1.0);
+    zoom_bottom = float(-zoom_size * (1.0 - y_scroll) - 1.0);
+    zoom_top = float(zoom_size * y_scroll + 1.0);
+  }
+
+  // TriangleStrip: BL, TL, BR, TR — texcoords Y-flipped (glReadPixels is bottom-to-top)
+  float vertexData[] = {
+      zoom_left, zoom_bottom, 0.0f, 1.0f,
+      zoom_left, zoom_top, 0.0f, 0.0f,
+      zoom_right, zoom_bottom, 1.0f, 1.0f,
+      zoom_right, zoom_top, 1.0f, 0.0f,
+  };
+
+  QMatrix4x4 mvp = rhi_->clipSpaceCorrMatrix();
+  mvp.ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
+
+  float colorMult[] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+  u->updateDynamicBuffer(vbuf_, 0, sizeof(vertexData), vertexData);
+  u->updateDynamicBuffer(vert_ubuf_, 0, 64, mvp.constData());
+  u->updateDynamicBuffer(frag_ubuf_, 0, 16, colorMult);
+
+  const QColor clearColor(0, 0, 0, 255);
+  cb->beginPass(renderTarget(), clearColor, {1.0f, 0}, u);
+
+  if (has_frame) {
+    const QSize outputSize = renderTarget()->pixelSize();
+    cb->setGraphicsPipeline(pipeline_);
+    cb->setViewport({0, 0, float(outputSize.width()), float(outputSize.height())});
+    cb->setShaderResources(srb_);
+    const QRhiCommandBuffer::VertexInput vbufBinding(vbuf_, 0);
+    cb->setVertexInput(0, 1, &vbufBinding);
+    cb->draw(4);
+  }
+
+  cb->endPass();
+
+  // Retry render if texture failed
+  if (renderer->did_texture_fail() && !viewer->playing) {
+    renderer->start_render(viewer->seq.get(), viewer->get_playback_speed());
+  }
+
+  // Schedule overlay repaint
+  if (overlay_) overlay_->update();
+}
+
+// --- ViewerOverlay ---
+
+ViewerOverlay::ViewerOverlay(ViewerWidget* vw, QWidget* parent) : QWidget(parent), vw_(vw) {
+  setAttribute(Qt::WA_TranslucentBackground);
+  setAttribute(Qt::WA_TransparentForMouseEvents);
+}
+
+void ViewerOverlay::paintEvent(QPaintEvent*) {
+  QPainter p(this);
+  if (vw_->waveform) {
+    vw_->draw_waveform_func(p);
+  } else if (vw_->viewer->seq != nullptr) {
+    if (olive::CurrentConfig.show_title_safe_area) {
+      vw_->draw_title_safe_area(p);
+    }
+    vw_->draw_guides(p);
+    if (vw_->gizmos != nullptr) {
+      vw_->draw_gizmos(p);
+    }
+  }
 }

@@ -30,8 +30,6 @@ extern "C" {
 
 #include <QApplication>
 #include <QOffscreenSurface>
-#include <QOpenGLFramebufferObject>
-#include <QOpenGLPaintDevice>
 #include <QPainter>
 #include <QtMath>
 
@@ -405,11 +403,9 @@ void ExportThread::Export()
   // Frame counters - used for generating encoding statistics (e.g. average frame time, ETA, etc.)
   long remaining_frames, frame_count = 1;
 
-  // Use Sequence Viewer's render thread - TODO separate this into a new render thread for background rendering
-  RenderThread* renderer = panel_sequence_viewer->viewer_widget->get_renderer();
-
-  // Override connection from RenderThread
-  disconnect(renderer, &RenderThread::ready, panel_sequence_viewer->viewer_widget, &ViewerWidget::queue_repaint);
+  // Create a dedicated render thread for export (viewer composites on main thread now)
+  RenderThread* renderer = new RenderThread();
+  renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
   // Loop from now (set to the beginning frame earlier) to the end of the frame
@@ -429,20 +425,24 @@ void ExportThread::Export()
     if (params_.video_enabled) {
       do {
         // TODO optimize by rendering the next frame while encoding the last
-        renderer->start_render(nullptr, olive::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0, true);
+        renderer->start_render(olive::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0, true);
 
         // Wait for RenderThread to return
         waitCond.wait(&mutex);
 
         if (interrupt_) {
-          return;
+          renderer->cancel();
+          delete renderer;
+          goto cleanup_state;
         }
 
         // If the RenderThread failed, do another render
       } while (renderer->did_texture_fail());
 
       if (interrupt_) {
-        return;
+        renderer->cancel();
+        delete renderer;
+        goto cleanup_state;
       }
 
     }
@@ -475,7 +475,9 @@ void ExportThread::Export()
 
       // Send frame to encoder
       if (!Encode(fmt_ctx, vcodec_ctx, sws_frame, video_pkt, video_stream)) {
-        return;
+        av_frame_free(&sws_frame);
+        sws_frame = nullptr;
+        goto cleanup_renderer;
       }
 
       av_frame_free(&sws_frame);
@@ -520,7 +522,8 @@ void ExportThread::Export()
 
         // Send frame to encoder
         if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) {
-          return;
+          audio_write_lock.unlock();
+          goto cleanup_renderer;
         }
 
         // Increment by the frame's number of samples
@@ -548,10 +551,12 @@ void ExportThread::Export()
     frame_count++;
   }
 
-  // Restore original connection from RenderThread
-  disconnect(renderer, &RenderThread::ready, this, &ExportThread::wake);
-  connect(renderer, &RenderThread::ready, panel_sequence_viewer->viewer_widget, &ViewerWidget::queue_repaint);
+cleanup_renderer:
+  // Clean up export render thread
+  renderer->cancel();
+  delete renderer;
 
+cleanup_state:
   // Always clean up clip/rendering state, even on cancel
   olive::Global->set_rendering_state(false);
   close_active_clips(olive::ActiveSequence.get());

@@ -28,8 +28,6 @@ extern "C" {
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QMessageBox>
-#include <QOpenGLContext>
-#include <QOpenGLWidget>
 #include <QPushButton>
 #include <QThread>
 #include <QVBoxLayout>
@@ -345,9 +343,8 @@ void ExportDialog::export_thread_finished() {
   // Re-enable/disable UI widgets based on the rendering state
   prep_ui_for_render(false);
 
-  // Move OpenGL context back to the sequence viewer
-  panel_sequence_viewer->viewer_widget->makeCurrent();
-  panel_sequence_viewer->viewer_widget->initializeGL();
+  // Trigger viewer repaint after export
+  panel_sequence_viewer->viewer_widget->update();
 
   // Update the application UI
   update_ui(false);

@@ -1,11 +1,12 @@
-#version 110
-
-uniform float hue;
-uniform float saturation;
-uniform float brightness;
-
-uniform sampler2D myTexture;
-varying vec2 vTexCoord;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    float hue;
+    float saturation;
+    float brightness;
+};
+layout(binding = 2) uniform sampler2D myTexture;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 vec3 rgb2hsv(vec3 c) {
     vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -23,8 +24,8 @@ vec3 hsv2rgb(vec3 c) {
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-void main(void) {	
-	vec4 tex_color = texture2D(myTexture, vTexCoord);
+void main(void) {
+	vec4 tex_color = texture(myTexture, vTexCoord);
 
 	vec3 hsv = rgb2hsv(tex_color.rgb);
 	hsv.r += (hue/360.0);
@@ -33,7 +34,7 @@ void main(void) {
 
 	vec3 rgb = hsv2rgb(hsv);
 
-	gl_FragColor = vec4(
+	fragColor = vec4(
 		rgb.r,
 		rgb.g,
 		rgb.b,

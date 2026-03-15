@@ -172,7 +172,7 @@ struct Config {
    * **TRUE** if Olive should attempt to use hardware decoding (VAAPI on Linux, D3D11VA on Windows,
    * VideoToolbox on macOS). Falls back to software decoding if unavailable.
    */
-  bool hardware_decoding{false};
+  bool hardware_decoding{true};
 
   /**
    * @brief The scroll wheel zooms rather than scrolls
@@ -624,35 +624,23 @@ struct Config {
  * This struct handles any configuration that's set as a command-line argument to Olive, and shouldn't be persistent
  * between restarts of Olive.
  */
+enum class RhiBackend { Auto, Vulkan, Metal, D3D12, D3D11, OpenGL };
+
 struct RuntimeConfig {
-  /**
-   * @brief RuntimeConfig Constructor
-   *
-   * Sets default runtime configuration
-   */
   RuntimeConfig();
 
-  /**
-   * @brief Enable shaders
-   *
-   * Debugging tool. Set to **FALSE** to bypass OpenGL shaders.
-   */
   bool shaders_are_enabled{true};
-
-  /**
-   * @brief Disable blending modes
-   *
-   * Some users had difficulty utilizing blending modes (provided by shaders). Set this to **TRUE** to bypass
-   * shader-based blending modes and utilize standard (less versatile) OpenGL blending instead.
-   */
   bool disable_blending{false};
-
-  /**
-   * @brief Load an external translation file
-   *
-   * Overrides Config::language_file and sets the path to a language file to use.
-   */
   QString external_translation_file;
+
+  // RHI backend selection. Auto = platform best (Metal/macOS, D3D12/Windows, Vulkan/Linux).
+  // Override via --rhi-backend <name> or AMBER_RHI_BACKEND env var.
+  // Resolved from Auto to a concrete backend in main() before any widget is created.
+  RhiBackend rhi_backend{RhiBackend::Auto};
+
+  // QVulkanInstance* created in main() — used by RenderThread for offscreen Vulkan QRhi.
+  // Stored as void* to avoid pulling QVulkanInstance into this header.
+  void* vulkan_instance{nullptr};
 };
 
 namespace olive {

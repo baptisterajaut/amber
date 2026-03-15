@@ -52,6 +52,11 @@ ViewerContainer::ViewerContainer(QWidget *parent)
   child = new ViewerWidget(this);
   child->container = this;
 
+  // Overlay as sibling of ViewerWidget (not child) — a child QWidget over
+  // a QRhiWidget breaks Vulkan compositing in Amber's widget hierarchy.
+  child->overlay_ = new ViewerOverlay(child, this);
+  child->overlay_->raise();
+
   connect(horizontal_scrollbar, &QScrollBar::valueChanged, this, &ViewerContainer::scroll_changed);
   connect(vertical_scrollbar, &QScrollBar::valueChanged, this, &ViewerContainer::scroll_changed);
 
@@ -182,6 +187,12 @@ void ViewerContainer::adjust() {
         child->move(zoomed_x, zoomed_y);
         child->resize(zoomed_width, zoomed_height);
       }
+    }
+
+    // Position overlay to match viewer widget (overlay is a sibling)
+    if (child->overlay_) {
+      child->overlay_->setGeometry(child->geometry());
+      child->overlay_->raise();
     }
 
     // Position rulers to align with the viewer area

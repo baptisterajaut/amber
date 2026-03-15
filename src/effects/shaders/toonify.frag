@@ -1,15 +1,16 @@
-#version 150
-uniform sampler2D tex0;
-in vec2 vTexCoord;
-out vec4 FragColor;
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    float colors; // 12.0
+    float sat_levels; // 4.0
+    float bri_levels; // 4.0
+    float edge_thres; // 0.2;
+    float edge_thres2; // 5.0;
+};
+layout(binding = 2) uniform sampler2D tex0;
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 FragColor;
 
-uniform float colors; // 12.0
-uniform float sat_levels; // 4.0
-uniform float bri_levels; // 4.0
-uniform float edge_thres; // 0.2;
-uniform float edge_thres2; // 5.0;
-
-vec3 RGBtoHSV( float r, float g, float b) 
+vec3 RGBtoHSV( float r, float g, float b)
 {
 	 float minv, maxv, delta;
 	 vec3 res;
@@ -17,7 +18,7 @@ vec3 RGBtoHSV( float r, float g, float b)
 	 minv = min(min(r, g), b);
 	 maxv = max(max(r, g), b);
 	 res.z = maxv;            // v
-	 
+
 	 delta = maxv - minv;
 
 	 if( maxv != 0.0 )
@@ -39,17 +40,17 @@ vec3 RGBtoHSV( float r, float g, float b)
 	 res.x = res.x * 60.0;            // degrees
 	 if( res.x < 0.0 )
 			res.x = res.x + 360.0;
-			
+
 	 return res;
 }
 
-vec3 HSVtoRGB(float h, float s, float v ) 
+vec3 HSVtoRGB(float h, float s, float v )
 {
 	 int i;
 	 float f, p, q, t;
 	 vec3 res;
 
-	 if( s == 0.0 ) 
+	 if( s == 0.0 )
 	 {
 			// achromatic (grey)
 			res.x = v;
@@ -65,7 +66,7 @@ vec3 HSVtoRGB(float h, float s, float v )
 	 q = v * ( 1.0 - s * f );
 	 t = v * ( 1.0 - s * ( 1.0 - f ) );
 
-	 switch(i) 
+	 switch(i)
 	 {
 			case 0:
 				 res.x = v;
@@ -102,12 +103,12 @@ vec3 HSVtoRGB(float h, float s, float v )
 }
 
 // averaged pixel intensity from 3 color channels
-float avg_intensity(vec4 pix) 
+float avg_intensity(vec4 pix)
 {
  return (pix.r + pix.g + pix.b)/3.;
 }
 
-vec4 get_pixel(vec2 coords, float dx, float dy) 
+vec4 get_pixel(vec2 coords, float dx, float dy)
 {
  return texture(tex0,coords + vec2(dx, dy));
 }
@@ -147,7 +148,7 @@ void main() {
 	vec3 colorOrg = texture(tex0, uv).rgb;
 	vec3 vHSV =  RGBtoHSV(colorOrg.r,colorOrg.g,colorOrg.b);
 
-	// hue limiting	
+	// hue limiting
 	if (colors == 0.0) {
 		vHSV.y = 0.0;
 	} else {

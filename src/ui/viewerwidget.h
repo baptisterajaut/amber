@@ -23,12 +23,11 @@
 
 #include <QMatrix4x4>
 #include <QMutex>
-#include <QOpenGLFunctions>
-#include <QOpenGLTexture>
-#include <QOpenGLWidget>
+#include <QRhiWidget>
 #include <QThread>
 #include <QTimer>
 #include <QWaitCondition>
+#include <rhi/qrhi.h>
 
 #include "effects/effect.h"
 #include "project/footage.h"
@@ -39,10 +38,10 @@
 #include "ui/viewerwindow.h"
 
 class Viewer;
-class QOpenGLFramebufferObject;
+class ViewerOverlay;
 struct GLTextureCoords;
 
-class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions {
+class ViewerWidget : public QRhiWidget {
   Q_OBJECT
  public:
   ViewerWidget(QWidget* parent = nullptr);
@@ -51,8 +50,9 @@ class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions {
   void close_window();
   void wait_until_render_is_paused();
 
-  void paintGL() override;
-  void initializeGL() override;
+  void initialize(QRhiCommandBuffer *cb) override;
+  void render(QRhiCommandBuffer *cb) override;
+  void releaseResources() override;
   Viewer* viewer;
   ViewerContainer* container;
 
@@ -78,6 +78,7 @@ class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions {
 
  protected:
   bool event(QEvent* e) override;
+  void resizeEvent(QResizeEvent* event) override;
   void keyPressEvent(QKeyEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
@@ -85,10 +86,13 @@ class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions {
   void wheelEvent(QWheelEvent* event) override;
 
  private:
-  void draw_waveform_func();
-  void draw_title_safe_area();
-  void draw_guides();
-  void draw_gizmos();
+  friend class ViewerContainer;
+  friend class ViewerOverlay;
+  ViewerOverlay* overlay_{nullptr};
+  void draw_waveform_func(QPainter& p);
+  void draw_title_safe_area(QPainter& p);
+  void draw_guides(QPainter& p);
+  void draw_gizmos(QPainter& p);
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
   void move_gizmos(QMouseEvent* event, bool done);
   int find_guide_at(int video_x, int video_y, bool* hit_mirror = nullptr) const;
@@ -111,8 +115,22 @@ class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions {
   int gizmo_x_mvmt;
   int gizmo_y_mvmt;
   EffectGizmo* selected_gizmo{nullptr};
-  QOpenGLShaderProgram* passthrough_program_{nullptr};
   RenderThread* renderer;
+  QRhi* rhi_{nullptr};
+  bool rhi_initialized_{false};
+
+  // RHI pipeline
+  QRhiBuffer* vbuf_{nullptr};
+  QRhiBuffer* vert_ubuf_{nullptr};
+  QRhiBuffer* frag_ubuf_{nullptr};
+  QRhiSampler* sampler_{nullptr};
+  QRhiTexture* frame_tex_{nullptr};
+  QRhiShaderResourceBindings* srb_{nullptr};
+  QRhiGraphicsPipeline* pipeline_{nullptr};
+  QSize rt_pixel_size_;
+  int rt_sample_count_{0};
+  int cached_tex_w_{0};
+  int cached_tex_h_{0};
   ViewerWindow* window;
   double x_scroll{0};
   double y_scroll{0};
@@ -128,6 +146,18 @@ class ViewerWidget : public QOpenGLWidget, QOpenGLFunctions {
   void set_fit_zoom();
   void set_custom_zoom();
   void set_menu_zoom(QAction* action);
+};
+
+class ViewerOverlay : public QWidget {
+  Q_OBJECT
+ public:
+  ViewerOverlay(ViewerWidget* vw, QWidget* parent);
+
+ protected:
+  void paintEvent(QPaintEvent* event) override;
+
+ private:
+  ViewerWidget* vw_;
 };
 
 #endif  // VIEWERWIDGET_H

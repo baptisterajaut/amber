@@ -349,7 +349,7 @@ void TimelineHeader::delete_markers() {
 }
 
 void TimelineHeader::paintEvent(QPaintEvent*) {
-  if (viewer->seq != nullptr && zoom > 0) {
+  if (viewer != nullptr && viewer->seq != nullptr && zoom > 0) {
     QPainter p(this);
     int yoff = get_marker_offset();
 
@@ -438,7 +438,7 @@ void TimelineHeader::paintEvent(QPaintEvent*) {
     }
 
     // draw markers
-    for (int i=0;i<viewer->marker_ref->size();i++) {
+    for (int i=0;viewer->marker_ref != nullptr && i<viewer->marker_ref->size();i++) {
       const Marker& m = viewer->marker_ref->at(i);
 
       int marker_x = getHeaderScreenPointFromFrame(m.frame);

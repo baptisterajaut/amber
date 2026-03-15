@@ -25,7 +25,6 @@
 #include <QGridLayout>
 #include <QSpinBox>
 #include <QCheckBox>
-#include <QOpenGLFunctions>
 #include <QComboBox>
 #include <QMouseEvent>
 

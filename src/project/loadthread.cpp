@@ -397,6 +397,12 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
                   }
                 }
 
+                // Validate sequence dimensions — prevent division-by-zero cascades
+                if (s->width <= 0) s->width = 1920;
+                if (s->height <= 0) s->height = 1080;
+                if (s->frame_rate <= 0) s->frame_rate = 29.97;
+                if (s->audio_frequency <= 0) s->audio_frequency = 48000;
+
                 // load all clips and clip information
                 while (!cancelled_ && !(stream.name() == child_search && stream.isEndElement()) && !stream.atEnd()) {
                   read_next_start_element(stream);

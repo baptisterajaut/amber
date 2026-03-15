@@ -1,18 +1,18 @@
-#version 110
-
-varying vec2 vTexCoord;
-
-uniform float speed;
-uniform float intensity;
-uniform float frequency;
-uniform float xoff;
-uniform float yoff;
-uniform bool reverse;
-uniform bool stretch;
-
-uniform vec2 resolution; // Screen resolution
-uniform float time; // time in seconds
-uniform sampler2D tex0; // scene buffer
+#version 440
+layout(std140, binding = 1) uniform FragParams {
+    vec2 resolution; // Screen resolution
+    float speed;
+    float intensity;
+    float frequency;
+    float xoff;
+    float yoff;
+    float time; // time in seconds
+    bool reverse;
+    bool stretch;
+};
+layout(binding = 2) uniform sampler2D tex0; // scene buffer
+layout(location = 0) in vec2 vTexCoord;
+layout(location = 0) out vec4 fragColor;
 
 void main(void) {
 	vec2 texCoord = vTexCoord;
@@ -30,5 +30,5 @@ void main(void) {
 	vec2 p = 2.0 * texCoord - center;
 	float len = length(p);
 	vec2 uv = vTexCoord + (p/len)*cos((frequency*0.01)*(len*12.0-real_time*(speed*0.05)))*(intensity*0.0005);
-	gl_FragColor = texture2D(tex0,uv);  
+	fragColor = texture(tex0,uv);
 }

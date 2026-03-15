@@ -28,7 +28,6 @@
 
 #include <cinttypes>
 
-#include <QOpenGLFramebufferObject>
 #include <QtMath>
 #include <QAudioSink>
 #include <cmath>
@@ -215,35 +214,62 @@ void Cacher::OpenWorker() {
                stream->codecpar->sample_aspect_ratio.den
                );
 
-      avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("buffer"), "in", filter_args, nullptr, filter_graph);
-      avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("buffersink"), "out", nullptr, nullptr, filter_graph);
+      bool video_filter_ok = true;
+
+      if (avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("buffer"), "in", filter_args, nullptr, filter_graph) < 0) {
+        qCritical() << "Could not create video buffer source";
+        video_filter_ok = false;
+      }
+
+      if (video_filter_ok && avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("buffersink"), "out", nullptr, nullptr, filter_graph) < 0) {
+        qCritical() << "Could not create video buffer sink";
+        video_filter_ok = false;
+      }
 
       AVFilterContext* last_filter = buffersrc_ctx;
 
       char filter_args[100];
 
-      if (ms->video_interlacing != VIDEO_PROGRESSIVE) {
+      if (video_filter_ok && ms->video_interlacing != VIDEO_PROGRESSIVE) {
         AVFilterContext* yadif_filter;
         snprintf(filter_args, sizeof(filter_args), "mode=3:parity=%d", ((ms->video_interlacing == VIDEO_TOP_FIELD_FIRST) ? 0 : 1)); // there's a CUDA version if we start using nvdec/nvenc
-        avfilter_graph_create_filter(&yadif_filter, avfilter_get_by_name("yadif"), "yadif", filter_args, nullptr, filter_graph);
-
-        avfilter_link(last_filter, 0, yadif_filter, 0);
-        last_filter = yadif_filter;
+        if (avfilter_graph_create_filter(&yadif_filter, avfilter_get_by_name("yadif"), "yadif", filter_args, nullptr, filter_graph) < 0) {
+          qCritical() << "Could not create yadif filter";
+          video_filter_ok = false;
+        } else {
+          avfilter_link(last_filter, 0, yadif_filter, 0);
+          last_filter = yadif_filter;
+        }
       }
 
-      if (clip->NeedsCpuRgba()) {
-        snprintf(filter_args, sizeof(filter_args), "pix_fmts=%s", av_get_pix_fmt_name(kDestPixFmt));
-      } else {
-        snprintf(filter_args, sizeof(filter_args), "pix_fmts=yuv420p|nv12|%s", av_get_pix_fmt_name(kDestPixFmt));
+      if (video_filter_ok) {
+        if (clip->NeedsCpuRgba()) {
+          snprintf(filter_args, sizeof(filter_args), "pix_fmts=%s", av_get_pix_fmt_name(kDestPixFmt));
+        } else {
+          snprintf(filter_args, sizeof(filter_args), "pix_fmts=yuv420p|nv12|%s", av_get_pix_fmt_name(kDestPixFmt));
+        }
+
+        AVFilterContext* format_conv;
+        if (avfilter_graph_create_filter(&format_conv, avfilter_get_by_name("format"), "fmt", filter_args, nullptr, filter_graph) < 0) {
+          qCritical() << "Could not create format filter";
+          video_filter_ok = false;
+        } else {
+          avfilter_link(last_filter, 0, format_conv, 0);
+          avfilter_link(format_conv, 0, buffersink_ctx, 0);
+        }
       }
 
-      AVFilterContext* format_conv;
-      avfilter_graph_create_filter(&format_conv, avfilter_get_by_name("format"), "fmt", filter_args, nullptr, filter_graph);
-      avfilter_link(last_filter, 0, format_conv, 0);
+      if (video_filter_ok && avfilter_graph_config(filter_graph, nullptr) < 0) {
+        qCritical() << "Could not configure video filter graph";
+        video_filter_ok = false;
+      }
 
-      avfilter_link(format_conv, 0, buffersink_ctx, 0);
-
-      avfilter_graph_config(filter_graph, nullptr);
+      if (!video_filter_ok) {
+        avfilter_graph_free(&filter_graph);
+        filter_graph = nullptr;
+        buffersrc_ctx = nullptr;
+        buffersink_ctx = nullptr;
+      }
 
     } else if (stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
       if (codecCtx->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC) av_channel_layout_default(&codecCtx->ch_layout, stream->codecpar->ch_layout.nb_channels);
@@ -637,14 +663,11 @@ void Cacher::Close(bool wait_for_finish)
 
 void Cacher::ResetAudio()
 {
-  // using audio_write_lock seems like a good idea, but hasn't been tested yet. If there are audio issues when seeking,
-  // try uncommenting them
-
-//  audio_write_lock.lock();
+  audio_write_lock.lock();
   audio_reset_ = true;
   frame_sample_index_ = -1;
   audio_buffer_write = 0;
-//  audio_write_lock.unlock();
+  audio_write_lock.unlock();
 }
 
 int Cacher::media_width()

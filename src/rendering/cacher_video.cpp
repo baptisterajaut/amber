@@ -28,6 +28,11 @@
 #include "global/debug.h"
 
 void Cacher::CacheVideoWorker() {
+  // Skip video caching if filter graph failed to initialize
+  if (filter_graph == nullptr) {
+    WakeMainThread();
+    return;
+  }
 
   // is this media a still image?
   if (clip->media_stream()->infinite_length) {
@@ -410,7 +415,7 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
 int Cacher::RetrieveFrameAndProcess(AVFrame **f)
 {
   // error codes from FFmpeg
-  int retrieve_code, read_code, send_code;
+  int retrieve_code, read_code = 0, send_code;
 
   // frame for FFmpeg to decode into
   *f = av_frame_alloc();

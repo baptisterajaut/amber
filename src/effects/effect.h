@@ -1,4 +1,4 @@
-﻿/***
+/***
 
     Olive - Non-Linear Video Editor
     Copyright (C) 2019  Olive Team
@@ -26,9 +26,6 @@
 #include <QString>
 #include <QVector>
 #include <QColor>
-#include <QOpenGLFunctions>
-#include <QOpenGLShaderProgram>
-#include <QOpenGLTexture>
 #include <QMutex>
 #include <QThread>
 #include <QLabel>
@@ -39,6 +36,8 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <random>
+#include <rhi/qrhi.h>
+#include <rhi/qshader.h>
 
 #include "ui/collapsiblewidget.h"
 #include "effectrow.h"
@@ -136,6 +135,13 @@ const EffectMeta* get_meta_from_name(const QString& input);
 
 qint16 mix_audio_sample(qint16 a, qint16 b);
 
+// Uniform entry extracted from QShaderDescription (for filling UBO data)
+struct UniformEntry {
+  QString name;
+  int offset;
+  int size;
+};
+
 class Effect : public QObject {
   Q_OBJECT
 public:
@@ -171,14 +177,23 @@ public:
   void load_from_string(const QByteArray &s);
   QByteArray save_to_string();
 
-  // glsl handling
+  // shader handling (QRhi)
   bool is_open();
   void open();
   void close();
   bool is_glsl_linked();
-  QOpenGLShaderProgram* program() const { return glslProgram; }
+  bool is_shader_valid();
+  const QShader& vertexShader() const { return vertexShader_; }
+  const QShader& fragmentShader() const { return fragmentShader_; }
+  int fragUboSize() const { return fragUboSize_; }
+  int vertUboSize() const { return vertUboSize_; }
+  const QVector<UniformEntry>& uniformEntries() const { return uniformEntries_; }
+  const QVector<UniformEntry>& vertUniformEntries() const { return vertUniformEntries_; }
+  void fillFragUbo(double timecode, int iteration, QByteArray& uboData);
   virtual void startEffect();
   virtual void endEffect();
+
+  static QShader bakeOrLoadCached(const QString& path, QShader::Stage stage);
 
   enum VideoEffectFlags : uint8_t {
     ShaderFlag        = 0x1,
@@ -195,9 +210,9 @@ public:
   const char* ffmpeg_filter;
 
   virtual void process_image(double timecode, uint8_t* input, uint8_t* output, int size);
-  virtual void process_shader(double timecode, GLTextureCoords&, int iteration);
+  virtual void process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData);
   virtual void process_coords(double timecode, GLTextureCoords& coords, int data);
-  virtual GLuint process_superimpose(double timecode);
+  virtual QRhiTexture* process_superimpose(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode);
   virtual void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes, int channel_count);
 
   virtual void gizmo_draw(double timecode, GLTextureCoords& coords);
@@ -229,14 +244,21 @@ public slots:
   void save_to_file();
   void load_from_file();
 protected:
-  // glsl effect
-  QOpenGLShaderProgram* glslProgram{nullptr};
+  // shader paths (from effect XML)
   QString vertPath;
   QString fragPath;
 
+  // QRhi shaders
+  QShader vertexShader_;
+  QShader fragmentShader_;
+  QVector<UniformEntry> uniformEntries_;   // fragment UBO members (binding 1)
+  QVector<UniformEntry> vertUniformEntries_;  // vertex UBO members (binding 1, for cornerpin)
+  int fragUboSize_{0};
+  int vertUboSize_{0};
+
   // superimpose effect
   QImage img;
-  QOpenGLTexture* texture{nullptr};
+  QRhiTexture* superimposeTex_{nullptr};
 
   // enable effect to update constantly
   virtual bool AlwaysUpdate();
