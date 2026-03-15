@@ -473,8 +473,6 @@ add_executable(${OLIVE_TARGET}
 qt_add_shaders(${OLIVE_TARGET} "amber_shaders"
   PREFIX "/shaders"
   GLSL "150"
-  NOHLSL
-  NOMSL
   BASE "rendering/shaders"
   FILES
     rendering/shaders/common.vert
