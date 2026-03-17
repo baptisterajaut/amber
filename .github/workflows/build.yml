@@ -3,7 +3,7 @@ name: Build packages
 on:
   workflow_dispatch:
   release:
-    types: [published, edited]
+    types: [published]
 
 permissions:
   contents: write
