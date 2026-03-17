@@ -752,6 +752,15 @@ void PreferencesDialog::setup_ui() {
 
   row++;
 
+  // Appearance -> Effect Panel Shrinkable
+  QCheckBox* effect_panel_shrinkable = new QCheckBox(tr("Allow Effect Properties panel to be smaller than its content"));
+  effect_panel_shrinkable->setToolTip(tr("When enabled, the Effect Properties panel can be resized narrower than its content. "
+                                         "A horizontal scrollbar will appear to access clipped content."));
+  AddBoolPair(effect_panel_shrinkable, &olive::CurrentConfig.effect_panel_shrinkable);
+  appearance_layout->addWidget(effect_panel_shrinkable, row, 0, 1, 3);
+
+  row++;
+
   // Playback
   QWidget* playback_tab = new QWidget(this);
   QVBoxLayout* playback_tab_layout = new QVBoxLayout(playback_tab);

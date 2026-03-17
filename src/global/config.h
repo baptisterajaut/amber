@@ -602,6 +602,14 @@ struct Config {
   int snap_outgoing_modifier{0};
 
   /**
+   * @brief Allow effect panel to shrink below content width
+   *
+   * **TRUE** allows the effect properties panel to be resized smaller than its content
+   * (horizontal scrollbar activates). **FALSE** locks the panel width to fit its content.
+   */
+  bool effect_panel_shrinkable{false};
+
+  /**
    * @brief Show ruler guides in the sequence viewer
    */
   bool show_guides{false};

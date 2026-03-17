@@ -83,6 +83,7 @@ constexpr BoolEntry kBoolEntries[] = {
     {"ShowGuides", &Config::show_guides},
     {"LockGuides", &Config::lock_guides},
     {"SnapToOutgoingClip", &Config::snap_to_outgoing_clip},
+    {"EffectPanelShrinkable", &Config::effect_panel_shrinkable},
 };
 
 constexpr IntEntry kIntEntries[] = {
@@ -257,6 +258,7 @@ void Config::save(QString path) {
   stream.writeTextElement("ShowGuides", QString::number(show_guides));
   stream.writeTextElement("SnapToOutgoingClip", QString::number(snap_to_outgoing_clip));
   stream.writeTextElement("SnapOutgoingModifier", QString::number(snap_outgoing_modifier));
+  stream.writeTextElement("EffectPanelShrinkable", QString::number(effect_panel_shrinkable));
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc

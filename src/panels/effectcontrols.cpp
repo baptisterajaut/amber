@@ -744,7 +744,11 @@ EffectsArea::EffectsArea(QWidget* parent) :
 
 void EffectsArea::resizeEvent(QResizeEvent *)
 {
-  parent_widget->setMinimumWidth(sizeHint().width());
+  if (!olive::CurrentConfig.effect_panel_shrinkable) {
+    setMinimumWidth(sizeHint().width());
+  } else {
+    setMinimumWidth(0);
+  }
 }
 
 void EffectsArea::receive_wheel_event(QWheelEvent *e) {
