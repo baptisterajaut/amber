@@ -290,7 +290,7 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
 
       bool has_shader = can_process_shaders && e->is_glsl_linked();
 
-      if (has_shader) {
+      if (has_shader && composite_texture != nullptr) {
         ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
         QMatrix4x4 blitMvp;
         blitMvp.ortho(-1, 1, -1, 1, -1, 1);
