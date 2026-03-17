@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
-project(amber-editor VERSION 1.2.0 LANGUAGES CXX)
+project(amber-editor VERSION 1.2.1 LANGUAGES CXX)
 
 option(BUILD_DOXYGEN "Build Doxygen documentation" OFF)
 
@@ -480,6 +480,14 @@ qt_add_shaders(${OLIVE_TARGET} "amber_shaders"
     rendering/shaders/yuv2rgb.frag
     rendering/shaders/blending.frag
     rendering/shaders/premultiply.frag
+)
+
+# Copy shader effects next to the binary so dev builds find them
+add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EFFECTS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Copying shader effects to build directory"
 )
 
 target_compile_definitions(${OLIVE_TARGET} PRIVATE ${OLIVE_DEFINITIONS})
