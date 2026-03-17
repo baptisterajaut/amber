@@ -986,7 +986,7 @@ bool Timeline::snap_to_point(long point, long* l) {
   return false;
 }
 
-bool Timeline::snap_to_timeline(long* l, bool use_playhead, bool use_markers, bool use_workarea) {
+bool Timeline::snap_to_timeline(long* l, bool use_playhead, bool use_markers, bool use_workarea, bool for_playhead) {
   snapped = false;
   if (snapping) {
     if (use_playhead && !panel_sequence_viewer->playing) {
@@ -1007,12 +1007,24 @@ bool Timeline::snap_to_timeline(long* l, bool use_playhead, bool use_markers, bo
       if (snap_to_point(olive::ActiveSequence->workarea_out, l)) return true;
     }
 
+    // When seeking the playhead, snap to timeline_out - 1 so the viewer shows the
+    // last frame of the outgoing clip. Hold modifier key to invert the setting.
+    bool outgoing_pref = olive::CurrentConfig.snap_to_outgoing_clip;
+    if (for_playhead) {
+      static constexpr Qt::KeyboardModifier kModifiers[] = {Qt::ShiftModifier, Qt::ControlModifier, Qt::AltModifier};
+      int mod_idx = qBound(0, olive::CurrentConfig.snap_outgoing_modifier, 2);
+      if (QGuiApplication::keyboardModifiers() & kModifiers[mod_idx]) {
+        outgoing_pref = !outgoing_pref;
+      }
+    }
+    bool prefer_outgoing = for_playhead && outgoing_pref;
+
     // snap to clip/transition
     for (auto c : olive::ActiveSequence->clips) {
       if (c != nullptr) {
         if (snap_to_point(c->timeline_in(), l)) {
           return true;
-        } else if (snap_to_point(c->timeline_out(), l)) {
+        } else if (snap_to_point(prefer_outgoing ? c->timeline_out() - 1 : c->timeline_out(), l)) {
           return true;
         } else if (c->opening_transition != nullptr
                    && snap_to_point(c->timeline_in() + c->opening_transition->get_true_length(), l)) {

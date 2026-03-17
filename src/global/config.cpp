@@ -82,6 +82,7 @@ constexpr BoolEntry kBoolEntries[] = {
     {"ShowWelcomeDialog", &Config::show_welcome_dialog},
     {"ShowGuides", &Config::show_guides},
     {"LockGuides", &Config::lock_guides},
+    {"SnapToOutgoingClip", &Config::snap_to_outgoing_clip},
 };
 
 constexpr IntEntry kIntEntries[] = {
@@ -101,6 +102,7 @@ constexpr IntEntry kIntEntries[] = {
     {"DefaultSequenceAudioFrequency", &Config::default_sequence_audio_frequency},
     {"DefaultSequenceAudioLayout", &Config::default_sequence_audio_channel_layout},
     {"FrameSkipStep", &Config::frame_skip_step},
+    {"SnapOutgoingModifier", &Config::snap_outgoing_modifier},
 };
 
 constexpr DoubleEntry kDoubleEntries[] = {
@@ -253,6 +255,8 @@ void Config::save(QString path) {
   stream.writeTextElement("ShowWelcomeDialog", QString::number(show_welcome_dialog));
   stream.writeTextElement("FrameSkipStep", QString::number(frame_skip_step));
   stream.writeTextElement("ShowGuides", QString::number(show_guides));
+  stream.writeTextElement("SnapToOutgoingClip", QString::number(snap_to_outgoing_clip));
+  stream.writeTextElement("SnapOutgoingModifier", QString::number(snap_outgoing_modifier));
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc

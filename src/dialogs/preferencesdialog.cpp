@@ -23,6 +23,7 @@
 #include <QMenuBar>
 #include <QAction>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QTabWidget>
 #include <QLineEdit>
 #include <QLabel>
@@ -269,6 +270,7 @@ void PreferencesDialog::accept() {
 
   olive::CurrentConfig.effect_textbox_lines = effect_textbox_lines_field->value();
   olive::CurrentConfig.frame_skip_step = frame_skip_step_field->value();
+  olive::CurrentConfig.snap_outgoing_modifier = snap_outgoing_modifier_combo->currentIndex();
   olive::CurrentConfig.language_file = language_combobox->currentData().toString();
 
   olive::CurrentConfig.default_sequence_width = default_sequence.width;
@@ -621,6 +623,27 @@ void PreferencesDialog::setup_ui() {
   QCheckBox* seek_also_selects = new QCheckBox(tr("Seek Also Selects"));
   AddBoolPair(seek_also_selects, &olive::CurrentConfig.seek_also_selects);
   behavior_tab_layout->Add(seek_also_selects);
+
+  QCheckBox* snap_to_outgoing_clip = new QCheckBox(tr("Snap Playhead to Last Frame of Outgoing Clip"));
+  snap_to_outgoing_clip->setToolTip(tr("When snapping the playhead to a clip boundary, show the last frame of the outgoing clip instead of the first frame of the incoming clip"));
+  AddBoolPair(snap_to_outgoing_clip, &olive::CurrentConfig.snap_to_outgoing_clip);
+  behavior_tab_layout->Add(snap_to_outgoing_clip);
+
+  {
+    QWidget* mod_row = new QWidget();
+    QHBoxLayout* mod_layout = new QHBoxLayout(mod_row);
+    mod_layout->setContentsMargins(0, 0, 0, 0);
+    mod_layout->addWidget(new QLabel(tr("Invert Snap Modifier:")));
+    snap_outgoing_modifier_combo = new QComboBox();
+    snap_outgoing_modifier_combo->addItem(tr("Shift"));
+    snap_outgoing_modifier_combo->addItem(tr("Ctrl"));
+    snap_outgoing_modifier_combo->addItem(tr("Alt"));
+    snap_outgoing_modifier_combo->setCurrentIndex(qBound(0, olive::CurrentConfig.snap_outgoing_modifier, 2));
+    snap_outgoing_modifier_combo->setToolTip(tr("Hold this key while seeking to invert the snap-to-outgoing-clip behavior"));
+    mod_layout->addWidget(snap_outgoing_modifier_combo);
+    mod_layout->addStretch();
+    behavior_tab_layout->Add(mod_row);
+  }
 
   QCheckBox* seek_to_end_of_pastes = new QCheckBox(tr("Seek to the End of Pastes"));
   AddBoolPair(seek_to_end_of_pastes, &olive::CurrentConfig.paste_seeks);

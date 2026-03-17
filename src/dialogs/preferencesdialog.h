@@ -251,6 +251,11 @@ private:
   QComboBox* ui_style;
 
   /**
+   * @brief UI widget for selecting the snap outgoing modifier key
+   */
+  QComboBox* snap_outgoing_modifier_combo;
+
+  /**
    * @brief Stored default Sequence object
    *
    * Default Sequence settings are loaded into an actual Sequence object that can be loaded into NewSequenceDialog

@@ -374,6 +374,7 @@ QRhiTexture* olive::rendering::compose_sequence(ComposeSequenceParams& params) {
   }
 
   int audio_track_count = 0;
+  bool gizmos_drawn = false;
 
   QVector<Clip*> current_clips;
 
@@ -554,6 +555,7 @@ QRhiTexture* olive::rendering::compose_sequence(ComposeSequenceParams& params) {
           if (params.gizmos != nullptr && params.gizmos->parent_clip == c) {
             params.gizmos->gizmo_draw(timecode, coords);
             params.gizmos->gizmo_world_to_screen(clip_mvp);
+            gizmos_drawn = true;
           }
 
           if (textureID != nullptr) {
@@ -705,6 +707,12 @@ QRhiTexture* olive::rendering::compose_sequence(ComposeSequenceParams& params) {
     if (got_mutex) {
       c->state_change_lock.unlock();
     }
+  }
+
+  // Clear gizmos if the clip wasn't rendered this frame (e.g. playhead at clip end).
+  // Prevents ViewerOverlay from drawing stale gizmo positions.
+  if (params.gizmos != nullptr && !gizmos_drawn) {
+    params.gizmos = nullptr;
   }
 
   if (audio_track_count == 0) {

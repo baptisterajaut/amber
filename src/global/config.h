@@ -586,6 +586,22 @@ struct Config {
   int frame_skip_step{5};
 
   /**
+   * @brief Snap playhead to last frame of outgoing clip
+   *
+   * When snapping the playhead to a clip boundary, **TRUE** shows the last frame of the outgoing clip
+   * (snaps to timeline_out - 1), **FALSE** shows the first frame of the incoming clip (snaps to timeline_out).
+   * Hold the snap_outgoing_modifier key to temporarily invert this setting.
+   */
+  bool snap_to_outgoing_clip{true};
+
+  /**
+   * @brief Modifier key to invert snap_to_outgoing_clip behavior
+   *
+   * 0 = Shift, 1 = Ctrl, 2 = Alt
+   */
+  int snap_outgoing_modifier{0};
+
+  /**
    * @brief Show ruler guides in the sequence viewer
    */
   bool show_guides{false};

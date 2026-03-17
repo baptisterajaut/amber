@@ -299,6 +299,7 @@ void RenderThread::paint() {
   params.gizmos = gizmos;
 
   olive::rendering::compose_sequence(params);
+  gizmos = params.gizmos;  // nulled by compose_sequence if clip wasn't rendered
 
   // CPU readback
   {
