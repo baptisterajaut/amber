@@ -215,8 +215,12 @@ void AudioSenderThread::run() {
 }
 
 int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
-  // send audio to device
-  qint64 actual_write = audio_io_device->write(reinterpret_cast<const char*>(audio_ibuffer)+offset, max);
+  bool mute = audio_scrub.load();
+
+  // During scrub: consume the buffer for VU metering but don't send to audio device (avoids clicks)
+  qint64 actual_write = mute
+    ? max
+    : audio_io_device->write(reinterpret_cast<const char*>(audio_ibuffer)+offset, max);
 
   qint64 audio_ibuffer_limit = audio_ibuffer_read + actual_write;
 
@@ -246,7 +250,8 @@ int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
 
   audio_ibuffer_read = audio_ibuffer_limit;
 
-  return actual_write;
+  // Return 0 when muted to prevent a second drain pass from overwriting VU with zeros
+  return mute ? 0 : actual_write;
 }
 
 double log_volume(double linear) {
