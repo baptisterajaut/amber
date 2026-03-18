@@ -89,6 +89,15 @@ jobs:
           mkdir -p Amber.app/Contents/Resources
           cp Amber Amber.app/Contents/MacOS/Amber
           cp ../packaging/macos/olive.icns Amber.app/Contents/Resources/amber.icns
+          # Shader effects (XML + GLSL)
+          mkdir -p Amber.app/Contents/Effects
+          cp effects/*.xml effects/*.frag effects/*.vert Amber.app/Contents/Effects/ 2>/dev/null || true
+          # Frei0r plugins (pre-built from upstream release)
+          curl -sL -o /tmp/frei0r.zip \
+            "https://github.com/dyne/frei0r/releases/download/v2.5.4/frei0r-v2.5.4_osx.zip"
+          mkdir -p /tmp/frei0r && cd /tmp/frei0r && unzip -q /tmp/frei0r.zip
+          cp -r /tmp/frei0r/frei0r-*/. Amber.app/Contents/Effects/frei0r-1/ 2>/dev/null || true
+          cd "$OLDPWD"
           cat > Amber.app/Contents/Info.plist <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

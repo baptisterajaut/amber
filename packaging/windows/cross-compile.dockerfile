@@ -39,9 +39,15 @@ RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release \
 # --- Packaging stage ---
 FROM build AS package
 
-RUN dnf install -y curl mingw64-nsis mingw-nsis-base && dnf clean all
+RUN dnf install -y curl unzip mingw64-nsis mingw-nsis-base && dnf clean all
 
 COPY packaging/ /packaging/
+
+# Download pre-built Frei0r plugins for Windows
+RUN curl -sL -o /tmp/frei0r.zip \
+      "https://github.com/dyne/frei0r/releases/download/v2.5.4/frei0r-v2.5.4_win64.zip" && \
+    mkdir -p /tmp/frei0r && cd /tmp/frei0r && unzip -q /tmp/frei0r.zip && \
+    rm /tmp/frei0r.zip
 
 # Collect everything into /out
 RUN SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \
@@ -52,6 +58,7 @@ RUN SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \
     cp "${SYSROOT}/lib/qt6/plugins/imageformats/"*.dll /out/imageformats/ 2>/dev/null || true && \
     cp "${SYSROOT}/lib/qt6/plugins/multimedia/"*.dll /out/multimedia/ 2>/dev/null || true && \
     cp /src/effects/shaders/*.xml /src/effects/shaders/*.frag /src/effects/shaders/*.vert /out/effects/ 2>/dev/null || true && \
+    cp -r /tmp/frei0r/frei0r-*/. /out/effects/frei0r-1/ 2>/dev/null || true && \
     cp /src/build/*.qm /out/ts/ 2>/dev/null || true
 
 # makensis hardcodes x86-unicode but mingw64-nsis ships amd64-unicode

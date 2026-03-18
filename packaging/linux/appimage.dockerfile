@@ -27,7 +27,6 @@ RUN apt-get update && apt-get install -y \
     libxkbcommon-dev libxkbcommon-x11-dev libxrender-dev \
     libavformat-dev libavcodec-dev libavutil-dev \
     libswscale-dev libswresample-dev libavfilter-dev \
-    frei0r-plugins-dev \
     libvulkan-dev \
     curl file libfuse2 \
     && rm -rf /var/lib/apt/lists/*
