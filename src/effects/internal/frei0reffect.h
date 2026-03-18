@@ -24,7 +24,7 @@
 #ifndef NOFREI0R
 
 #include <QLibrary>
-#include <frei0r.h>
+#include "include/frei0r.h"
 
 #include "effects/effect.h"
 

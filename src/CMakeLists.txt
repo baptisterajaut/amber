@@ -46,8 +46,8 @@ find_package(FFMPEG 3.4 REQUIRED
   swresample
 )
 
-find_package(frei0r)
-if(NOT FREI0R_FOUND)
+option(NOFREI0R "Disable Frei0r plugin support" OFF)
+if(NOFREI0R)
   list(APPEND OLIVE_DEFINITIONS -DNOFREI0R)
 endif()
 

@@ -33,7 +33,7 @@
 #include <QDebug>
 
 #ifndef NOFREI0R
-#include <frei0r.h>
+#include "include/frei0r.h"
 using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
 #endif
 
