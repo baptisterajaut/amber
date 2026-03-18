@@ -35,7 +35,7 @@ void Cacher::CacheVideoWorker() {
   }
 
   // is this media a still image?
-  if (clip->media_stream()->infinite_length) {
+  if (clip->media_stream() != nullptr && clip->media_stream()->infinite_length) {
 
     // for efficiency, we do slightly different things for a still image
 

@@ -183,7 +183,9 @@ void CloseAllClipsCommand::doUndo() {
 }
 
 void CloseAllClipsCommand::doRedo() {
-  close_active_clips(olive::ActiveSequence.get());
+  if (olive::ActiveSequence != nullptr) {
+    close_active_clips(olive::ActiveSequence.get());
+  }
 }
 
 void UpdateViewer::doUndo() {
@@ -191,5 +193,7 @@ void UpdateViewer::doUndo() {
 }
 
 void UpdateViewer::doRedo() {
-  panel_sequence_viewer->viewer_widget->frame_update();
+  if (panel_sequence_viewer != nullptr) {
+    panel_sequence_viewer->viewer_widget->frame_update();
+  }
 }

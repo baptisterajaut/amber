@@ -514,7 +514,7 @@ void PreviewGenerator::generate_waveform() {
     av_packet_free(&packet);
 
     for (unsigned int i=0;i<fmt_ctx_->nb_streams;i++) {
-      if (waveform_cache_data[i] != nullptr) {
+      if (waveform_cache_data[i] != nullptr && codec_ctx[i] != nullptr) {
         for (int j=0;j<codec_ctx[i]->ch_layout.nb_channels;j++) {
           delete [] waveform_cache_data[i][j];
         }

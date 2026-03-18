@@ -357,7 +357,9 @@ QRhiTexture* olive::rendering::compose_sequence(ComposeSequenceParams& params) {
 
   if (!params.nests.isEmpty()) {
     for (auto nest : params.nests) {
+      if (nest->media() == nullptr) continue;
       s = nest->media()->to_sequence().get();
+      if (s == nullptr) continue;
       playhead += nest->clip_in(true) - nest->timeline_in(true);
       playhead = rescale_frame_number(playhead, nest->sequence->frame_rate, s->frame_rate);
     }
@@ -563,7 +565,7 @@ QRhiTexture* olive::rendering::compose_sequence(ComposeSequenceParams& params) {
             QRhiTextureRenderTarget* back_target1;
             QRhiTexture* back_tex1;
             QRhiRenderPassDescriptor* back_rpd;
-            if (params.nests.size() > 0) {
+            if (params.nests.size() > 0 && params.nests.last()->fbo_rhi != nullptr) {
               ClipRhiResources* nestRes = static_cast<ClipRhiResources*>(params.nests.last()->fbo_rhi);
               back_target1 = nestRes->rt[1];
               back_tex1 = nestRes->tex[1];

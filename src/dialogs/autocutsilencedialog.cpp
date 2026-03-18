@@ -119,6 +119,8 @@ void AutoCutSilenceDialog::accept() {
 }
 
 void AutoCutSilenceDialog::cut_silence() {
+  if (olive::ActiveSequence == nullptr) return;
+
   ComboAction* ca = new ComboAction();
 
   // Loop over clips provided to this dialog

@@ -177,6 +177,10 @@ bool ExportThread::SetupVideo() {
   }
 
   // Create raw AVFrame that will contain the RGBA buffer straight from compositing
+  if (olive::ActiveSequence == nullptr) {
+    export_error = tr("no active sequence");
+    return false;
+  }
   video_frame = av_frame_alloc();
   av_frame_make_writable(video_frame);
   video_frame->format = AV_PIX_FMT_RGBA;

@@ -84,7 +84,7 @@ void OliveGlobal::update_project_filename(const QString &s) {
   olive::ActiveProjectFilename = s;
 
   // update main window title to reflect new project filename
-  olive::MainWindow->updateTitle();
+  if (olive::MainWindow != nullptr) olive::MainWindow->updateTitle();
 }
 
 void OliveGlobal::check_for_autorecovery_file() {
@@ -120,12 +120,14 @@ void OliveGlobal::set_rendering_state(bool rendering) {
 
 void OliveGlobal::set_modified(bool modified)
 {
+  if (olive::MainWindow == nullptr) return;
   olive::MainWindow->setWindowModified(modified);
   changed_since_last_autorecovery = modified;
 }
 
 bool OliveGlobal::is_modified()
 {
+  if (olive::MainWindow == nullptr) return false;
   return olive::MainWindow->isWindowModified();
 }
 
@@ -433,7 +435,7 @@ void OliveGlobal::open_about_dialog() {
 }
 
 void OliveGlobal::open_debug_log() {
-  olive::DebugDialog->show();
+  if (olive::DebugDialog != nullptr) olive::DebugDialog->show();
 }
 
 void OliveGlobal::open_speed_dialog() {

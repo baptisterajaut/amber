@@ -83,7 +83,8 @@ void SetTimelineInOutCommand::doUndo() {
   seq->workarea_out = old_out;
 
   // footage viewer functions
-  if (seq->wrapper_sequence) {
+  if (seq->wrapper_sequence && !seq->clips.isEmpty()
+      && seq->clips.at(0) != nullptr && seq->clips.at(0)->media() != nullptr) {
     Footage* m = seq->clips.at(0)->media()->to_footage();
     m->using_inout = old_enabled;
     m->in = old_in;
@@ -101,7 +102,8 @@ void SetTimelineInOutCommand::doRedo() {
   seq->workarea_out = new_out;
 
   // footage viewer functions
-  if (seq->wrapper_sequence) {
+  if (seq->wrapper_sequence && !seq->clips.isEmpty()
+      && seq->clips.at(0) != nullptr && seq->clips.at(0)->media() != nullptr) {
     Footage* m = seq->clips.at(0)->media()->to_footage();
     m->using_inout = new_enabled;
     m->in = new_in;

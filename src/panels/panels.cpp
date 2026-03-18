@@ -38,13 +38,15 @@ Timeline* panel_timeline = nullptr;
 GraphEditor* panel_graph_editor = nullptr;
 
 void update_ui(bool modified) {
-  if (modified) {
-    panel_effect_controls->SetClips();
+  if (panel_effect_controls != nullptr) {
+    if (modified) {
+      panel_effect_controls->SetClips();
+    }
+    panel_effect_controls->update_keyframes();
   }
-  panel_effect_controls->update_keyframes();
-  panel_timeline->repaint_timeline();
-  panel_sequence_viewer->update_viewer();
-  panel_graph_editor->update_panel();
+  if (panel_timeline != nullptr) panel_timeline->repaint_timeline();
+  if (panel_sequence_viewer != nullptr) panel_sequence_viewer->update_viewer();
+  if (panel_graph_editor != nullptr) panel_graph_editor->update_panel();
 }
 
 QDockWidget *get_focused_panel(bool force_hover) {

@@ -32,6 +32,8 @@
 #include "undo/undostack.h"
 
 void Timeline::copy(bool del) {
+  if (olive::ActiveSequence == nullptr) return;
+
   bool cleared = false;
   bool copied = false;
 
@@ -90,6 +92,8 @@ void Timeline::copy(bool del) {
 }
 
 void Timeline::relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>& new_clips) {
+  if (olive::ActiveSequence == nullptr) return;
+
   // relink pasted clips
   for (int i=0;i<old_clips.size();i++) {
     // these indices should correspond
@@ -107,6 +111,7 @@ void Timeline::relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>&
 }
 
 void Timeline::paste(bool insert) {
+  if (olive::ActiveSequence == nullptr) return;
   if (clipboard.size() > 0) {
     if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
       ComboAction* ca = new ComboAction();

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
-project(amber-editor VERSION 1.2.1 LANGUAGES CXX)
+project(amber-editor VERSION 1.2.2 LANGUAGES CXX)
 
 option(BUILD_DOXYGEN "Build Doxygen documentation" OFF)
 

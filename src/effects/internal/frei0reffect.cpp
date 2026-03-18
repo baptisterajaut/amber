@@ -144,11 +144,13 @@ void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *outpu
   f0rSetParamValue set_param = reinterpret_cast<f0rSetParamValue>(handle.resolve("f0r_set_param_value"));
   if (set_param == nullptr) return;
 
-  for (int i=0;i<param_count;i++) {
-    EffectRow* param_row = row(i);
-
+  for (int i=0, row_idx=0; i<param_count; i++) {
     f0r_param_info_t param_info;
     get_param_info(&param_info, i);
+
+    if (param_info.type < 0 || param_info.type > F0R_PARAM_STRING) continue;
+
+    EffectRow* param_row = row(row_idx++);
 
     switch (param_info.type) {
     case F0R_PARAM_BOOL:

@@ -266,6 +266,7 @@ bool frame_rate_is_droppable(double rate) {
 }
 
 void Viewer::seek(long p) {
+  if (seq == nullptr) return;
   pause();
   if (main_sequence) {
     seq->playhead = p;
@@ -452,6 +453,7 @@ void Viewer::pause() {
       panel_project->process_file_list(file_list);
 
       // add it to the sequence
+      if (panel_project->last_imported_media.isEmpty()) return;
       ClipPtr c = std::make_shared<Clip>(seq.get());
       Media* m = panel_project->last_imported_media.at(0);
       Footage* f = m->to_footage();
@@ -609,7 +611,10 @@ void Viewer::set_zoom_value(double d) {
   }
 }
 
-void Viewer::set_sb_max() { headers->set_scrollbar_max(horizontal_bar, seq->getEndFrame(), headers->width()); }
+void Viewer::set_sb_max() {
+  if (seq == nullptr) return;
+  headers->set_scrollbar_max(horizontal_bar, seq->getEndFrame(), headers->width());
+}
 
 void Viewer::set_playback_speed(int s) {
   pause();

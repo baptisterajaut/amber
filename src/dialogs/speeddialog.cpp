@@ -61,7 +61,9 @@ SpeedDialog::SpeedDialog(QWidget *parent, QVector<Clip*> clips) : QDialog(parent
   grid->addWidget(new QLabel(tr("Duration:"), this), 2, 0);
   duration = new LabelSlider(this);
   duration->SetDisplayType(LabelSlider::FrameNumber);
-  duration->SetFrameRate(olive::ActiveSequence->frame_rate);
+  if (olive::ActiveSequence != nullptr) {
+    duration->SetFrameRate(olive::ActiveSequence->frame_rate);
+  }
   grid->addWidget(duration, 2, 1);
 
   main_layout->addLayout(grid);

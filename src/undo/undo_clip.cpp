@@ -284,13 +284,16 @@ void SetClipProperty::MainLoop(bool undo)
 
 void SetClipProperty::doUndo() {
   MainLoop(true);
-  panel_sequence_viewer->viewer_widget->frame_update();
-
+  if (panel_sequence_viewer != nullptr) {
+    panel_sequence_viewer->viewer_widget->frame_update();
+  }
 }
 
 void SetClipProperty::doRedo() {
   MainLoop(false);
-  panel_sequence_viewer->viewer_widget->frame_update();
+  if (panel_sequence_viewer != nullptr) {
+    panel_sequence_viewer->viewer_widget->frame_update();
+  }
 }
 
 SetSpeedAction::SetSpeedAction(Clip* c, double speed) {

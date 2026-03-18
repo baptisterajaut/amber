@@ -92,7 +92,9 @@ bool EffectControls::keyframe_focus() {
 void EffectControls::set_zoom(bool in) {
   zoom *= (in) ? 2 : 0.5;
   update_keyframes();
-  scroll_to_frame(olive::ActiveSequence->playhead);
+  if (olive::ActiveSequence != nullptr) {
+    scroll_to_frame(olive::ActiveSequence->playhead);
+  }
 }
 
 void EffectControls::menu_select(QAction* q) {
@@ -125,7 +127,9 @@ void EffectControls::menu_select(QAction* q) {
     update_ui(true);
   } else {
     Reload();
-    panel_sequence_viewer->viewer_widget->frame_update();
+    if (panel_sequence_viewer != nullptr) {
+      panel_sequence_viewer->viewer_widget->frame_update();
+    }
   }
 }
 
