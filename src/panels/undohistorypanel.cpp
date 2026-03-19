@@ -24,18 +24,29 @@
 #include <QVBoxLayout>
 
 #include "engine/undo/undostack.h"
+#include "panels.h"
 
 UndoHistoryPanel::UndoHistoryPanel(QWidget* parent) : Panel(parent) {
   setObjectName("undo_history");
-  setWindowTitle(tr("Undo History"));
 
   QWidget* central = new QWidget(this);
   QVBoxLayout* layout = new QVBoxLayout(central);
   layout->setContentsMargins(0, 0, 0, 0);
 
   view_ = new QUndoView(&amber::UndoStack, this);
-  view_->setEmptyLabel(tr("Initial State"));
   layout->addWidget(view_);
 
   setWidget(central);
+
+  // QUndoView calls QUndoStack::setIndex() when the user clicks an entry,
+  // but that bypasses OliveGlobal::undo()/redo() which normally refresh the UI.
+  // Connect indexChanged to update_ui so all panels repaint after navigation.
+  connect(&amber::UndoStack, &QUndoStack::indexChanged, this, [](int) {
+    update_ui(true);
+  });
+}
+
+void UndoHistoryPanel::Retranslate() {
+  setWindowTitle(tr("Undo History"));
+  view_->setEmptyLabel(tr("Initial State"));
 }

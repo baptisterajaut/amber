@@ -29,7 +29,7 @@ class UndoHistoryPanel : public Panel {
   Q_OBJECT
  public:
   explicit UndoHistoryPanel(QWidget* parent);
-  void Retranslate() override {}
+  void Retranslate() override;
 
  private:
   QUndoView* view_;

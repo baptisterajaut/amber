@@ -82,6 +82,10 @@
         <source>Release Time:</source>
         <translation>Čas uvolnění:</translation>
     </message>
+    <message>
+        <source>Auto-Cut Silence</source>
+        <translation>Automaticky odstranit ticho</translation>
+    </message>
 </context>
 <context>
     <name>Cacher</name>
@@ -126,6 +130,10 @@
     <message>
         <source>(multiple)</source>
         <translation>(více)</translation>
+    </message>
+    <message>
+        <source>Edit Clip Properties</source>
+        <translation>Upravit vlastnosti klipu</translation>
     </message>
 </context>
 <context>
@@ -237,6 +245,22 @@
         <source>No candidate for effect &apos;%1&apos;. This effect may be corrupt. Try reinstalling it or Amber.</source>
         <translation>Žádný kandidát pro efekt &apos;%1&apos;. Tento efekt může být poškozen. Zkuste ho přeinstalovat nebo Amber.</translation>
     </message>
+    <message>
+        <source>Delete Effect</source>
+        <translation>Smazat efekt</translation>
+    </message>
+    <message>
+        <source>Move Effect Up</source>
+        <translation>Posunout efekt nahoru</translation>
+    </message>
+    <message>
+        <source>Move Effect Down</source>
+        <translation>Posunout efekt dolů</translation>
+    </message>
+    <message>
+        <source>Move Gizmo</source>
+        <translation>Přesunout gizmo</translation>
+    </message>
 </context>
 <context>
     <name>EffectControls</name>
@@ -272,6 +296,18 @@
         <source>AUDIO EFFECTS</source>
         <translation>ZVUKOVÉ EFEKTY</translation>
     </message>
+    <message>
+        <source>Add Effect</source>
+        <translation>Přidat efekt</translation>
+    </message>
+    <message>
+        <source>Cut Effect(s)</source>
+        <translation>Vyjmout efekt(y)</translation>
+    </message>
+    <message>
+        <source>Delete Effect(s)</source>
+        <translation>Smazat efekt(y)</translation>
+    </message>
 </context>
 <context>
     <name>EffectRow</name>
@@ -282,6 +318,14 @@
     <message>
         <source>Disabling keyframes will delete all current keyframes. Are you sure you want to do this?</source>
         <translation>Zákázání klíčových snímků smaže všechny nynější klíčové snímky. Opravdu to chcete udělat?</translation>
+    </message>
+    <message>
+        <source>Enable Keyframes</source>
+        <translation>Povolit klíčové snímky</translation>
+    </message>
+    <message>
+        <source>Toggle Keyframe</source>
+        <translation>Přepnout klíčový snímek</translation>
     </message>
 </context>
 <context>
@@ -490,6 +534,68 @@
         <source>%p% (ETA: %1:%2:%3)</source>
         <translation>%p% (odhadovaný čas dokončení: %1:%2:%3)</translation>
     </message>
+    <message>
+        <source>Preset:</source>
+        <translation>Předvolba:</translation>
+    </message>
+    <message>
+        <source>Save Preset...</source>
+        <translation>Uložit předvolbu...</translation>
+    </message>
+    <message>
+        <source>Default</source>
+        <translation>Výchozí</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>Chyba</translation>
+    </message>
+    <message>
+        <source>Could not save preset file:
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not open preset file:
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Failed to parse preset file:
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ExportSavePresetDialog</name>
+    <message>
+        <source>Save Export Preset</source>
+        <translation>Uložit předvolbu exportu</translation>
+    </message>
+    <message>
+        <source>Preset Name:</source>
+        <translation>Název předvolby:</translation>
+    </message>
+    <message>
+        <source>Existing Presets:</source>
+        <translation>Existující předvolby:</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>Chyba</translation>
+    </message>
+    <message>
+        <source>Please enter a preset name.</source>
+        <translation>Zadejte název předvolby.</translation>
+    </message>
+    <message>
+        <source>Overwrite Preset</source>
+        <translation>Přepsat předvolbu</translation>
+    </message>
+    <message>
+        <source>A preset named &quot;%1&quot; already exists. Overwrite?</source>
+        <translation>Předvolba s názvem „%1&quot; již existuje. Přepsat?</translation>
+    </message>
 </context>
 <context>
     <name>ExportThread</name>
@@ -561,6 +667,10 @@
         <source>could not allocate audio stream</source>
         <translation>Nepodařilo se přiřadit datový proud zvuku</translation>
     </message>
+    <message>
+        <source>no active sequence</source>
+        <translation>žádná aktivní sekvence</translation>
+    </message>
 </context>
 <context>
     <name>FillLeftRightEffect</name>
@@ -575,6 +685,41 @@
     <message>
         <source>Fill Right with Left</source>
         <translation>Vyplnit pravý levým</translation>
+    </message>
+</context>
+<context>
+    <name>FootageRelinkDialog</name>
+    <message>
+        <source>Relink Media</source>
+        <translation>Znovu propojit média</translation>
+    </message>
+    <message>
+        <source>Filename</source>
+        <translation>Název souboru</translation>
+    </message>
+    <message>
+        <source>Last Known Path</source>
+        <translation>Poslední známá cesta</translation>
+    </message>
+    <message>
+        <source>Status</source>
+        <translation>Stav</translation>
+    </message>
+    <message>
+        <source>Browse...</source>
+        <translation>Procházet...</translation>
+    </message>
+    <message>
+        <source>Skip</source>
+        <translation>Přeskočit</translation>
+    </message>
+    <message>
+        <source>Relink &quot;%1&quot;</source>
+        <translation>Znovu propojit „%1&quot;</translation>
+    </message>
+    <message>
+        <source>Relinked</source>
+        <translation>Znovu propojeno</translation>
     </message>
 </context>
 <context>
@@ -629,6 +774,18 @@
         <source>Reset View</source>
         <translation>Obnovit výchozí zvětšení</translation>
     </message>
+    <message>
+        <source>Add Keyframe</source>
+        <translation>Přidat klíčový snímek</translation>
+    </message>
+    <message>
+        <source>Move Keyframe(s)</source>
+        <translation>Přesunout klíčový(é) snímek(ky)</translation>
+    </message>
+    <message>
+        <source>Change Keyframe Type</source>
+        <translation>Změnit typ klíčového snímku</translation>
+    </message>
 </context>
 <context>
     <name>InterlacingName</name>
@@ -657,6 +814,61 @@
     </message>
 </context>
 <context>
+    <name>KeyframePropertiesDialog</name>
+    <message>
+        <source>Keyframe Properties</source>
+        <translation>Vlastnosti klíčového snímku</translation>
+    </message>
+    <message>
+        <source>Multiple Keyframe Properties</source>
+        <translation>Vlastnosti více klíčových snímků</translation>
+    </message>
+    <message>
+        <source>Time:</source>
+        <translation>Čas:</translation>
+    </message>
+    <message>
+        <source>Type:</source>
+        <translation>Typ:</translation>
+    </message>
+    <message>
+        <source>Linear</source>
+        <translation>Lineární</translation>
+    </message>
+    <message>
+        <source>Bezier</source>
+        <translation>Bézier</translation>
+    </message>
+    <message>
+        <source>Hold</source>
+        <translation>Podržet</translation>
+    </message>
+    <message>
+        <source>(multiple)</source>
+        <translation>(více)</translation>
+    </message>
+    <message>
+        <source>Bezier In Handle:</source>
+        <translation>Bézier vstupní úchyt:</translation>
+    </message>
+    <message>
+        <source>X:</source>
+        <translation>X:</translation>
+    </message>
+    <message>
+        <source>Y:</source>
+        <translation>Y:</translation>
+    </message>
+    <message>
+        <source>Bezier Out Handle:</source>
+        <translation>Bézier výstupní úchyt:</translation>
+    </message>
+    <message>
+        <source>Edit Keyframe</source>
+        <translation>Upravit klíčový snímek</translation>
+    </message>
+</context>
+<context>
     <name>KeyframeView</name>
     <message>
         <source>Hold</source>
@@ -669,6 +881,18 @@
     <message>
         <source>Linear</source>
         <translation>Lineární</translation>
+    </message>
+    <message>
+        <source>Properties...</source>
+        <translation>Vlastnosti...</translation>
+    </message>
+    <message>
+        <source>Change Keyframe Type</source>
+        <translation>Změnit typ klíčového snímku</translation>
+    </message>
+    <message>
+        <source>Move Keyframe(s)</source>
+        <translation>Přesunout klíčový(é) snímek(ky)</translation>
     </message>
 </context>
 <context>
@@ -1142,6 +1366,26 @@
         <source>Lock Guides</source>
         <translation>Zamknout vodítka</translation>
     </message>
+    <message>
+        <source>Relink Media...</source>
+        <translation>Znovu propojit média...</translation>
+    </message>
+    <message>
+        <source>Undo History</source>
+        <translation>Historie kroků zpět</translation>
+    </message>
+    <message>
+        <source>Color Labels</source>
+        <translation>Barevné štítky</translation>
+    </message>
+    <message>
+        <source>Relink Media</source>
+        <translation>Znovu propojit média</translation>
+    </message>
+    <message>
+        <source>All media is linked.</source>
+        <translation>Všechna média jsou propojena.</translation>
+    </message>
 </context>
 <context>
     <name>Marker</name>
@@ -1156,6 +1400,49 @@
     <message>
         <source>Set sequence marker name:</source>
         <translation>Nastavit název značky úryvku (sledu záběrů):</translation>
+    </message>
+    <message>
+        <source>Add Marker</source>
+        <translation>Přidat značku</translation>
+    </message>
+</context>
+<context>
+    <name>MarkerPropertiesDialog</name>
+    <message>
+        <source>&quot;%1&quot; Marker Properties</source>
+        <translation>Vlastnosti značky „%1&quot;</translation>
+    </message>
+    <message>
+        <source>Untitled</source>
+        <translation>Bez názvu</translation>
+    </message>
+    <message>
+        <source>Multiple Marker Properties</source>
+        <translation>Vlastnosti více značek</translation>
+    </message>
+    <message>
+        <source>Name:</source>
+        <translation>Název:</translation>
+    </message>
+    <message>
+        <source>(multiple)</source>
+        <translation>(více)</translation>
+    </message>
+    <message>
+        <source>Frame:</source>
+        <translation>Snímek:</translation>
+    </message>
+    <message>
+        <source>Color:</source>
+        <translation>Barva:</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Žádný</translation>
+    </message>
+    <message>
+        <source>Edit Marker</source>
+        <translation>Upravit značku</translation>
     </message>
 </context>
 <context>
@@ -1266,6 +1553,10 @@ Rozložení zvuku: %6</translation>
     <message>
         <source>Tracks:</source>
         <translation>Stopy:</translation>
+    </message>
+    <message>
+        <source>Edit Media Properties</source>
+        <translation>Upravit vlastnosti média</translation>
     </message>
 </context>
 <context>
@@ -1469,6 +1760,14 @@ Rozložení zvuku: %6</translation>
         <source>Height:</source>
         <translation>Výška:</translation>
     </message>
+    <message>
+        <source>Create Sequence</source>
+        <translation>Vytvořit sekvenci</translation>
+    </message>
+    <message>
+        <source>Edit Sequence</source>
+        <translation>Upravit sekvenci</translation>
+    </message>
 </context>
 <context>
     <name>OliveGlobal</name>
@@ -1531,6 +1830,14 @@ Rozložení zvuku: %6</translation>
     <message>
         <source>Amber didn&apos;t close properly and an autorecovery file was detected. Would you like to open it?</source>
         <translation>Amber nebyl správně ukončen a byl nalezen soubor automatického obnovení. Chcete jej otevřít?</translation>
+    </message>
+    <message>
+        <source>Project Already Empty</source>
+        <translation>Projekt je již prázdný</translation>
+    </message>
+    <message>
+        <source>You already have a bare project. If you&apos;re trying to activate the timeline, you need to create a new sequence (File &gt; New &gt; Sequence, or %1).</source>
+        <translation>Již máte prázdný projekt. Pro aktivaci časové osy vytvořte novou sekvenci (Soubor &gt; Nový &gt; Sekvence, nebo %1).</translation>
     </message>
 </context>
 <context>
@@ -1862,6 +2169,86 @@ Rozložení zvuku: %6</translation>
         <source>Jump Step:</source>
         <translation>Krok skoku:</translation>
     </message>
+    <message>
+        <source>Default Still Image Length:</source>
+        <translation>Výchozí délka statického obrázku:</translation>
+    </message>
+    <message>
+        <source>Auto-Recovery</source>
+        <translation>Automatické obnovení</translation>
+    </message>
+    <message>
+        <source>Enable Auto-Recovery</source>
+        <translation>Povolit automatické obnovení</translation>
+    </message>
+    <message>
+        <source>Interval (minutes):</source>
+        <translation>Interval (minuty):</translation>
+    </message>
+    <message>
+        <source>Maximum Versions:</source>
+        <translation>Maximální počet verzí:</translation>
+    </message>
+    <message>
+        <source>Snap Playhead to Last Frame of Outgoing Clip</source>
+        <translation>Přichytit kurzor k poslednímu snímku odchozího klipu</translation>
+    </message>
+    <message>
+        <source>When snapping the playhead to a clip boundary, show the last frame of the outgoing clip instead of the first frame of the incoming clip</source>
+        <translation>Při přichycení kurzoru k hranici klipu zobrazit poslední snímek odchozího klipu místo prvního snímku příchozího</translation>
+    </message>
+    <message>
+        <source>Invert Snap Modifier:</source>
+        <translation>Modifikátor inverze přichytávání:</translation>
+    </message>
+    <message>
+        <source>Shift</source>
+        <translation>Shift</translation>
+    </message>
+    <message>
+        <source>Ctrl</source>
+        <translation>Ctrl</translation>
+    </message>
+    <message>
+        <source>Alt</source>
+        <translation>Alt</translation>
+    </message>
+    <message>
+        <source>Hold this key while seeking to invert the snap-to-outgoing-clip behavior</source>
+        <translation>Podržte tuto klávesu při hledání pro inverzi chování přichytávání k odchozímu klipu</translation>
+    </message>
+    <message>
+        <source>Use Last Keyframe Type as Default</source>
+        <translation>Použít poslední typ klíčového snímku jako výchozí</translation>
+    </message>
+    <message>
+        <source>When enabled, changing a keyframe&apos;s type also updates the default type for new keyframes</source>
+        <translation>Když je povoleno, změna typu klíčového snímku také aktualizuje výchozí typ pro nové klíčové snímky</translation>
+    </message>
+    <message>
+        <source>Default Type:</source>
+        <translation>Výchozí typ:</translation>
+    </message>
+    <message>
+        <source>Linear</source>
+        <translation>Lineární</translation>
+    </message>
+    <message>
+        <source>Bezier</source>
+        <translation>Bézier</translation>
+    </message>
+    <message>
+        <source>Hold</source>
+        <translation>Podržet</translation>
+    </message>
+    <message>
+        <source>Allow Effect Properties panel to be smaller than its content</source>
+        <translation>Povolit panelu vlastností efektů být menší než jeho obsah</translation>
+    </message>
+    <message>
+        <source>When enabled, the Effect Properties panel can be resized narrower than its content. A horizontal scrollbar will appear to access clipped content.</source>
+        <translation>Když je povoleno, panel vlastností efektů může být zmenšen na užší rozměr než jeho obsah. Zobrazí se horizontální posuvník pro přístup k oříznutému obsahu.</translation>
+    </message>
 </context>
 <context>
     <name>PreviewGenerator</name>
@@ -1992,6 +2379,34 @@ Rozložení zvuku: %6</translation>
         <source>&quot;%1&quot; is an Olive project file. It will merge with this project. Do you wish to continue?</source>
         <translation>&quot;%1&quot; je soubor s projektem Olive. Sloučí se s tímto projektem. Chcete pokračovat?</translation>
     </message>
+    <message>
+        <source>Duplicate Sequence</source>
+        <translation>Duplikovat sekvenci</translation>
+    </message>
+    <message>
+        <source>Replace Media</source>
+        <translation>Nahradit médium</translation>
+    </message>
+    <message>
+        <source>Rename Media</source>
+        <translation>Přejmenovat médium</translation>
+    </message>
+    <message>
+        <source>New Folder</source>
+        <translation>Nová složka</translation>
+    </message>
+    <message>
+        <source>Delete Media</source>
+        <translation>Smazat média</translation>
+    </message>
+    <message>
+        <source>Import Media</source>
+        <translation>Importovat média</translation>
+    </message>
+    <message>
+        <source>Delete Clips</source>
+        <translation>Smazat klipy</translation>
+    </message>
 </context>
 <context>
     <name>ProxyDialog</name>
@@ -2064,6 +2479,49 @@ Rozložení zvuku: %6</translation>
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>Change Value</source>
+        <translation>Změnit hodnotu</translation>
+    </message>
+    <message>
+        <source>Change Color</source>
+        <translation>Změnit barvu</translation>
+    </message>
+    <message>
+        <source>Change Font</source>
+        <translation>Změnit písmo</translation>
+    </message>
+    <message>
+        <source>Delete Keyframe(s)</source>
+        <translation>Smazat klíčový(é) snímek(ky)</translation>
+    </message>
+    <message>
+        <source>Rename Media</source>
+        <translation>Přejmenovat médium</translation>
+    </message>
+    <message>
+        <source>Color Label</source>
+        <translation>Barevný štítek</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Žádný</translation>
+    </message>
+    <message>
+        <source>Enable Effect</source>
+        <translation>Povolit efekt</translation>
+    </message>
+    <message>
+        <source>Disable Effect</source>
+        <translation>Zakázat efekt</translation>
+    </message>
+    <message>
+        <source>Set Color Label</source>
+        <translation>Nastavit barevný štítek</translation>
+    </message>
+</context>
+<context>
     <name>ReplaceClipMediaDialog</name>
     <message>
         <source>No media selected</source>
@@ -2116,6 +2574,10 @@ Rozložení zvuku: %6</translation>
     <message>
         <source>Select which media you want to replace this media&apos;s clips with:</source>
         <translation>Vyberte, kterým záznamem chcete nahradit záběry tohoto záznamu:</translation>
+    </message>
+    <message>
+        <source>Replace Clip Media</source>
+        <translation>Nahradit médium klipu</translation>
     </message>
 </context>
 <context>
@@ -2364,6 +2826,22 @@ Rozložení zvuku: %6</translation>
         <source>You dropped a file onto &apos;%1&apos;. Would you like to replace it with the dropped file?</source>
         <translation>Upustil jste soubor na &apos;%1&apos;. Chcete jej nahradit upuštěným souborem?</translation>
     </message>
+    <message>
+        <source>Create Sequence</source>
+        <translation>Vytvořit sekvenci</translation>
+    </message>
+    <message>
+        <source>Open Sequence</source>
+        <translation>Otevřít sekvenci</translation>
+    </message>
+    <message>
+        <source>Move Media</source>
+        <translation>Přesunout médium</translation>
+    </message>
+    <message>
+        <source>Rename Media</source>
+        <translation>Přejmenovat médium</translation>
+    </message>
 </context>
 <context>
     <name>SpeedDialog</name>
@@ -2394,6 +2872,26 @@ Rozložení zvuku: %6</translation>
     <message>
         <source>Speed/Duration</source>
         <translation>Rychlost/Doba trvání</translation>
+    </message>
+    <message>
+        <source>Loop Mode:</source>
+        <translation>Režim smyčky:</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Žádný</translation>
+    </message>
+    <message>
+        <source>Loop</source>
+        <translation>Smyčka</translation>
+    </message>
+    <message>
+        <source>Clamp</source>
+        <translation>Zafixovat</translation>
+    </message>
+    <message>
+        <source>Change Speed</source>
+        <translation>Změnit rychlost</translation>
     </message>
 </context>
 <context>
@@ -2710,12 +3208,92 @@ Rozložení zvuku: %6</translation>
         <source>Transition Tool</source>
         <translation>Nástroj pro přechod</translation>
     </message>
+    <message>
+        <source>Add Transition</source>
+        <translation>Přidat přechod</translation>
+    </message>
+    <message>
+        <source>Nest Clip(s)</source>
+        <translation>Vnořit klip(y)</translation>
+    </message>
+    <message>
+        <source>Ripple Delete In/Out</source>
+        <translation>Ripple smazání vstupního/výstupního bodu</translation>
+    </message>
+    <message>
+        <source>Delete In/Out</source>
+        <translation>Smazat vstupní/výstupní bod</translation>
+    </message>
+    <message>
+        <source>Toggle Clip(s)</source>
+        <translation>Přepnout klip(y)</translation>
+    </message>
+    <message>
+        <source>Ripple Delete</source>
+        <translation>Smazat s posunem</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Smazat</translation>
+    </message>
+    <message>
+        <source>Ripple Edit</source>
+        <translation>Ripple úprava</translation>
+    </message>
+    <message>
+        <source>Trim</source>
+        <translation>Oříznout</translation>
+    </message>
+    <message>
+        <source>Toggle Links</source>
+        <translation>Přepnout propojení</translation>
+    </message>
+    <message>
+        <source>Paste</source>
+        <translation>Vložit</translation>
+    </message>
+    <message>
+        <source>Paste Effect(s)</source>
+        <translation>Vložit efekt(y)</translation>
+    </message>
+    <message>
+        <source>Split Clip(s)</source>
+        <translation>Rozdělit klip(y)</translation>
+    </message>
 </context>
 <context>
     <name>TimelineHeader</name>
     <message>
         <source>Center Timecodes</source>
         <translation>Vystředit časové kódy</translation>
+    </message>
+    <message>
+        <source>Set In Point</source>
+        <translation>Nastavit vstupní bod</translation>
+    </message>
+    <message>
+        <source>Set Out Point</source>
+        <translation>Nastavit výstupní bod</translation>
+    </message>
+    <message>
+        <source>Resize Work Area</source>
+        <translation>Změnit velikost pracovní oblasti</translation>
+    </message>
+    <message>
+        <source>Move Marker(s)</source>
+        <translation>Přesunout značku(y)</translation>
+    </message>
+    <message>
+        <source>Delete Marker(s)</source>
+        <translation>Smazat značku(y)</translation>
+    </message>
+    <message>
+        <source>Set Color Label</source>
+        <translation>Nastavit barevný štítek</translation>
+    </message>
+    <message>
+        <source>Marker Properties...</source>
+        <translation>Vlastnosti značky...</translation>
     </message>
 </context>
 <context>
@@ -2814,6 +3392,34 @@ Doba trvání: %4</translation>
         <source>Custom Parameters</source>
         <translation>Vlastní parametry</translation>
     </message>
+    <message>
+        <source>Add Clip(s)</source>
+        <translation>Přidat klip(y)</translation>
+    </message>
+    <message>
+        <source>Create Clip</source>
+        <translation>Vytvořit klip</translation>
+    </message>
+    <message>
+        <source>Move Clip(s)</source>
+        <translation>Přesunout klip(y)</translation>
+    </message>
+    <message>
+        <source>Add Transition</source>
+        <translation>Přidat přechod</translation>
+    </message>
+    <message>
+        <source>Split Clip(s)</source>
+        <translation>Rozdělit klip(y)</translation>
+    </message>
+    <message>
+        <source>Select</source>
+        <translation>Vybrat</translation>
+    </message>
+    <message>
+        <source>Set Autoscale</source>
+        <translation>Nastavit automatické měřítko</translation>
+    </message>
 </context>
 <context>
     <name>ToneEffect</name>
@@ -2881,6 +3487,17 @@ Doba trvání: %4</translation>
     </message>
 </context>
 <context>
+    <name>UndoHistoryPanel</name>
+    <message>
+        <source>Undo History</source>
+        <translation>Historie kroků zpět</translation>
+    </message>
+    <message>
+        <source>Initial State</source>
+        <translation>Počáteční stav</translation>
+    </message>
+</context>
+<context>
     <name>VSTHost</name>
     <message>
         <source>Show</source>
@@ -2940,6 +3557,29 @@ Doba trvání: %4</translation>
     <message>
         <source>Drag audio only</source>
         <translation>Táhnout pouze zvuk</translation>
+    </message>
+    <message>
+        <source>Add Recorded Clip</source>
+        <translation>Přidat nahraný klip</translation>
+    </message>
+    <message>
+        <source>Clear In Point</source>
+        <translation>Vymazat vstupní bod</translation>
+    </message>
+    <message>
+        <source>Clear Out Point</source>
+        <translation>Vymazat výstupní bod</translation>
+    </message>
+    <message>
+        <source>Clear In/Out</source>
+        <translation>Vymazat vstupní/výstupní bod</translation>
+    </message>
+</context>
+<context>
+    <name>ViewerContainer</name>
+    <message>
+        <source>Add Guide</source>
+        <translation>Přidat vodítko</translation>
     </message>
 </context>
 <context>
@@ -3007,6 +3647,18 @@ Doba trvání: %4</translation>
     <message>
         <source>Position (pixels):</source>
         <translation>Pozice (pixely):</translation>
+    </message>
+    <message>
+        <source>Move Guide</source>
+        <translation>Přesunout vodítko</translation>
+    </message>
+    <message>
+        <source>Toggle Mirror</source>
+        <translation>Přepnout zrcadlo</translation>
+    </message>
+    <message>
+        <source>Add Guide</source>
+        <translation>Přidat vodítko</translation>
     </message>
 </context>
 <context>
