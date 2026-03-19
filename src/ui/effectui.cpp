@@ -147,10 +147,12 @@ EffectUI::EffectUI(Effect* e) :
 
   enabled_check->setChecked(e->IsEnabled());
   QCheckBox* chk = enabled_check;
-  connect(e, &Effect::EnabledChanged, chk, [chk](bool b) {
+  QWidget* cw = contents;
+  connect(e, &Effect::EnabledChanged, chk, [chk, cw](bool b) {
     chk->blockSignals(true);
     chk->setChecked(b);
     chk->blockSignals(false);
+    cw->setEnabled(b);
   });
   connect(chk, &QCheckBox::toggled, this, [e](bool checked) {
     amber::UndoStack.push(new SetEffectEnabled(e, checked));
