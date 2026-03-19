@@ -56,84 +56,84 @@ void Timeline::setup_ui() {
   tool_buttons_layout->setContentsMargins(0, 0, 0, 0);
 
   toolArrowButton = new QPushButton();
-  toolArrowButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/arrow.svg")));
+  toolArrowButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/arrow.svg")));
   toolArrowButton->setCheckable(true);
   toolArrowButton->setProperty("tool", TIMELINE_TOOL_POINTER);
   connect(toolArrowButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolArrowButton);
 
   toolEditButton = new QPushButton();
-  toolEditButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/beam.svg")));
+  toolEditButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/beam.svg")));
   toolEditButton->setCheckable(true);
   toolEditButton->setProperty("tool", TIMELINE_TOOL_EDIT);
   connect(toolEditButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolEditButton);
 
   toolRippleButton = new QPushButton();
-  toolRippleButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/ripple.svg")));
+  toolRippleButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/ripple.svg")));
   toolRippleButton->setCheckable(true);
   toolRippleButton->setProperty("tool", TIMELINE_TOOL_RIPPLE);
   connect(toolRippleButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolRippleButton);
 
   toolRazorButton = new QPushButton();
-  toolRazorButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/razor.svg")));
+  toolRazorButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/razor.svg")));
   toolRazorButton->setCheckable(true);
   toolRazorButton->setProperty("tool", TIMELINE_TOOL_RAZOR);
   connect(toolRazorButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolRazorButton);
 
   toolSlipButton = new QPushButton();
-  toolSlipButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/slip.svg")));
+  toolSlipButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/slip.svg")));
   toolSlipButton->setCheckable(true);
   toolSlipButton->setProperty("tool", TIMELINE_TOOL_SLIP);
   connect(toolSlipButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolSlipButton);
 
   toolSlideButton = new QPushButton();
-  toolSlideButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/slide.svg")));
+  toolSlideButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/slide.svg")));
   toolSlideButton->setCheckable(true);
   toolSlideButton->setProperty("tool", TIMELINE_TOOL_SLIDE);
   connect(toolSlideButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolSlideButton);
 
   toolHandButton = new QPushButton();
-  toolHandButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/hand.svg")));
+  toolHandButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/hand.svg")));
   toolHandButton->setCheckable(true);
 
   toolHandButton->setProperty("tool", TIMELINE_TOOL_HAND);
   connect(toolHandButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolHandButton);
   toolTransitionButton = new QPushButton();
-  toolTransitionButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/transition-tool.svg")));
+  toolTransitionButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/transition-tool.svg")));
   toolTransitionButton->setCheckable(true);
   connect(toolTransitionButton, &QPushButton::clicked, this, &Timeline::transition_tool_click);
   tool_buttons_layout->addWidget(toolTransitionButton);
 
   snappingButton = new QPushButton();
-  snappingButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/magnet.svg")));
+  snappingButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/magnet.svg")));
   snappingButton->setCheckable(true);
   snappingButton->setChecked(true);
   connect(snappingButton, &QPushButton::toggled, this, &Timeline::snapping_clicked);
   tool_buttons_layout->addWidget(snappingButton);
 
   zoomInButton = new QPushButton();
-  zoomInButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/zoomin.svg")));
+  zoomInButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/zoomin.svg")));
   connect(zoomInButton, &QPushButton::clicked, this, &Timeline::zoom_in);
   tool_buttons_layout->addWidget(zoomInButton);
 
   zoomOutButton = new QPushButton();
-  zoomOutButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/zoomout.svg")));
+  zoomOutButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/zoomout.svg")));
   connect(zoomOutButton, &QPushButton::clicked, this, &Timeline::zoom_out);
   tool_buttons_layout->addWidget(zoomOutButton);
 
   recordButton = new QPushButton();
-  recordButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/record.svg")));
+  recordButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/record.svg")));
   connect(recordButton, &QPushButton::clicked, this, &Timeline::record_btn_click);
   tool_buttons_layout->addWidget(recordButton);
 
   addButton = new QPushButton();
-  addButton->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/add-button.svg")));
+  addButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/add-button.svg")));
   connect(addButton, &QPushButton::clicked, this, &Timeline::add_btn_click);
   tool_buttons_layout->addWidget(addButton);
 
@@ -239,7 +239,7 @@ void Timeline::Retranslate() {
 
 void Timeline::resizeEvent(QResizeEvent *) {
   // adjust maximum scrollbar
-  if (olive::ActiveSequence != nullptr) set_sb_max();
+  if (amber::ActiveSequence != nullptr) set_sb_max();
 
 
   // resize tool button widget to its contents
@@ -272,20 +272,20 @@ void Timeline::repaint_timeline() {
   if (!block_repaints) {
     bool draw = true;
 
-    if (olive::ActiveSequence != nullptr
+    if (amber::ActiveSequence != nullptr
         && !horizontalScrollBar->isSliderDown()
         && !horizontalScrollBar->is_resizing()
         && panel_sequence_viewer->playing
         && !zoom_just_changed) {
       // auto scroll
-      if (olive::CurrentConfig.autoscroll == olive::AUTOSCROLL_PAGE_SCROLL) {
-        int playhead_x = getTimelineScreenPointFromFrame(olive::ActiveSequence->playhead);
+      if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_PAGE_SCROLL) {
+        int playhead_x = getTimelineScreenPointFromFrame(amber::ActiveSequence->playhead);
         if (playhead_x < 0 || playhead_x > (editAreas->width() - videoScrollbar->width())) {
-          horizontalScrollBar->setValue(getScreenPointFromFrame(zoom, olive::ActiveSequence->playhead));
+          horizontalScrollBar->setValue(getScreenPointFromFrame(zoom, amber::ActiveSequence->playhead));
           draw = false;
         }
-      } else if (olive::CurrentConfig.autoscroll == olive::AUTOSCROLL_SMOOTH_SCROLL) {
-        if (center_scroll_to_playhead(horizontalScrollBar, zoom, olive::ActiveSequence->playhead)) {
+      } else if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_SMOOTH_SCROLL) {
+        if (center_scroll_to_playhead(horizontalScrollBar, zoom, amber::ActiveSequence->playhead)) {
           draw = false;
         }
       }
@@ -296,7 +296,7 @@ void Timeline::repaint_timeline() {
       video_area->update();
       audio_area->update();
 
-      if (olive::ActiveSequence != nullptr
+      if (amber::ActiveSequence != nullptr
           && !zoom_just_changed) {
         set_sb_max();
       }
@@ -307,7 +307,7 @@ void Timeline::repaint_timeline() {
 }
 
 void Timeline::update_sequence() {
-  bool null_sequence = (olive::ActiveSequence == nullptr);
+  bool null_sequence = (amber::ActiveSequence == nullptr);
 
   for (int i=0;i<tool_buttons.count();i++) {
     tool_buttons[i]->setEnabled(!null_sequence);
@@ -324,16 +324,16 @@ void Timeline::update_sequence() {
 
 void Timeline::UpdateTitle() {
   QString title = tr("Timeline: ");
-  if (olive::ActiveSequence == nullptr) {
+  if (amber::ActiveSequence == nullptr) {
     setWindowTitle(title + tr("(none)"));
   } else {
-    setWindowTitle(title + olive::ActiveSequence->name);
+    setWindowTitle(title + amber::ActiveSequence->name);
     update_ui(false);
   }
 }
 
 void Timeline::set_sb_max() {
-  headers->set_scrollbar_max(horizontalScrollBar, olive::ActiveSequence->getEndFrame(), editAreas->width() - getScreenPointFromFrame(zoom, 200));
+  headers->set_scrollbar_max(horizontalScrollBar, amber::ActiveSequence->getEndFrame(), editAreas->width() - getScreenPointFromFrame(zoom, 200));
 }
 
 void Timeline::set_marker() {
@@ -341,14 +341,14 @@ void Timeline::set_marker() {
   QVector<int> clips_selected;
   bool clip_mode = false;
 
-  for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
-    Clip* c = olive::ActiveSequence->clips.at(i).get();
+  for (int i=0;i<amber::ActiveSequence->clips.size();i++) {
+    Clip* c = amber::ActiveSequence->clips.at(i).get();
     if (c != nullptr
         && c->IsSelected()) {
 
       // only add markers if the playhead is inside the clip
-      if (olive::ActiveSequence->playhead >= c->timeline_in()
-          && olive::ActiveSequence->playhead <= c->timeline_out()) {
+      if (amber::ActiveSequence->playhead >= c->timeline_in()
+          && amber::ActiveSequence->playhead <= c->timeline_out()) {
         clips_selected.append(i);
       }
 
@@ -365,16 +365,16 @@ void Timeline::set_marker() {
   }
 
   // pass off to internal set marker function
-  set_marker_internal(olive::ActiveSequence.get(), clips_selected);
+  set_marker_internal(amber::ActiveSequence.get(), clips_selected);
 
 }
 
 void Timeline::toggle_show_all() {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     showing_all = !showing_all;
     if (showing_all) {
       old_zoom = zoom;
-      set_zoom_value(double(timeline_area->width() - 200) / double(olive::ActiveSequence->getEndFrame()));
+      set_zoom_value(double(timeline_area->width() - 200) / double(amber::ActiveSequence->getEndFrame()));
     } else {
       set_zoom_value(old_zoom);
     }
@@ -382,5 +382,5 @@ void Timeline::toggle_show_all() {
 }
 
 bool Timeline::focused() {
-  return (olive::ActiveSequence != nullptr && (headers->hasFocus() || video_area->hasFocus() || audio_area->hasFocus()));
+  return (amber::ActiveSequence != nullptr && (headers->hasFocus() || video_area->hasFocus() || audio_area->hasFocus()));
 }

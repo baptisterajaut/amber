@@ -20,7 +20,7 @@
 
 #include "audiomonitor.h"
 
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "rendering/audio.h"
 #include "panels/panels.h"
 #include "panels/timeline.h"
@@ -72,7 +72,7 @@ void AudioMonitor::resizeEvent(QResizeEvent *e) {
 }
 
 void AudioMonitor::paintEvent(QPaintEvent *) {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     QMutexLocker locker(&values_mutex);
     if (values.size() > 0) {
       QPainter p(this);

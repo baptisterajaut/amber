@@ -27,7 +27,7 @@
 
 #include "global/debug.h"
 
-DebugDialog* olive::DebugDialog = nullptr;
+DebugDialog* amber::DebugDialog = nullptr;
 
 DebugDialog::DebugDialog(QWidget *parent) : QDialog(parent) {
   QVBoxLayout* layout = new QVBoxLayout(this);

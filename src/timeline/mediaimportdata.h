@@ -3,7 +3,7 @@
 
 #include "project/media.h"
 
-namespace olive {
+namespace amber {
 namespace timeline {
 
 enum MediaImportType : uint8_t {

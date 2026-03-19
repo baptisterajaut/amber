@@ -29,12 +29,12 @@
 #include <QCursor>
 #include <QDebug>
 
-QCursor olive::cursor::LeftTrim;
-QCursor olive::cursor::RightTrim;
-QCursor olive::cursor::LeftRipple;
-QCursor olive::cursor::RightRipple;
-QCursor olive::cursor::Slip;
-QCursor olive::cursor::Razor;
+QCursor amber::cursor::LeftTrim;
+QCursor amber::cursor::RightTrim;
+QCursor amber::cursor::LeftRipple;
+QCursor amber::cursor::RightRipple;
+QCursor amber::cursor::Slip;
+QCursor amber::cursor::Razor;
 
 const int cursor_size = 24;
 
@@ -59,13 +59,13 @@ QCursor load_cursor(const QString& file, int hotX = -1, int hotY = -1, bool righ
   return QCursor(pixmap, hotX, hotY);
 }
 
-void olive::cursor::Initialize(){
+void amber::cursor::Initialize(){
   qInfo() << "Initializing custom cursors";
-  olive::cursor::LeftTrim = load_cursor(":/cursors/1_left.svg");
-  olive::cursor::RightTrim = load_cursor(":/cursors/1_right.svg");
-  olive::cursor::LeftRipple = load_cursor(":/cursors/3_left.svg");
-  olive::cursor::RightRipple = load_cursor(":/cursors/3_right.svg");
-  olive::cursor::Slip = load_cursor(":/cursors/4.svg");
-  olive::cursor::Razor = load_cursor(":/cursors/5.svg");
+  amber::cursor::LeftTrim = load_cursor(":/cursors/1_left.svg");
+  amber::cursor::RightTrim = load_cursor(":/cursors/1_right.svg");
+  amber::cursor::LeftRipple = load_cursor(":/cursors/3_left.svg");
+  amber::cursor::RightRipple = load_cursor(":/cursors/3_right.svg");
+  amber::cursor::Slip = load_cursor(":/cursors/4.svg");
+  amber::cursor::Razor = load_cursor(":/cursors/5.svg");
   qInfo() << "Finished initializing custom cursors";
 }

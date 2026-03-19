@@ -20,7 +20,7 @@
 
 #include "clipboard.h"
 
-#include "timeline/clip.h"
+#include "engine/clip.h"
 #include "effects/effect.h"
 #include "effects/transition.h"
 

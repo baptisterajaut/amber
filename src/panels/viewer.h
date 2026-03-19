@@ -101,7 +101,7 @@ public:
 
 
 
-  void initiate_drag(olive::timeline::MediaImportType drag_type);
+  void initiate_drag(amber::timeline::MediaImportType drag_type);
 
   void Retranslate() override;
 protected:

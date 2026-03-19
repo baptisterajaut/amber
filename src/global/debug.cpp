@@ -100,8 +100,8 @@ void debug_message_handler(QtMsgType type, const QMessageLogContext &context, co
   debug_info.append(QString("<font color='%1'><b>[%2]</b> %3 (%4:%5, %6)</font><br>")
                      .arg(fontColor, msgTag, localMsg, context.file, QString::number(context.line), context.function));
   fflush(stderr);
-  if (olive::DebugDialog != nullptr && olive::DebugDialog->isVisible()) {
-    QMetaObject::invokeMethod(olive::DebugDialog, "update_log", Qt::QueuedConnection);
+  if (amber::DebugDialog != nullptr && amber::DebugDialog->isVisible()) {
+    QMetaObject::invokeMethod(amber::DebugDialog, "update_log", Qt::QueuedConnection);
   }
   debug_mutex.unlock();
 }

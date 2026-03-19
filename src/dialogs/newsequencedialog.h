@@ -28,7 +28,7 @@
 
 #include "panels/project.h"
 #include "project/media.h"
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 
 /**
  * @brief The NewSequenceDialog class

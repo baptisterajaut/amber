@@ -72,5 +72,5 @@ void BoolField::UpdateFromWidget(bool b)
   SetValueAt(Now(), b);
 
   kdc->SetNewKeyframes();
-  olive::UndoStack.push(kdc);
+  amber::UndoStack.push(kdc);
 }

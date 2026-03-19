@@ -23,18 +23,18 @@
 #include <QEvent>
 #include <QDebug>
 
-QVector<Panel*> olive::panels;
+QVector<Panel*> amber::panels;
 
 Panel::Panel(QWidget *parent) : QDockWidget (parent) {
 //  setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Maximum);
 //  setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
-  olive::panels.append(this);
+  amber::panels.append(this);
 }
 
 Panel::~Panel()
 {
-  olive::panels.removeAll(this);
+  amber::panels.removeAll(this);
 }
 
 void Panel::LoadLayoutState(const QByteArray &) {}

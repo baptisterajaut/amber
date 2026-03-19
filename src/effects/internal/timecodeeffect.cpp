@@ -35,8 +35,8 @@
 
 #include "ui/labelslider.h"
 #include "ui/collapsiblewidget.h"
-#include "timeline/clip.h"
-#include "timeline/sequence.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 #include "panels/viewer.h"
 #include "ui/comboboxex.h"
 #include "ui/colorbutton.h"
@@ -90,13 +90,13 @@ TimecodeEffect::TimecodeEffect(Clip* c, const EffectMeta* em) :
 
 void TimecodeEffect::redraw(double timecode) {
   if (tc_select->GetValueAt(timecode).toBool()) {
-    display_timecode = prepend_text->GetStringAt(timecode) + frame_to_timecode(olive::ActiveSequence->playhead,
-                                                                               olive::CurrentConfig.timecode_view,
-                                                                               olive::ActiveSequence->frame_rate);
+    display_timecode = prepend_text->GetStringAt(timecode) + frame_to_timecode(amber::ActiveSequence->playhead,
+                                                                               amber::CurrentConfig.timecode_view,
+                                                                               amber::ActiveSequence->frame_rate);
   } else {
     double media_rate = parent_clip->media_frame_rate();
     display_timecode = prepend_text->GetStringAt(timecode) + frame_to_timecode(qRound(timecode * media_rate),
-                                                                               olive::CurrentConfig.timecode_view,
+                                                                               amber::CurrentConfig.timecode_view,
                                                                                media_rate);
   }
   img.fill(Qt::transparent);

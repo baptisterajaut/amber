@@ -31,7 +31,7 @@ QWidget *StringField::CreateWidget(QWidget *existing)
     text_edit->setUndoRedoEnabled(true);
 
     // the "2" is because the height needs one extra pixel of padding on the top and the bottom
-    text_edit->setTextHeight(qCeil(text_edit->fontMetrics().lineSpacing()*olive::CurrentConfig.effect_textbox_lines
+    text_edit->setTextHeight(qCeil(text_edit->fontMetrics().lineSpacing()*amber::CurrentConfig.effect_textbox_lines
                                    + text_edit->document()->documentMargin()
                                    + text_edit->document()->documentMargin() + 2));
 
@@ -75,5 +75,5 @@ void StringField::UpdateFromWidget(const QString &s)
   SetValueAt(Now(), s);
 
   kdc->SetNewKeyframes();
-  olive::UndoStack.push(kdc);
+  amber::UndoStack.push(kdc);
 }

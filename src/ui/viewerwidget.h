@@ -32,8 +32,8 @@
 #include "effects/effect.h"
 #include "project/footage.h"
 #include "rendering/renderthread.h"
-#include "timeline/clip.h"
-#include "timeline/guide.h"
+#include "engine/clip.h"
+#include "core/guide.h"
 #include "ui/viewercontainer.h"
 #include "ui/viewerwindow.h"
 

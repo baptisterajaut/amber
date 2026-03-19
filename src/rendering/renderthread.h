@@ -29,7 +29,7 @@
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
 
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "effects/effect.h"
 
 class RenderThread : public QThread {

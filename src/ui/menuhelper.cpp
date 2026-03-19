@@ -33,11 +33,11 @@
 #include "panels/panels.h"
 #include "ui/focusfilter.h"
 
-MenuHelper olive::MenuHelper;
+MenuHelper amber::MenuHelper;
 
 void MenuHelper::InitializeSharedMenus()
 {
-  new_project_ = create_menu_action(nullptr, "newproj", olive::Global.get(), SLOT(new_project()), QKeySequence("Ctrl+N"));
+  new_project_ = create_menu_action(nullptr, "newproj", amber::Global.get(), SLOT(new_project()), QKeySequence("Ctrl+N"));
   new_project_->setParent(this);
 
   new_sequence_ = create_menu_action(nullptr, "newseq", panel_project, SLOT(new_sequence()), QKeySequence("Ctrl+Shift+N"));
@@ -46,19 +46,19 @@ void MenuHelper::InitializeSharedMenus()
   new_folder_ = create_menu_action(nullptr, "newfolder", panel_project, SLOT(new_folder()));
   new_folder_->setParent(this);
 
-  set_in_point_ = create_menu_action(nullptr, "setinpoint", &olive::FocusFilter, SLOT(set_in_point()), QKeySequence("I"));
+  set_in_point_ = create_menu_action(nullptr, "setinpoint", &amber::FocusFilter, SLOT(set_in_point()), QKeySequence("I"));
   set_in_point_->setParent(this);
 
-  set_out_point_ = create_menu_action(nullptr, "setoutpoint", &olive::FocusFilter, SLOT(set_out_point()), QKeySequence("O"));
+  set_out_point_ = create_menu_action(nullptr, "setoutpoint", &amber::FocusFilter, SLOT(set_out_point()), QKeySequence("O"));
   set_out_point_->setParent(this);
 
-  reset_in_point_ = create_menu_action(nullptr, "resetin", &olive::FocusFilter, SLOT(clear_in()));
+  reset_in_point_ = create_menu_action(nullptr, "resetin", &amber::FocusFilter, SLOT(clear_in()));
   reset_in_point_->setParent(this);
 
-  reset_out_point_ = create_menu_action(nullptr, "resetout", &olive::FocusFilter, SLOT(clear_out()));
+  reset_out_point_ = create_menu_action(nullptr, "resetout", &amber::FocusFilter, SLOT(clear_out()));
   reset_out_point_->setParent(this);
 
-  clear_inout_point = create_menu_action(nullptr, "clearinout", &olive::FocusFilter, SLOT(clear_inout()), QKeySequence("G"));
+  clear_inout_point = create_menu_action(nullptr, "clearinout", &amber::FocusFilter, SLOT(clear_inout()), QKeySequence("G"));
   clear_inout_point->setParent(this);
 
   add_default_transition_ = create_menu_action(nullptr, "deftransition", panel_timeline, SLOT(add_transition()), QKeySequence("Ctrl+Shift+D"));
@@ -73,22 +73,22 @@ void MenuHelper::InitializeSharedMenus()
   nest_ = create_menu_action(nullptr, "nest", panel_timeline, SLOT(nest()));
   nest_->setParent(this);
 
-  cut_ = create_menu_action(nullptr, "cut", &olive::FocusFilter, SLOT(cut()), QKeySequence("Ctrl+X"));
+  cut_ = create_menu_action(nullptr, "cut", &amber::FocusFilter, SLOT(cut()), QKeySequence("Ctrl+X"));
   cut_->setParent(this);
 
-  copy_ = create_menu_action(nullptr, "copy", &olive::FocusFilter, SLOT(copy()), QKeySequence("Ctrl+C"));
+  copy_ = create_menu_action(nullptr, "copy", &amber::FocusFilter, SLOT(copy()), QKeySequence("Ctrl+C"));
   copy_->setParent(this);
 
-  paste_ = create_menu_action(nullptr, "paste", olive::Global.get(), SLOT(paste()), QKeySequence("Ctrl+V"));
+  paste_ = create_menu_action(nullptr, "paste", amber::Global.get(), SLOT(paste()), QKeySequence("Ctrl+V"));
   paste_->setParent(this);
 
-  paste_insert_ = create_menu_action(nullptr, "pasteinsert", olive::Global.get(), SLOT(paste_insert()), QKeySequence("Ctrl+Shift+V"));
+  paste_insert_ = create_menu_action(nullptr, "pasteinsert", amber::Global.get(), SLOT(paste_insert()), QKeySequence("Ctrl+Shift+V"));
   paste_insert_->setParent(this);
 
-  duplicate_ = create_menu_action(nullptr, "duplicate", &olive::FocusFilter, SLOT(duplicate()), QKeySequence("Ctrl+D"));
+  duplicate_ = create_menu_action(nullptr, "duplicate", &amber::FocusFilter, SLOT(duplicate()), QKeySequence("Ctrl+D"));
   duplicate_->setParent(this);
 
-  delete_ = create_menu_action(nullptr, "delete", &olive::FocusFilter, SLOT(delete_function()), QKeySequence("Del"));
+  delete_ = create_menu_action(nullptr, "delete", &amber::FocusFilter, SLOT(delete_function()), QKeySequence("Del"));
   delete_->setParent(this);
 
   ripple_delete_ = create_menu_action(nullptr, "rippledelete", panel_timeline, SLOT(ripple_delete()), QKeySequence("Shift+Del"));
@@ -194,23 +194,23 @@ void MenuHelper::set_titlesafe_from_menu() {
   if (qIsNaN(tsa)) {
 
     // disable title safe area
-    olive::CurrentConfig.show_title_safe_area = false;
+    amber::CurrentConfig.show_title_safe_area = false;
 
   } else {
 
     // using title safe area
-    olive::CurrentConfig.show_title_safe_area = true;
+    amber::CurrentConfig.show_title_safe_area = true;
 
     // are we using the default area aspect ratio, or a specific one
     if (qIsNull(tsa)) {
 
       // default title safe area
-      olive::CurrentConfig.use_custom_title_safe_ratio = false;
+      amber::CurrentConfig.use_custom_title_safe_ratio = false;
 
     } else {
 
       // using a specific aspect ratio
-      olive::CurrentConfig.use_custom_title_safe_ratio = true;
+      amber::CurrentConfig.use_custom_title_safe_ratio = true;
 
       if (tsa < 0.0) {
 
@@ -221,22 +221,22 @@ void MenuHelper::set_titlesafe_from_menu() {
 
         do {
           if (invalid) {
-            QMessageBox::critical(olive::MainWindow, tr("Invalid aspect ratio"), tr("The aspect ratio '%1' is invalid. Please try again.").arg(input));
+            QMessageBox::critical(amber::MainWindow, tr("Invalid aspect ratio"), tr("The aspect ratio '%1' is invalid. Please try again.").arg(input));
           }
 
-          input = QInputDialog::getText(olive::MainWindow, tr("Enter custom aspect ratio"), tr("Enter the aspect ratio to use for the title/action safe area (e.g. 16:9):"));
+          input = QInputDialog::getText(amber::MainWindow, tr("Enter custom aspect ratio"), tr("Enter the aspect ratio to use for the title/action safe area (e.g. 16:9):"));
           invalid = !arTest.match(input).hasMatch() && !input.isEmpty();
         } while (invalid);
 
         if (!input.isEmpty()) {
           QStringList inputList = input.split(':');
-          olive::CurrentConfig.custom_title_safe_ratio = inputList.at(0).toDouble()/inputList.at(1).toDouble();
+          amber::CurrentConfig.custom_title_safe_ratio = inputList.at(0).toDouble()/inputList.at(1).toDouble();
         }
 
       } else {
 
         // specified tsa is a specific custom aspect ratio
-        olive::CurrentConfig.custom_title_safe_ratio = tsa;
+        amber::CurrentConfig.custom_title_safe_ratio = tsa;
       }
 
     }
@@ -248,7 +248,7 @@ void MenuHelper::set_titlesafe_from_menu() {
 
 void MenuHelper::set_autoscroll() {
   QAction* action = static_cast<QAction*>(sender());
-  olive::CurrentConfig.autoscroll = action->data().toInt();
+  amber::CurrentConfig.autoscroll = action->data().toInt();
 }
 
 void MenuHelper::menu_click_button() {
@@ -257,13 +257,13 @@ void MenuHelper::menu_click_button() {
 
 void MenuHelper::set_timecode_view() {
   QAction* action = static_cast<QAction*>(sender());
-  olive::CurrentConfig.timecode_view = action->data().toInt();
+  amber::CurrentConfig.timecode_view = action->data().toInt();
   update_ui(false);
 }
 
 void MenuHelper::open_recent_from_menu() {
   int index = static_cast<QAction*>(sender())->data().toInt();
-  olive::Global.get()->open_recent(index);
+  amber::Global.get()->open_recent(index);
 }
 
 void MenuHelper::create_effect_paste_action(QMenu *menu)

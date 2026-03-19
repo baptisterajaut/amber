@@ -24,16 +24,12 @@
 #include <QPushButton>
 #include <QMessageBox>
 
-#include "undo/undo.h"
-#include "undo/undostack.h"
-#include "timeline/clip.h"
-#include "timeline/sequence.h"
-#include "panels/panels.h"
-#include "panels/effectcontrols.h"
-#include "panels/viewer.h"
-#include "panels/grapheditor.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
+#include "core/appcontext.h"
 #include "effect.h"
-#include "ui/viewerwidget.h"
 #include "ui/keyframenavigator.h"
 #include "ui/clickablelabel.h"
 
@@ -93,14 +89,14 @@ void EffectRow::SetKeyframingEnabled(bool enabled) {
       Field(i)->PrepareDataForKeyframing(true, ca);
     }
 
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
 
-    update_ui(false);
+    amber::app_ctx->updateUi(false);
 
   } else {
 
     // Confirm with the user whether they really want to disable keyframing
-    if (QMessageBox::question(panel_effect_controls,
+    if (QMessageBox::question(nullptr,
                               tr("Disable Keyframes"),
                               tr("Disabling keyframes will delete all current keyframes. "
                                  "Are you sure you want to do this?"),
@@ -116,9 +112,9 @@ void EffectRow::SetKeyframingEnabled(bool enabled) {
       // Disable keyframing setting on this row
       ca->append(new SetIsKeyframing(this, false));
 
-      olive::UndoStack.push(ca);
+      amber::UndoStack.push(ca);
 
-      update_ui(false);
+      amber::app_ctx->updateUi(false);
 
     } else {
 
@@ -153,7 +149,7 @@ void EffectRow::GoToPreviousKeyframe() {
   }
 
   // If we found a keyframe less than the playhead, jump to it
-  if (key != LONG_MIN) panel_sequence_viewer->seek(key);
+  if (key != LONG_MIN) amber::app_ctx->seekPlayhead(key);
 }
 
 void EffectRow::ToggleKeyframe() {
@@ -222,8 +218,8 @@ void EffectRow::ToggleKeyframe() {
 
   }
 
-  olive::UndoStack.push(ca);
-  update_ui(false);
+  amber::UndoStack.push(ca);
+  amber::app_ctx->updateUi(false);
 }
 
 void EffectRow::GoToNextKeyframe() {
@@ -233,16 +229,16 @@ void EffectRow::GoToNextKeyframe() {
     EffectField* f = Field(i);
     for (const auto & keyframe : f->keyframes) {
       long comp = keyframe.time - c->clip_in() + c->timeline_in();
-      if (comp > olive::ActiveSequence->playhead) {
+      if (comp > amber::ActiveSequence->playhead) {
         key = qMin(comp, key);
       }
     }
   }
-  if (key != LONG_MAX) panel_sequence_viewer->seek(key);
+  if (key != LONG_MAX) amber::app_ctx->seekPlayhead(key);
 }
 
 void EffectRow::FocusRow() {
-  panel_graph_editor->set_row(this);
+  amber::app_ctx->setGraphEditorRow(this);
 }
 
 void EffectRow::SetKeyframeOnAllFields(ComboAction* ca) {
@@ -257,7 +253,7 @@ void EffectRow::SetKeyframeOnAllFields(ComboAction* ca) {
     ca->append(kdc);
   }
 
-  panel_effect_controls->update_keyframes();
+  amber::app_ctx->updateKeyframes();
 }
 
 Effect *EffectRow::GetParentEffect()

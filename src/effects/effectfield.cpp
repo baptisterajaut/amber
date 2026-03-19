@@ -30,11 +30,11 @@
 #include "effects/effectrow.h"
 #include "effects/effect.h"
 
-#include "undo/undo.h"
-#include "timeline/clip.h"
-#include "timeline/sequence.h"
+#include "engine/undo/undo.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 
-#include "global/math.h"
+#include "core/math.h"
 
 #include "global/debug.h"
 

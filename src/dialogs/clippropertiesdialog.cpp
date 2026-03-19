@@ -5,7 +5,7 @@
 #include <QDialogButtonBox>
 
 #include "panels/panels.h"
-#include "undo/undo.h"
+#include "engine/undo/undo.h"
 
 ClipPropertiesDialog::ClipPropertiesDialog(QWidget *parent, QVector<Clip *> clips) :
   QDialog(parent)
@@ -113,7 +113,7 @@ void ClipPropertiesDialog::accept()
   }
 
   if (ca->hasActions()) {
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
     update_ui(false);
   } else {
     delete ca;

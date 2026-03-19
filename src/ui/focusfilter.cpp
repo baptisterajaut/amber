@@ -21,10 +21,10 @@
 #include "focusfilter.h"
 
 #include "panels/panels.h"
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "ui/timelineheader.h"
 
-FocusFilter olive::FocusFilter;
+FocusFilter amber::FocusFilter;
 
 FocusFilter::FocusFilter() = default;
 
@@ -118,7 +118,7 @@ void FocusFilter::set_viewer_fullscreen() {
 }
 
 void FocusFilter::set_marker() {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     QDockWidget* focused_panel = get_focused_panel();
 
     if (focused_panel == panel_footage_viewer) {
@@ -223,7 +223,7 @@ void FocusFilter::delete_function() {
   } else if (panel_graph_editor->view_is_focused()) {
     panel_graph_editor->delete_selected_keys();
   } else {
-    panel_timeline->delete_selection(olive::ActiveSequence->selections, false);
+    panel_timeline->delete_selection(amber::ActiveSequence->selections, false);
   }
 }
 
@@ -269,7 +269,7 @@ void FocusFilter::zoom_out() {
 }
 
 void FocusFilter::cut() {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     QDockWidget* focused_panel = get_focused_panel();
     if (panel_effect_controls == focused_panel) {
       panel_effect_controls->copy(true);
@@ -280,7 +280,7 @@ void FocusFilter::cut() {
 }
 
 void FocusFilter::copy() {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     QDockWidget* focused_panel = get_focused_panel();
     if (panel_effect_controls == focused_panel) {
       panel_effect_controls->copy(false);

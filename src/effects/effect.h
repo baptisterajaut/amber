@@ -39,6 +39,7 @@
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
 
+#include "core/audio.h"
 #include "ui/collapsiblewidget.h"
 #include "effectrow.h"
 #include "effectgizmo.h"
@@ -59,8 +60,6 @@ struct EffectMeta {
   int subtype;
 };
 extern QVector<EffectMeta> effects;
-
-double log_volume(double linear);
 
 enum EffectType : uint8_t {
   EFFECT_TYPE_INVALID,
@@ -276,6 +275,27 @@ private:
   int flags_{0};
 
   QVector<KeyframeDataChange*> gizmo_dragging_actions_;
+
+  /**
+   * @brief Parse an XML effect definition file and populate rows, fields, and shader info
+   *
+   * Called from the constructor when the effect is defined by an external XML file
+   * (em->filename is non-empty, em->internal == -1). Parses <row>/<field> elements
+   * to create EffectRows and EffectFields, and <shader> elements to set shader paths
+   * and flags.
+   */
+  void parseEffectXml();
+
+  /**
+   * @brief Parse a single <field> XML element and create the corresponding EffectField
+   *
+   * Handles all field types (DOUBLE, BOOL, COLOR, COMBO, FONT, STRING, FILE) including
+   * their type-specific attributes (default, min, max, r/g/b, etc.).
+   *
+   * @param reader  XML stream positioned at a <field> start element
+   * @param row     Parent EffectRow to attach the field to
+   */
+  void parseFieldElement(QXmlStreamReader& reader, EffectRow* row);
 
   // superimpose functions
   virtual void redraw(double timecode);

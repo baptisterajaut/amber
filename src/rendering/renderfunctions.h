@@ -25,7 +25,7 @@
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
 
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "effects/effect.h"
 #include "panels/viewer.h"
 
@@ -78,7 +78,7 @@ struct ComposeSequenceParams {
   QVector<QRhiResource*> transientResources;
 };
 
-namespace olive {
+namespace amber {
 namespace rendering {
 
 QRhiTexture* compose_sequence(ComposeSequenceParams &params);

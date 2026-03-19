@@ -23,17 +23,9 @@
 #include <QVector>
 
 #include "effectfields.h"
-#include "undo/undo.h"
-#include "undo/undostack.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 #include "panels/panels.h"
-
-EffectKeyframe::EffectKeyframe()
-{
-  pre_handle_x = -40;
-  pre_handle_y = 0;
-  post_handle_x = 40;
-  post_handle_y = 0;
-}
 
 void delete_keyframes(QVector<EffectField *>& selected_key_fields, QVector<int> &selected_keys) {
   QVector<EffectField*> fields;
@@ -60,7 +52,7 @@ void delete_keyframes(QVector<EffectField *>& selected_key_fields, QVector<int> 
     for (int i=0;i<key_indices.size();i++) {
       ca->append(new KeyframeDelete(fields.at(i), key_indices.at(i)));
     }
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
     selected_keys.clear();
     selected_key_fields.clear();
     update_ui(false);

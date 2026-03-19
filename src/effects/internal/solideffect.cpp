@@ -26,8 +26,8 @@
 #include <QImage>
 #include <QComboBox>
 
-#include "timeline/clip.h"
-#include "timeline/sequence.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 
 const int SMPTE_BARS = 7;
 const int SMPTE_STRIP_COUNT = 3;

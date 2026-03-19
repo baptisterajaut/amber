@@ -3,7 +3,7 @@
 #include <QTextDocument>
 #include <QtMath>
 
-#include "timeline/clip.h"
+#include "engine/clip.h"
 #include "ui/blur.h"
 
 enum AutoscrollDirection {
@@ -168,7 +168,7 @@ void RichTextEffect::redraw(double timecode)
 
     int blurSoftness = qFloor(shadow_softness->GetDoubleAt(timecode));
     if (blurSoftness > 0) {
-      olive::ui::blur(img, img.rect(), blurSoftness, true);
+      amber::ui::blur(img, img.rect(), blurSoftness, true);
     }
 
     p.setCompositionMode(QPainter::CompositionMode_SourceIn);

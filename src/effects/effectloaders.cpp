@@ -22,10 +22,10 @@
 
 #include "effects/effect.h"
 #include "effects/transition.h"
-#include "global/path.h"
-#include "panels/panels.h"
-#include "panels/effectcontrols.h"
+#include "core/path.h"
 #include "global/config.h"
+
+QMutex effects_loaded_mutex;
 
 #include <QDir>
 #include <QXmlStreamReader>
@@ -38,7 +38,7 @@ using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
 #endif
 
 void load_internal_effects() {
-  if (!olive::CurrentRuntimeConfig.shaders_are_enabled) {
+  if (!amber::CurrentRuntimeConfig.shaders_are_enabled) {
     qWarning() << "Shaders are disabled, some effects may be nonfunctional";
   }
 
@@ -270,7 +270,7 @@ void load_frei0r_effects() {
 #endif
 
 EffectInit::EffectInit() {
-  panel_effect_controls->effects_loaded.lock();
+  effects_loaded_mutex.lock();
 }
 
 void EffectInit::run() {
@@ -280,6 +280,6 @@ void EffectInit::run() {
 #ifndef NOFREI0R
   load_frei0r_effects();
 #endif
-  panel_effect_controls->effects_loaded.unlock();
+  effects_loaded_mutex.unlock();
   qInfo() << "Finished initializing effects";
 }

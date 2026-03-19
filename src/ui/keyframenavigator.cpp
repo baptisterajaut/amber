@@ -44,7 +44,7 @@ KeyframeNavigator::KeyframeNavigator(QWidget *parent, bool addLeftPad) : QWidget
 
   left_key_nav = new QPushButton(this);
   left_key_nav->setSizePolicy(button_size_policy);
-  left_key_nav->setIcon(olive::icon::LeftArrow);
+  left_key_nav->setIcon(amber::icon::LeftArrow);
   left_key_nav->setIconSize(left_key_nav->iconSize()*0.5);
   left_key_nav->setVisible(false);
   key_controls->addWidget(left_key_nav);
@@ -53,7 +53,7 @@ KeyframeNavigator::KeyframeNavigator(QWidget *parent, bool addLeftPad) : QWidget
 
   key_addremove = new QPushButton(this);
   key_addremove->setSizePolicy(button_size_policy);
-  key_addremove->setIcon(olive::icon::Diamond);
+  key_addremove->setIcon(amber::icon::Diamond);
   key_addremove->setIconSize(key_addremove->iconSize()*0.5);
   key_addremove->setVisible(false);
   key_controls->addWidget(key_addremove);
@@ -62,7 +62,7 @@ KeyframeNavigator::KeyframeNavigator(QWidget *parent, bool addLeftPad) : QWidget
 
   right_key_nav = new QPushButton(this);
   right_key_nav->setSizePolicy(button_size_policy);
-  right_key_nav->setIcon(olive::icon::RightArrow);
+  right_key_nav->setIcon(amber::icon::RightArrow);
   right_key_nav->setIconSize(right_key_nav->iconSize()*0.5);
   right_key_nav->setVisible(false);
   key_controls->addWidget(right_key_nav);
@@ -70,7 +70,7 @@ KeyframeNavigator::KeyframeNavigator(QWidget *parent, bool addLeftPad) : QWidget
   connect(right_key_nav, &QPushButton::clicked, this, &KeyframeNavigator::clicked);
 
   keyframe_enable = new QPushButton(this);
-  keyframe_enable->setIcon(olive::icon::Clock);
+  keyframe_enable->setIcon(amber::icon::Clock);
   keyframe_enable->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
   keyframe_enable->setIconSize(keyframe_enable->iconSize()*0.75);
   keyframe_enable->setCheckable(true);

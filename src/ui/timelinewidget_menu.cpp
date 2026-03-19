@@ -29,12 +29,12 @@
 #include "rendering/renderfunctions.h"
 #include "ui/menuhelper.h"
 #include "ui/menu.h"
-#include "undo/undostack.h"
+#include "engine/undo/undostack.h"
 #include "dialogs/newsequencedialog.h"
 #include "dialogs/clippropertiesdialog.h"
 
 void TimelineWidget::show_context_menu(const QPoint& pos) {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     // hack because sometimes right clicking doesn't trigger mouse release event
     panel_timeline->rect_select_init = false;
     panel_timeline->rect_select_proc = false;
@@ -43,16 +43,16 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 
     QAction* undoAction = menu.addAction(tr("&Undo"));
     QAction* redoAction = menu.addAction(tr("&Redo"));
-    connect(undoAction, &QAction::triggered, olive::Global.get(), &OliveGlobal::undo);
-    connect(redoAction, &QAction::triggered, olive::Global.get(), &OliveGlobal::redo);
-    undoAction->setEnabled(olive::UndoStack.canUndo());
-    redoAction->setEnabled(olive::UndoStack.canRedo());
+    connect(undoAction, &QAction::triggered, amber::Global.get(), &OliveGlobal::undo);
+    connect(redoAction, &QAction::triggered, amber::Global.get(), &OliveGlobal::redo);
+    undoAction->setEnabled(amber::UndoStack.canUndo());
+    redoAction->setEnabled(amber::UndoStack.canRedo());
     menu.addSeparator();
 
     // collect all the selected clips
-    QVector<Clip*> selected_clips = olive::ActiveSequence->SelectedClips();
+    QVector<Clip*> selected_clips = amber::ActiveSequence->SelectedClips();
 
-    olive::MenuHelper.make_edit_functions_menu(&menu, !selected_clips.isEmpty());
+    amber::MenuHelper.make_edit_functions_menu(&menu, !selected_clips.isEmpty());
 
     if (selected_clips.isEmpty()) {
       // no clips are selected
@@ -85,10 +85,10 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 
       menu.addSeparator();
 
-      menu.addAction(tr("&Speed/Duration"), olive::Global.get(), &OliveGlobal::open_speed_dialog);
+      menu.addAction(tr("&Speed/Duration"), amber::Global.get(), &OliveGlobal::open_speed_dialog);
 
       if (audio_clips_are_selected) {
-        menu.addAction(tr("Auto-Cut Silence"), olive::Global.get(), &OliveGlobal::open_autocut_silence_dialog);
+        menu.addAction(tr("Auto-Cut Silence"), amber::Global.get(), &OliveGlobal::open_autocut_silence_dialog);
       }
 
       QAction* autoscaleAction = menu.addAction(tr("Auto-S&cale"), this, &TimelineWidget::toggle_autoscale);
@@ -96,7 +96,7 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
       // set autoscale to the first selected clip
       autoscaleAction->setChecked(selected_clips.at(0)->autoscaled());
 
-      olive::MenuHelper.make_clip_functions_menu(&menu);
+      amber::MenuHelper.make_clip_functions_menu(&menu);
 
       // stabilizer option
       /*int video_clip_count = 0;
@@ -138,7 +138,7 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 }
 
 void TimelineWidget::toggle_autoscale() {
-  QVector<Clip*> selected_clips = olive::ActiveSequence->SelectedClips();
+  QVector<Clip*> selected_clips = amber::ActiveSequence->SelectedClips();
 
   if (!selected_clips.isEmpty()) {
     SetClipProperty* action = new SetClipProperty(kSetClipPropertyAutoscale);
@@ -147,21 +147,21 @@ void TimelineWidget::toggle_autoscale() {
       action->AddSetting(c, !c->autoscaled());
     }
 
-    olive::UndoStack.push(action);
+    amber::UndoStack.push(action);
   }
 }
 
 void TimelineWidget::tooltip_timer_timeout() {
-  if (olive::ActiveSequence != nullptr) {
-    if (tooltip_clip < olive::ActiveSequence->clips.size()) {
-      ClipPtr c = olive::ActiveSequence->clips.at(tooltip_clip);
+  if (amber::ActiveSequence != nullptr) {
+    if (tooltip_clip < amber::ActiveSequence->clips.size()) {
+      ClipPtr c = amber::ActiveSequence->clips.at(tooltip_clip);
       if (c != nullptr) {
         QToolTip::showText(QCursor::pos(),
                            tr("%1\nStart: %2\nEnd: %3\nDuration: %4").arg(
                              c->name(),
-                             frame_to_timecode(c->timeline_in(), olive::CurrentConfig.timecode_view, olive::ActiveSequence->frame_rate),
-                             frame_to_timecode(c->timeline_out(), olive::CurrentConfig.timecode_view, olive::ActiveSequence->frame_rate),
-                             frame_to_timecode(c->length(), olive::CurrentConfig.timecode_view, olive::ActiveSequence->frame_rate)
+                             frame_to_timecode(c->timeline_in(), amber::CurrentConfig.timecode_view, amber::ActiveSequence->frame_rate),
+                             frame_to_timecode(c->timeline_out(), amber::CurrentConfig.timecode_view, amber::ActiveSequence->frame_rate),
+                             frame_to_timecode(c->length(), amber::CurrentConfig.timecode_view, amber::ActiveSequence->frame_rate)
                              ));
       }
     }
@@ -172,12 +172,12 @@ void TimelineWidget::tooltip_timer_timeout() {
 void TimelineWidget::open_sequence_properties() {
   QList<Media*> sequence_items;
   QList<Media*> all_top_level_items;
-  for (int i=0;i<olive::project_model.childCount();i++) {
-    all_top_level_items.append(olive::project_model.child(i));
+  for (int i=0;i<amber::project_model.childCount();i++) {
+    all_top_level_items.append(amber::project_model.child(i));
   }
   panel_project->get_all_media_from_table(all_top_level_items, sequence_items, MEDIA_TYPE_SEQUENCE); // find all sequences in project
   for (auto sequence_item : sequence_items) {
-    if (sequence_item->to_sequence() == olive::ActiveSequence) {
+    if (sequence_item->to_sequence() == amber::ActiveSequence) {
       NewSequenceDialog nsd(this, sequence_item);
       nsd.exec();
       return;
@@ -189,7 +189,7 @@ void TimelineWidget::open_sequence_properties() {
 void TimelineWidget::show_clip_properties()
 {
   // get list of selected clips
-  QVector<Clip*> selected_clips = olive::ActiveSequence->SelectedClips();
+  QVector<Clip*> selected_clips = amber::ActiveSequence->SelectedClips();
 
   // if clips are selected, open the clip properties dialog
   if (!selected_clips.isEmpty()) {

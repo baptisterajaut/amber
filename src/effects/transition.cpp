@@ -21,8 +21,8 @@
 #include "transition.h"
 
 #include "ui/mainwindow.h"
-#include "timeline/clip.h"
-#include "timeline/sequence.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 #include "global/debug.h"
 
 #include "project/clipboard.h"
@@ -113,7 +113,7 @@ TransitionPtr Transition::CreateFromMeta(Clip* c, Clip* s, const EffectMeta* em)
     }
   } else {
     qCritical() << "Invalid transition data";
-    QMessageBox::critical(olive::MainWindow,
+    QMessageBox::critical(amber::MainWindow,
                           QCoreApplication::translate("transition", "Invalid transition"),
                           QCoreApplication::translate("transition", "No candidate for transition '%1'. This transition may be corrupt. Try reinstalling it or Amber.").arg(em->name)
                           );

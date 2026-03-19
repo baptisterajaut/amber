@@ -233,7 +233,7 @@ private slots:
 
 };
 
-namespace olive {
+namespace amber {
 /**
      * @brief A global MenuHelper object to assist menu creation throughout Olive.
      */

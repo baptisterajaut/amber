@@ -22,6 +22,7 @@
 #define EFFECTLOADERS_H
 
 #include <QList>
+#include <QMutex>
 #include <QThread>
 
 /**
@@ -46,5 +47,10 @@ protected:
    */
   void run() override;
 };
+
+/// Mutex used to synchronize effect loading with consumers.
+/// EffectInit locks it at construction and unlocks it when loading finishes.
+/// Code that needs effects to be available should lock/unlock this mutex.
+extern QMutex effects_loaded_mutex;
 
 #endif // EFFECTLOADERS_H

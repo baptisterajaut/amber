@@ -29,14 +29,14 @@
 #include <QProgressBar>
 #include <QGroupBox>
 
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "rendering/exportthread.h"
 
 /**
  * @brief The ExportDialog class
  *
- * The dialog to initiate an export. Requires a valid Sequence to be set in olive::ActiveSequence or the result is
- * defined (most likely a crash), so you should always do a `nullptr` check on olive::ActiveSequence before constructing
+ * The dialog to initiate an export. Requires a valid Sequence to be set in amber::ActiveSequence or the result is
+ * defined (most likely a crash), so you should always do a `nullptr` check on amber::ActiveSequence before constructing
  * this dialog.
  */
 class ExportDialog : public QDialog

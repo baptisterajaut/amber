@@ -98,7 +98,7 @@ void ActionSearch::search_update(const QString &s, const QString &p, QMenu *pare
     // We'll clear all the current items in the list since if we're here, we're just starting.
     list_widget->clear();
 
-    QList<QAction*> menus = olive::MainWindow->menuBar()->actions();
+    QList<QAction*> menus = amber::MainWindow->menuBar()->actions();
 
     // Loop through all menus from the menubar and run this function on each one.
     for (auto i : menus) {

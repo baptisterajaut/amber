@@ -24,7 +24,7 @@
 #include <QPainter>
 
 #include "panels/viewer.h"
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "global/config.h"
 #include "ui/viewercontainer.h"
 #include "ui/viewerwidget.h"
@@ -200,7 +200,7 @@ void RulerWidget::paintEvent(QPaintEvent*) {
 }
 
 void RulerWidget::mousePressEvent(QMouseEvent* event) {
-  if (event->button() == Qt::LeftButton && viewer_->seq != nullptr && !olive::CurrentConfig.lock_guides) {
+  if (event->button() == Qt::LeftButton && viewer_->seq != nullptr && !amber::CurrentConfig.lock_guides) {
     dragging_ = true;
     double pos = (orientation_ == Guide::Horizontal) ? event->position().x() : event->position().y();
     drag_video_pos_ = widget_to_video(pos);

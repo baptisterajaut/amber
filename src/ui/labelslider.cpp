@@ -25,10 +25,10 @@
 #include <QApplication>
 #include <QMenu>
 
-#include "undo/undo.h"
+#include "engine/undo/undo.h"
 #include "panels/viewer.h"
 #include "global/config.h"
-#include "global/math.h"
+#include "core/math.h"
 #include "global/debug.h"
 #include "ui/styling.h"
 #include "ui/menu.h"
@@ -94,7 +94,7 @@ QString LabelSlider::ValueToString() {
   } else {
     switch (display_type) {
     case FrameNumber:
-      return frame_to_timecode(long(v), olive::CurrentConfig.timecode_view, frame_rate);
+      return frame_to_timecode(long(v), amber::CurrentConfig.timecode_view, frame_rate);
     case Percent:
       return QString::number((v*100), 'f', decimal_places).append("%");
     case Decibel:
@@ -122,7 +122,7 @@ QString LabelSlider::ValueToString() {
 
 void LabelSlider::SetColor(QString c) {
   if (c.isEmpty()) {
-    if (olive::styling::UseDarkIcons()) {
+    if (amber::styling::UseDarkIcons()) {
       c = "#0080ff";
     } else {
       c = "#ffc000";
@@ -311,7 +311,7 @@ void LabelSlider::ShowDialog()
     if (s.isEmpty()) return;
 
     // parse string timecode to a frame number
-    d = timecode_to_frame(s, olive::CurrentConfig.timecode_view, frame_rate);
+    d = timecode_to_frame(s, amber::CurrentConfig.timecode_view, frame_rate);
 
   } else {
 

@@ -2,12 +2,12 @@
 
 #include "global/config.h"
 
-bool olive::styling::UseDarkIcons()
+bool amber::styling::UseDarkIcons()
 {
-  return olive::CurrentConfig.style == kOliveDefaultLight || olive::CurrentConfig.style == kNativeDarkIcons;
+  return amber::CurrentConfig.style == kOliveDefaultLight || amber::CurrentConfig.style == kNativeDarkIcons;
 }
 
-QColor olive::styling::GetIconColor()
+QColor amber::styling::GetIconColor()
 {
   if (UseDarkIcons()) {
     return Qt::black;
@@ -18,7 +18,7 @@ QColor olive::styling::GetIconColor()
 
 
 
-bool olive::styling::UseNativeUI()
+bool amber::styling::UseNativeUI()
 {
-  return olive::CurrentConfig.style == kNativeLightIcons || olive::CurrentConfig.style == kNativeDarkIcons;
+  return amber::CurrentConfig.style == kNativeLightIcons || amber::CurrentConfig.style == kNativeDarkIcons;
 }

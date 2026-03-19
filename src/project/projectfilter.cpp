@@ -21,7 +21,7 @@
 #include "projectfilter.h"
 
 #include "project/media.h"
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 
 #include <QDebug>
 

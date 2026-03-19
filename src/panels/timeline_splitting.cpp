@@ -22,14 +22,14 @@
 
 #include "global/global.h"
 #include "panels/panels.h"
-#include "undo/undostack.h"
+#include "engine/undo/undostack.h"
 
 void Timeline::split_clip_at_positions(ComboAction* ca, int clip_index, QVector<long> positions) {
 
   QVector<int> pre_splits;
 
   // Add the clip and each of its links to the pre_splits array
-  Clip* clip = olive::ActiveSequence->clips.at(clip_index).get();
+  Clip* clip = amber::ActiveSequence->clips.at(clip_index).get();
   pre_splits.append(clip_index);
   for (int i : clip->linked)   {
     pre_splits.append(i);
@@ -66,7 +66,7 @@ void Timeline::split_clip_at_positions(ComboAction* ca, int clip_index, QVector<
 
   for (auto & post_split : post_splits) {
     relink_clips_using_ids(pre_splits, post_split);
-    ca->append(new AddClipCommand(olive::ActiveSequence.get(), post_split));
+    ca->append(new AddClipCommand(amber::ActiveSequence.get(), post_split));
   }
 
 }
@@ -76,13 +76,13 @@ ClipPtr Timeline::split_clip(ComboAction* ca, bool transitions, int p, long fram
 }
 
 ClipPtr Timeline::split_clip(ComboAction* ca, bool transitions, int p, long frame, long post_in) {
-  Clip* pre = olive::ActiveSequence->clips.at(p).get();
+  Clip* pre = amber::ActiveSequence->clips.at(p).get();
   if (pre != nullptr) {
 
     if (pre->timeline_in() < frame && pre->timeline_out() > frame) {
       // duplicate clip without duplicating its transitions, we'll restore them later
 
-      ClipPtr post = pre->copy(olive::ActiveSequence.get());
+      ClipPtr post = pre->copy(amber::ActiveSequence.get());
 
       long new_clip_length = frame - pre->timeline_in();
 
@@ -156,7 +156,7 @@ bool Timeline::split_clip_and_relink(ComboAction *ca, int clip, long frame, bool
 
   split_cache.append(clip);
 
-  Clip* c = olive::ActiveSequence->clips.at(clip).get();
+  Clip* c = amber::ActiveSequence->clips.at(clip).get();
   if (c != nullptr) {
     QVector<int> pre_clips;
     QVector<ClipPtr> post_clips;
@@ -177,7 +177,7 @@ bool Timeline::split_clip_and_relink(ComboAction *ca, int clip, long frame, bool
         // find linked clips of old clip
         for (int l : c->linked) {
           if (!split_cache.contains(l)) {
-            Clip* link = olive::ActiveSequence->clips.at(l).get();
+            Clip* link = amber::ActiveSequence->clips.at(l).get();
             if ((original_clip_is_selected && link->IsSelected()) || !original_clip_is_selected) {
               split_cache.append(l);
               ClipPtr s = split_clip(ca, true, l, frame);
@@ -191,7 +191,7 @@ bool Timeline::split_clip_and_relink(ComboAction *ca, int clip, long frame, bool
 
         relink_clips_using_ids(pre_clips, post_clips);
       }
-      ca->append(new AddClipCommand(olive::ActiveSequence.get(), post_clips));
+      ca->append(new AddClipCommand(amber::ActiveSequence.get(), post_clips));
       return true;
     }
   }
@@ -251,10 +251,10 @@ bool Timeline::split_selection(ComboAction* ca) {
   QVector<ClipPtr> secondary_post_splits;
 
   // find clips within selection and split
-  for (int j=0;j<olive::ActiveSequence->clips.size();j++) {
-    ClipPtr clip = olive::ActiveSequence->clips.at(j);
+  for (int j=0;j<amber::ActiveSequence->clips.size();j++) {
+    ClipPtr clip = amber::ActiveSequence->clips.at(j);
     if (clip != nullptr) {
-      for (const auto & s : olive::ActiveSequence->selections) {
+      for (const auto & s : amber::ActiveSequence->selections) {
         if (s.track == clip->track()) {
           ClipPtr post_b = split_clip(ca, true, j, s.out);
           ClipPtr post_a = split_clip(ca, true, j, s.in);
@@ -278,8 +278,8 @@ bool Timeline::split_selection(ComboAction* ca) {
     relink_clips_using_ids(pre_splits, post_splits);
     relink_clips_using_ids(pre_splits, secondary_post_splits);
 
-    ca->append(new AddClipCommand(olive::ActiveSequence.get(), post_splits));
-    ca->append(new AddClipCommand(olive::ActiveSequence.get(), secondary_post_splits));
+    ca->append(new AddClipCommand(amber::ActiveSequence.get(), post_splits));
+    ca->append(new AddClipCommand(amber::ActiveSequence.get(), secondary_post_splits));
 
     return true;
   }
@@ -288,8 +288,8 @@ bool Timeline::split_selection(ComboAction* ca) {
 
 bool Timeline::split_all_clips_at_point(ComboAction* ca, long point) {
   bool split = false;
-  for (int j=0;j<olive::ActiveSequence->clips.size();j++) {
-    ClipPtr c = olive::ActiveSequence->clips.at(j);
+  for (int j=0;j<amber::ActiveSequence->clips.size();j++) {
+    ClipPtr c = amber::ActiveSequence->clips.at(j);
     if (c != nullptr) {
       // always relinks
       if (split_clip_and_relink(ca, j, point, true)) {
@@ -305,14 +305,14 @@ void Timeline::split_at_playhead() {
   bool split_selected = false;
   split_cache.clear();
 
-  if (olive::ActiveSequence->selections.size() > 0) {
+  if (amber::ActiveSequence->selections.size() > 0) {
     // see if whole clips are selected
     QVector<int> pre_clips;
     QVector<ClipPtr> post_clips;
-    for (int j=0;j<olive::ActiveSequence->clips.size();j++) {
-      Clip* clip = olive::ActiveSequence->clips.at(j).get();
+    for (int j=0;j<amber::ActiveSequence->clips.size();j++) {
+      Clip* clip = amber::ActiveSequence->clips.at(j).get();
       if (clip != nullptr && clip->IsSelected()) {
-        ClipPtr s = split_clip(ca, true, j, olive::ActiveSequence->playhead);
+        ClipPtr s = split_clip(ca, true, j, amber::ActiveSequence->playhead);
         if (s != nullptr) {
           pre_clips.append(j);
           post_clips.append(s);
@@ -324,7 +324,7 @@ void Timeline::split_at_playhead() {
     if (split_selected) {
       // relink clips if we split
       relink_clips_using_ids(pre_clips, post_clips);
-      ca->append(new AddClipCommand(olive::ActiveSequence.get(), post_clips));
+      ca->append(new AddClipCommand(amber::ActiveSequence.get(), post_clips));
     } else {
       // split a selection if not
       split_selected = split_selection(ca);
@@ -333,11 +333,11 @@ void Timeline::split_at_playhead() {
 
   // if nothing was selected or no selections fell within playhead, simply split at playhead
   if (!split_selected) {
-    split_selected = split_all_clips_at_point(ca, olive::ActiveSequence->playhead);
+    split_selected = split_all_clips_at_point(ca, amber::ActiveSequence->playhead);
   }
 
   if (split_selected) {
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
     update_ui(true);
   } else {
     delete ca;

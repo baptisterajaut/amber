@@ -46,14 +46,14 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
 
     // Italic Button
     italic_button = new QPushButton();
-    italic_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/italic.svg", false));
+    italic_button->setIcon(amber::icon::CreateIconFromSVG(":/icons/italic.svg", false));
     italic_button->setCheckable(true);
     connect(italic_button, &QPushButton::clicked, textEdit, &QTextEdit::setFontItalic);
     toolbar->addWidget(italic_button);
 
     // Underline Button
     underline_button = new QPushButton();
-    underline_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/underline.svg", false));
+    underline_button->setIcon(amber::icon::CreateIconFromSVG(":/icons/underline.svg", false));
     underline_button->setCheckable(true);
     connect(underline_button, &QPushButton::clicked, textEdit, &QTextEdit::setFontUnderline);
     toolbar->addWidget(underline_button);
@@ -91,7 +91,7 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
 
     // Left Align
     left_align_button = new QPushButton();
-    left_align_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/align-left.svg", false));
+    left_align_button->setIcon(amber::icon::CreateIconFromSVG(":/icons/align-left.svg", false));
     left_align_button->setCheckable(true);
     left_align_button->setProperty("a", Qt::AlignLeft);
     connect(left_align_button, &QPushButton::clicked, this, &TextEditDialog::SetAlignmentFromProperty);
@@ -99,7 +99,7 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
 
     // Center Align
     center_align_button = new QPushButton();
-    center_align_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/align-center.svg", false));
+    center_align_button->setIcon(amber::icon::CreateIconFromSVG(":/icons/align-center.svg", false));
     center_align_button->setCheckable(true);
     center_align_button->setProperty("a", Qt::AlignCenter);
     connect(center_align_button, &QPushButton::clicked, this, &TextEditDialog::SetAlignmentFromProperty);
@@ -107,7 +107,7 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
 
     // Right Align
     right_align_button = new QPushButton();
-    right_align_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/align-right.svg", false));
+    right_align_button->setIcon(amber::icon::CreateIconFromSVG(":/icons/align-right.svg", false));
     right_align_button->setCheckable(true);
     right_align_button->setProperty("a", Qt::AlignRight);
     connect(right_align_button, &QPushButton::clicked, this, &TextEditDialog::SetAlignmentFromProperty);
@@ -115,7 +115,7 @@ TextEditDialog::TextEditDialog(QWidget *parent, const QString &s, bool rich_text
 
     // Justify Align
     justify_align_button = new QPushButton();
-    justify_align_button->setIcon(olive::icon::CreateIconFromSVG(":/icons/justify-center.svg", false));
+    justify_align_button->setIcon(amber::icon::CreateIconFromSVG(":/icons/justify-center.svg", false));
     justify_align_button->setCheckable(true);
     justify_align_button->setProperty("a", Qt::AlignJustify);
     connect(justify_align_button, &QPushButton::clicked, this, &TextEditDialog::SetAlignmentFromProperty);

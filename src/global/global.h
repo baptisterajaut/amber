@@ -22,7 +22,7 @@
 #define OLIVEGLOBAL_H
 
 #include <memory>
-#include "undo/undo.h"
+#include "engine/undo/undo.h"
 
 #include <QTimer>
 #include <QFile>
@@ -136,7 +136,7 @@ public:
     QString get_recent_project_list_file();
 
     /**
-     * @brief (Re)load translation file from olive::config
+     * @brief (Re)load translation file from amber::config
      */
     void load_translation_from_config();
 
@@ -318,7 +318,7 @@ public slots:
      *
      * Call this to change the active Sequence (e.g. when the user double clicks a Sequence in the Project panel).
      * This will affect panel_timeline, panel_sequence_viewer, and panel_effect_controls and can then be retrieved
-     * using olive::ActiveSequence.
+     * using amber::ActiveSequence.
      *
      * @param s
      *
@@ -427,7 +427,7 @@ private slots:
 
 };
 
-namespace olive {
+namespace amber {
     /**
      * @brief Object resource for various global functions used throughout Olive
      */

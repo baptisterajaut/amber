@@ -94,7 +94,7 @@ DemoNotice::DemoNotice(QWidget *parent) :
 
 void DemoNotice::accept() {
   if (dont_show_again_->isChecked()) {
-    olive::CurrentConfig.show_welcome_dialog = false;
+    amber::CurrentConfig.show_welcome_dialog = false;
   }
   QDialog::accept();
 }

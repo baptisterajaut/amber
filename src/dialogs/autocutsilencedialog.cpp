@@ -26,7 +26,7 @@
 #include <QPushButton>
 #include <QDialogButtonBox>
 
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "rendering/renderfunctions.h"
 #include "panels/panels.h"
 #include "panels/timeline.h"
@@ -119,14 +119,14 @@ void AutoCutSilenceDialog::accept() {
 }
 
 void AutoCutSilenceDialog::cut_silence() {
-  if (olive::ActiveSequence == nullptr) return;
+  if (amber::ActiveSequence == nullptr) return;
 
   ComboAction* ca = new ComboAction();
 
   // Loop over clips provided to this dialog
   for (int j : clips_) {
 
-    Clip* clip = olive::ActiveSequence->clips.at(j).get();
+    Clip* clip = amber::ActiveSequence->clips.at(j).get();
 
     // Check if this clip is an audio footage clip
     if (clip->track() >= 0
@@ -210,7 +210,7 @@ void AutoCutSilenceDialog::cut_silence() {
   }
 
   if (ca->hasActions()) {
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
   } else {
     delete ca;
   }

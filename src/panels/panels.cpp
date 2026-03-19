@@ -20,8 +20,8 @@
 
 #include "panels.h"
 
-#include "timeline/sequence.h"
-#include "timeline/clip.h"
+#include "engine/sequence.h"
+#include "engine/clip.h"
 #include "effects/transition.h"
 #include "global/config.h"
 #include "effects/effectloaders.h"
@@ -51,7 +51,7 @@ void update_ui(bool modified) {
 
 QDockWidget *get_focused_panel(bool force_hover) {
   QDockWidget* w = nullptr;
-  if (olive::CurrentConfig.hover_focus || force_hover) {
+  if (amber::CurrentConfig.hover_focus || force_hover) {
     if (panel_project->underMouse()) {
       w = panel_project;
     } else if (panel_effect_controls->underMouse()) {

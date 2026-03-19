@@ -27,7 +27,7 @@
 #include "project/media.h"
 #include "project/sourcescommon.h"
 #include "global/debug.h"
-#include "global/math.h"
+#include "core/math.h"
 
 SourceIconView::SourceIconView(SourcesCommon &commons) :
   commons_(commons)

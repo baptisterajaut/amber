@@ -30,16 +30,17 @@
 #include "mainwindow.h"
 #include "panels/panels.h"
 #include "panels/timeline.h"
-#include "timeline/sequence.h"
-#include "undo/undo.h"
+#include "engine/sequence.h"
+#include "engine/undo/undo.h"
 #include "project/media.h"
 #include "panels/viewer.h"
 #include "global/config.h"
 #include "global/global.h"
+#include "ui/styling.h"
 #include "ui/menu.h"
 #include "ui/menuhelper.h"
 #include "global/debug.h"
-#include "undo/undostack.h"
+#include "engine/undo/undostack.h"
 
 constexpr int CLICK_RANGE = 5;
 constexpr int PLAYHEAD_SIZE = 6;
@@ -113,7 +114,7 @@ void TimelineHeader::set_in_point(long new_in) {
     new_out = viewer->seq->getEndFrame();
   }
 
-  olive::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, new_in, new_out));
+  amber::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, new_in, new_out));
   update_parents();
 }
 
@@ -125,7 +126,7 @@ void TimelineHeader::set_out_point(long new_out) {
     new_in = 0;
   }
 
-  olive::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, new_in, new_out));
+  amber::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, new_in, new_out));
   update_parents();
 }
 
@@ -278,7 +279,7 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
   if (viewer->seq != nullptr) {
     dragging = false;
     if (resizing_workarea) {
-      olive::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, temp_workarea_in, temp_workarea_out));
+      amber::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, temp_workarea_in, temp_workarea_out));
     } else if (dragging_markers && selected_markers.size() > 0) {
       bool moved = false;
       ComboAction* ca = new ComboAction();
@@ -290,7 +291,7 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
         }
       }
       if (moved) {
-        olive::UndoStack.push(ca);
+        amber::UndoStack.push(ca);
       } else {
         delete ca;
       }
@@ -328,7 +329,7 @@ void TimelineHeader::delete_markers() {
     // Send command to delete selected markers
     DeleteMarkerAction* dma = new DeleteMarkerAction(viewer->marker_ref);
     dma->markers.append(selected_markers);
-    olive::UndoStack.push(dma);
+    amber::UndoStack.push(dma);
 
     // remove any indices for the selected markers that no longer exist
     for (int i=0;i<selected_markers.size();i++) {
@@ -385,14 +386,14 @@ void TimelineHeader::paintEvent(QPaintEvent*) {
       // draw text
       bool draw_text = false;
       if (text_enabled && lineX-textWidth > lastTextBoundary) {
-        timecode = frame_to_timecode(frame + in_visible, olive::CurrentConfig.timecode_view, viewer->seq->frame_rate);
+        timecode = frame_to_timecode(frame + in_visible, amber::CurrentConfig.timecode_view, viewer->seq->frame_rate);
         fullTextWidth = fm.horizontalAdvance(timecode);
         textWidth = fullTextWidth>>1;
 
         text_x = lineX;
 
         // centers the text to that point on the timeline, LEFT aligns it if not
-        if (olive::CurrentConfig.center_timeline_timecodes) {
+        if (amber::CurrentConfig.center_timeline_timecodes) {
           text_x -= textWidth;
         } else {
           text_x += TEXT_PADDING_FROM_LINE;
@@ -406,13 +407,13 @@ void TimelineHeader::paintEvent(QPaintEvent*) {
 
       if (lineX > lastLineX+LINE_MIN_PADDING) {
         if (draw_text) {
-          p.setPen(olive::styling::GetIconColor());
+          p.setPen(amber::styling::GetIconColor());
           p.drawText(QRect(text_x, 0, fullTextWidth, yoff), timecode);
         }
 
         // draw line markers
         p.setPen(Qt::gray);
-        p.drawLine(lineX, (!olive::CurrentConfig.center_timeline_timecodes && draw_text) ? 0 : yoff, lineX, height());
+        p.drawLine(lineX, (!amber::CurrentConfig.center_timeline_timecodes && draw_text) ? 0 : yoff, lineX, height());
 
         // draw sub-line markers
         for (int j=1;j<sublineCount;j++) {
@@ -432,7 +433,7 @@ void TimelineHeader::paintEvent(QPaintEvent*) {
       in_x = getHeaderScreenPointFromFrame((resizing_workarea ? temp_workarea_in : viewer->seq->workarea_in));
       int out_x = getHeaderScreenPointFromFrame((resizing_workarea ? temp_workarea_out : viewer->seq->workarea_out));
       p.fillRect(QRect(in_x, 0, out_x-in_x, height()), QColor(0, 192, 255, 128));
-      p.setPen(olive::styling::GetIconColor());
+      p.setPen(amber::styling::GetIconColor());
       p.drawLine(in_x, 0, in_x, height());
       p.drawLine(out_x, 0, out_x, height());
     }
@@ -475,14 +476,14 @@ void TimelineHeader::show_context_menu(const QPoint &pos) {
   Menu menu(this);
 
   // Add items for setting the in/out points of a QMenu
-  olive::MenuHelper.make_inout_menu(&menu);
+  amber::MenuHelper.make_inout_menu(&menu);
 
   menu.addSeparator();
 
-  QAction* center_timecodes = menu.addAction(tr("Center Timecodes"), &olive::MenuHelper, &MenuHelper::toggle_bool_action);
+  QAction* center_timecodes = menu.addAction(tr("Center Timecodes"), &amber::MenuHelper, &MenuHelper::toggle_bool_action);
   center_timecodes->setCheckable(true);
-  center_timecodes->setChecked(olive::CurrentConfig.center_timeline_timecodes);
-  center_timecodes->setData(reinterpret_cast<quintptr>(&olive::CurrentConfig.center_timeline_timecodes));
+  center_timecodes->setChecked(amber::CurrentConfig.center_timeline_timecodes);
+  center_timecodes->setData(reinterpret_cast<quintptr>(&amber::CurrentConfig.center_timeline_timecodes));
 
   menu.exec(mapToGlobal(pos));
 }

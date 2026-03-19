@@ -35,8 +35,8 @@
 
 #include "ui/labelslider.h"
 #include "ui/collapsiblewidget.h"
-#include "timeline/clip.h"
-#include "timeline/sequence.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 #include "ui/comboboxex.h"
 #include "ui/colorbutton.h"
 #include "ui/fontcombobox.h"
@@ -281,7 +281,7 @@ void TextEffect::redraw(double timecode) {
     p.drawPath(shadow_path);
 
     int blurSoftness = qFloor(shadow_softness->GetDoubleAt(timecode));
-    if (blurSoftness > 0) olive::ui::blur(img, img.rect(), blurSoftness, true);
+    if (blurSoftness > 0) amber::ui::blur(img, img.rect(), blurSoftness, true);
   }
 
   // draw outline

@@ -37,7 +37,7 @@ protected:
   void changeEvent(QEvent* e) override;
 };
 
-namespace olive {
+namespace amber {
   extern QVector<Panel*> panels;
 }
 

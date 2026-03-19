@@ -29,18 +29,17 @@ extern "C" {
 }
 
 #include <QApplication>
+#include <QDateTime>
 #include <QOffscreenSurface>
 #include <QPainter>
 #include <QtMath>
 
 #include "global/global.h"
-#include "timeline/sequence.h"
-#include "panels/panels.h"
-#include "ui/viewerwidget.h"
+#include "engine/sequence.h"
+#include "core/appcontext.h"
 #include "rendering/renderthread.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/audio.h"
-#include "ui/mainwindow.h"
 #include "global/debug.h"
 
 ExportThread::ExportThread(const ExportParams &params,
@@ -177,23 +176,23 @@ bool ExportThread::SetupVideo() {
   }
 
   // Create raw AVFrame that will contain the RGBA buffer straight from compositing
-  if (olive::ActiveSequence == nullptr) {
+  if (amber::ActiveSequence == nullptr) {
     export_error = tr("no active sequence");
     return false;
   }
   video_frame = av_frame_alloc();
   av_frame_make_writable(video_frame);
   video_frame->format = AV_PIX_FMT_RGBA;
-  video_frame->width = olive::ActiveSequence->width;
-  video_frame->height = olive::ActiveSequence->height;
+  video_frame->width = amber::ActiveSequence->width;
+  video_frame->height = amber::ActiveSequence->height;
   av_frame_get_buffer(video_frame, 0);
 
   video_pkt = av_packet_alloc();
 
   // Set up conversion context
   sws_ctx = sws_getContext(
-        olive::ActiveSequence->width,
-        olive::ActiveSequence->height,
+        amber::ActiveSequence->width,
+        amber::ActiveSequence->height,
         AV_PIX_FMT_RGBA,
         params_.video_width,
         params_.video_height,
@@ -284,7 +283,7 @@ bool ExportThread::SetupAudio() {
   // init audio resampler context
   {
     AVChannelLayout in_ch_layout = {};
-    av_channel_layout_from_mask(&in_ch_layout, olive::ActiveSequence->audio_layout);
+    av_channel_layout_from_mask(&in_ch_layout, amber::ActiveSequence->audio_layout);
     swr_alloc_set_opts2(
           &swr_ctx,
           &acodec_ctx->ch_layout,
@@ -413,7 +412,7 @@ void ExportThread::Export()
   connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
   // Loop from now (set to the beginning frame earlier) to the end of the frame
-  while (olive::ActiveSequence->playhead <= params_.end_frame && !interrupt_) {
+  while (amber::ActiveSequence->playhead <= params_.end_frame && !interrupt_) {
 
     // Start timing how long this frame will take
     frame_start_time = QDateTime::currentMSecsSinceEpoch();
@@ -422,14 +421,14 @@ void ExportThread::Export()
     if (params_.audio_enabled) {
       waiting_for_audio_ = true;
       SetAudioWakeObject(this);
-      olive::rendering::compose_audio(nullptr, olive::ActiveSequence.get(), 1, true);
+      amber::rendering::compose_audio(nullptr, amber::ActiveSequence.get(), 1, true);
     }
 
     // If we're exporting video, trigger a render on the RenderThread
     if (params_.video_enabled) {
       do {
         // TODO optimize by rendering the next frame while encoding the last
-        renderer->start_render(olive::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0, true);
+        renderer->start_render(amber::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0, true);
 
         // Wait for RenderThread to return
         waitCond.wait(&mutex);
@@ -452,7 +451,7 @@ void ExportThread::Export()
     }
 
     // Get the current sequence playhead in seconds (used for timestamp calculations later on)
-    double timecode_secs = double(olive::ActiveSequence->playhead - params_.start_frame) / olive::ActiveSequence->frame_rate;
+    double timecode_secs = double(amber::ActiveSequence->playhead - params_.start_frame) / amber::ActiveSequence->frame_rate;
 
     // If we're exporting video, construct an AVFrame in the destination codec's pixel format to convert the raw RGBA
     // OpenGL buffer to
@@ -541,15 +540,15 @@ void ExportThread::Export()
     // Generating encoding statistics (e.g. the time it took to encode this frame/estimated remaining time)
     frame_time = (QDateTime::currentMSecsSinceEpoch()-frame_start_time);
     total_time += frame_time;
-    remaining_frames = (params_.end_frame - olive::ActiveSequence->playhead);
+    remaining_frames = (params_.end_frame - amber::ActiveSequence->playhead);
     avg_time = (total_time/frame_count);
     eta = (remaining_frames*avg_time);
 
     // Emit a signal for the percent of the sequence that's been encoded so far
-    emit ProgressChanged(qRound((double(olive::ActiveSequence->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
+    emit ProgressChanged(qRound((double(amber::ActiveSequence->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
 
     // Increment sequence playhead
-    olive::ActiveSequence->playhead++;
+    amber::ActiveSequence->playhead++;
 
     // Increment frame count (used for generating encoding statistics above)
     frame_count++;
@@ -562,8 +561,8 @@ cleanup_renderer:
 
 cleanup_state:
   // Always clean up clip/rendering state, even on cancel
-  olive::Global->set_rendering_state(false);
-  close_active_clips(olive::ActiveSequence.get());
+  amber::Global->set_rendering_state(false);
+  close_active_clips(amber::ActiveSequence.get());
 
   if (interrupt_) {
     return;
@@ -661,7 +660,7 @@ void ExportThread::Cleanup()
 
 void ExportThread::run() {
   // Ensure sequence isn't currently playing
-  panel_sequence_viewer->pause();
+  amber::app_ctx->pausePlayback();
 
   // Set audio rendering rate BEFORE seeking, because seek() can trigger
   // compose_audio() which opens clips and configures audio filter graphs
@@ -672,7 +671,7 @@ void ExportThread::run() {
   }
 
   // Seek to the first frame we're exporting
-  panel_sequence_viewer->seek(params_.start_frame);
+  amber::app_ctx->seekPlayhead(params_.start_frame);
 
   // Lock mutex (used for thread synchronizations)
   mutex.lock();

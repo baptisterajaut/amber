@@ -92,7 +92,7 @@ intptr_t hostCallback(AEffect* effect, int32_t opcode, int32_t index, intptr_t v
     // but we are aware of it
     break;
   case audioMasterEndEdit: // change made
-    olive::Global->set_modified(true);
+    amber::Global->set_modified(true);
     break;
   default:
     qInfo() << "Plugin requested unhandled opcode" << opcode;
@@ -127,7 +127,7 @@ void VSTHost::loadPlugin() {
     // Show an error if the plugin fails to load
 
     qCritical() << "Failed to load VST plugin" << dll_fn << "-" << modulePtr.errorString();
-    QMessageBox::critical(olive::MainWindow,
+    QMessageBox::critical(amber::MainWindow,
                           tr("Error loading VST plugin"),
                           tr("Failed to load VST plugin \"%1\": %2").arg(dll_fn, modulePtr.errorString()));
     return;
@@ -143,7 +143,7 @@ void VSTHost::loadPlugin() {
   }
 
   if (mainEntryPoint == nullptr) {
-    QMessageBox::critical(olive::MainWindow,
+    QMessageBox::critical(amber::MainWindow,
                           tr("Error loading VST plugin"),
                           tr("Failed to locate entry point for dynamic library."));
     modulePtr.unload();
@@ -170,7 +170,7 @@ bool VSTHost::configurePluginCallbacks() {
   // real VST plugin, or is otherwise corrupt.
   if(plugin->magic != kEffectMagic) {
     qCritical() << "Plugin's magic number is bad";
-    QMessageBox::critical(olive::MainWindow, tr("VST Error"), tr("Plugin's magic number is invalid"));
+    QMessageBox::critical(amber::MainWindow, tr("VST Error"), tr("Plugin's magic number is invalid"));
     return false;
   }
 
@@ -225,7 +225,7 @@ void VSTHost::processAudio(long numFrames) {
 void VSTHost::CreateDialogIfNull()
 {
   if (dialog == nullptr) {
-    dialog = new QDialog(olive::MainWindow);
+    dialog = new QDialog(amber::MainWindow);
     dialog->setWindowTitle(tr("VST Plugin"));
     dialog->setAttribute(Qt::WA_NativeWindow, true);
     dialog->setWindowFlags(dialog->windowFlags() | Qt::MSWindowsFixedSizeDialogHint);

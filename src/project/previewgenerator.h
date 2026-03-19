@@ -49,6 +49,11 @@ private:
   void parse_media();
   bool retrieve_preview(const QString &hash);
   void generate_waveform();
+  bool setup_stream_codecs(AVCodecContext** codec_ctx, qint16*** waveform_cache_data);
+  void process_video_frame(AVFrame* temp_frame, FootageStream* s, AVCodecContext** codec_ctx, int stream_index);
+  void process_audio_frame(AVFrame* temp_frame, FootageStream* s, int stream_index,
+                           qint16*** waveform_cache_data, int& waveform_cache_count, AVPacket* packet);
+  void retrieve_media_duration(int64_t* media_lengths);
   void finalize_media();
   void invalidate_media(const QString& error_msg);
   QString get_thumbnail_path(const QString &hash, const FootageStream &ms);

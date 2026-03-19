@@ -153,10 +153,10 @@ void ProxyDialog::accept() {
     footage->proxy = true;
     footage->proxy_path.clear();
 
-    olive::proxy_generator.queue(i);
+    amber::proxy_generator.queue(i);
   }
 
-  olive::Global->set_modified(true);
+  amber::Global->set_modified(true);
 
   QDialog::accept();
 }

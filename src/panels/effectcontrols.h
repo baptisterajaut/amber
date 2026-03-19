@@ -22,7 +22,6 @@
 #define EFFECTCONTROLS_H
 
 #include <QUndoCommand>
-#include <QMutex>
 #include <QMenu>
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -77,8 +76,6 @@ public:
 
   ResizableScrollBar* horizontalScrollBar;
   QScrollBar* verticalScrollBar;
-
-  QMutex effects_loaded;
 
   void Retranslate() override;
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
-project(amber-editor VERSION 1.2.2 LANGUAGES CXX)
+project(amber-editor VERSION 1.2.3 LANGUAGES CXX)
 
 option(BUILD_DOXYGEN "Build Doxygen documentation" OFF)
 
@@ -206,10 +206,6 @@ set(OLIVE_SOURCES
   global/debug.h
   global/global.cpp
   global/global.h
-  global/math.cpp
-  global/math.h
-  global/path.cpp
-  global/path.h
   include/vestige.h
   panels/effectcontrols.cpp
   panels/effectcontrols.h
@@ -247,10 +243,8 @@ set(OLIVE_SOURCES
   project/sourcescommon.h
   rendering/audio.cpp
   rendering/audio.h
-  rendering/cacher.cpp
-  rendering/cacher_audio.cpp
-  rendering/cacher_video.cpp
-  rendering/cacher.h
+  rendering/audio_ui.cpp
+  rendering/audio_ui.h
   rendering/clipqueue.cpp
   rendering/clipqueue.h
   rendering/exportthread.cpp
@@ -259,20 +253,18 @@ set(OLIVE_SOURCES
   rendering/renderfunctions.h
   rendering/renderthread.cpp
   rendering/renderthread.h
-  timeline/clip.cpp
-  timeline/clip.h
   timeline/marker.cpp
-  timeline/guide.h
   timeline/marker.h
   timeline/mediaimportdata.cpp
   timeline/mediaimportdata.h
-  timeline/selection.h
-  timeline/sequence.cpp
-  timeline/sequence.h
+  ui/appcontextimpl.cpp
+  ui/appcontextimpl.h
   ui/audiomonitor.cpp
   ui/audiomonitor.h
   ui/blur.cpp
   ui/blur.h
+  ui/checkbox_command.cpp
+  ui/checkbox_command.h
   ui/clickablelabel.cpp
   ui/clickablelabel.h
   ui/collapsiblewidget.cpp
@@ -349,24 +341,6 @@ set(OLIVE_SOURCES
   ui/viewerwidget.h
   ui/viewerwindow.cpp
   ui/viewerwindow.h
-  undo/comboaction.cpp
-  undo/comboaction.h
-  undo/undoactions.h
-  undo/undo_clip.cpp
-  undo/undo_clip.h
-  undo/undo_effect.cpp
-  undo/undo_effect.h
-  undo/undo_generic.cpp
-  undo/undo_generic.h
-  undo/undo_guide.cpp
-  undo/undo_guide.h
-  undo/undo_media.cpp
-  undo/undo_media.h
-  undo/undo_timeline.cpp
-  undo/undo_timeline.h
-  undo/undo.h
-  undo/undostack.cpp
-  undo/undostack.h
   main.cpp
 )
 
@@ -469,6 +443,22 @@ add_executable(${OLIVE_TARGET}
   ${OLIVE_EFFECTS}
   ${OLIVE_QM_FILES}
 )
+
+add_subdirectory(core)
+add_subdirectory(engine)
+
+# Link-time optimization for Release builds (recovers overhead from function decomposition)
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
+if(ipo_supported)
+  set_property(TARGET ${OLIVE_TARGET} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+endif()
+
+# Test suite (only when not cross-compiling)
+if(NOT CMAKE_CROSSCOMPILING)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 qt_add_shaders(${OLIVE_TARGET} "amber_shaders"
   PREFIX "/shaders"

@@ -24,13 +24,12 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
-#include "panels/panels.h"
-#include "panels/project.h"
+#include "core/appcontext.h"
 
 #include "debug.h"
 
-Config olive::CurrentConfig;
-RuntimeConfig olive::CurrentRuntimeConfig;
+Config amber::CurrentConfig;
+RuntimeConfig amber::CurrentRuntimeConfig;
 
 namespace {
 
@@ -178,7 +177,7 @@ void Config::load(QString path) {
       }
     }
     if (!handled && name == QLatin1String("Style")) {
-      style = static_cast<olive::styling::Style>(text.toInt());
+      style = static_cast<amber::styling::Style>(text.toInt());
     }
   }
 
@@ -200,7 +199,7 @@ void Config::save(QString path) {
   stream.writeStartDocument();                // doc
   stream.writeStartElement("Configuration");  // configuration
 
-  stream.writeTextElement("Version", QString::number(olive::kSaveVersion));
+  stream.writeTextElement("Version", QString::number(amber::kSaveVersion));
   stream.writeTextElement("HardwareDecoding", QString::number(hardware_decoding));
   stream.writeTextElement("ShowTrackLines", QString::number(show_track_lines));
   stream.writeTextElement("ScrollZooms", QString::number(scroll_zooms));
@@ -227,7 +226,7 @@ void Config::save(QString path) {
   stream.writeTextElement("HoverFocus", QString::number(hover_focus));
   stream.writeTextElement("ProjectViewType", QString::number(project_view_type));
   stream.writeTextElement("SetNameWithMarker", QString::number(set_name_with_marker));
-  stream.writeTextElement("ShowProjectToolbar", QString::number(panel_project->IsToolbarVisible()));
+  stream.writeTextElement("ShowProjectToolbar", QString::number(amber::app_ctx->isToolbarVisible()));
   stream.writeTextElement("PreviousFrameQueueSize", QString::number(previous_queue_size));
   stream.writeTextElement("PreviousFrameQueueType", QString::number(previous_queue_type));
   stream.writeTextElement("UpcomingFrameQueueSize", QString::number(upcoming_queue_size));

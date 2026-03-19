@@ -69,5 +69,5 @@ void FontField::UpdateFromWidget(const QString& s)
   SetValueAt(Now(), s);
 
   kdc->SetNewKeyframes();
-  olive::UndoStack.push(kdc);
+  amber::UndoStack.push(kdc);
 }

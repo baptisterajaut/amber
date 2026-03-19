@@ -30,14 +30,14 @@
 #include "ui/menuhelper.h"
 #include "panels/panels.h"
 #include "project/media.h"
-#include "undo/undo.h"
+#include "engine/undo/undo.h"
 #include "rendering/renderfunctions.h"
 #include "panels/timeline.h"
 #include "panels/project.h"
 #include "project/footage.h"
 #include "panels/viewer.h"
 #include "project/projectfilter.h"
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "global/config.h"
 #include "global/global.h"
 #include "dialogs/proxydialog.h"
@@ -45,7 +45,7 @@
 #include "project/proxygenerator.h"
 #include "ui/mainwindow.h"
 #include "ui/menu.h"
-#include "undo/undostack.h"
+#include "engine/undo/undostack.h"
 
 SourcesCommon::SourcesCommon(Project* parent, ProjectFilter &sort_filter) :
   
@@ -58,7 +58,7 @@ SourcesCommon::SourcesCommon(Project* parent, ProjectFilter &sort_filter) :
 
 void SourcesCommon::create_seq_from_selected() {
   if (!selected_items.isEmpty()) {
-    QVector<olive::timeline::MediaImportData> media_list;
+    QVector<amber::timeline::MediaImportData> media_list;
     for (const auto & selected_item : selected_items) {
       media_list.append(project_parent->item_to_media(selected_item));
     }
@@ -71,7 +71,7 @@ void SourcesCommon::create_seq_from_selected() {
     panel_timeline->add_clips_from_ghosts(ca, s.get());
 
     project_parent->create_sequence_internal(ca, s, true, nullptr);
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
   }
 }
 
@@ -85,7 +85,7 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
 
   Menu* new_menu = new Menu(tr("New"));
   menu.addMenu(new_menu);
-  olive::MenuHelper.make_new_menu(new_menu);
+  amber::MenuHelper.make_new_menu(new_menu);
 
   Menu* view_menu = new Menu(tr("View"));
   menu.addMenu(view_menu);
@@ -172,7 +172,7 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
           && cached_selected_footage.at(0)->to_footage()->proxy
           && cached_selected_footage.at(0)->to_footage()->proxy_path.isEmpty()) {
         QAction* action = proxies->addAction(tr("Generating proxy: %1% complete").arg(
-                                               olive::proxy_generator.get_proxy_progress(cached_selected_footage.at(0))
+                                               amber::proxy_generator.get_proxy_progress(cached_selected_footage.at(0))
                                                )
                                              );
         action->setEnabled(false);
@@ -259,7 +259,7 @@ void SourcesCommon::mouseDoubleClickEvent(const QModelIndexList& selected_items)
   } else if (selected_items.size() == 1) {
     Media* media = project_parent->item_to_media(selected_items.at(0));
     if (media->get_type() == MEDIA_TYPE_SEQUENCE) {
-      olive::UndoStack.push(new ChangeSequenceAction(media->to_sequence()));
+      amber::UndoStack.push(new ChangeSequenceAction(media->to_sequence()));
     } else {
       OpenSelectedMediaInMediaViewer(project_parent->item_to_media(selected_items.at(0)));
     }
@@ -285,7 +285,7 @@ void SourcesCommon::dropEvent(QWidget* parent,
           && drop_item.isValid()
           && m->get_type() == MEDIA_TYPE_FOOTAGE
           && !QFileInfo(paths.at(0)).isDir()
-          && olive::CurrentConfig.drop_on_media_to_replace
+          && amber::CurrentConfig.drop_on_media_to_replace
           && QMessageBox::question(
             parent,
             tr("Replace Media"),
@@ -342,7 +342,7 @@ void SourcesCommon::dropEvent(QWidget* parent,
         MediaMove* mm = new MediaMove();
         mm->to = m.get();
         mm->items = move_items;
-        olive::UndoStack.push(mm);
+        amber::UndoStack.push(mm);
       }
     }
   }
@@ -386,7 +386,7 @@ void SourcesCommon::rename_interval() {
 void SourcesCommon::item_renamed(Media* item) {
   if (editing_item == item) {
     MediaRename* mr = new MediaRename(item, "idk");
-    olive::UndoStack.push(mr);
+    amber::UndoStack.push(mr);
     editing_item = nullptr;
   }
 }
@@ -405,7 +405,7 @@ void SourcesCommon::OpenSelectedMediaInMediaViewer(Media* item) {
 
 void SourcesCommon::open_create_proxy_dialog() {
   // open the proxy dialog and send it a list of currently selected footage
-  ProxyDialog pd(olive::MainWindow, cached_selected_footage);
+  ProxyDialog pd(amber::MainWindow, cached_selected_footage);
   pd.exec();
 }
 
@@ -417,7 +417,7 @@ void SourcesCommon::clear_proxies_from_selected() {
 
     if (f->proxy && !f->proxy_path.isEmpty()) {
       if (QFileInfo::exists(f->proxy_path)) {
-        if (QMessageBox::question(olive::MainWindow,
+        if (QMessageBox::question(amber::MainWindow,
                                   tr("Delete proxy"),
                                   tr("Would you like to delete the proxy file \"%1\" as well?").arg(f->proxy_path),
                                   QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
@@ -430,9 +430,9 @@ void SourcesCommon::clear_proxies_from_selected() {
     f->proxy_path.clear();
   }
 
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     // close all clips so we can delete any proxies requested to be deleted
-    close_active_clips(olive::ActiveSequence.get());
+    close_active_clips(amber::ActiveSequence.get());
   }
 
   // delete proxies requested to be deleted
@@ -440,10 +440,10 @@ void SourcesCommon::clear_proxies_from_selected() {
     QFile::remove(i);
   }
 
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     // update viewer (will re-open active clips with original media)
     panel_sequence_viewer->viewer_widget->frame_update();
   }
 
-  olive::Global->set_modified(true);
+  amber::Global->set_modified(true);
 }

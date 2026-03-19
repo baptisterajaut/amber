@@ -26,9 +26,9 @@
 #include <QMessageBox>
 
 #include "panels/panels.h"
-#include "undo/undostack.h"
-#include "rendering/cacher.h"
-#include "undo/undo.h"
+#include "engine/undo/undostack.h"
+#include "engine/cacher.h"
+#include "engine/undo/undo.h"
 
 ReplaceClipMediaDialog::ReplaceClipMediaDialog(QWidget *parent, Media* old_media) :
   QDialog(parent),
@@ -66,7 +66,7 @@ ReplaceClipMediaDialog::ReplaceClipMediaDialog(QWidget *parent, Media* old_media
 
   layout->addLayout(buttons);
 
-  tree->setModel(&olive::project_model);
+  tree->setModel(&amber::project_model);
 }
 
 void ReplaceClipMediaDialog::accept() {
@@ -95,7 +95,7 @@ void ReplaceClipMediaDialog::accept() {
             QMessageBox::Ok
             );
     } else {
-      if (new_item->get_type() == MEDIA_TYPE_SEQUENCE && olive::ActiveSequence == new_item->to_sequence()) {
+      if (new_item->get_type() == MEDIA_TYPE_SEQUENCE && amber::ActiveSequence == new_item->to_sequence()) {
         QMessageBox::critical(
               this,
               tr("Active sequence selected"),
@@ -109,13 +109,13 @@ void ReplaceClipMediaDialog::accept() {
               use_same_media_in_points->isChecked()
               );
 
-        for (auto c : olive::ActiveSequence->clips) {
+        for (auto c : amber::ActiveSequence->clips) {
           if (c != nullptr && c->media() == media) {
             rcmc->clips.append(c);
           }
         }
 
-        olive::UndoStack.push(rcmc);
+        amber::UndoStack.push(rcmc);
 
         QDialog::accept();
       }

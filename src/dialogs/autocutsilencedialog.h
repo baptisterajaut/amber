@@ -24,7 +24,7 @@
 #include <QDialog>
 #include <QCheckBox>
 
-#include "timeline/clip.h"
+#include "engine/clip.h"
 #include "ui/labelslider.h"
 
 class AutoCutSilenceDialog : public QDialog

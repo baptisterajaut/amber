@@ -56,7 +56,7 @@ static RhiBackend parseRhiBackend(const char* name) {
 }
 
 int main(int argc, char *argv[]) {
-  olive::Global = std::unique_ptr<OliveGlobal>(new OliveGlobal);
+  amber::Global = std::unique_ptr<OliveGlobal>(new OliveGlobal);
 
   bool launch_fullscreen = false;
   QString load_proj;
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 #ifndef GITHASH
           qWarning() << "No Git commit information found";
 #endif
-          printf("%s\n", olive::AppName.toUtf8().constData());
+          printf("%s\n", amber::AppName.toUtf8().constData());
           return 0;
         } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
           printf("Usage: %s [options] [filename]\n\n"
@@ -96,20 +96,20 @@ int main(int argc, char *argv[]) {
           launch_fullscreen = true;
         } else if (!strcmp(argv[i], "--rhi-backend")) {
           if (i + 1 < argc) {
-            olive::CurrentRuntimeConfig.rhi_backend = parseRhiBackend(argv[++i]);
+            amber::CurrentRuntimeConfig.rhi_backend = parseRhiBackend(argv[++i]);
           } else {
             printf("[ERROR] No backend name specified\n");
             return 1;
           }
         } else if (!strcmp(argv[i], "--disable-shaders")) {
-          olive::CurrentRuntimeConfig.shaders_are_enabled = false;
+          amber::CurrentRuntimeConfig.shaders_are_enabled = false;
         } else if (!strcmp(argv[i], "--no-debug")) {
           use_internal_logger = false;
         } else if (!strcmp(argv[i], "--disable-blend-modes")) {
-          olive::CurrentRuntimeConfig.disable_blending = true;
+          amber::CurrentRuntimeConfig.disable_blending = true;
         } else if (!strcmp(argv[i], "--translation")) {
           if (i + 1 < argc && argv[i + 1][0] != '-') {
-            olive::CurrentRuntimeConfig.external_translation_file = argv[++i];
+            amber::CurrentRuntimeConfig.external_translation_file = argv[++i];
           } else {
             printf("[ERROR] No translation file specified\n");
             return 1;
@@ -125,10 +125,10 @@ int main(int argc, char *argv[]) {
   }
 
   // Env var override (CLI takes precedence)
-  if (olive::CurrentRuntimeConfig.rhi_backend == RhiBackend::Auto) {
+  if (amber::CurrentRuntimeConfig.rhi_backend == RhiBackend::Auto) {
     QByteArray env = qgetenv("AMBER_RHI_BACKEND");
     if (!env.isEmpty()) {
-      olive::CurrentRuntimeConfig.rhi_backend = parseRhiBackend(env.constData());
+      amber::CurrentRuntimeConfig.rhi_backend = parseRhiBackend(env.constData());
     }
   }
 
@@ -155,14 +155,14 @@ int main(int argc, char *argv[]) {
   // Create Vulkan instance (needed by both QRhiWidget and offscreen QRhi when using Vulkan)
 #if AMBER_HAS_VULKAN
   {
-    RhiBackend b = olive::CurrentRuntimeConfig.rhi_backend;
+    RhiBackend b = amber::CurrentRuntimeConfig.rhi_backend;
     bool want_vulkan = (b == RhiBackend::Auto || b == RhiBackend::Vulkan);
     if (want_vulkan) {
       s_vulkanInstance.setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
       if (!s_vulkanInstance.create()) {
         qWarning() << "Failed to create QVulkanInstance, Vulkan backend unavailable";
       } else {
-        olive::CurrentRuntimeConfig.vulkan_instance = &s_vulkanInstance;
+        amber::CurrentRuntimeConfig.vulkan_instance = &s_vulkanInstance;
       }
     }
   }
@@ -170,51 +170,51 @@ int main(int argc, char *argv[]) {
 
   // Probe: verify Vulkan QRhi actually works (instance can create without usable GPU)
 #if AMBER_HAS_VULKAN
-  if (olive::CurrentRuntimeConfig.vulkan_instance != nullptr) {
+  if (amber::CurrentRuntimeConfig.vulkan_instance != nullptr) {
     QRhiVulkanInitParams probeParams;
     probeParams.inst = &s_vulkanInstance;
     std::unique_ptr<QRhi> probe(QRhi::create(QRhi::Vulkan, &probeParams));
     if (!probe) {
       qWarning() << "Vulkan instance created but no usable GPU found, disabling Vulkan";
-      olive::CurrentRuntimeConfig.vulkan_instance = nullptr;
+      amber::CurrentRuntimeConfig.vulkan_instance = nullptr;
     }
   }
 #endif
 
   // Validate explicit backend is available on this platform
   {
-    RhiBackend b = olive::CurrentRuntimeConfig.rhi_backend;
-    if (b == RhiBackend::Vulkan && olive::CurrentRuntimeConfig.vulkan_instance == nullptr) {
+    RhiBackend b = amber::CurrentRuntimeConfig.rhi_backend;
+    if (b == RhiBackend::Vulkan && amber::CurrentRuntimeConfig.vulkan_instance == nullptr) {
       qWarning() << "Vulkan requested but unavailable, falling back to OpenGL";
-      olive::CurrentRuntimeConfig.rhi_backend = RhiBackend::OpenGL;
+      amber::CurrentRuntimeConfig.rhi_backend = RhiBackend::OpenGL;
     }
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_IOS)
     if (b == RhiBackend::Metal) {
       qWarning() << "Metal backend only available on macOS/iOS, falling back to OpenGL";
-      olive::CurrentRuntimeConfig.rhi_backend = RhiBackend::OpenGL;
+      amber::CurrentRuntimeConfig.rhi_backend = RhiBackend::OpenGL;
     }
 #endif
 #if !defined(Q_OS_WIN)
     if (b == RhiBackend::D3D12 || b == RhiBackend::D3D11) {
       qWarning() << "D3D12/D3D11 backend only available on Windows, falling back to OpenGL";
-      olive::CurrentRuntimeConfig.rhi_backend = RhiBackend::OpenGL;
+      amber::CurrentRuntimeConfig.rhi_backend = RhiBackend::OpenGL;
     }
 #endif
   }
 
   // Resolve Auto to platform-specific default
-  if (olive::CurrentRuntimeConfig.rhi_backend == RhiBackend::Auto) {
+  if (amber::CurrentRuntimeConfig.rhi_backend == RhiBackend::Auto) {
 #if defined(Q_OS_MACOS) || defined(Q_OS_IOS)
-    olive::CurrentRuntimeConfig.rhi_backend = RhiBackend::Metal;
+    amber::CurrentRuntimeConfig.rhi_backend = RhiBackend::Metal;
 #elif defined(Q_OS_WIN)
-    olive::CurrentRuntimeConfig.rhi_backend = RhiBackend::D3D12;
+    amber::CurrentRuntimeConfig.rhi_backend = RhiBackend::D3D12;
 #else
-    olive::CurrentRuntimeConfig.rhi_backend =
-        (olive::CurrentRuntimeConfig.vulkan_instance != nullptr) ? RhiBackend::Vulkan : RhiBackend::OpenGL;
+    amber::CurrentRuntimeConfig.rhi_backend =
+        (amber::CurrentRuntimeConfig.vulkan_instance != nullptr) ? RhiBackend::Vulkan : RhiBackend::OpenGL;
 #endif
   }
 
-  olive::media_icon_service = std::unique_ptr<MediaIconService>(new MediaIconService());
+  amber::media_icon_service = std::unique_ptr<MediaIconService>(new MediaIconService());
 
   QCoreApplication::setOrganizationName("ambervideoeditor.org");
   QCoreApplication::setOrganizationDomain("ambervideoeditor.org");
@@ -233,12 +233,12 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-  olive::timeline::MultiplyTrackSizesByDPI();
+  amber::timeline::MultiplyTrackSizesByDPI();
 
-  QObject::connect(&w, &MainWindow::finished_first_paint, olive::Global.get(), &OliveGlobal::finished_initialize, Qt::QueuedConnection);
+  QObject::connect(&w, &MainWindow::finished_first_paint, amber::Global.get(), &OliveGlobal::finished_initialize, Qt::QueuedConnection);
 
   if (!load_proj.isEmpty()) {
-    olive::Global->load_project_on_launch(load_proj);
+    amber::Global->load_project_on_launch(load_proj);
   }
   if (launch_fullscreen) {
     w.showFullScreen();

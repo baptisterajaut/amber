@@ -26,7 +26,7 @@ const int kThrobberSize = 50;
 #include "project/projectmodel.h"
 #include "ui/icons.h"
 
-std::unique_ptr<MediaIconService> olive::media_icon_service;
+std::unique_ptr<MediaIconService> amber::media_icon_service;
 
 MediaIconService::MediaIconService() {
   // set up animation timer
@@ -55,13 +55,13 @@ void MediaIconService::SetMediaIcon(Media *media, int icon_type) {
 
   switch (icon_type) {
   case ICON_TYPE_VIDEO:
-    olive::project_model.set_icon(media, olive::icon::MediaVideo);
+    amber::project_model.set_icon(media, amber::icon::MediaVideo);
     break;
   case ICON_TYPE_AUDIO:
-    olive::project_model.set_icon(media, olive::icon::MediaAudio);
+    amber::project_model.set_icon(media, amber::icon::MediaAudio);
     break;
   case ICON_TYPE_IMAGE:
-    olive::project_model.set_icon(media, olive::icon::MediaImage);
+    amber::project_model.set_icon(media, amber::icon::MediaImage);
     break;
   case ICON_TYPE_LOADING:
     throbber_items_.append(media);
@@ -76,7 +76,7 @@ void MediaIconService::SetMediaIcon(Media *media, int icon_type) {
     }
     break;
   case ICON_TYPE_ERROR:
-    olive::project_model.set_icon(media, olive::icon::MediaError);
+    amber::project_model.set_icon(media, amber::icon::MediaError);
     break;
   }
 
@@ -93,7 +93,7 @@ void MediaIconService::AnimationUpdate() {
   throbber_lock_.lock();
 
   for (auto throbber_item : throbber_items_) {
-    olive::project_model.set_icon(throbber_item, throbber_ico);
+    amber::project_model.set_icon(throbber_item, throbber_ico);
   }
 
   throbber_lock_.unlock();

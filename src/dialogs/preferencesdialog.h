@@ -34,7 +34,7 @@
 #include <QDoubleSpinBox>
 #include <QSpinBox>
 
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 
 class KeySequenceEditor;
 

@@ -69,7 +69,7 @@ private:
   QTextEdit* textEdit;
 };
 
-namespace olive {
+namespace amber {
 /**
  * @brief Omnipresent instance of DebugDialog to be shown or hidden as the user wants
  */

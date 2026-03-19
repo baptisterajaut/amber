@@ -351,7 +351,7 @@ class MainWindow : public QMainWindow {
   bool first_show{true};
 };
 
-namespace olive {
+namespace amber {
 extern MainWindow* MainWindow;
 }
 

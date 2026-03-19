@@ -28,11 +28,11 @@
 #include <QApplication>
 #include <QScreen>
 
-#include "timeline/sequence.h"
-#include "timeline/clip.h"
+#include "engine/sequence.h"
+#include "engine/clip.h"
 #include "project/footage.h"
 #include "project/media.h"
-#include "undo/undo.h"
+#include "engine/undo/undo.h"
 #include "timelinetools.h"
 
 class Timeline;
@@ -80,6 +80,43 @@ private:
   int getClipIndexFromCoords(long frame, int track);
 
   void VerifyTransitionHelper();
+
+  // mouseMoveEvent per-action handlers
+  void mouseMoveSelecting(bool alt);
+  void mouseMoveHandMoving(QMouseEvent* event);
+  void mouseMoveMovingInit(QMouseEvent* event);
+  void mouseMoveSplitting(bool alt);
+  void mouseMoveRectSelect(QMouseEvent* event, bool alt);
+  void mouseMoveHoverTrimDetection(QMouseEvent* event);
+  void mouseMoveHoverTransition(QMouseEvent* event);
+
+  // update_ghosts sub-handlers
+  void updateGhostsSnap(int effective_tool, long& frame_diff);
+  void updateGhostsValidate(int effective_tool, bool clips_are_movable, long& frame_diff);
+  void updateGhostsApply(int effective_tool, bool clips_are_movable, long frame_diff,
+                          int track_diff, long& earliest_in_point);
+  void updateGhostsApplySelections(int effective_tool, bool clips_are_movable, long frame_diff, int track_diff);
+  void updateGhostsTooltip(const QPoint& mouse_pos, long frame_diff, long earliest_in_point);
+
+  // paintEvent sub-handlers
+  void drawClips(QPainter& p);
+  void drawRecordingClip(QPainter& p);
+  void drawTrackLines(QPainter& p, int video_track_limit, int audio_track_limit);
+  void drawSelections(QPainter& p);
+  void drawGhosts(QPainter& p);
+  void drawSplittingCursor(QPainter& p);
+  void drawPlayhead(QPainter& p);
+  void drawEditCursor(QPainter& p);
+
+  // mousePressEvent sub-handlers
+  void mousePressCreating();
+  void mousePressPointer(int hovered_clip, bool shift, bool alt, int effective_tool);
+
+  // mouseReleaseEvent sub-handlers
+  bool mouseReleaseCreating(ComboAction* ca, bool shift);
+  bool mouseReleaseMoving(ComboAction* ca, bool alt, bool ctrl);
+  bool mouseReleaseTransition(ComboAction* ca);
+  bool mouseReleaseSplitting(ComboAction* ca, bool alt);
 
   bool track_resizing;
   int track_target;

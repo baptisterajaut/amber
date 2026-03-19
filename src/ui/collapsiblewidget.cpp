@@ -100,7 +100,7 @@ bool CollapsibleWidget::IsSelected()
 }
 
 void CollapsibleWidget::set_button_icon(bool open) {
-  collapse_button->setIcon(open ? olive::icon::DownArrow : olive::icon::RightArrow);
+  collapse_button->setIcon(open ? amber::icon::DownArrow : amber::icon::RightArrow);
 }
 
 void CollapsibleWidget::SetContents(QWidget* c) {

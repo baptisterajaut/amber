@@ -53,7 +53,7 @@ extern "C" {
 #include "project/previewgenerator.h"
 #include "project/projectfilter.h"
 #include "project/sourcescommon.h"
-#include "rendering/cacher.h"
+#include "engine/cacher.h"
 #include "rendering/renderfunctions.h"
 #include "ui/icons.h"
 #include "ui/mainwindow.h"
@@ -62,8 +62,8 @@ extern "C" {
 #include "ui/menuhelper.h"
 #include "ui/sourceiconview.h"
 #include "ui/sourcetable.h"
-#include "undo/undo.h"
-#include "undo/undostack.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 
 constexpr int MAXIMUM_RECENT_PROJECTS = 10;  // FIXME: should be configurable
 
@@ -83,7 +83,7 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
 
   // optional toolbar
   toolbar_widget = new QWidget();
-  toolbar_widget->setVisible(olive::CurrentConfig.show_project_toolbar);
+  toolbar_widget->setVisible(amber::CurrentConfig.show_project_toolbar);
   toolbar_widget->setObjectName("project_toolbar");
 
   QHBoxLayout* toolbar = new QHBoxLayout(toolbar_widget);
@@ -91,33 +91,33 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   toolbar->setSpacing(0);
 
   QPushButton* toolbar_new = new QPushButton();
-  toolbar_new->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/add-button.svg")));
+  toolbar_new->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/add-button.svg")));
   toolbar_new->setToolTip(tr("New"));
   connect(toolbar_new, &QPushButton::clicked, this, &Project::make_new_menu);
   toolbar->addWidget(toolbar_new);
 
   QPushButton* toolbar_open = new QPushButton();
-  toolbar_open->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/open.svg")));
+  toolbar_open->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/open.svg")));
   toolbar_open->setToolTip(tr("Open Project"));
-  connect(toolbar_open, &QPushButton::clicked, olive::Global.get(), &OliveGlobal::OpenProject);
+  connect(toolbar_open, &QPushButton::clicked, amber::Global.get(), &OliveGlobal::OpenProject);
   toolbar->addWidget(toolbar_open);
 
   QPushButton* toolbar_save = new QPushButton();
-  toolbar_save->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/save.svg")));
+  toolbar_save->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/save.svg")));
   toolbar_save->setToolTip(tr("Save Project"));
-  connect(toolbar_save, &QPushButton::clicked, olive::Global.get(), &OliveGlobal::save_project);
+  connect(toolbar_save, &QPushButton::clicked, amber::Global.get(), &OliveGlobal::save_project);
   toolbar->addWidget(toolbar_save);
 
   QPushButton* toolbar_undo = new QPushButton();
-  toolbar_undo->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/undo.svg")));
+  toolbar_undo->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/undo.svg")));
   toolbar_undo->setToolTip(tr("Undo"));
-  connect(toolbar_undo, &QPushButton::clicked, olive::Global.get(), &OliveGlobal::undo);
+  connect(toolbar_undo, &QPushButton::clicked, amber::Global.get(), &OliveGlobal::undo);
   toolbar->addWidget(toolbar_undo);
 
   QPushButton* toolbar_redo = new QPushButton();
-  toolbar_redo->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/redo.svg")));
+  toolbar_redo->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/redo.svg")));
   toolbar_redo->setToolTip(tr("Redo"));
-  connect(toolbar_redo, &QPushButton::clicked, olive::Global.get(), &OliveGlobal::redo);
+  connect(toolbar_redo, &QPushButton::clicked, amber::Global.get(), &OliveGlobal::redo);
   toolbar->addWidget(toolbar_redo);
 
   toolbar_search = new QLineEdit();
@@ -126,19 +126,19 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   toolbar->addWidget(toolbar_search);
 
   QPushButton* toolbar_tree_view = new QPushButton();
-  toolbar_tree_view->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/treeview.svg")));
+  toolbar_tree_view->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/treeview.svg")));
   toolbar_tree_view->setToolTip(tr("Tree View"));
   connect(toolbar_tree_view, &QPushButton::clicked, this, &Project::set_tree_view);
   toolbar->addWidget(toolbar_tree_view);
 
   QPushButton* toolbar_icon_view = new QPushButton();
-  toolbar_icon_view->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/iconview.svg")));
+  toolbar_icon_view->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/iconview.svg")));
   toolbar_icon_view->setToolTip(tr("Icon View"));
   connect(toolbar_icon_view, &QPushButton::clicked, this, &Project::set_icon_view);
   toolbar->addWidget(toolbar_icon_view);
 
   QPushButton* toolbar_list_view = new QPushButton();
-  toolbar_list_view->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/listview.svg")));
+  toolbar_list_view->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/listview.svg")));
   toolbar_list_view->setToolTip(tr("List View"));
   connect(toolbar_list_view, &QPushButton::clicked, this, &Project::set_list_view);
   toolbar->addWidget(toolbar_list_view);
@@ -169,7 +169,7 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   icon_view_controls->setSpacing(0);
 
   directory_up = new QPushButton();
-  directory_up->setIcon(olive::icon::CreateIconFromSVG(QStringLiteral(":/icons/dirup.svg")));
+  directory_up->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/dirup.svg")));
   directory_up->setEnabled(false);
   icon_view_controls->addWidget(directory_up);
 
@@ -198,9 +198,9 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   connect(directory_up, &QPushButton::clicked, this, &Project::go_up_dir);
   connect(icon_view, &SourceIconView::changed_root, this, &Project::set_up_dir_enabled);
 
-  connect(olive::media_icon_service.get(), &MediaIconService::IconChanged, icon_view->viewport(),
+  connect(amber::media_icon_service.get(), &MediaIconService::IconChanged, icon_view->viewport(),
           qOverload<>(&QWidget::update));
-  connect(olive::media_icon_service.get(), &MediaIconService::IconChanged, tree_view->viewport(),
+  connect(amber::media_icon_service.get(), &MediaIconService::IconChanged, tree_view->viewport(),
           qOverload<>(&QWidget::update));
 
   update_view_type();
@@ -208,7 +208,7 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   Retranslate();
 }
 
-void Project::ConnectFilterToModel() { sorter.setSourceModel(&olive::project_model); }
+void Project::ConnectFilterToModel() { sorter.setSourceModel(&amber::project_model); }
 
 void Project::DisconnectFilterToModel() { sorter.setSourceModel(nullptr); }
 
@@ -230,8 +230,8 @@ QString Project::get_next_sequence_name(QString start) {
       name += "0";
     }
     name += QString::number(n);
-    for (int i = 0; i < olive::project_model.childCount(); i++) {
-      if (QString::compare(olive::project_model.child(i)->get_name(), name, Qt::CaseInsensitive) == 0) {
+    for (int i = 0; i < amber::project_model.childCount(); i++) {
+      if (QString::compare(amber::project_model.child(i)->get_name(), name, Qt::CaseInsensitive) == 0) {
         found = true;
         n++;
         break;
@@ -241,17 +241,17 @@ QString Project::get_next_sequence_name(QString start) {
   return name;
 }
 
-SequencePtr create_sequence_from_media(QVector<olive::timeline::MediaImportData>& media_list) {
+SequencePtr create_sequence_from_media(QVector<amber::timeline::MediaImportData>& media_list) {
   SequencePtr s(new Sequence());
 
   s->name = panel_project->get_next_sequence_name();
 
   // Retrieve default Sequence settings from Config
-  s->width = olive::CurrentConfig.default_sequence_width;
-  s->height = olive::CurrentConfig.default_sequence_height;
-  s->frame_rate = olive::CurrentConfig.default_sequence_framerate;
-  s->audio_frequency = olive::CurrentConfig.default_sequence_audio_frequency;
-  s->audio_layout = olive::CurrentConfig.default_sequence_audio_channel_layout;
+  s->width = amber::CurrentConfig.default_sequence_width;
+  s->height = amber::CurrentConfig.default_sequence_height;
+  s->frame_rate = amber::CurrentConfig.default_sequence_framerate;
+  s->audio_frequency = amber::CurrentConfig.default_sequence_audio_frequency;
+  s->audio_layout = amber::CurrentConfig.default_sequence_audio_channel_layout;
 
   bool got_video_values = false;
   bool got_audio_values = false;
@@ -316,7 +316,7 @@ void Project::duplicate_selected() {
     }
   }
   if (duped) {
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
   } else {
     delete ca;
   }
@@ -339,12 +339,12 @@ void Project::replace_media(MediaPtr item, QString filename) {
   }
   if (!filename.isEmpty()) {
     ReplaceMediaCommand* rmc = new ReplaceMediaCommand(item, filename);
-    olive::UndoStack.push(rmc);
+    amber::UndoStack.push(rmc);
   }
 }
 
 void Project::replace_clip_media() {
-  if (olive::ActiveSequence == nullptr) {
+  if (amber::ActiveSequence == nullptr) {
     QMessageBox::critical(this, tr("No active sequence"),
                           tr("No sequence is active, please open the sequence you want to replace clips from."),
                           QMessageBox::Ok);
@@ -352,7 +352,7 @@ void Project::replace_clip_media() {
     QModelIndexList selected_items = get_current_selected();
     if (selected_items.size() == 1) {
       Media* item = item_to_media(selected_items.at(0));
-      if (item->get_type() == MEDIA_TYPE_SEQUENCE && olive::ActiveSequence == item->to_sequence()) {
+      if (item->get_type() == MEDIA_TYPE_SEQUENCE && amber::ActiveSequence == item->to_sequence()) {
         QMessageBox::critical(
             this, tr("Active sequence selected"),
             tr("You cannot insert a sequence into itself, so no clips of this media would be in this sequence."),
@@ -384,7 +384,7 @@ void Project::open_properties() {
                                                  QLineEdit::Normal, item->get_name());
         if (!new_name.isEmpty()) {
           MediaRename* mr = new MediaRename(item, new_name);
-          olive::UndoStack.push(mr);
+          amber::UndoStack.push(mr);
         }
       }
     }
@@ -393,14 +393,14 @@ void Project::open_properties() {
 
 void Project::new_folder() {
   MediaPtr m = create_folder_internal(nullptr);
-  olive::UndoStack.push(new AddMediaCommand(m, get_selected_folder()));
+  amber::UndoStack.push(new AddMediaCommand(m, get_selected_folder()));
 
-  QModelIndex index = olive::project_model.create_index(m->row(), 0, m.get());
-  switch (olive::CurrentConfig.project_view_type) {
-    case olive::PROJECT_VIEW_TREE:
+  QModelIndex index = amber::project_model.create_index(m->row(), 0, m.get());
+  switch (amber::CurrentConfig.project_view_type) {
+    case amber::PROJECT_VIEW_TREE:
       tree_view->edit(sorter.mapFromSource(index));
       break;
-    case olive::PROJECT_VIEW_ICON:
+    case amber::PROJECT_VIEW_ICON:
       icon_view->edit(sorter.mapFromSource(index));
       break;
   }
@@ -424,10 +424,10 @@ MediaPtr Project::create_sequence_internal(ComboAction* ca, SequencePtr s, bool 
     }
 
   } else {
-    olive::project_model.appendChild(parent, item);
+    amber::project_model.appendChild(parent, item);
 
     if (open) {
-      olive::Global->set_sequence(s);
+      amber::Global->set_sequence(s);
     }
   }
 
@@ -509,8 +509,8 @@ void Project::delete_selected_media() {
   QVector<Media*> parents;
   QList<Media*> sequence_items;
   QList<Media*> all_top_level_items;
-  for (int i = 0; i < olive::project_model.childCount(); i++) {
-    all_top_level_items.append(olive::project_model.child(i));
+  for (int i = 0; i < amber::project_model.childCount(); i++) {
+    all_top_level_items.append(amber::project_model.child(i));
   }
   get_all_media_from_table(all_top_level_items, sequence_items, MEDIA_TYPE_SEQUENCE);  // find all sequences in project
   if (sequence_items.size() > 0) {
@@ -594,7 +594,7 @@ void Project::delete_selected_media() {
     panel_graph_editor->set_row(nullptr);
     panel_effect_controls->Clear(true);
 
-    if (olive::ActiveSequence != nullptr) olive::ActiveSequence->selections.clear();
+    if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
 
     // remove media and parents
     for (auto parent : parents) {
@@ -614,7 +614,7 @@ void Project::delete_selected_media() {
 
         Sequence* s = item->to_sequence().get();
 
-        if (s == olive::ActiveSequence.get()) {
+        if (s == amber::ActiveSequence.get()) {
           ca->append(new ChangeSequenceAction(nullptr));
         }
 
@@ -633,7 +633,7 @@ void Project::delete_selected_media() {
         }
       }
     }
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
 
     // redraw clips
     if (redraw) {
@@ -648,7 +648,7 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
   bool imported = false;
 
   // retrieve the array of image formats from the user's configuration
-  QStringList image_sequence_formats = olive::CurrentConfig.img_seq_formats.split("|");
+  QStringList image_sequence_formats = amber::CurrentConfig.img_seq_formats.split("|");
 
   // a cache of image sequence formatted URLS to assist the user in importing image sequences
   QVector<QString> image_sequence_urls;
@@ -680,7 +680,7 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
       if (create_undo_action) {
         ca->append(new AddMediaCommand(folder, parent));
       } else {
-        olive::project_model.appendChild(parent, folder);
+        amber::project_model.appendChild(parent, folder);
       }
 
       process_file_list(subdir_filenames, true, nullptr, folder.get());
@@ -699,7 +699,7 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
                                       .arg(file),
                                   QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
           // load the project without clearing the current one
-          olive::Global->ImportProject(file);
+          amber::Global->ImportProject(file);
         }
 
       } else {
@@ -850,7 +850,7 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
             if (create_undo_action) {
               ca->append(new AddMediaCommand(item, parent));
             } else {
-              olive::project_model.appendChild(parent, item);
+              amber::project_model.appendChild(parent, item);
             }
           }
 
@@ -861,7 +861,7 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
   }
   if (create_undo_action) {
     if (imported) {
-      olive::UndoStack.push(ca);
+      amber::UndoStack.push(ca);
 
       for (auto i : last_imported_media) {
         // generate waveform/thumbnail in another thread
@@ -884,9 +884,9 @@ Media* Project::get_selected_folder() {
 }
 
 bool Project::reveal_media(Media* media, QModelIndex parent) {
-  for (int i = 0; i < olive::project_model.rowCount(parent); i++) {
-    const QModelIndex& item = olive::project_model.index(i, 0, parent);
-    Media* m = olive::project_model.getItem(item);
+  for (int i = 0; i < amber::project_model.rowCount(parent); i++) {
+    const QModelIndex& item = amber::project_model.index(i, 0, parent);
+    Media* m = amber::project_model.getItem(item);
 
     if (m->get_type() == MEDIA_TYPE_FOLDER) {
       // if this item is a folder, recursively run this function to search it too
@@ -901,7 +901,7 @@ bool Project::reveal_media(Media* media, QModelIndex parent) {
       // retrieve its parent item
       QModelIndex hierarchy = sorted_index.parent();
 
-      if (olive::CurrentConfig.project_view_type == olive::PROJECT_VIEW_TREE) {
+      if (amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_TREE) {
         // if we're in tree view, expand every folder in the hierarchy containing the media
         while (hierarchy.isValid()) {
           tree_view->setExpanded(hierarchy, true);
@@ -913,7 +913,7 @@ bool Project::reveal_media(Media* media, QModelIndex parent) {
                                   sorter.index(sorted_index.row(), sorter.columnCount() - 1, sorted_index.parent()));
 
         tree_view->selectionModel()->select(row_select, QItemSelectionModel::Select);
-      } else if (olive::CurrentConfig.project_view_type == olive::PROJECT_VIEW_ICON) {
+      } else if (amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_ICON) {
         // if we're in icon view, we just "browse" to the parent folder
         icon_view->setRootIndex(hierarchy);
 
@@ -942,7 +942,7 @@ void Project::import_dialog() {
 }
 
 void Project::delete_clips_using_selected_media() {
-  if (olive::ActiveSequence == nullptr) {
+  if (amber::ActiveSequence == nullptr) {
     QMessageBox::critical(this, tr("No active sequence"),
                           tr("No sequence is active, please open the sequence you want to delete clips from."),
                           QMessageBox::Ok);
@@ -950,13 +950,13 @@ void Project::delete_clips_using_selected_media() {
     ComboAction* ca = new ComboAction();
     bool deleted = false;
     QModelIndexList items = get_current_selected();
-    for (int i = 0; i < olive::ActiveSequence->clips.size(); i++) {
-      const ClipPtr& c = olive::ActiveSequence->clips.at(i);
+    for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
+      const ClipPtr& c = amber::ActiveSequence->clips.at(i);
       if (c != nullptr) {
         for (const auto& item : items) {
           Media* m = item_to_media(item);
           if (c->media() == m) {
-            ca->append(new DeleteClipAction(olive::ActiveSequence.get(), i));
+            ca->append(new DeleteClipAction(amber::ActiveSequence.get(), i));
             deleted = true;
           }
         }
@@ -967,7 +967,7 @@ void Project::delete_clips_using_selected_media() {
       if (delete_clips_in_clipboard_with_media(ca, m)) deleted = true;
     }
     if (deleted) {
-      olive::UndoStack.push(ca);
+      amber::UndoStack.push(ca);
       update_ui(true);
     } else {
       delete ca;
@@ -989,7 +989,7 @@ void Project::clear() {
   }
 
   // delete everything else
-  olive::project_model.clear();
+  amber::project_model.clear();
 
   // update tree view (sometimes this doesn't seem to update reliably)
   tree_view->update();
@@ -1003,9 +1003,9 @@ void save_marker(QXmlStreamWriter& stream, const Marker& m) {
 }
 
 void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only, const QModelIndex& parent) {
-  for (int i = 0; i < olive::project_model.rowCount(parent); i++) {
-    const QModelIndex& item = olive::project_model.index(i, 0, parent);
-    Media* m = olive::project_model.getItem(item);
+  for (int i = 0; i < amber::project_model.rowCount(parent); i++) {
+    const QModelIndex& item = amber::project_model.index(i, 0, parent);
+    Media* m = amber::project_model.getItem(item);
 
     if (type == m->get_type()) {
       if (m->get_type() == MEDIA_TYPE_FOLDER) {
@@ -1020,7 +1020,7 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
           if (!item.parent().isValid()) {
             stream.writeAttribute("parent", "0");
           } else {
-            stream.writeAttribute("parent", QString::number(olive::project_model.getItem(item.parent())->temp_id));
+            stream.writeAttribute("parent", QString::number(amber::project_model.getItem(item.parent())->temp_id));
           }
           stream.writeEndElement();
         }
@@ -1089,7 +1089,7 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
             stream.writeAttribute("framerate", QString::number(s->frame_rate, 'f', 10));
             stream.writeAttribute("afreq", QString::number(s->audio_frequency));
             stream.writeAttribute("alayout", QString::number(s->audio_layout));
-            if (s == olive::ActiveSequence.get()) {
+            if (s == amber::ActiveSequence.get()) {
               stream.writeAttribute("open", "1");
             }
             stream.writeAttribute("workarea", QString::number(s->using_workarea));
@@ -1212,7 +1212,7 @@ void Project::save_project(bool autorecovery) {
   media_id = 1;
   sequence_id = 1;
 
-  QFile file(autorecovery ? autorecovery_filename : olive::ActiveProjectFilename);
+  QFile file(autorecovery ? autorecovery_filename : amber::ActiveProjectFilename);
   if (!file.open(QIODevice::WriteOnly)) {
     qCritical() << "Could not open file";
     return;
@@ -1224,10 +1224,10 @@ void Project::save_project(bool autorecovery) {
 
   stream.writeStartElement("project");  // project
 
-  stream.writeTextElement("version", QString::number(olive::kSaveVersion));
+  stream.writeTextElement("version", QString::number(amber::kSaveVersion));
 
-  stream.writeTextElement("url", olive::ActiveProjectFilename);
-  proj_dir = QFileInfo(olive::ActiveProjectFilename).absoluteDir();
+  stream.writeTextElement("url", amber::ActiveProjectFilename);
+  proj_dir = QFileInfo(amber::ActiveProjectFilename).absoluteDir();
 
   save_folder(stream, MEDIA_TYPE_FOLDER, true);
 
@@ -1252,23 +1252,23 @@ void Project::save_project(bool autorecovery) {
   file.close();
 
   if (!autorecovery) {
-    add_recent_project(olive::ActiveProjectFilename);
-    olive::Global->set_modified(false);
+    add_recent_project(amber::ActiveProjectFilename);
+    amber::Global->set_modified(false);
   }
 }
 
 void Project::update_view_type() {
-  tree_view->setVisible(olive::CurrentConfig.project_view_type == olive::PROJECT_VIEW_TREE);
-  icon_view_container->setVisible(olive::CurrentConfig.project_view_type == olive::PROJECT_VIEW_ICON ||
-                                  olive::CurrentConfig.project_view_type == olive::PROJECT_VIEW_LIST);
+  tree_view->setVisible(amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_TREE);
+  icon_view_container->setVisible(amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_ICON ||
+                                  amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_LIST);
 
-  switch (olive::CurrentConfig.project_view_type) {
-    case olive::PROJECT_VIEW_TREE:
+  switch (amber::CurrentConfig.project_view_type) {
+    case amber::PROJECT_VIEW_TREE:
       sources_common.view = tree_view;
       break;
-    case olive::PROJECT_VIEW_ICON:
-    case olive::PROJECT_VIEW_LIST:
-      icon_view->setViewMode(olive::CurrentConfig.project_view_type == olive::PROJECT_VIEW_ICON ? QListView::IconMode
+    case amber::PROJECT_VIEW_ICON:
+    case amber::PROJECT_VIEW_LIST:
+      icon_view->setViewMode(amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_ICON ? QListView::IconMode
                                                                                                 : QListView::ListMode);
 
       // update list/grid size since they use this value slightly differently
@@ -1280,23 +1280,23 @@ void Project::update_view_type() {
 }
 
 void Project::set_icon_view() {
-  olive::CurrentConfig.project_view_type = olive::PROJECT_VIEW_ICON;
+  amber::CurrentConfig.project_view_type = amber::PROJECT_VIEW_ICON;
   update_view_type();
 }
 
 void Project::set_list_view() {
-  olive::CurrentConfig.project_view_type = olive::PROJECT_VIEW_LIST;
+  amber::CurrentConfig.project_view_type = amber::PROJECT_VIEW_LIST;
   update_view_type();
 }
 
 void Project::set_tree_view() {
-  olive::CurrentConfig.project_view_type = olive::PROJECT_VIEW_TREE;
+  amber::CurrentConfig.project_view_type = amber::PROJECT_VIEW_TREE;
   update_view_type();
 }
 
 void Project::save_recent_projects() {
   // save to file
-  QFile f(olive::Global->get_recent_project_list_file());
+  QFile f(amber::Global->get_recent_project_list_file());
   if (f.open(QFile::WriteOnly | QFile::Truncate | QFile::Text)) {
     QTextStream out(&f);
     for (int i = 0; i < recent_projects.size(); i++) {
@@ -1334,7 +1334,7 @@ void Project::go_up_dir() {
 
 void Project::make_new_menu() {
   Menu new_menu(this);
-  olive::MenuHelper.make_new_menu(&new_menu);
+  amber::MenuHelper.make_new_menu(&new_menu);
   new_menu.exec(QCursor::pos());
 }
 
@@ -1357,8 +1357,8 @@ void Project::add_recent_project(QString url) {
 }
 
 void Project::list_all_sequences_worker(QVector<Media*>* list, Media* parent) {
-  for (int i = 0; i < olive::project_model.childCount(parent); i++) {
-    Media* item = olive::project_model.child(i, parent);
+  for (int i = 0; i < amber::project_model.childCount(parent); i++) {
+    Media* item = amber::project_model.child(i, parent);
     switch (item->get_type()) {
       case MEDIA_TYPE_SEQUENCE:
         list->append(item);
@@ -1377,7 +1377,7 @@ QVector<Media*> Project::list_all_project_sequences() {
 }
 
 QModelIndexList Project::get_current_selected() {
-  if (olive::CurrentConfig.project_view_type == olive::PROJECT_VIEW_TREE) {
+  if (amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_TREE) {
     return tree_view->selectionModel()->selectedRows();
   }
   return icon_view->selectionModel()->selectedIndexes();

@@ -34,8 +34,8 @@
 #include "project/footage.h"
 #include "project/media.h"
 #include "panels/project.h"
-#include "undo/undo.h"
-#include "undo/undostack.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 
 MediaPropertiesDialog::MediaPropertiesDialog(QWidget *parent, Media *i) :
   QDialog(parent),
@@ -203,7 +203,7 @@ void MediaPropertiesDialog::accept() {
   }
   ca->appendPost(new UpdateViewer());
 
-  olive::UndoStack.push(ca);
+  amber::UndoStack.push(ca);
 
   QDialog::accept();
 }

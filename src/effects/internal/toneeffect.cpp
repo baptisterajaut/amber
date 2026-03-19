@@ -24,8 +24,8 @@
 
 #define TONE_TYPE_SINE 0
 
-#include "timeline/clip.h"
-#include "timeline/sequence.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 
 ToneEffect::ToneEffect(Clip* c, const EffectMeta *em) : Effect(c, em), sinX(INT_MIN) {
   EffectRow* type_row = new EffectRow(this, tr("Type"));

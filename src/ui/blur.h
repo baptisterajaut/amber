@@ -4,7 +4,7 @@
 #include <QImage>
 #include <QRect>
 
-namespace olive {
+namespace amber {
   namespace ui {
     /**
      * @brief Convenience function for blurring a QImage

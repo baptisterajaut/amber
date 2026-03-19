@@ -21,11 +21,11 @@
 #include "marker.h"
 
 #include "global/config.h"
-#include "undo/undo.h"
-#include "undo/undostack.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 #include "ui/mainwindow.h"
-#include "timeline/sequence.h"
-#include "timeline/clip.h"
+#include "engine/sequence.h"
+#include "engine/clip.h"
 #include "panels/panels.h"
 #include "panels/viewer.h"
 
@@ -54,13 +54,13 @@ void set_marker_internal(Sequence* seq, const QVector<int>& clips) {
 
   // add_marker is used to determine whether we're adding a marker, depending on whether the user input a marker name
   // however if (config.set_name_with_marker) is true, we don't need a marker name so we just add
-  bool add_marker = !olive::CurrentConfig.set_name_with_marker;
+  bool add_marker = !amber::CurrentConfig.set_name_with_marker;
 
   QString marker_name;
 
   // if (config.set_name_with_marker) is false (set above), ask for a marker name
   if (!add_marker) {
-    QInputDialog d(olive::MainWindow);
+    QInputDialog d(amber::MainWindow);
     d.setWindowTitle(QCoreApplication::translate("Marker", "Set Marker"));
     d.setLabelText(clips.size() > 0
                    ? QCoreApplication::translate("Marker", "Set clip marker name:")
@@ -111,7 +111,7 @@ void set_marker_internal(Sequence* seq, const QVector<int>& clips) {
 
 
     // push action
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
 
     // redraw UI for new markers
     update_ui(false);

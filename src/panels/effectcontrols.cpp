@@ -33,12 +33,13 @@
 
 #include "panels/panels.h"
 #include "effects/effect.h"
+#include "effects/effectloaders.h"
 #include "effects/transition.h"
-#include "timeline/clip.h"
+#include "engine/clip.h"
 #include "ui/collapsiblewidget.h"
-#include "timeline/sequence.h"
-#include "undo/undo.h"
-#include "undo/undostack.h"
+#include "engine/sequence.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 #include "panels/project.h"
 #include "panels/timeline.h"
 #include "panels/viewer.h"
@@ -92,8 +93,8 @@ bool EffectControls::keyframe_focus() {
 void EffectControls::set_zoom(bool in) {
   zoom *= (in) ? 2 : 0.5;
   update_keyframes();
-  if (olive::ActiveSequence != nullptr) {
-    scroll_to_frame(olive::ActiveSequence->playhead);
+  if (amber::ActiveSequence != nullptr) {
+    scroll_to_frame(amber::ActiveSequence->playhead);
   }
 }
 
@@ -108,21 +109,21 @@ void EffectControls::menu_select(QAction* q) {
                                               nullptr,
                                               nullptr,
                                               meta,
-                                              olive::CurrentConfig.default_transition_length));
+                                              amber::CurrentConfig.default_transition_length));
         }
         if (c->closing_transition == nullptr) {
           ca->append(new AddTransitionCommand(nullptr,
                                               c,
                                               nullptr,
                                               meta,
-                                              olive::CurrentConfig.default_transition_length));
+                                              amber::CurrentConfig.default_transition_length));
         }
       } else {
         ca->append(new AddEffectCommand(c, nullptr, meta));
       }
     }
   }
-  olive::UndoStack.push(ca);
+  amber::UndoStack.push(ca);
   if (effect_menu_type == EFFECT_TYPE_TRANSITION) {
     update_ui(true);
   } else {
@@ -180,7 +181,7 @@ void EffectControls::copy(bool del) {
 
   if (del) {
     if (ca->hasActions()) {
-      olive::UndoStack.push(ca);
+      amber::UndoStack.push(ca);
     } else {
       delete ca;
     }
@@ -199,7 +200,7 @@ void EffectControls::show_effect_menu(int type, int subtype) {
   effect_menu_type = type;
   effect_menu_subtype = subtype;
 
-  effects_loaded.lock();
+  effects_loaded_mutex.lock();
 
   Menu effects_menu(this);
   effects_menu.setToolTipsVisible(true);
@@ -257,7 +258,7 @@ void EffectControls::show_effect_menu(int type, int subtype) {
     }
   }
 
-  effects_loaded.unlock();
+  effects_loaded_mutex.unlock();
 
   connect(&effects_menu, &QMenu::triggered, this, &EffectControls::menu_select);
   effects_menu.exec(QCursor::pos());
@@ -374,8 +375,8 @@ void EffectControls::setup_ui() {
   veHeaderLayout->setSpacing(0);
   veHeaderLayout->setContentsMargins(0, 0, 0, 0);
 
-  QIcon add_effect_icon = olive::icon::CreateIconFromSVG(":/icons/add-effect.svg", false);
-  QIcon add_transition_icon = olive::icon::CreateIconFromSVG(":/icons/add-transition.svg", false);
+  QIcon add_effect_icon = amber::icon::CreateIconFromSVG(":/icons/add-effect.svg", false);
+  QIcon add_transition_icon = amber::icon::CreateIconFromSVG(":/icons/add-transition.svg", false);
 
   btnAddVideoEffect = new QPushButton();
   btnAddVideoEffect->setIcon(add_effect_icon);
@@ -539,7 +540,7 @@ void EffectControls::queue_post_update() {
 void EffectControls::effects_area_context_menu() {
   Menu menu(this);
 
-  olive::MenuHelper.create_effect_paste_action(&menu);
+  amber::MenuHelper.create_effect_paste_action(&menu);
 
   menu.exec(QCursor::pos());
 }
@@ -590,7 +591,7 @@ void EffectControls::DeleteSelectedEffects() {
   }
 
   if (ca->hasActions()) {
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
     update_ui(true);
   } else {
     delete ca;
@@ -604,13 +605,13 @@ void EffectControls::Reload() {
 
 void EffectControls::SetClips()
 {
-  if (olive::ActiveSequence == nullptr) {
+  if (amber::ActiveSequence == nullptr) {
     Clear(true);
     selected_clips_.clear();
     return;
   }
 
-  QVector<Clip*> new_clips = olive::ActiveSequence->SelectedClips(false);
+  QVector<Clip*> new_clips = amber::ActiveSequence->SelectedClips(false);
 
   // If the selected clips haven't changed, skip the expensive teardown/rebuild
   if (new_clips == selected_clips_) {
@@ -748,7 +749,7 @@ EffectsArea::EffectsArea(QWidget* parent) :
 
 void EffectsArea::resizeEvent(QResizeEvent *)
 {
-  if (!olive::CurrentConfig.effect_panel_shrinkable) {
+  if (!amber::CurrentConfig.effect_panel_shrinkable) {
     setMinimumWidth(sizeHint().width());
   } else {
     setMinimumWidth(0);

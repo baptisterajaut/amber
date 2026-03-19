@@ -30,9 +30,9 @@ extern "C" {
 #include <QtMath>
 
 #include "footage.h"
-#include "timeline/sequence.h"
-#include "undo/undo.h"
-#include "undo/undostack.h"
+#include "engine/sequence.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "panels/viewer.h"
 #include "panels/project.h"
@@ -87,7 +87,7 @@ void Media::set_footage(FootagePtr f) {
 }
 
 void Media::set_sequence(SequencePtr s) {
-  set_icon(olive::icon::MediaSequence);
+  set_icon(amber::icon::MediaSequence);
   type = MEDIA_TYPE_SEQUENCE;
   object = VoidPtr(s);
   if (s != nullptr) {
@@ -99,7 +99,7 @@ void Media::set_folder() {
   if (folder_name.isEmpty()) {
     folder_name = QCoreApplication::translate("Media", "New Folder");
   }
-  set_icon(olive::icon::MediaFolder);
+  set_icon(amber::icon::MediaFolder);
   type = MEDIA_TYPE_FOLDER;
   object = nullptr;
 }
@@ -283,7 +283,7 @@ bool Media::setData(int col, const QVariant &value) {
   if (col == 0) {
     QString n = value.toString();
     if (!n.isEmpty() && get_name() != n) {
-      olive::UndoStack.push(new MediaRename(this, value.toString()));
+      amber::UndoStack.push(new MediaRename(this, value.toString()));
       return true;
     }
   }
@@ -305,7 +305,7 @@ int Media::columnCount() const {
 QString Media::GetStringDuration() {
   if (get_type() == MEDIA_TYPE_SEQUENCE) {
     Sequence* s = to_sequence().get();
-    return frame_to_timecode(s->getEndFrame(), olive::CurrentConfig.timecode_view, s->frame_rate);
+    return frame_to_timecode(s->getEndFrame(), amber::CurrentConfig.timecode_view, s->frame_rate);
   }
   if (get_type() == MEDIA_TYPE_FOOTAGE) {
     Footage* f = to_footage();
@@ -315,7 +315,7 @@ QString Media::GetStringDuration() {
       r = f->video_tracks.at(0).video_frame_rate * f->speed;
 
     long len = f->get_length_in_frames(r);
-    if (len > 0) return frame_to_timecode(len, olive::CurrentConfig.timecode_view, r);
+    if (len > 0) return frame_to_timecode(len, amber::CurrentConfig.timecode_view, r);
   }
   return QString();
 }

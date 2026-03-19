@@ -66,7 +66,7 @@ AboutDialog::AboutDialog(QWidget *parent) :
                          "<p>%3</p>"
                          "<p>%4</p>"
                          "</body></html>")
-                     .arg(olive::AppName,
+                     .arg(amber::AppName,
                           tr("A fork of Olive 0.1 ported to Qt 6 and modern FFmpeg, "
                              "with many bugs from the original codebase fixed along the way."),
                           tr("Free open-source software released under the GNU GPL. "

@@ -41,7 +41,7 @@
 ViewerWindow::ViewerWindow(QWidget* parent) : QRhiWidget(parent) {
   setWindowFlags(Qt::Window);
 
-  switch (olive::CurrentRuntimeConfig.rhi_backend) {
+  switch (amber::CurrentRuntimeConfig.rhi_backend) {
     case RhiBackend::Vulkan: setApi(Api::Vulkan); break;
     case RhiBackend::Metal: setApi(Api::Metal); break;
     case RhiBackend::D3D12: setApi(Api::Direct3D12); break;
@@ -50,8 +50,8 @@ ViewerWindow::ViewerWindow(QWidget* parent) : QRhiWidget(parent) {
   }
 
 #if AMBER_HAS_VULKAN
-  if (olive::CurrentRuntimeConfig.rhi_backend == RhiBackend::Vulkan) {
-    auto* vi = static_cast<QVulkanInstance*>(olive::CurrentRuntimeConfig.vulkan_instance);
+  if (amber::CurrentRuntimeConfig.rhi_backend == RhiBackend::Vulkan) {
+    auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
     if (vi) {
       winId();
       if (windowHandle()) {
@@ -106,7 +106,7 @@ void ViewerWindow::showEvent(QShowEvent*) {
   }
   shortcuts_.clear();
 
-  QList<QAction*> menubar_actions = olive::MainWindow->menuBar()->actions();
+  QList<QAction*> menubar_actions = amber::MainWindow->menuBar()->actions();
   for (auto menubar_action : menubar_actions) {
     shortcut_copier(shortcuts_, menubar_action->menu());
   }

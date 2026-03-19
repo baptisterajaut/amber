@@ -29,10 +29,10 @@
 #include <QMouseEvent>
 
 #include "ui/collapsiblewidget.h"
-#include "timeline/clip.h"
-#include "timeline/sequence.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 #include "project/footage.h"
-#include "global/math.h"
+#include "core/math.h"
 #include "ui/labelslider.h"
 #include "ui/comboboxex.h"
 #include "panels/project.h"

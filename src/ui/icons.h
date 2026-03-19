@@ -3,7 +3,7 @@
 
 #include <QIcon>
 
-namespace olive {
+namespace amber {
   namespace icon {
     extern QIcon LeftArrow;
     extern QIcon RightArrow;

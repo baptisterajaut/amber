@@ -23,7 +23,7 @@
 
 #include <QWidget>
 
-#include "timeline/guide.h"
+#include "core/guide.h"
 
 class Viewer;
 class ViewerContainer;

@@ -66,12 +66,21 @@ private:
   void set_scroll_y(int s);
   void set_zoom(double xz, double yz);
 
-  int get_screen_x(double);
-  int get_screen_y(double);
+  int get_screen_x(double) const;
+  int get_screen_y(double) const;
   long get_value_x(int);
   double get_value_y(int);
 
   void selection_update();
+
+  void handle_mouse_pan(QMouseEvent* event);
+  void handle_mouse_click_add_drag(QMouseEvent* event);
+  void handle_mouse_rect_select(QMouseEvent* event);
+  void handle_mouse_keyframe_drag(QMouseEvent* event);
+  void handle_mouse_bezier_handle_drag(QMouseEvent* event, double x_diff, double y_diff);
+  void handle_mouse_hover(QMouseEvent* event);
+  bool is_hovering_keyframe(const QPoint& pos) const;
+  bool test_click_add_on_field(QMouseEvent* event, EffectField* field, int field_index);
 
   QVector<bool> field_visibility;
 

@@ -21,7 +21,7 @@
 #include "keyframedrawing.h"
 
 #include "effects/effect.h"
-#include "timeline/clip.h"
+#include "engine/clip.h"
 
 #define KEYFRAME_POINT_COUNT 4
 

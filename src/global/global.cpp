@@ -28,7 +28,7 @@
 #include <QDebug>
 
 #include "panels/panels.h"
-#include "global/path.h"
+#include "core/path.h"
 #include "global/config.h"
 #include "rendering/audio.h"
 #include "dialogs/demonotice.h"
@@ -43,14 +43,14 @@
 #include "project/loadthread.h"
 #include "project/projectmodel.h"
 #include "ui/menuhelper.h"
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "ui/mediaiconservice.h"
 #include "ui/mainwindow.h"
-#include "undo/undostack.h"
+#include "engine/undo/undostack.h"
 
-std::unique_ptr<OliveGlobal> olive::Global;
-QString olive::ActiveProjectFilename;
-QString olive::AppName;
+std::unique_ptr<OliveGlobal> amber::Global;
+QString amber::ActiveProjectFilename;
+QString amber::AppName;
 
 OliveGlobal::OliveGlobal() 
   
@@ -63,7 +63,7 @@ OliveGlobal::OliveGlobal()
   version_id = QString(" | %1").arg(GITHASH);
 #endif
 
-  olive::AppName = QString("Amber (%1%2)").arg(APPVERSION, version_id);
+  amber::AppName = QString("Amber (%1%2)").arg(APPVERSION, version_id);
 
   // set the file filter used in all file dialogs pertaining to Olive project files.
   project_file_filter = tr("Amber Project %1").arg("(*.ove)");
@@ -81,10 +81,10 @@ const QString &OliveGlobal::get_project_file_filter() {
 
 void OliveGlobal::update_project_filename(const QString &s) {
   // set filename to s
-  olive::ActiveProjectFilename = s;
+  amber::ActiveProjectFilename = s;
 
   // update main window title to reflect new project filename
-  if (olive::MainWindow != nullptr) olive::MainWindow->updateTitle();
+  if (amber::MainWindow != nullptr) amber::MainWindow->updateTitle();
 }
 
 void OliveGlobal::check_for_autorecovery_file() {
@@ -120,19 +120,19 @@ void OliveGlobal::set_rendering_state(bool rendering) {
 
 void OliveGlobal::set_modified(bool modified)
 {
-  if (olive::MainWindow == nullptr) return;
-  olive::MainWindow->setWindowModified(modified);
+  if (amber::MainWindow == nullptr) return;
+  amber::MainWindow->setWindowModified(modified);
   changed_since_last_autorecovery = modified;
 }
 
 bool OliveGlobal::is_modified()
 {
-  if (olive::MainWindow == nullptr) return false;
-  return olive::MainWindow->isWindowModified();
+  if (amber::MainWindow == nullptr) return false;
+  return amber::MainWindow->isWindowModified();
 }
 
 void OliveGlobal::load_project_on_launch(const QString& s) {
-  olive::ActiveProjectFilename = s;
+  amber::ActiveProjectFilename = s;
   enable_load_project_on_init = true;
 }
 
@@ -141,12 +141,12 @@ QString OliveGlobal::get_recent_project_list_file() {
 }
 
 void OliveGlobal::load_translation_from_config() {
-  QString language_file = olive::CurrentRuntimeConfig.external_translation_file.isEmpty() ?
-        olive::CurrentConfig.language_file :
-        olive::CurrentRuntimeConfig.external_translation_file;
+  QString language_file = amber::CurrentRuntimeConfig.external_translation_file.isEmpty() ?
+        amber::CurrentConfig.language_file :
+        amber::CurrentRuntimeConfig.external_translation_file;
 
   // clear runtime language file so if the user sets a different language, we won't load it next time
-  olive::CurrentRuntimeConfig.external_translation_file.clear();
+  amber::CurrentRuntimeConfig.external_translation_file.clear();
 
   // remove current translation if there is one
   QApplication::removeTranslator(translator.get());
@@ -183,7 +183,7 @@ void OliveGlobal::LoadProject(const QString &fn, bool autorecovery)
 
   panel_project->DisconnectFilterToModel();
 
-  LoadDialog ld(olive::MainWindow);
+  LoadDialog ld(amber::MainWindow);
 
   ld.open();
 
@@ -207,14 +207,14 @@ void OliveGlobal::ClearProject()
   panel_effect_controls->Clear(true);
 
   // clear existing project
-  olive::Global->set_sequence(nullptr);
+  amber::Global->set_sequence(nullptr);
   panel_footage_viewer->set_media(nullptr);
 
   // clear project contents (footage, sequences, etc.)
   panel_project->clear();
 
   // clear undo stack
-  olive::UndoStack.clear();
+  amber::UndoStack.clear();
 
   // empty current project filename
   update_project_filename("");
@@ -223,7 +223,7 @@ void OliveGlobal::ClearProject()
   update_ui(false);
 
   // set to unmodified
-  olive::Global->set_modified(false);
+  amber::Global->set_modified(false);
 }
 
 void OliveGlobal::ImportProject(const QString &fn)
@@ -233,10 +233,10 @@ void OliveGlobal::ImportProject(const QString &fn)
 }
 
 void OliveGlobal::new_project() {
-  if (olive::project_model.childCount() == 0 && !is_modified()) {
-    QString shortcut = olive::MenuHelper.new_sequence_action()->shortcut().toString(QKeySequence::NativeText);
+  if (amber::project_model.childCount() == 0 && !is_modified()) {
+    QString shortcut = amber::MenuHelper.new_sequence_action()->shortcut().toString(QKeySequence::NativeText);
     QMessageBox::information(
-        olive::MainWindow,
+        amber::MainWindow,
         tr("Project Already Empty"),
         tr("You already have a bare project. If you're trying to activate the timeline, "
            "you need to create a new sequence (File > New > Sequence, or %1).").arg(shortcut));
@@ -248,7 +248,7 @@ void OliveGlobal::new_project() {
 }
 
 void OliveGlobal::OpenProject() {
-  QString fn = QFileDialog::getOpenFileName(olive::MainWindow, tr("Open Project..."), "", project_file_filter);
+  QString fn = QFileDialog::getOpenFileName(amber::MainWindow, tr("Open Project..."), "", project_file_filter);
   if (!fn.isEmpty() && can_close_project()) {
     OpenProjectWorker(fn, false);
   }
@@ -258,7 +258,7 @@ void OliveGlobal::open_recent(int index) {
   QString recent_url = recent_projects.at(index);
   if (!QFile::exists(recent_url)) {
     if (QMessageBox::question(
-          olive::MainWindow,
+          amber::MainWindow,
           tr("Missing recent project"),
           tr("The project '%1' no longer exists. Would you like to remove it from the recent projects list?").arg(recent_url),
           QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes) {
@@ -271,7 +271,7 @@ void OliveGlobal::open_recent(int index) {
 }
 
 bool OliveGlobal::save_project_as() {
-  QString fn = QFileDialog::getSaveFileName(olive::MainWindow, tr("Save Project As..."), "", project_file_filter);
+  QString fn = QFileDialog::getSaveFileName(amber::MainWindow, tr("Save Project As..."), "", project_file_filter);
   if (!fn.isEmpty()) {
     if (!fn.endsWith(".ove", Qt::CaseInsensitive)) {
       fn += ".ove";
@@ -284,7 +284,7 @@ bool OliveGlobal::save_project_as() {
 }
 
 bool OliveGlobal::save_project() {
-  if (olive::ActiveProjectFilename.isEmpty()) {
+  if (amber::ActiveProjectFilename.isEmpty()) {
     return save_project_as();
   } else {
     panel_project->save_project(false);
@@ -299,7 +299,7 @@ bool OliveGlobal::can_close_project() {
           tr("Unsaved Project"),
           tr("This project has changed since it was last saved. Would you like to save it before closing?"),
           QMessageBox::Yes|QMessageBox::No|QMessageBox::Cancel,
-          olive::MainWindow
+          amber::MainWindow
           );
     m->setWindowModality(Qt::WindowModal);
     int r = m->exec();
@@ -315,7 +315,7 @@ bool OliveGlobal::can_close_project() {
 
 void OliveGlobal::open_export_dialog() {
   if (CheckForActiveSequence()) {
-    ExportDialog e(olive::MainWindow);
+    ExportDialog e(amber::MainWindow);
     e.exec();
   }
 }
@@ -324,12 +324,12 @@ void OliveGlobal::finished_initialize() {
   if (enable_load_project_on_init) {
 
     // if a project was set as a command line argument, we load it here
-    if (QFileInfo::exists(olive::ActiveProjectFilename)) {
-      OpenProjectWorker(olive::ActiveProjectFilename, false);
+    if (QFileInfo::exists(amber::ActiveProjectFilename)) {
+      OpenProjectWorker(amber::ActiveProjectFilename, false);
     } else {
-      QMessageBox::critical(olive::MainWindow,
+      QMessageBox::critical(amber::MainWindow,
                             tr("Missing Project File"),
-                            tr("Specified project '%1' does not exist.").arg(olive::ActiveProjectFilename),
+                            tr("Specified project '%1' does not exist.").arg(amber::ActiveProjectFilename),
                             QMessageBox::Ok);
       update_project_filename(nullptr);
     }
@@ -339,8 +339,8 @@ void OliveGlobal::finished_initialize() {
   } else {
     // if we are not loading a project on launch and are running a release build, open the demo notice dialog
 #ifndef QT_DEBUG
-    if (olive::CurrentConfig.show_welcome_dialog) {
-      DemoNotice* d = new DemoNotice(olive::MainWindow);
+    if (amber::CurrentConfig.show_welcome_dialog) {
+      DemoNotice* d = new DemoNotice(amber::MainWindow);
       connect(d, &QDialog::finished, d, &QObject::deleteLater);
       d->open();
     }
@@ -363,7 +363,7 @@ void OliveGlobal::open_preferences() {
   panel_sequence_viewer->pause();
   panel_footage_viewer->pause();
 
-  PreferencesDialog pd(olive::MainWindow);
+  PreferencesDialog pd(amber::MainWindow);
   pd.exec();
 }
 
@@ -372,7 +372,7 @@ void OliveGlobal::set_sequence(SequencePtr s)
   panel_graph_editor->set_row(nullptr);
   panel_effect_controls->Clear(true);
 
-  olive::ActiveSequence = s;
+  amber::ActiveSequence = s;
   panel_sequence_viewer->set_main_sequence();
   panel_timeline->update_sequence();
   panel_timeline->setFocus();
@@ -382,15 +382,15 @@ void OliveGlobal::OpenProjectWorker(QString fn, bool autorecovery) {
   ClearProject();
   update_project_filename(fn);
   LoadProject(fn, autorecovery);
-  olive::UndoStack.clear();
+  amber::UndoStack.clear();
 }
 
 bool OliveGlobal::CheckForActiveSequence(bool show_msg)
 {
-  if (olive::ActiveSequence == nullptr) {
+  if (amber::ActiveSequence == nullptr) {
 
     if (show_msg) {
-      QMessageBox::information(olive::MainWindow,
+      QMessageBox::information(amber::MainWindow,
                                tr("No active sequence"),
                                tr("Please open the sequence to perform this action."),
                                QMessageBox::Ok);
@@ -404,7 +404,7 @@ bool OliveGlobal::CheckForActiveSequence(bool show_msg)
 void OliveGlobal::undo() {
   // workaround to prevent crash (and also users should never need to do this)
   if (!panel_timeline->importing) {
-    olive::UndoStack.undo();
+    amber::UndoStack.undo();
     update_ui(true);
   }
 }
@@ -412,39 +412,39 @@ void OliveGlobal::undo() {
 void OliveGlobal::redo() {
   // workaround to prevent crash (and also users should never need to do this)
   if (!panel_timeline->importing) {
-    olive::UndoStack.redo();
+    amber::UndoStack.redo();
     update_ui(true);
   }
 }
 
 void OliveGlobal::paste() {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     panel_timeline->paste(false);
   }
 }
 
 void OliveGlobal::paste_insert() {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
     panel_timeline->paste(true);
   }
 }
 
 void OliveGlobal::open_about_dialog() {
-  AboutDialog a(olive::MainWindow);
+  AboutDialog a(amber::MainWindow);
   a.exec();
 }
 
 void OliveGlobal::open_debug_log() {
-  if (olive::DebugDialog != nullptr) olive::DebugDialog->show();
+  if (amber::DebugDialog != nullptr) amber::DebugDialog->show();
 }
 
 void OliveGlobal::open_speed_dialog() {
-  if (olive::ActiveSequence != nullptr) {
+  if (amber::ActiveSequence != nullptr) {
 
-    QVector<Clip*> selected_clips = olive::ActiveSequence->SelectedClips();
+    QVector<Clip*> selected_clips = amber::ActiveSequence->SelectedClips();
 
     if (!selected_clips.isEmpty()) {
-      SpeedDialog s(olive::MainWindow, selected_clips);
+      SpeedDialog s(amber::MainWindow, selected_clips);
       s.exec();
     }
   }
@@ -453,15 +453,15 @@ void OliveGlobal::open_speed_dialog() {
 void OliveGlobal::open_autocut_silence_dialog() {
   if (CheckForActiveSequence()) {
 
-    QVector<int> selected_clips = olive::ActiveSequence->SelectedClipIndexes();
+    QVector<int> selected_clips = amber::ActiveSequence->SelectedClipIndexes();
 
     if (selected_clips.isEmpty()) {
-      QMessageBox::critical(olive::MainWindow,
+      QMessageBox::critical(amber::MainWindow,
                             tr("No clips selected"),
                             tr("Select the clips you wish to auto-cut"),
                             QMessageBox::Ok);
     } else {
-      AutoCutSilenceDialog s(olive::MainWindow, selected_clips);
+      AutoCutSilenceDialog s(amber::MainWindow, selected_clips);
       s.exec();
     }
 
@@ -469,10 +469,10 @@ void OliveGlobal::open_autocut_silence_dialog() {
 }
 
 void OliveGlobal::clear_undo_stack() {
-  olive::UndoStack.clear();
+  amber::UndoStack.clear();
 }
 
 void OliveGlobal::open_action_search() {
-  ActionSearch as(olive::MainWindow);
+  ActionSearch as(amber::MainWindow);
   as.exec();
 }

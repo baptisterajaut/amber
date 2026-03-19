@@ -26,14 +26,14 @@
 #include "effects/effect.h"
 #include "ui/collapsiblewidget.h"
 #include "panels/panels.h"
-#include "timeline/clip.h"
+#include "engine/clip.h"
 #include "panels/timeline.h"
 #include "ui/timelineheader.h"
-#include "undo/undo.h"
-#include "undo/undostack.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 #include "panels/viewer.h"
 #include "ui/viewerwidget.h"
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "panels/grapheditor.h"
 #include "ui/keyframedrawing.h"
 #include "ui/clickablelabel.h"
@@ -87,7 +87,7 @@ void KeyframeView::menu_set_key_type(QAction* a) {
       EffectField* f = selected_fields.at(i);
       ca->append(new SetInt(&f->keyframes[selected_keyframes.at(i)].type, a->data().toInt()));
     }
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
     update_ui(false);
   }
 }
@@ -163,7 +163,7 @@ void KeyframeView::paintEvent(QPaintEvent*) {
     panel_effect_controls->horizontalScrollBar->setMaximum(qMax(max_width - width(), 0));
     header->set_visible_in(visible_in);
 
-    int playhead_x = getScreenPointFromFrame(panel_effect_controls->zoom, olive::ActiveSequence->playhead-visible_in) - x_scroll;
+    int playhead_x = getScreenPointFromFrame(panel_effect_controls->zoom, amber::ActiveSequence->playhead-visible_in) - x_scroll;
     if (dragging && panel_timeline->snapped) {
       p.setPen(Qt::white);
     } else {
@@ -374,7 +374,7 @@ void KeyframeView::mouseMoveEvent(QMouseEvent* event) {
           Clip* c = field->GetParentRow()->GetParentEffect()->parent_clip;
           long key_time = old_key_vals.at(i) + frame_diff - c->clip_in() + c->timeline_in();
           long key_eval = key_time;
-          if (panel_timeline->snap_to_point(olive::ActiveSequence->playhead, &key_eval)) {
+          if (panel_timeline->snap_to_point(amber::ActiveSequence->playhead, &key_eval)) {
             frame_diff += (key_eval - key_time);
             break;
           }
@@ -423,7 +423,7 @@ void KeyframeView::mouseReleaseEvent(QMouseEvent*) {
                  selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time
                  ));
     }
-    olive::UndoStack.push(ca);
+    amber::UndoStack.push(ca);
   }
 
   select_rect = false;

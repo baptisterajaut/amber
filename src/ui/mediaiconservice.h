@@ -53,7 +53,7 @@ private:
   QMutex throbber_lock_;
 };
 
-namespace olive {
+namespace amber {
 extern std::unique_ptr<MediaIconService> media_icon_service;
 }
 

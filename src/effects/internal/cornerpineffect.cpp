@@ -20,8 +20,8 @@
 
 #include "cornerpineffect.h"
 
-#include "global/path.h"
-#include "timeline/clip.h"
+#include "core/path.h"
+#include "engine/clip.h"
 #include "global/debug.h"
 
 CornerPinEffect::CornerPinEffect(Clip* c, const EffectMeta *em) : Effect(c, em) {

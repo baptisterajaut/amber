@@ -238,7 +238,7 @@ public slots:
   void zoom_out();
 };
 
-namespace olive {
+namespace amber {
 extern FocusFilter FocusFilter;
 }
 

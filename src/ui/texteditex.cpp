@@ -96,7 +96,7 @@ void TextEditEx::text_edit_menu() {
 void TextEditEx::open_text_edit() {
   const QString& current_text = (enable_rich_text_) ? text_editor_->toHtml() : text_editor_->toPlainText();
 
-  TextEditDialog ted(olive::MainWindow, current_text, enable_rich_text_);
+  TextEditDialog ted(amber::MainWindow, current_text, enable_rich_text_);
   ted.exec();
   QString result = ted.get_string();
   if (!result.isEmpty()) {

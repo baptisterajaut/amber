@@ -39,7 +39,7 @@ LoadDialog::LoadDialog(QWidget *parent) :
 
   QVBoxLayout* layout = new QVBoxLayout(this);
 
-  layout->addWidget(new QLabel(tr("Loading '%1'...").arg(olive::ActiveProjectFilename.mid(olive::ActiveProjectFilename.lastIndexOf('/')+1)), this));
+  layout->addWidget(new QLabel(tr("Loading '%1'...").arg(amber::ActiveProjectFilename.mid(amber::ActiveProjectFilename.lastIndexOf('/')+1)), this));
 
   bar = new QProgressBar(this);
   bar->setValue(0);

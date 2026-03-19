@@ -30,9 +30,9 @@
 #include "global/debug.h"
 #include "panels/viewer.h"
 #include "rulerwidget.h"
-#include "timeline/sequence.h"
-#include "undo/undo_guide.h"
-#include "undo/undostack.h"
+#include "engine/sequence.h"
+#include "engine/undo/undo_guide.h"
+#include "engine/undo/undostack.h"
 #include "viewerwidget.h"
 
 // enforces aspect ratio
@@ -98,26 +98,26 @@ void ViewerContainer::adjust() {
 
       connect(horizontal_ruler, &RulerWidget::guide_created, this, [this](Guide::Orientation o, int pos) {
         if (viewer->seq != nullptr) {
-          olive::UndoStack.push(new AddGuideAction(viewer->seq.get(), {o, pos}));
+          amber::UndoStack.push(new AddGuideAction(viewer->seq.get(), {o, pos}));
           child->update();
         }
       });
       connect(vertical_ruler, &RulerWidget::guide_created, this, [this](Guide::Orientation o, int pos) {
         if (viewer->seq != nullptr) {
-          olive::UndoStack.push(new AddGuideAction(viewer->seq.get(), {o, pos}));
+          amber::UndoStack.push(new AddGuideAction(viewer->seq.get(), {o, pos}));
           child->update();
         }
       });
 
-      horizontal_ruler->setVisible(olive::CurrentConfig.show_guides);
-      vertical_ruler->setVisible(olive::CurrentConfig.show_guides);
+      horizontal_ruler->setVisible(amber::CurrentConfig.show_guides);
+      vertical_ruler->setVisible(amber::CurrentConfig.show_guides);
     }
 
     // Sync ruler visibility with config on every adjust
-    horizontal_ruler->setVisible(olive::CurrentConfig.show_guides);
-    vertical_ruler->setVisible(olive::CurrentConfig.show_guides);
+    horizontal_ruler->setVisible(amber::CurrentConfig.show_guides);
+    vertical_ruler->setVisible(amber::CurrentConfig.show_guides);
 
-    bool rulers_visible = olive::CurrentConfig.show_guides;
+    bool rulers_visible = amber::CurrentConfig.show_guides;
     int ruler_h = rulers_visible ? RulerWidget::kRulerThickness : 0;
 
     if (child->waveform) {

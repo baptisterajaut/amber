@@ -64,7 +64,7 @@ private:
   void transcode(const ProxyInfo& info);
 };
 
-namespace olive {
+namespace amber {
   // proxy generator is a global omnipotent entity
   extern ProxyGenerator proxy_generator;
 }

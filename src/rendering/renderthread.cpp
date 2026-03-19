@@ -38,7 +38,7 @@
 
 #include "global/config.h"
 #include "rendering/renderfunctions.h"
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 
 static QShader loadQsb(const QString& path) {
   QFile f(path);
@@ -97,12 +97,12 @@ void RenderThread::run() {
 
     // Create QRhi if not yet initialized
     if (rhi_ == nullptr) {
-      RhiBackend backend = olive::CurrentRuntimeConfig.rhi_backend;
+      RhiBackend backend = amber::CurrentRuntimeConfig.rhi_backend;
 
       switch (backend) {
 #if AMBER_HAS_VULKAN
         case RhiBackend::Vulkan: {
-          auto* vi = static_cast<QVulkanInstance*>(olive::CurrentRuntimeConfig.vulkan_instance);
+          auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
           if (vi && vi->isValid()) {
             QRhiVulkanInitParams vkParams;
             vkParams.inst = vi;
@@ -298,7 +298,7 @@ void RenderThread::paint() {
   gizmos = seq->GetSelectedGizmo();
   params.gizmos = gizmos;
 
-  olive::rendering::compose_sequence(params);
+  amber::rendering::compose_sequence(params);
   gizmos = params.gizmos;  // nulled by compose_sequence if clip wasn't rendered
 
   // CPU readback

@@ -23,9 +23,9 @@
 
 #include <QString>
 
-#include "ui/styling.h"
+#include "core/style.h"
 
-namespace olive {
+namespace amber {
 /**
  * @brief Version identifier for saved projects
  *
@@ -143,7 +143,7 @@ enum FrameQueueType : uint8_t {
   /** Queue size value is in seconds */
   FRAME_QUEUE_TYPE_SECONDS
 };
-}  // namespace olive
+}  // namespace amber
 
 /**
  * @brief The Config struct
@@ -240,7 +240,7 @@ struct Config {
    *
    * Set to a member of enum TimecodeType.
    */
-  int timecode_view{olive::kTimecodeDrop};
+  int timecode_view{amber::kTimecodeDrop};
 
   /**
    * @brief Show title/action safe area
@@ -318,7 +318,7 @@ struct Config {
    *
    * Set to a member of enum AutoScrollMode.
    */
-  int autoscroll{olive::AUTOSCROLL_PAGE_SCROLL};
+  int autoscroll{amber::AUTOSCROLL_PAGE_SCROLL};
 
   /**
    * @brief Current audio sample rate
@@ -345,7 +345,7 @@ struct Config {
    *
    * Set to a member of enum ProjectView.
    */
-  int project_view_type{olive::PROJECT_VIEW_TREE};
+  int project_view_type{amber::PROJECT_VIEW_TREE};
 
   /**
    * @brief Ask for a marker name when setting a marker
@@ -383,7 +383,7 @@ struct Config {
    *
    * Set to a member of enum FrameQueueType.
    */
-  int previous_queue_type{olive::FRAME_QUEUE_TYPE_FRAMES};
+  int previous_queue_type{amber::FRAME_QUEUE_TYPE_FRAMES};
 
   /**
    * @brief Upcoming frame queue size
@@ -404,7 +404,7 @@ struct Config {
    *
    * Set to a member of enum FrameQueueType.
    */
-  int upcoming_queue_type{olive::FRAME_QUEUE_TYPE_SECONDS};
+  int upcoming_queue_type{amber::FRAME_QUEUE_TYPE_SECONDS};
 
   /**
    * @brief Loop
@@ -530,9 +530,9 @@ struct Config {
   /**
    * @brief Style to use when theming Olive.
    *
-   * Set to a member of olive::styling::Style.
+   * Set to a member of amber::styling::Style.
    */
-  olive::styling::Style style{olive::styling::kOliveDefaultDark};
+  amber::styling::Style style{amber::styling::kOliveDefaultDark};
 
   /**
    * @brief Use native menu styling
@@ -667,9 +667,9 @@ struct RuntimeConfig {
   void* vulkan_instance{nullptr};
 };
 
-namespace olive {
+namespace amber {
 extern Config CurrentConfig;
 extern RuntimeConfig CurrentRuntimeConfig;
-}  // namespace olive
+}  // namespace amber
 
 #endif  // CONFIG_H

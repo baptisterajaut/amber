@@ -25,7 +25,7 @@
 #include <QMessageBox>
 #include <QDir>
 
-#include "timeline/clip.h"
+#include "engine/clip.h"
 
 using f0rConstructFunc = f0r_instance_t (*)(unsigned int width, unsigned int height);
 using f0rInitFunc = int (*) ();

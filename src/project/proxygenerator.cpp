@@ -20,7 +20,7 @@
 
 #include "proxygenerator.h"
 
-#include "global/path.h"
+#include "core/path.h"
 #include "project/previewgenerator.h"
 #include "ui/mainwindow.h"
 
@@ -376,7 +376,7 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   footage->proxy_path = info.path;
 
   qInfo() << "Finished creating proxy for" << footage->url;
-  QMetaObject::invokeMethod(olive::MainWindow->statusBar(),
+  QMetaObject::invokeMethod(amber::MainWindow->statusBar(),
                             "showMessage",
                             Qt::QueuedConnection,
                             Q_ARG(QString, tr("Finished generating proxy for \"%1\"").arg(footage->url)));
@@ -471,4 +471,4 @@ double ProxyGenerator::get_proxy_progress(Media* m) {
 }
 
 // proxy generator is a global omnipotent entity
-ProxyGenerator olive::proxy_generator;
+ProxyGenerator amber::proxy_generator;

@@ -4,7 +4,7 @@
 #include <QDialog>
 #include <QLineEdit>
 
-#include "timeline/clip.h"
+#include "engine/clip.h"
 #include "ui/labelslider.h"
 
 /**

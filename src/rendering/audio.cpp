@@ -20,14 +20,12 @@
 
 #include "audio.h"
 
+#include "core/appcontext.h"
 #include "global/global.h"
 
-#include "timeline/sequence.h"
-
-#include "panels/panels.h"
+#include "engine/sequence.h"
 
 #include "global/config.h"
-#include "ui/audiomonitor.h"
 #include "rendering/renderfunctions.h"
 #include "global/debug.h"
 
@@ -40,7 +38,6 @@
 #include <QtMath>
 #include <QFile>
 #include <QDir>
-#include <QComboBox>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -49,20 +46,10 @@ extern "C" {
 QAudioSink* audio_output;
 QIODevice* audio_io_device;
 bool audio_device_set = false;
-std::atomic<bool> audio_scrub{false};
-QMutex audio_write_lock;
 QAudioSource* audio_input = nullptr;
 QTimer* audio_notify_timer = nullptr;
 QFile output_recording;
 bool recording = false;
-
-bool audio_rendering = false;
-int audio_rendering_rate = 0;
-
-qint8 audio_ibuffer[audio_ibuffer_size];
-qint64 audio_ibuffer_read = 0;
-long audio_ibuffer_frame = 0;
-double audio_ibuffer_timecode = 0;
 
 AudioSenderThread* audio_thread = nullptr;
 
@@ -74,7 +61,7 @@ QAudioDevice get_audio_device(bool output) {
   QList<QAudioDevice> devs = output ? QMediaDevices::audioOutputs() : QMediaDevices::audioInputs();
 
   // try to retrieve preferred device from config
-  QString preferred_device = output ? olive::CurrentConfig.preferred_audio_output : olive::CurrentConfig.preferred_audio_input;
+  QString preferred_device = output ? amber::CurrentConfig.preferred_audio_output : amber::CurrentConfig.preferred_audio_input;
   if (!preferred_device.isEmpty()) {
     for (const auto & dev : devs) {
       // try to match available devices with preferred device
@@ -103,7 +90,7 @@ void init_audio() {
   stop_audio();
 
   QAudioFormat audio_format;
-  audio_format.setSampleRate(olive::CurrentConfig.audio_rate);
+  audio_format.setSampleRate(amber::CurrentConfig.audio_rate);
   audio_format.setChannelCount(2);
   audio_format.setSampleFormat(QAudioFormat::Int16);
 
@@ -196,7 +183,7 @@ void AudioSenderThread::run() {
     cond.wait(&lock);
     if (close) {
       break;
-    } else if (panel_sequence_viewer->playing || panel_footage_viewer->playing || audio_scrub) {
+    } else if (amber::app_ctx->isPlaying() || audio_scrub) {
       int written_bytes = 0;
 
       int adjusted_read_index = audio_ibuffer_read%audio_ibuffer_size;
@@ -243,7 +230,7 @@ int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
       averages[i] = log_volume(1.0-(averages[i]));
     }
 
-    panel_timeline->audio_monitor->set_value(averages);
+    amber::app_ctx->setAudioMonitorValues(averages);
   }
 
   memset(audio_ibuffer+offset, 0, actual_write);
@@ -252,11 +239,6 @@ int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
 
   // Return 0 when muted to prevent a second drain pass from overwriting VU with zeros
   return mute ? 0 : actual_write;
-}
-
-double log_volume(double linear) {
-  // expects a value between 0 and 1 (or more if amplifying)
-  return (qExp(linear)-1)/(M_E-1);
 }
 
 void int32_to_char_array(qint32 i, char* array) {
@@ -336,12 +318,12 @@ void write_wave_trailer(QFile& f) {
 }
 
 bool start_recording() {
-  if (olive::ActiveSequence == nullptr) {
+  if (amber::ActiveSequence == nullptr) {
     qCritical() << "No active sequence to record into";
     return false;
   }
 
-  QString audio_path = QCoreApplication::translate("Audio", "%1 Audio").arg(olive::ActiveProjectFilename);
+  QString audio_path = QCoreApplication::translate("Audio", "%1 Audio").arg(amber::ActiveProjectFilename);
   QDir audio_dir(audio_path);
   if (!audio_dir.exists() && !audio_dir.mkpath(".")) {
     qCritical() << "Failed to create audio directory";
@@ -367,8 +349,8 @@ bool start_recording() {
   }
 
   QAudioFormat audio_format = audio_output->format();
-  if (olive::CurrentConfig.recording_mode != audio_format.channelCount()) {
-    audio_format.setChannelCount(olive::CurrentConfig.recording_mode);
+  if (amber::CurrentConfig.recording_mode != audio_format.channelCount()) {
+    audio_format.setChannelCount(amber::CurrentConfig.recording_mode);
   }
 
   QAudioDevice info = get_audio_device(false);
@@ -397,16 +379,6 @@ void stop_recording() {
 
 QString get_recorded_audio_filename() {
   return output_recording.fileName();
-}
-
-void combobox_audio_sample_rates(QComboBox *combobox) {
-  combobox->addItem("22050 Hz", 22050);
-  combobox->addItem("24000 Hz", 24000);
-  combobox->addItem("32000 Hz", 32000);
-  combobox->addItem("44100 Hz", 44100);
-  combobox->addItem("48000 Hz", 48000);
-  combobox->addItem("88200 Hz", 88200);
-  combobox->addItem("96000 Hz", 96000);
 }
 
 QObject* audio_wake_object = nullptr;

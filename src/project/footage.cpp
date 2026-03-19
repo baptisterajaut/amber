@@ -25,7 +25,7 @@
 #include <QPainter>
 
 #include "project/previewgenerator.h"
-#include "timeline/clip.h"
+#include "engine/clip.h"
 
 Footage::Footage() {
   ready = (false);

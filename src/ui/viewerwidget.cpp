@@ -42,13 +42,13 @@ extern "C" {
 
 #include "global/config.h"
 #include "global/debug.h"
-#include "global/math.h"
+#include "core/math.h"
 #include "mainwindow.h"
 #include "panels/panels.h"
 #include "project/media.h"
 #include "project/projectelements.h"
 #include "rendering/audio.h"
-#include "rendering/cacher.h"
+#include "engine/cacher.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
 #include "ui/collapsiblewidget.h"
@@ -56,16 +56,16 @@ extern "C" {
 #include "ui/timelinewidget.h"
 #include "ui/viewercontainer.h"
 #include "ui/viewerwindow.h"
-#include "undo/comboaction.h"
-#include "undo/undo.h"
-#include "undo/undo_guide.h"
-#include "undo/undostack.h"
+#include "engine/undo/comboaction.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undo_guide.h"
+#include "engine/undo/undostack.h"
 
 ViewerWidget::ViewerWidget(QWidget* parent)
     : QRhiWidget(parent)
 
 {
-  switch (olive::CurrentRuntimeConfig.rhi_backend) {
+  switch (amber::CurrentRuntimeConfig.rhi_backend) {
     case RhiBackend::Vulkan: setApi(Api::Vulkan); break;
     case RhiBackend::Metal: setApi(Api::Metal); break;
     case RhiBackend::D3D12: setApi(Api::Direct3D12); break;
@@ -347,7 +347,7 @@ void ViewerWidget::frame_update() {
                              nullptr, nullptr, 0, 0, false, scrubbing);
     }
 
-    olive::rendering::compose_audio(viewer, viewer->seq.get(), viewer->get_playback_speed(), false);
+    amber::rendering::compose_audio(viewer, viewer->seq.get(), viewer->get_playback_speed(), false);
   }
 }
 
@@ -423,7 +423,7 @@ void ViewerWidget::move_gizmos(QMouseEvent* event, bool done) {
 }
 
 bool ViewerWidget::event(QEvent* e) {
-  if (e->type() == QEvent::ShortcutOverride && hovered_guide_index_ >= 0 && !olive::CurrentConfig.lock_guides) {
+  if (e->type() == QEvent::ShortcutOverride && hovered_guide_index_ >= 0 && !amber::CurrentConfig.lock_guides) {
     auto* ke = static_cast<QKeyEvent*>(e);
     QKeySequence pressed(ke->key() | ke->modifiers());
     if (pressed == guide_delete_action_->shortcut() || pressed == guide_mirror_action_->shortcut()) {
@@ -435,7 +435,7 @@ bool ViewerWidget::event(QEvent* e) {
 }
 
 void ViewerWidget::keyPressEvent(QKeyEvent* event) {
-  if (hovered_guide_index_ >= 0 && viewer->seq != nullptr && !olive::CurrentConfig.lock_guides) {
+  if (hovered_guide_index_ >= 0 && viewer->seq != nullptr && !amber::CurrentConfig.lock_guides) {
     QKeySequence pressed(event->key() | event->modifiers());
     if (pressed == guide_delete_action_->shortcut()) {
       guide_action_delete();
@@ -454,7 +454,7 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
     seek_from_click(qRound(event->position().x()));
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
     container->dragScrollPress(event->position().toPoint() * container->zoom);
-  } else if (viewer->seq != nullptr && olive::CurrentConfig.show_guides && !olive::CurrentConfig.lock_guides) {
+  } else if (viewer->seq != nullptr && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
     double multiplier = double(viewer->seq->width) / double(width());
     int video_x = qRound(event->position().x() * multiplier);
     int image_y = qRound(event->position().y() * multiplier);
@@ -530,7 +530,7 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
     }
 
     // Hover cursor for guides
-    if (!dragging && olive::CurrentConfig.show_guides && !olive::CurrentConfig.lock_guides) {
+    if (!dragging && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
       bool hit_mirror = false;
       int idx = find_guide_at(video_x, image_y, &hit_mirror);
       if (idx >= 0) {
@@ -556,7 +556,7 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
       container->dragScrollMove(event->position().toPoint() * container->zoom);
     } else if (event->buttons() & Qt::LeftButton) {
       if (gizmos == nullptr) {
-        viewer->initiate_drag(olive::timeline::kImportBoth);
+        viewer->initiate_drag(amber::timeline::kImportBoth);
         dragging = false;
       } else {
         move_gizmos(event, false);
@@ -580,12 +580,12 @@ void ViewerWidget::mouseReleaseEvent(QMouseEvent* event) {
       if (g.position < 0 || g.position > max_val) {
         // Dragged off-screen → restore then push delete action
         g.position = dragging_guide_old_pos_;
-        olive::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), dragging_guide_index_));
+        amber::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), dragging_guide_index_));
       } else if (g.position != dragging_guide_old_pos_) {
         // Moved to a new position → restore then push move action
         int new_pos = g.position;
         g.position = dragging_guide_old_pos_;
-        olive::UndoStack.push(
+        amber::UndoStack.push(
             new MoveGuideAction(viewer->seq.get(), dragging_guide_index_, dragging_guide_old_pos_, new_pos));
       }
     }
@@ -647,12 +647,12 @@ void ViewerWidget::draw_title_safe_area(QPainter& p) {
   double offsetX = 0;
   double offsetY = 0;
 
-  if (olive::CurrentConfig.use_custom_title_safe_ratio && olive::CurrentConfig.custom_title_safe_ratio > 0) {
-    if (olive::CurrentConfig.custom_title_safe_ratio > viewportAr) {
-      areaH = w / olive::CurrentConfig.custom_title_safe_ratio;
+  if (amber::CurrentConfig.use_custom_title_safe_ratio && amber::CurrentConfig.custom_title_safe_ratio > 0) {
+    if (amber::CurrentConfig.custom_title_safe_ratio > viewportAr) {
+      areaH = w / amber::CurrentConfig.custom_title_safe_ratio;
       offsetY = (h - areaH) * 0.5;
     } else {
-      areaW = h * olive::CurrentConfig.custom_title_safe_ratio;
+      areaW = h * amber::CurrentConfig.custom_title_safe_ratio;
       offsetX = (w - areaW) * 0.5;
     }
   }
@@ -687,7 +687,7 @@ void ViewerWidget::draw_title_safe_area(QPainter& p) {
 }
 
 void ViewerWidget::draw_guides(QPainter& p) {
-  if (viewer->seq == nullptr || !olive::CurrentConfig.show_guides) return;
+  if (viewer->seq == nullptr || !amber::CurrentConfig.show_guides) return;
 
   // Compute image→widget coordinate transform
   // container->zoom maps image-space pixels to widget-space pixels directly
@@ -829,7 +829,7 @@ int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) cons
 
 void ViewerWidget::guide_action_delete() {
   if (hovered_guide_index_ < 0 || viewer->seq == nullptr) return;
-  olive::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), hovered_guide_index_));
+  amber::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), hovered_guide_index_));
   hovered_guide_index_ = -1;
   update();
 }
@@ -844,9 +844,9 @@ void ViewerWidget::guide_action_mirror() {
     auto* combo = new ComboAction();
     combo->append(new MoveGuideAction(viewer->seq.get(), hovered_guide_index_, g.position, mirror_pos));
     combo->append(new SetGuideMirrorAction(viewer->seq.get(), hovered_guide_index_, false));
-    olive::UndoStack.push(combo);
+    amber::UndoStack.push(combo);
   } else {
-    olive::UndoStack.push(new SetGuideMirrorAction(viewer->seq.get(), hovered_guide_index_, !was_mirrored));
+    amber::UndoStack.push(new SetGuideMirrorAction(viewer->seq.get(), hovered_guide_index_, !was_mirrored));
   }
   update();
 }
@@ -868,7 +868,7 @@ void ViewerWidget::show_guide_context_menu(int guide_index, const QPoint& global
     int val = QInputDialog::getInt(this, tr("Set Guide Value"), tr("Position (pixels):"), display_pos, 0, dim, 1, &ok);
     if (ok && val != display_pos) {
       int new_primary = (on_mirror && g.mirror) ? (dim - val) : val;
-      olive::UndoStack.push(new MoveGuideAction(viewer->seq.get(), guide_index, g.position, new_primary));
+      amber::UndoStack.push(new MoveGuideAction(viewer->seq.get(), guide_index, g.position, new_primary));
       update();
     }
   } else if (selected == mirror_action) {
@@ -881,13 +881,13 @@ void ViewerWidget::show_guide_context_menu(int guide_index, const QPoint& global
       auto* combo = new ComboAction();
       combo->append(new MoveGuideAction(viewer->seq.get(), guide_index, g.position, mirror_pos));
       combo->append(new SetGuideMirrorAction(viewer->seq.get(), guide_index, false));
-      olive::UndoStack.push(combo);
+      amber::UndoStack.push(combo);
     } else {
-      olive::UndoStack.push(new SetGuideMirrorAction(viewer->seq.get(), guide_index, !was_mirrored));
+      amber::UndoStack.push(new SetGuideMirrorAction(viewer->seq.get(), guide_index, !was_mirrored));
     }
     update();
   } else if (selected == delete_guide) {
-    olive::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), guide_index));
+    amber::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), guide_index));
     update();
   }
 }
@@ -911,7 +911,7 @@ void ViewerWidget::finish_guide_creation() {
       Guide g;
       g.orientation = creating_guide_orientation_;
       g.position = creating_guide_pos_;
-      olive::UndoStack.push(new AddGuideAction(viewer->seq.get(), g));
+      amber::UndoStack.push(new AddGuideAction(viewer->seq.get(), g));
     }
   }
   creating_guide_ = false;
@@ -1045,7 +1045,7 @@ void ViewerOverlay::paintEvent(QPaintEvent*) {
   if (vw_->waveform) {
     vw_->draw_waveform_func(p);
   } else if (vw_->viewer->seq != nullptr) {
-    if (olive::CurrentConfig.show_title_safe_area) {
+    if (amber::CurrentConfig.show_title_safe_area) {
       vw_->draw_title_safe_area(p);
     }
     vw_->draw_guides(p);

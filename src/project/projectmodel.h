@@ -62,7 +62,7 @@ private:
   MediaPtr root_item_;
 };
 
-namespace olive {
+namespace amber {
 extern ProjectModel project_model;
 }
 

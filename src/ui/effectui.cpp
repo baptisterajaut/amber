@@ -2,13 +2,13 @@
 
 #include <QPoint>
 
-#include "timeline/clip.h"
+#include "engine/clip.h"
 #include "ui/menuhelper.h"
 #include "ui/keyframenavigator.h"
 #include "ui/clickablelabel.h"
 #include "ui/menu.h"
 #include "panels/panels.h"
-#include "undo/undo_effect.h"
+#include "engine/undo/undo_effect.h"
 #include "global/global.h"
 
 EffectUI::EffectUI(Effect* e) :
@@ -153,7 +153,7 @@ EffectUI::EffectUI(Effect* e) :
     chk->blockSignals(false);
   });
   connect(chk, &QCheckBox::toggled, this, [e](bool checked) {
-    olive::UndoStack.push(new SetEffectEnabled(e, checked));
+    amber::UndoStack.push(new SetEffectEnabled(e, checked));
     update_ui(false);
   });
 }
@@ -299,7 +299,7 @@ void EffectUI::show_context_menu(const QPoint& pos) {
     QAction* copy_action = menu.addAction(tr("&Copy"));
     connect(copy_action, &QAction::triggered, this, &EffectUI::CopyRequested);
 
-    olive::MenuHelper.create_effect_paste_action(&menu);
+    amber::MenuHelper.create_effect_paste_action(&menu);
 
     menu.addSeparator();
 

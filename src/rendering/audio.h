@@ -21,52 +21,40 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
-#include <atomic>
 #include <QVector>
 #include <QThread>
 #include <QWaitCondition>
 #include <QMutex>
 #include <QIODevice>
 #include <QAudioSink>
-#include <QComboBox>
 
-#include "timeline/sequence.h"
+#include "core/audio.h"
+#include "engine/sequence.h"
 
 class AudioSenderThread : public QThread {
   Q_OBJECT
-public:
+ public:
   AudioSenderThread();
   void run() override;
   void stop();
   QWaitCondition cond;
   bool close{false};
   QMutex lock;
-public slots:
+ public slots:
   void notifyReceiver();
-private:
+ private:
   QVector<qint16> samples;
   int send_audio_to_output(qint64 offset, int max);
 };
 
-double log_volume(double linear);
-
 extern QAudioSink* audio_output;
 extern QIODevice* audio_io_device;
 extern AudioSenderThread* audio_thread;
-extern QMutex audio_write_lock;
-
-constexpr int audio_ibuffer_size = 192000;
-extern qint8 audio_ibuffer[audio_ibuffer_size];
-extern qint64 audio_ibuffer_read;
-extern long audio_ibuffer_frame;
-extern double audio_ibuffer_timecode;
-extern std::atomic<bool> audio_scrub;
 extern bool recording;
-extern bool audio_rendering;
-extern int audio_rendering_rate;
+
 void clear_audio_ibuffer();
 
-QObject *GetAudioWakeObject();
+QObject* GetAudioWakeObject();
 void SetAudioWakeObject(QObject* o);
 void WakeAudioWakeObject();
 
@@ -82,6 +70,4 @@ bool start_recording();
 void stop_recording();
 QString get_recorded_audio_filename();
 
-void combobox_audio_sample_rates(QComboBox* combobox);
-
-#endif // AUDIO_H
+#endif  // AUDIO_H

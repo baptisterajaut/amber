@@ -23,7 +23,7 @@
 
 #include <QCursor>
 
-namespace olive{
+namespace amber{
   namespace cursor {
     extern QCursor LeftTrim;
     extern QCursor RightTrim;

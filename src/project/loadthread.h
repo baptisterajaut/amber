@@ -29,7 +29,8 @@
 #include <QMessageBox>
 
 #include "project/projectelements.h"
-#include "timeline/clip.h"
+#include "engine/clip.h"
+#include "core/guide.h"
 
 class LoadThread : public QThread
 {
@@ -54,6 +55,19 @@ private:
 
   bool load_worker(QFile& f, QXmlStreamReader& stream, int type);
   void load_effect(QXmlStreamReader& stream, Clip* c);
+
+  // Per-element parse helpers (called from load_worker)
+  void parse_folder(QXmlStreamReader& stream);
+  void parse_footage(QXmlStreamReader& stream, const QStringView& child_search);
+  bool parse_sequence(QXmlStreamReader& stream, const QStringView& child_search);
+  bool parse_clip(QXmlStreamReader& stream, SequencePtr s);
+  Marker parse_marker(QXmlStreamReader& stream);
+  Guide parse_guide(QXmlStreamReader& stream);
+  QString resolve_footage_url(const QString& raw_url);
+  void parse_clip_links(QXmlStreamReader& stream, Clip* c);
+  void parse_clip_attributes(QXmlStreamReader& stream, ClipPtr c, int& media_type, int& media_id, int& stream_id);
+  void parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent);
+  bool correct_clip_links(SequencePtr s);
 
   void read_next(QXmlStreamReader& stream);
   void read_next_start_element(QXmlStreamReader& stream);

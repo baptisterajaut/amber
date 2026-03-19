@@ -1,32 +1,34 @@
 #include "icons.h"
 
 #include <QDebug>
+#include <QPainter>
 
 #include "global/global.h"
 #include "global/config.h"
+#include "ui/styling.h"
 
-QIcon olive::icon::LeftArrow;
-QIcon olive::icon::RightArrow;
-QIcon olive::icon::UpArrow;
-QIcon olive::icon::DownArrow;
-QIcon olive::icon::Diamond;
-QIcon olive::icon::Clock;
+QIcon amber::icon::LeftArrow;
+QIcon amber::icon::RightArrow;
+QIcon amber::icon::UpArrow;
+QIcon amber::icon::DownArrow;
+QIcon amber::icon::Diamond;
+QIcon amber::icon::Clock;
 
-QIcon olive::icon::MediaVideo;
-QIcon olive::icon::MediaAudio;
-QIcon olive::icon::MediaImage;
-QIcon olive::icon::MediaError;
-QIcon olive::icon::MediaSequence;
-QIcon olive::icon::MediaFolder;
+QIcon amber::icon::MediaVideo;
+QIcon amber::icon::MediaAudio;
+QIcon amber::icon::MediaImage;
+QIcon amber::icon::MediaError;
+QIcon amber::icon::MediaSequence;
+QIcon amber::icon::MediaFolder;
 
-QIcon olive::icon::ViewerGoToStart;
-QIcon olive::icon::ViewerPrevFrame;
-QIcon olive::icon::ViewerPlay;
-QIcon olive::icon::ViewerPause;
-QIcon olive::icon::ViewerNextFrame;
-QIcon olive::icon::ViewerGoToEnd;
+QIcon amber::icon::ViewerGoToStart;
+QIcon amber::icon::ViewerPrevFrame;
+QIcon amber::icon::ViewerPlay;
+QIcon amber::icon::ViewerPause;
+QIcon amber::icon::ViewerNextFrame;
+QIcon amber::icon::ViewerGoToEnd;
 
-QIcon olive::icon::CreateIconFromSVG(const QString &path, bool create_disabled)
+QIcon amber::icon::CreateIconFromSVG(const QString &path, bool create_disabled)
 {
   QIcon icon;
 
@@ -36,7 +38,7 @@ QIcon olive::icon::CreateIconFromSVG(const QString &path, bool create_disabled)
   QPixmap normal(path);
 
   // Color the icon dark if the user is using a dark theme
-  if (olive::styling::UseDarkIcons()) {
+  if (amber::styling::UseDarkIcons()) {
     p.begin(&normal);
     p.setCompositionMode(QPainter::CompositionMode_SourceIn);
     p.fillRect(normal.rect(), QColor(32, 32, 32));
@@ -65,7 +67,7 @@ QIcon olive::icon::CreateIconFromSVG(const QString &path, bool create_disabled)
   return icon;
 }
 
-void olive::icon::Initialize()
+void amber::icon::Initialize()
 {
   qInfo() << "Initializing icons";
 

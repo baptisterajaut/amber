@@ -27,10 +27,10 @@
 
 #include "ui/timelinewidget.h"
 #include "ui/timelinetools.h"
-#include "timeline/selection.h"
-#include "timeline/clip.h"
+#include "core/selection.h"
+#include "engine/clip.h"
 #include "timeline/mediaimportdata.h"
-#include "undo/undo.h"
+#include "engine/undo/undo.h"
 #include "ui/timelineheader.h"
 #include "ui/resizablescrollbar.h"
 #include "ui/audiomonitor.h"
@@ -51,7 +51,7 @@ enum TrimType : uint8_t {
   TRIM_OUT
 };
 
-namespace olive {
+namespace amber {
   namespace timeline {
     const int kGhostThickness = 2;
     const int kClipTextPadding = 3;
@@ -127,7 +127,7 @@ public:
   void edit_to_point_internal(bool in, bool ripple);
   void delete_in_out_internal(bool ripple);
 
-  void create_ghosts_from_media(Sequence *seq, long entry_point, QVector<olive::timeline::MediaImportData> &media_list);
+  void create_ghosts_from_media(Sequence *seq, long entry_point, QVector<amber::timeline::MediaImportData> &media_list);
   void add_clips_from_ghosts(ComboAction *ca, Sequence *s);
 
   int getTimelineScreenPointFromFrame(long frame);

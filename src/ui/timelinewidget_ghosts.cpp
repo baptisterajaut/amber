@@ -27,6 +27,10 @@
 #include "rendering/renderfunctions.h"
 
 void validate_transitions(Clip* c, int transition_type, long& frame_diff) {
+  if (!c) {
+    qWarning() << "validate_transitions: c is null";
+    return;
+  }
   long validator;
 
   if (transition_type == kTransitionOpening) {
@@ -64,6 +68,14 @@ void make_room_for_transition(ComboAction* ca,
                               bool delete_old_transitions,
                               long timeline_in = -1,
                               long timeline_out = -1) {
+  if (!ca) {
+    qWarning() << "make_room_for_transition: ca is null";
+    return;
+  }
+  if (!c) {
+    qWarning() << "make_room_for_transition: c is null";
+    return;
+  }
   // it's possible to specify other in/out points for the clip, but default behavior is to use the ones existing
   if (timeline_in < 0) {
     timeline_in = c->timeline_in();
@@ -99,6 +111,10 @@ void make_room_for_transition(ComboAction* ca,
 }
 
 void VerifyTransitionsAfterCreating(ComboAction* ca, Clip* open, Clip* close, long transition_start, long transition_end) {
+  if (!ca) {
+    qWarning() << "VerifyTransitionsAfterCreating: ca is null";
+    return;
+  }
   // in case the user made the transition larger than the clips, we're going to delete everything under
   // the transition ghost and extend the clips to the transition's coordinates as necessary
 
@@ -191,7 +207,7 @@ void VerifyTransitionsAfterCreating(ComboAction* ca, Clip* open, Clip* close, lo
 void TimelineWidget::init_ghosts() {
   for (int i=0;i<panel_timeline->ghosts.size();i++) {
     Ghost& g = panel_timeline->ghosts[i];
-    ClipPtr c = olive::ActiveSequence->clips.at(g.clip);
+    ClipPtr c = amber::ActiveSequence->clips.at(g.clip);
 
     g.track = g.old_track = c->track();
     g.clip_in = g.old_clip_in = c->clip_in();
@@ -220,77 +236,66 @@ void TimelineWidget::init_ghosts() {
     // used for trim ops
     g.media_length = c->media_length();
   }
-  for (auto & s : olive::ActiveSequence->selections) {
+  for (auto & s : amber::ActiveSequence->selections) {
     s.old_in = s.in;
     s.old_out = s.out;
     s.old_track = s.track;
   }
 }
 
-void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
-  int effective_tool = panel_timeline->tool;
-  if (panel_timeline->importing || panel_timeline->creating) effective_tool = TIMELINE_TOOL_POINTER;
+void TimelineWidget::updateGhostsSnap(int effective_tool, long& frame_diff) {
+  if (effective_tool == TIMELINE_TOOL_SLIP) return;
 
-  int mouse_track = getTrackFromScreenPoint(mouse_pos.y());
-  long frame_diff = (lock_frame) ? 0 : panel_timeline->getTimelineFrameFromScreenPoint(mouse_pos.x()) - panel_timeline->drag_frame_start;
-  int track_diff = ((effective_tool == TIMELINE_TOOL_SLIDE || panel_timeline->transition_select != kTransitionNone) && !panel_timeline->importing) ? 0 : mouse_track - panel_timeline->drag_track_start;
-  long validator;
-  long earliest_in_point = LONG_MAX;
+  // slipping doesn't move the clips so we don't bother snapping for it
+  for (int i=0;i<panel_timeline->ghosts.size();i++) {
+    const Ghost& g = panel_timeline->ghosts.at(i);
+    long fm;
 
-  // first try to snap
-  long fm;
-
-  if (effective_tool != TIMELINE_TOOL_SLIP) {
-    // slipping doesn't move the clips so we don't bother snapping for it
-    for (int i=0;i<panel_timeline->ghosts.size();i++) {
-      const Ghost& g = panel_timeline->ghosts.at(i);
-
-      // snap ghost's in point
-      if ((panel_timeline->tool != TIMELINE_TOOL_TRANSITION && panel_timeline->trim_target == -1)
-          || g.trim_type == TRIM_IN
-          || panel_timeline->transition_tool_open_clip > -1) {
-        fm = g.old_in + frame_diff;
-        if (panel_timeline->snap_to_timeline(&fm, true, true, true)) {
-          frame_diff = fm - g.old_in;
-          break;
-        }
+    // snap ghost's in point
+    if ((panel_timeline->tool != TIMELINE_TOOL_TRANSITION && panel_timeline->trim_target == -1)
+        || g.trim_type == TRIM_IN
+        || panel_timeline->transition_tool_open_clip > -1) {
+      fm = g.old_in + frame_diff;
+      if (panel_timeline->snap_to_timeline(&fm, true, true, true)) {
+        frame_diff = fm - g.old_in;
+        break;
       }
+    }
 
-      // snap ghost's out point
-      if ((panel_timeline->tool != TIMELINE_TOOL_TRANSITION && panel_timeline->trim_target == -1)
-          || g.trim_type == TRIM_OUT
-          || panel_timeline->transition_tool_close_clip > -1) {
-        fm = g.old_out + frame_diff;
-        if (panel_timeline->snap_to_timeline(&fm, true, true, true)) {
-          frame_diff = fm - g.old_out;
-          break;
-        }
+    // snap ghost's out point
+    if ((panel_timeline->tool != TIMELINE_TOOL_TRANSITION && panel_timeline->trim_target == -1)
+        || g.trim_type == TRIM_OUT
+        || panel_timeline->transition_tool_close_clip > -1) {
+      fm = g.old_out + frame_diff;
+      if (panel_timeline->snap_to_timeline(&fm, true, true, true)) {
+        frame_diff = fm - g.old_out;
+        break;
       }
+    }
 
-      // if the ghost is attached to a clip, snap its markers too
-      if (panel_timeline->trim_target == -1 && g.clip >= 0 && panel_timeline->tool != TIMELINE_TOOL_TRANSITION) {
-        ClipPtr c = olive::ActiveSequence->clips.at(g.clip);
-        for (int j=0;j<c->get_markers().size();j++) {
-          long marker_real_time = c->get_markers().at(j).frame + c->timeline_in() - c->clip_in();
-          fm = marker_real_time + frame_diff;
-          if (panel_timeline->snap_to_timeline(&fm, true, true, true)) {
-            frame_diff = fm - marker_real_time;
-            break;
-          }
+    // if the ghost is attached to a clip, snap its markers too
+    if (panel_timeline->trim_target == -1 && g.clip >= 0 && panel_timeline->tool != TIMELINE_TOOL_TRANSITION) {
+      ClipPtr c = amber::ActiveSequence->clips.at(g.clip);
+      for (int j=0;j<c->get_markers().size();j++) {
+        long marker_real_time = c->get_markers().at(j).frame + c->timeline_in() - c->clip_in();
+        fm = marker_real_time + frame_diff;
+        if (panel_timeline->snap_to_timeline(&fm, true, true, true)) {
+          frame_diff = fm - marker_real_time;
+          break;
         }
       }
     }
   }
+}
 
-  bool clips_are_movable = (effective_tool == TIMELINE_TOOL_POINTER || effective_tool == TIMELINE_TOOL_SLIDE);
+void TimelineWidget::updateGhostsValidate(int effective_tool, bool clips_are_movable, long& frame_diff) {
+  long validator;
 
-  // validate ghosts
-  long temp_frame_diff = frame_diff; // cache to see if we change it (thus cancelling any snap)
   for (int i=0;i<panel_timeline->ghosts.size();i++) {
     const Ghost& g = panel_timeline->ghosts.at(i);
     Clip* c = nullptr;
     if (g.clip != -1) {
-      c = olive::ActiveSequence->clips.at(g.clip).get();
+      c = amber::ActiveSequence->clips.at(g.clip).get();
     }
 
     const FootageStream* ms = nullptr;
@@ -428,27 +433,16 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
           }
         }
       }
-
-      // prevent clips from crossing tracks
-      if (same_sign(g.old_track, panel_timeline->drag_track_start)) {
-        while (!same_sign(g.old_track, g.old_track + track_diff)) {
-          if (g.old_track < 0) {
-            track_diff--;
-          } else {
-            track_diff++;
-          }
-        }
-      }
     } else if (effective_tool == TIMELINE_TOOL_TRANSITION) {
       if (panel_timeline->transition_tool_open_clip == -1
           || panel_timeline->transition_tool_close_clip == -1) {
         validate_transitions(c, g.media_stream, frame_diff);
       } else {
         // open transition clip
-        Clip* otc = olive::ActiveSequence->clips.at(panel_timeline->transition_tool_open_clip).get();
+        Clip* otc = amber::ActiveSequence->clips.at(panel_timeline->transition_tool_open_clip).get();
 
         // close transition clip
-        Clip* ctc = olive::ActiveSequence->clips.at(panel_timeline->transition_tool_close_clip).get();
+        Clip* ctc = amber::ActiveSequence->clips.at(panel_timeline->transition_tool_close_clip).get();
 
         if (g.media_stream == kTransitionClosing) {
           // swap
@@ -469,13 +463,12 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
       }
     }
   }
+}
 
-  // if the above validation changed the frame movement, it's unlikely we're still snapped
-  if (temp_frame_diff != frame_diff) {
-    panel_timeline->snapped = false;
-  }
+void TimelineWidget::updateGhostsApply(int effective_tool, bool clips_are_movable, long frame_diff,
+                                        int track_diff, long& earliest_in_point) {
+  int mouse_track = getTrackFromScreenPoint(mapFromGlobal(QCursor::pos()).y());
 
-  // apply changes to ghosts
   for (int i=0;i<panel_timeline->ghosts.size();i++) {
     Ghost& g = panel_timeline->ghosts[i];
 
@@ -516,7 +509,7 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
       g.out = g.old_out + frame_diff;
 
       if (g.transition != nullptr
-          && g.transition == olive::ActiveSequence->clips.at(g.clip)->opening_transition) {
+          && g.transition == amber::ActiveSequence->clips.at(g.clip)->opening_transition) {
         g.clip_in = g.old_clip_in + frame_diff;
       }
 
@@ -547,42 +540,45 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
 
     earliest_in_point = qMin(earliest_in_point, g.in);
   }
+}
 
-  // apply changes to selections
-  if (effective_tool != TIMELINE_TOOL_SLIP && !panel_timeline->importing && !panel_timeline->creating) {
-    for (int i=0;i<olive::ActiveSequence->selections.size();i++) {
-      Selection& s = olive::ActiveSequence->selections[i];
-      if (panel_timeline->trim_target > -1) {
-        if (panel_timeline->trim_type == TRIM_IN) {
-          s.in = s.old_in + frame_diff;
-        } else {
-          s.out = s.old_out + frame_diff;
-        }
-      } else if (clips_are_movable) {
-        for (auto & s : olive::ActiveSequence->selections) {
-          s.in = s.old_in + frame_diff;
-          s.out = s.old_out + frame_diff;
-          s.track = s.old_track;
+void TimelineWidget::updateGhostsApplySelections(int effective_tool, bool clips_are_movable, long frame_diff, int track_diff) {
+  if (effective_tool == TIMELINE_TOOL_SLIP || panel_timeline->importing || panel_timeline->creating) return;
 
-          if (panel_timeline->importing) {
-            int abs_track_diff = abs(track_diff);
-            if (s.old_track < 0) {
-              s.track -= abs_track_diff;
-            } else {
-              s.track += abs_track_diff;
-            }
+  for (int i=0;i<amber::ActiveSequence->selections.size();i++) {
+    Selection& s = amber::ActiveSequence->selections[i];
+    if (panel_timeline->trim_target > -1) {
+      if (panel_timeline->trim_type == TRIM_IN) {
+        s.in = s.old_in + frame_diff;
+      } else {
+        s.out = s.old_out + frame_diff;
+      }
+    } else if (clips_are_movable) {
+      for (auto & s : amber::ActiveSequence->selections) {
+        s.in = s.old_in + frame_diff;
+        s.out = s.old_out + frame_diff;
+        s.track = s.old_track;
+
+        if (panel_timeline->importing) {
+          int abs_track_diff = abs(track_diff);
+          if (s.old_track < 0) {
+            s.track -= abs_track_diff;
           } else {
-            if (same_sign(s.track, panel_timeline->drag_track_start)) s.track += track_diff;
+            s.track += abs_track_diff;
           }
+        } else {
+          if (same_sign(s.track, panel_timeline->drag_track_start)) s.track += track_diff;
         }
       }
     }
   }
+}
 
+void TimelineWidget::updateGhostsTooltip(const QPoint& mouse_pos, long frame_diff, long earliest_in_point) {
   if (panel_timeline->importing) {
-    QToolTip::showText(mapToGlobal(mouse_pos), frame_to_timecode(earliest_in_point, olive::CurrentConfig.timecode_view, olive::ActiveSequence->frame_rate));
+    QToolTip::showText(mapToGlobal(mouse_pos), frame_to_timecode(earliest_in_point, amber::CurrentConfig.timecode_view, amber::ActiveSequence->frame_rate));
   } else {
-    QString tip = ((frame_diff < 0) ? "-" : "+") + frame_to_timecode(qAbs(frame_diff), olive::CurrentConfig.timecode_view, olive::ActiveSequence->frame_rate);
+    QString tip = ((frame_diff < 0) ? "-" : "+") + frame_to_timecode(qAbs(frame_diff), amber::CurrentConfig.timecode_view, amber::ActiveSequence->frame_rate);
     if (panel_timeline->trim_target > -1) {
       // find which clip is being moved
       const Ghost* g = nullptr;
@@ -601,9 +597,58 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
         } else {
           len += frame_diff;
         }
-        tip += frame_to_timecode(len, olive::CurrentConfig.timecode_view, olive::ActiveSequence->frame_rate);
+        tip += frame_to_timecode(len, amber::CurrentConfig.timecode_view, amber::ActiveSequence->frame_rate);
       }
     }
     QToolTip::showText(mapToGlobal(mouse_pos), tip);
   }
+}
+
+void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
+  int effective_tool = panel_timeline->tool;
+  if (panel_timeline->importing || panel_timeline->creating) effective_tool = TIMELINE_TOOL_POINTER;
+
+  int mouse_track = getTrackFromScreenPoint(mouse_pos.y());
+  long frame_diff = (lock_frame) ? 0 : panel_timeline->getTimelineFrameFromScreenPoint(mouse_pos.x()) - panel_timeline->drag_frame_start;
+  int track_diff = ((effective_tool == TIMELINE_TOOL_SLIDE || panel_timeline->transition_select != kTransitionNone) && !panel_timeline->importing) ? 0 : mouse_track - panel_timeline->drag_track_start;
+  long earliest_in_point = LONG_MAX;
+
+  // first try to snap
+  updateGhostsSnap(effective_tool, frame_diff);
+
+  bool clips_are_movable = (effective_tool == TIMELINE_TOOL_POINTER || effective_tool == TIMELINE_TOOL_SLIDE);
+
+  // validate ghosts
+  long temp_frame_diff = frame_diff; // cache to see if we change it (thus cancelling any snap)
+  updateGhostsValidate(effective_tool, clips_are_movable, frame_diff);
+
+  // if the above validation changed the frame movement, it's unlikely we're still snapped
+  if (temp_frame_diff != frame_diff) {
+    panel_timeline->snapped = false;
+  }
+
+  // also validate track crossing for movable clips
+  if (clips_are_movable) {
+    for (int i=0;i<panel_timeline->ghosts.size();i++) {
+      const Ghost& g = panel_timeline->ghosts.at(i);
+      if (same_sign(g.old_track, panel_timeline->drag_track_start)) {
+        while (!same_sign(g.old_track, g.old_track + track_diff)) {
+          if (g.old_track < 0) {
+            track_diff--;
+          } else {
+            track_diff++;
+          }
+        }
+      }
+    }
+  }
+
+  // apply changes to ghosts
+  updateGhostsApply(effective_tool, clips_are_movable, frame_diff, track_diff, earliest_in_point);
+
+  // apply changes to selections
+  updateGhostsApplySelections(effective_tool, clips_are_movable, frame_diff, track_diff);
+
+  // show tooltip
+  updateGhostsTooltip(mouse_pos, frame_diff, earliest_in_point);
 }

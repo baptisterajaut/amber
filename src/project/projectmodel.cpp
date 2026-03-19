@@ -26,7 +26,7 @@
 #include "project/media.h"
 #include "global/debug.h"
 
-ProjectModel olive::project_model;
+ProjectModel amber::project_model;
 
 ProjectModel::ProjectModel(QObject *parent) : QAbstractItemModel(parent), root_item_(nullptr) {
   make_root();

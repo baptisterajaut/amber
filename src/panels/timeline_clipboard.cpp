@@ -29,20 +29,20 @@
 #include "global/config.h"
 #include "global/global.h"
 #include "rendering/renderfunctions.h"
-#include "undo/undostack.h"
+#include "engine/undo/undostack.h"
 
 void Timeline::copy(bool del) {
-  if (olive::ActiveSequence == nullptr) return;
+  if (amber::ActiveSequence == nullptr) return;
 
   bool cleared = false;
   bool copied = false;
 
   long min_in = 0;
 
-  for (int i=0;i<olive::ActiveSequence->clips.size();i++) {
-    ClipPtr c = olive::ActiveSequence->clips.at(i);
+  for (int i=0;i<amber::ActiveSequence->clips.size();i++) {
+    ClipPtr c = amber::ActiveSequence->clips.at(i);
     if (c != nullptr) {
-      for (const auto & s : olive::ActiveSequence->selections) {
+      for (const auto & s : amber::ActiveSequence->selections) {
         if (s.track == c->track() && !((c->timeline_in() <= s.in && c->timeline_out() <= s.in) || (c->timeline_in() >= s.out && c->timeline_out() >= s.out))) {
           if (!cleared) {
             clear_clipboard();
@@ -87,17 +87,17 @@ void Timeline::copy(bool del) {
   }
 
   if (del && copied) {
-    delete_selection(olive::ActiveSequence->selections, false);
+    delete_selection(amber::ActiveSequence->selections, false);
   }
 }
 
 void Timeline::relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>& new_clips) {
-  if (olive::ActiveSequence == nullptr) return;
+  if (amber::ActiveSequence == nullptr) return;
 
   // relink pasted clips
   for (int i=0;i<old_clips.size();i++) {
     // these indices should correspond
-    ClipPtr oc = olive::ActiveSequence->clips.at(old_clips.at(i));
+    ClipPtr oc = amber::ActiveSequence->clips.at(old_clips.at(i));
     for (int j=0;j<oc->linked.size();j++) {
       for (int k=0;k<old_clips.size();k++) { // find clip with that ID
         if (oc->linked.at(j) == old_clips.at(k)) {
@@ -111,7 +111,7 @@ void Timeline::relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>&
 }
 
 void Timeline::paste(bool insert) {
-  if (olive::ActiveSequence == nullptr) return;
+  if (amber::ActiveSequence == nullptr) return;
   if (clipboard.size() > 0) {
     if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
       ComboAction* ca = new ComboAction();
@@ -125,15 +125,15 @@ void Timeline::paste(bool insert) {
         ClipPtr c = std::static_pointer_cast<Clip>(i);
 
         // create copy of clip and offset by playhead
-        ClipPtr cc = c->copy(olive::ActiveSequence.get());
+        ClipPtr cc = c->copy(amber::ActiveSequence.get());
 
         // convert frame rates
-        cc->set_timeline_in(rescale_frame_number(cc->timeline_in(), c->cached_frame_rate(), olive::ActiveSequence->frame_rate));
-        cc->set_timeline_out(rescale_frame_number(cc->timeline_out(), c->cached_frame_rate(), olive::ActiveSequence->frame_rate));
-        cc->set_clip_in(rescale_frame_number(cc->clip_in(), c->cached_frame_rate(), olive::ActiveSequence->frame_rate));
+        cc->set_timeline_in(rescale_frame_number(cc->timeline_in(), c->cached_frame_rate(), amber::ActiveSequence->frame_rate));
+        cc->set_timeline_out(rescale_frame_number(cc->timeline_out(), c->cached_frame_rate(), amber::ActiveSequence->frame_rate));
+        cc->set_clip_in(rescale_frame_number(cc->clip_in(), c->cached_frame_rate(), amber::ActiveSequence->frame_rate));
 
-        cc->set_timeline_in(cc->timeline_in() + olive::ActiveSequence->playhead);
-        cc->set_timeline_out(cc->timeline_out() + olive::ActiveSequence->playhead);
+        cc->set_timeline_in(cc->timeline_in() + amber::ActiveSequence->playhead);
+        cc->set_timeline_out(cc->timeline_out() + amber::ActiveSequence->playhead);
         cc->set_track(c->track());
 
         paste_start = qMin(paste_start, cc->timeline_in());
@@ -151,8 +151,8 @@ void Timeline::paste(bool insert) {
       }
       if (insert) {
         split_cache.clear();
-        split_all_clips_at_point(ca, olive::ActiveSequence->playhead);
-        ripple_clips(ca, olive::ActiveSequence.get(), paste_start, paste_end - paste_start);
+        split_all_clips_at_point(ca, amber::ActiveSequence->playhead);
+        ripple_clips(ca, amber::ActiveSequence.get(), paste_start, paste_end - paste_start);
       } else {
         delete_areas_and_relink(ca, delete_areas, false);
       }
@@ -172,13 +172,13 @@ void Timeline::paste(bool insert) {
         }
       }
 
-      ca->append(new AddClipCommand(olive::ActiveSequence.get(), pasted_clips));
+      ca->append(new AddClipCommand(amber::ActiveSequence.get(), pasted_clips));
 
-      olive::UndoStack.push(ca);
+      amber::UndoStack.push(ca);
 
       update_ui(true);
 
-      if (olive::CurrentConfig.paste_seeks) {
+      if (amber::CurrentConfig.paste_seeks) {
         panel_sequence_viewer->seek(paste_end);
       }
     } else if (clipboard_type == CLIPBOARD_TYPE_EFFECT) {
@@ -188,7 +188,7 @@ void Timeline::paste(bool insert) {
       bool skip = false;
       bool ask_conflict = true;
 
-      QVector<Clip*> selected_clips = olive::ActiveSequence->SelectedClips();
+      QVector<Clip*> selected_clips = amber::ActiveSequence->SelectedClips();
 
       for (auto c : selected_clips) {
         for (const auto & j : clipboard) {
@@ -244,7 +244,7 @@ void Timeline::paste(bool insert) {
       }
       if (ca->hasActions()) {
         ca->appendPost(new ReloadEffectsCommand());
-        olive::UndoStack.push(ca);
+        amber::UndoStack.push(ca);
       } else {
         delete ca;
       }

@@ -26,13 +26,13 @@
 #include <QPushButton>
 #include <QDialogButtonBox>
 
-#include "timeline/sequence.h"
+#include "engine/sequence.h"
 #include "project/footage.h"
 #include "rendering/renderfunctions.h"
 #include "panels/panels.h"
 #include "panels/timeline.h"
-#include "undo/undo.h"
-#include "undo/undostack.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 #include "effects/effect.h"
 #include "project/media.h"
 
@@ -61,8 +61,8 @@ SpeedDialog::SpeedDialog(QWidget *parent, QVector<Clip*> clips) : QDialog(parent
   grid->addWidget(new QLabel(tr("Duration:"), this), 2, 0);
   duration = new LabelSlider(this);
   duration->SetDisplayType(LabelSlider::FrameNumber);
-  if (olive::ActiveSequence != nullptr) {
-    duration->SetFrameRate(olive::ActiveSequence->frame_rate);
+  if (amber::ActiveSequence != nullptr) {
+    duration->SetFrameRate(amber::ActiveSequence->frame_rate);
   }
   grid->addWidget(duration, 2, 1);
 
@@ -344,7 +344,7 @@ void set_speed(ComboAction* ca, Clip* c, double speed, bool ripple, long& ep, lo
   sel.in = c->timeline_in();
   sel.out = proposed_out;
   sel.track = c->track();
-  olive::ActiveSequence->selections.append(sel);
+  amber::ActiveSequence->selections.append(sel);
 }
 
 void SpeedDialog::accept() {
@@ -357,8 +357,8 @@ void SpeedDialog::accept() {
   SetClipProperty* reversed_action = new SetClipProperty(kSetClipPropertyReversed);
 
   // undoable action for restoring clip selections
-  SetSelectionsCommand* sel_command = new SetSelectionsCommand(olive::ActiveSequence.get());
-  sel_command->old_data = olive::ActiveSequence->selections;
+  SetSelectionsCommand* sel_command = new SetSelectionsCommand(amber::ActiveSequence.get());
+  sel_command->old_data = amber::ActiveSequence->selections;
 
   // variables used to calculate ripples
   long earliest_point = LONG_MAX;
@@ -436,13 +436,13 @@ void SpeedDialog::accept() {
     ripple_clips(ca, clips_.at(0)->sequence, earliest_point, longest_ripple);
   }
 
-  sel_command->new_data = olive::ActiveSequence->selections;
+  sel_command->new_data = amber::ActiveSequence->selections;
   ca->append(sel_command);
 
   ca->append(reversed_action);
   ca->append(audio_pitch_action);
 
-  olive::UndoStack.push(ca);
+  amber::UndoStack.push(ca);
 
   update_ui(true);
   QDialog::accept();
