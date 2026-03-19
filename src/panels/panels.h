@@ -21,11 +21,11 @@
 #ifndef PANELS_H
 #define PANELS_H
 
-#include "timeline.h"
 #include "effectcontrols.h"
-#include "viewer.h"
 #include "grapheditor.h"
 #include "project.h"
+#include "timeline.h"
+#include "viewer.h"
 
 extern Project* panel_project;
 extern EffectControls* panel_effect_controls;
@@ -34,10 +34,10 @@ extern Viewer* panel_footage_viewer;
 extern Timeline* panel_timeline;
 extern GraphEditor* panel_graph_editor;
 
-void update_ui(bool modified);
+void update_ui(bool modified, bool scrubbing = false);
 QDockWidget* get_focused_panel(bool force_hover = false);
-void alloc_panels(QWidget *parent);
+void alloc_panels(QWidget* parent);
 void free_panels();
 void scroll_to_frame_internal(QScrollBar* bar, long frame, double zoom, int area_width);
 
-#endif // PANELS_H
+#endif  // PANELS_H

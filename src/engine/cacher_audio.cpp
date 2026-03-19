@@ -180,18 +180,26 @@ bool Cacher::cacheAudioAccumulateReverse(AVFrame* frame, AVFrame*& out_frame, in
 #endif
       rev_frame->nb_samples = 0;
       rev_frame->pts = frame_->pts;
+      memset(rev_frame->data[0], 0, rev_frame->linesize[0]);
     }
-    int offset = rev_frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format)) *
-                 rev_frame->ch_layout.nb_channels;
+    int sample_size = av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format)) *
+                      rev_frame->ch_layout.nb_channels;
+    int offset = rev_frame->nb_samples * sample_size;
+    int copy_size = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
+                    frame->ch_layout.nb_channels;
+
+    if (offset + copy_size > rev_frame->linesize[0]) {
+      qWarning() << "cacheAudioAccumulateReverse: buffer overflow prevented, offset:" << offset
+                 << "copy:" << copy_size << "limit:" << rev_frame->linesize[0];
+      copy_size = qMax(0, rev_frame->linesize[0] - offset);
+    }
 #ifdef AUDIOWARNINGS
     dout << "offset 1:" << offset;
-    dout << "retrieved samples:" << frame->nb_samples << "size:"
-         << (frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
-             frame->ch_layout.nb_channels);
+    dout << "retrieved samples:" << frame->nb_samples << "size:" << copy_size;
 #endif
-    memcpy(rev_frame->data[0] + offset, frame->data[0],
-           (frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
-            frame->ch_layout.nb_channels));
+    if (copy_size > 0) {
+      memcpy(rev_frame->data[0] + offset, frame->data[0], copy_size);
+    }
 #ifdef AUDIOWARNINGS
     dout << "pts:" << frame_->pts << "dur:" << frame_->pkt_duration << "rev_target:" << reverse_target
          << "offset:" << offset << "limit:" << rev_frame->linesize[0];
@@ -279,7 +287,10 @@ bool Cacher::cacheAudioPostDecode(AVFrame* frame, int& nb_bytes, bool reverse_au
 #endif
   if (audio_buffer_write == 0) {
     audio_buffer_write = get_buffer_offset_from_frame(last_fr, qMax(timeline_in, target_frame));
-    if (audio_buffer_write < 0) return false;  // buffer not ready yet after seek
+    if (audio_buffer_write < 0) {
+      audio_buffer_write = 0;  // reset so next invocation retries instead of using stale -1
+      return false;
+    }
 
     if (frame_skip > 0) {
       int target = get_buffer_offset_from_frame(last_fr, qMax(timeline_in + frame_skip, target_frame));
@@ -290,7 +301,7 @@ bool Cacher::cacheAudioPostDecode(AVFrame* frame, int& nb_bytes, bool reverse_au
     }
   }
 
-  int offset = audio_ibuffer_read - audio_buffer_write;
+  int offset = audio_ibuffer_read.load() - audio_buffer_write;
   if (offset > 0) {
     audio_buffer_write += offset;
     frame_sample_index_ += offset;
@@ -391,7 +402,8 @@ bool Cacher::cacheAudioFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_a
                frame->ch_layout.nb_channels;
   if (new_frame) {
     apply_audio_effects(clip,
-                        bytes_to_seconds(audio_buffer_write, 2, current_audio_freq()) + audio_ibuffer_timecode +
+                        bytes_to_seconds(audio_buffer_write, 2, current_audio_freq()) +
+                            double(audio_ibuffer_frame.load()) / clip->sequence->frame_rate +
                             ((double)clip->clip_in(true) / clip->sequence->frame_rate) -
                             ((double)timeline_in / last_fr),
                         frame, nb_bytes, nests_);
@@ -421,7 +433,7 @@ Cacher::AudioMixResult Cacher::cacheAudioMixToBuffer(AVFrame* frame, int& nb_byt
   int sample_skip = 4 * qMax(0, qAbs(playback_speed_) - 1);
   int sample_byte_size = av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format));
 
-  while (frame_sample_index_ < nb_bytes && audio_buffer_write < audio_ibuffer_read + (audio_ibuffer_size >> 1) &&
+  while (frame_sample_index_ < nb_bytes && audio_buffer_write < audio_ibuffer_read.load() + (audio_ibuffer_size >> 1) &&
          audio_buffer_write < buffer_timeline_out) {
     for (int i = 0; i < frame->ch_layout.nb_channels; i++) {
       int upper_byte_index = (audio_buffer_write + 1) % audio_ibuffer_size;
@@ -453,9 +465,8 @@ Cacher::AudioMixResult Cacher::cacheAudioMixToBuffer(AVFrame* frame, int& nb_byt
 
   if (audio_reset_) return AudioMixReturn;
 
-  if (scrubbing_) {
-    if (audio_thread != nullptr) audio_thread->notifyReceiver();
-  }
+  // Note: scrub data_ready and notifyReceiver are deferred to CacheAudioWorker()
+  // after the full grain is decoded, to avoid the sender playing partial data.
 
   if (frame_sample_index_ >= nb_bytes) {
     frame_sample_index_ = -1;
@@ -483,6 +494,12 @@ void Cacher::CacheAudioWorker() {
     Reset();
     audio_reset_ = false;
     audio_just_reset = true;
+  }
+
+  // Skip grain decode if the previous grain hasn't been consumed yet by the sender.
+  // The next seek will clear audio_scrub_data_ready and trigger a fresh decode.
+  if (scrubbing_ && audio_scrub_data_ready.load()) {
+    return;
   }
 
   long timeline_in = clip->timeline_in(true);
@@ -537,6 +554,8 @@ void Cacher::CacheAudioWorker() {
     timeline_out = temp;
   }
 
+  qint64 scrub_bytes_mixed = 0;
+
   while (true) {
     AVFrame* frame;
     int nb_bytes = INT_MAX;
@@ -554,9 +573,12 @@ void Cacher::CacheAudioWorker() {
         frame_sample_index_ = 0;
         if (audio_buffer_write == 0) {
           audio_buffer_write = get_buffer_offset_from_frame(last_fr, qMax(timeline_in, target_frame));
-          if (audio_buffer_write < 0) break;  // buffer not ready yet after seek
+          if (audio_buffer_write < 0) {
+            audio_buffer_write = 0;
+            break;
+          }
         }
-        int offset = audio_ibuffer_read - audio_buffer_write;
+        int offset = audio_ibuffer_read.load() - audio_buffer_write;
         if (offset > 0) {
           audio_buffer_write += offset;
           frame_sample_index_ += offset;
@@ -570,16 +592,25 @@ void Cacher::CacheAudioWorker() {
     }
 
     // mix audio into internal buffer
+    qint64 write_before = audio_buffer_write;
     AudioMixResult mix_result = cacheAudioMixToBuffer(frame, nb_bytes, timeline_out);
+    scrub_bytes_mixed += (audio_buffer_write - write_before);
+
     if (mix_result == AudioMixReturn) return;
     if (mix_result == AudioMixBreak) break;
 
     if (reached_end) {
       frame->nb_samples = 0;
     }
-    if (scrubbing_) {
+    if (scrubbing_ && scrub_bytes_mixed >= scrub_grain_bytes(current_audio_freq())) {
       break;
     }
+  }
+
+  // Signal that scrub audio is ready after the full grain has been decoded
+  if (scrubbing_) {
+    audio_scrub_data_ready.store(true);
+    if (audio_thread != nullptr) audio_thread->notifyReceiver();
   }
 
   // If there's a QObject waiting for audio to be rendered, wake it now
@@ -615,6 +646,7 @@ void Cacher::Reset() {
       // flush ffmpeg codecs
       avcodec_flush_buffers(codecCtx);
       reached_end = false;
+      audio_buffer_write = 0;
 
       // seek (target_frame represents timeline timecode in frames, not clip timecode)
 

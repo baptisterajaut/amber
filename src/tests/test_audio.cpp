@@ -24,9 +24,7 @@ class TestAudio : public QObject {
     QVERIFY(log_volume(1.5) > 1.0);
   }
 
-  void testLogVolumeZero() {
-    QVERIFY(qAbs(log_volume(0.0)) < 0.001);
-  }
+  void testLogVolumeZero() { QVERIFY(qAbs(log_volume(0.0)) < 0.001); }
 
   void testLogVolumeNegative() {
     // formula doesn't clamp: (exp(-1) - 1) / (e - 1) ≈ -0.368
@@ -46,10 +44,9 @@ class TestAudio : public QObject {
 
   void testBufferGlobalsInit() {
     // Verify buffer globals have expected initial values
-    QCOMPARE(audio_ibuffer_read, qint64(0));
-    QCOMPARE(audio_ibuffer_frame, 0L);
-    QVERIFY(qAbs(audio_ibuffer_timecode - 0.0) < 0.001);
-    QCOMPARE(audio_scrub.load(), false);
+    QCOMPARE(audio_ibuffer_read.load(), qint64(0));
+    QCOMPARE(audio_ibuffer_frame.load(), 0L);
+    QCOMPARE(audio_scrub_id.load(), 0u);
     QCOMPARE(audio_rendering, false);
     QCOMPARE(audio_rendering_rate, 0);
   }

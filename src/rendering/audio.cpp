@@ -26,18 +26,18 @@
 #include "engine/sequence.h"
 
 #include "global/config.h"
-#include "rendering/renderfunctions.h"
 #include "global/debug.h"
+#include "rendering/renderfunctions.h"
 
 #include <QApplication>
+#include <QAudioDevice>
 #include <QAudioSink>
 #include <QAudioSource>
+#include <QDir>
+#include <QFile>
 #include <QMediaDevices>
-#include <QAudioDevice>
 #include <QTimer>
 #include <QtMath>
-#include <QFile>
-#include <QDir>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -53,17 +53,16 @@ bool recording = false;
 
 AudioSenderThread* audio_thread = nullptr;
 
-bool is_audio_device_set() {
-  return audio_device_set;
-}
+bool is_audio_device_set() { return audio_device_set; }
 
 QAudioDevice get_audio_device(bool output) {
   QList<QAudioDevice> devs = output ? QMediaDevices::audioOutputs() : QMediaDevices::audioInputs();
 
   // try to retrieve preferred device from config
-  QString preferred_device = output ? amber::CurrentConfig.preferred_audio_output : amber::CurrentConfig.preferred_audio_input;
+  QString preferred_device =
+      output ? amber::CurrentConfig.preferred_audio_output : amber::CurrentConfig.preferred_audio_input;
   if (!preferred_device.isEmpty()) {
-    for (const auto & dev : devs) {
+    for (const auto& dev : devs) {
       // try to match available devices with preferred device
       if (dev.description() == preferred_device) {
         return dev;
@@ -137,32 +136,32 @@ void stop_audio() {
   }
 }
 
-void clear_audio_ibuffer() {
+void clear_audio_ibuffer(long new_frame) {
   if (audio_thread != nullptr) audio_thread->lock.lock();
   audio_write_lock.lock();
+  // Frame must be stored before read-cursor: a cacher racing past audio_write_lock
+  // will compute a conservative offset and stall rather than overwrite stale data.
+  audio_ibuffer_frame.store(new_frame);
   memset(audio_ibuffer, 0, audio_ibuffer_size);
-  audio_ibuffer_read = 0;
+  audio_ibuffer_read.store(0);
   audio_write_lock.unlock();
   if (audio_thread != nullptr) audio_thread->lock.unlock();
 }
 
-int current_audio_freq() {
-  return audio_rendering ? audio_rendering_rate : audio_output->format().sampleRate();
-}
+int current_audio_freq() { return audio_rendering ? audio_rendering_rate : audio_output->format().sampleRate(); }
 
 qint64 get_buffer_offset_from_frame(double framerate, long frame) {
-  if (frame >= audio_ibuffer_frame) {
-    int multiplier = av_get_bytes_per_sample(AV_SAMPLE_FMT_S16)*2; // 2 channels for stereo
-    return static_cast<qint64>(qFloor((double(frame - audio_ibuffer_frame)/framerate)*current_audio_freq()))*multiplier;
+  long ibuf_frame = audio_ibuffer_frame.load();
+  if (frame >= ibuf_frame) {
+    int multiplier = av_get_bytes_per_sample(AV_SAMPLE_FMT_S16) * 2;  // 2 channels for stereo
+    return static_cast<qint64>(qFloor((double(frame - ibuf_frame) / framerate) * current_audio_freq())) * multiplier;
   } else {
-    qWarning() << "Invalid values passed to get_buffer_offset_from_frame" << frame << "<" << audio_ibuffer_frame;
+    qWarning() << "Invalid values passed to get_buffer_offset_from_frame" << frame << "<" << ibuf_frame;
     return -1;
   }
 }
 
-AudioSenderThread::AudioSenderThread()  {
-  connect(this, &QThread::finished, this, &QObject::deleteLater);
-}
+AudioSenderThread::AudioSenderThread() { connect(this, &QThread::finished, this, &QObject::deleteLater); }
 
 void AudioSenderThread::stop() {
   close = true;
@@ -170,8 +169,18 @@ void AudioSenderThread::stop() {
   wait();
 }
 
-void AudioSenderThread::notifyReceiver() {
-  cond.wakeAll();
+void AudioSenderThread::notifyReceiver() { cond.wakeAll(); }
+
+bool AudioSenderThread::scrub_grain_active() {
+  if (!audio_scrub_data_ready.load()) return false;
+  unsigned id = audio_scrub_id.load();
+  if (id != current_scrub_id_) {
+    current_scrub_id_ = id;
+    scrub_grain_played_ = 0;
+    scrub_grain_total_ = scrub_grain_samples(audio_output->format().sampleRate());
+    return true;
+  }
+  return scrub_grain_played_ < scrub_grain_total_;
 }
 
 void AudioSenderThread::run() {
@@ -183,10 +192,10 @@ void AudioSenderThread::run() {
     cond.wait(&lock);
     if (close) {
       break;
-    } else if (amber::app_ctx->isPlaying() || audio_scrub) {
+    } else if (amber::app_ctx->isPlaying() || scrub_grain_active()) {
       int written_bytes = 0;
 
-      int adjusted_read_index = audio_ibuffer_read%audio_ibuffer_size;
+      int adjusted_read_index = audio_ibuffer_read.load() % audio_ibuffer_size;
       int max_write = audio_ibuffer_size - adjusted_read_index;
       int actual_write = send_audio_to_output(adjusted_read_index, max_write);
       written_bytes += actual_write;
@@ -194,56 +203,80 @@ void AudioSenderThread::run() {
         // got all the bytes, write again
         written_bytes += send_audio_to_output(0, audio_ibuffer_size);
       }
-
-      audio_scrub = false;
     }
   }
   lock.unlock();
 }
 
 int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
-  bool mute = audio_scrub.load();
+  bool scrub_active = (scrub_grain_played_ < scrub_grain_total_);
 
-  // During scrub: consume the buffer for VU metering but don't send to audio device (avoids clicks)
-  qint64 actual_write = mute
-    ? max
-    : audio_io_device->write(reinterpret_cast<const char*>(audio_ibuffer)+offset, max);
+  qint64 actual_write;
+  qint64 consumed;
 
-  qint64 audio_ibuffer_limit = audio_ibuffer_read + actual_write;
+  if (scrub_active) {
+    // Staging buffer: apply Hann window to a copy, write windowed audio to device
+    int pairs_in_chunk = max / 4;
+    int pairs_to_write = 0;
+    int staging_size = pairs_in_chunk * 4;
+    staging_buffer_.resize(staging_size);
+    memset(staging_buffer_.data(), 0, staging_size);
 
-  if (actual_write > 0) {
-    // average values and send to audio monitor
+    for (int p = 0; p < pairs_in_chunk; p++) {
+      if (scrub_grain_played_ >= scrub_grain_total_) break;
+
+      double t = (scrub_grain_total_ > 1) ? (double(scrub_grain_played_) / double(scrub_grain_total_ - 1)) : 0.0;
+      double w = 0.5 * (1.0 - cos(2.0 * M_PI * t));
+
+      qint64 src = offset + p * 4;
+      for (int ch = 0; ch < 2; ch++) {
+        qint64 bi = src + ch * 2;
+        qint16 raw = qint16(((audio_ibuffer[bi + 1] & 0xFF) << 8) | (audio_ibuffer[bi] & 0xFF));
+        qint16 windowed = qint16(raw * w);
+        staging_buffer_[p * 4 + ch * 2] = char(windowed & 0xFF);
+        staging_buffer_[p * 4 + ch * 2 + 1] = char((windowed >> 8) & 0xFF);
+      }
+      scrub_grain_played_++;
+      pairs_to_write = p + 1;
+    }
+
+    actual_write = (pairs_to_write > 0) ? audio_io_device->write(staging_buffer_.constData(), pairs_to_write * 4) : 0;
+    consumed = pairs_to_write * 4;  // only consume what the grain used
+  } else {
+    // Normal playback: write raw ibuffer directly to device
+    actual_write = audio_io_device->write(reinterpret_cast<const char*>(audio_ibuffer) + offset, max);
+    consumed = (actual_write > 0) ? actual_write : 0;
+  }
+
+  // Compute VU from raw ibuffer over only the consumed range
+  if (consumed > 0) {
     int channels = audio_output->format().channelCount();
-    qint64 lim = offset + actual_write;
+    qint64 lim = offset + consumed;
     QVector<double> averages;
     averages.resize(channels);
     averages.fill(0);
 
     int counter = 0;
     qint16 sample;
-    for (qint64 i=offset;i<lim;i+=2) {
-      sample = qint16(((audio_ibuffer[i+1] & 0xFF) << 8) | (audio_ibuffer[i] & 0xFF));
-      averages[counter] = qMax((double(qAbs(sample))/32768.0), averages[counter]);
-      counter = (counter+1)%channels;
+    for (qint64 i = offset; i < lim; i += 2) {
+      sample = qint16(((audio_ibuffer[i + 1] & 0xFF) << 8) | (audio_ibuffer[i] & 0xFF));
+      averages[counter] = qMax((double(qAbs(sample)) / 32768.0), averages[counter]);
+      counter = (counter + 1) % channels;
     }
-    for (int i=0;i<channels;i++) {
-      averages[i] = log_volume(1.0-(averages[i]));
+    for (int i = 0; i < channels; i++) {
+      averages[i] = log_volume(1.0 - (averages[i]));
     }
-
     amber::app_ctx->setAudioMonitorValues(averages);
   }
 
-  memset(audio_ibuffer+offset, 0, actual_write);
+  memset(audio_ibuffer + offset, 0, consumed);
+  audio_ibuffer_read.fetch_add(consumed);
 
-  audio_ibuffer_read = audio_ibuffer_limit;
-
-  // Return 0 when muted to prevent a second drain pass from overwriting VU with zeros
-  return mute ? 0 : actual_write;
+  // Return 0 during scrub to prevent a second wrap-around drain
+  return scrub_active ? 0 : actual_write;
 }
 
-void int32_to_char_array(qint32 i, char* array) {
-  memcpy(array, &i, 4);
-}
+void int32_to_char_array(qint32 i, char* array) { memcpy(array, &i, 4); }
 
 void write_wave_header(QFile& f, const QAudioFormat& format) {
   qint32 int32bit;
@@ -253,7 +286,7 @@ void write_wave_header(QFile& f, const QAudioFormat& format) {
   f.write("RIFF");
 
   // 4 byte file size, filled in later
-  for (int i=0;i<4;i++) f.putChar(0);
+  for (int i = 0; i < 4; i++) f.putChar(0);
 
   // 4 byte file type header + 4 byte format chunk marker
   f.write("WAVEfmt");
@@ -261,7 +294,7 @@ void write_wave_header(QFile& f, const QAudioFormat& format) {
 
   // 4 byte length of the above format data (always 16 bytes)
   f.putChar(16);
-  for (int i=0;i<3;i++) f.putChar(0);
+  for (int i = 0; i < 3; i++) f.putChar(0);
 
   // 2 byte type format (1 is PCM)
   f.putChar(1);
@@ -296,7 +329,7 @@ void write_wave_header(QFile& f, const QAudioFormat& format) {
   f.write("data");
 
   // 4 byte integer for data chunk size (filled in later)?
-  for (int i=0;i<4;i++) f.putChar(0);
+  for (int i = 0; i < 4; i++) f.putChar(0);
 }
 
 void write_wave_trailer(QFile& f) {
@@ -335,9 +368,8 @@ bool start_recording() {
   do {
     file_number++;
 
-    QString audio_filename = QString("%1.wav").arg(
-          QCoreApplication::translate("Audio", "Recording %1").arg(QString::number(file_number))
-          );
+    QString audio_filename =
+        QString("%1.wav").arg(QCoreApplication::translate("Audio", "Recording %1").arg(QString::number(file_number)));
 
     audio_file_path = audio_dir.filePath(audio_filename);
   } while (QFile(audio_file_path).exists());
@@ -377,15 +409,12 @@ void stop_recording() {
   }
 }
 
-QString get_recorded_audio_filename() {
-  return output_recording.fileName();
-}
+QString get_recorded_audio_filename() { return output_recording.fileName(); }
 
 QObject* audio_wake_object = nullptr;
 QMutex audio_wake_mutex;
 
-QObject* GetAudioWakeObject()
-{
+QObject* GetAudioWakeObject() {
   audio_wake_mutex.lock();
 
   QObject* wake_object = audio_wake_object;
@@ -396,14 +425,13 @@ QObject* GetAudioWakeObject()
   return wake_object;
 }
 
-void SetAudioWakeObject(QObject *o)
-{
+void SetAudioWakeObject(QObject* o) {
   audio_wake_mutex.lock();
   audio_wake_object = o;
   audio_wake_mutex.unlock();
 }
 
-void WakeAudioWakeObject() {  
+void WakeAudioWakeObject() {
   QObject* audio_wake_object = GetAudioWakeObject();
 
   if (audio_wake_object != nullptr) {

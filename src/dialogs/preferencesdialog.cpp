@@ -672,10 +672,6 @@ void PreferencesDialog::setup_ui() {
   AddBoolPair(enable_seek_to_import, &amber::CurrentConfig.enable_seek_to_import);
   behavior_tab_layout->Add(enable_seek_to_import);
 
-  QCheckBox* enable_audio_scrubbing = new QCheckBox(tr("Audio Scrubbing"));
-  AddBoolPair(enable_audio_scrubbing, &amber::CurrentConfig.enable_audio_scrubbing);
-  behavior_tab_layout->Add(enable_audio_scrubbing);
-
   QCheckBox* enable_drop_on_media_to_replace = new QCheckBox(tr("Drop Files on Media to Replace"));
   AddBoolPair(enable_drop_on_media_to_replace, &amber::CurrentConfig.drop_on_media_to_replace);
   behavior_tab_layout->Add(enable_drop_on_media_to_replace);
@@ -871,6 +867,13 @@ void PreferencesDialog::setup_ui() {
   recordingComboBox->addItem(tr("Stereo"));
   recordingComboBox->setCurrentIndex(amber::CurrentConfig.recording_mode - 1);
   audio_tab_layout->addWidget(recordingComboBox, row, 1);
+
+  row++;
+
+  // Audio -> Audio Scrubbing
+  QCheckBox* enable_audio_scrubbing = new QCheckBox(tr("Audio Scrubbing"));
+  AddBoolPair(enable_audio_scrubbing, &amber::CurrentConfig.enable_audio_scrubbing);
+  audio_tab_layout->addWidget(enable_audio_scrubbing, row, 0, 1, 2);
 
   row++;
 

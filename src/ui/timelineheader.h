@@ -21,79 +21,82 @@
 #ifndef TIMELINEHEADER_H
 #define TIMELINEHEADER_H
 
-#include <QWidget>
+#include <QElapsedTimer>
 #include <QFontMetrics>
+#include <QWidget>
 class Viewer;
 class QScrollBar;
 
 bool center_scroll_to_playhead(QScrollBar* bar, double zoom, long playhead);
 
-class TimelineHeader : public QWidget
-{
-	Q_OBJECT
-public:
-	explicit TimelineHeader(QWidget *parent = nullptr);
-	void set_in_point(long p);
-	void set_out_point(long p);
+class TimelineHeader : public QWidget {
+  Q_OBJECT
+ public:
+  explicit TimelineHeader(QWidget* parent = nullptr);
+  void set_in_point(long p);
+  void set_out_point(long p);
 
-	Viewer* viewer{nullptr};
+  Viewer* viewer{nullptr};
 
-	bool snapping{true};
+  bool snapping{true};
 
-	void show_text(bool enable);
-	double get_zoom();
-	void delete_markers();
-	void set_scrollbar_max(QScrollBar* bar, long sequence_end_frame, int offset);
+  void show_text(bool enable);
+  double get_zoom();
+  void delete_markers();
+  void set_scrollbar_max(QScrollBar* bar, long sequence_end_frame, int offset);
 
-public slots:
-	void update_zoom(double z);
-	void set_scroll(int);
-	void set_visible_in(long i);
-	void show_context_menu(const QPoint &pos);
-	void resized_scroll_listener(double d);
+ public slots:
+  void update_zoom(double z);
+  void set_scroll(int);
+  void set_visible_in(long i);
+  void show_context_menu(const QPoint& pos);
+  void resized_scroll_listener(double d);
 
-protected:
-	void paintEvent(QPaintEvent*) override;
-	void mousePressEvent(QMouseEvent*) override;
-	void mouseMoveEvent(QMouseEvent*) override;
-	void mouseReleaseEvent(QMouseEvent*) override;
-	void focusOutEvent(QFocusEvent*) override;
+ protected:
+  void paintEvent(QPaintEvent*) override;
+  void mousePressEvent(QMouseEvent*) override;
+  void mouseMoveEvent(QMouseEvent*) override;
+  void mouseReleaseEvent(QMouseEvent*) override;
+  void focusOutEvent(QFocusEvent*) override;
 
-private:
-	void update_parents();
+ private:
+  void update_parents();
 
-	bool dragging{false};
+  bool dragging{false};
 
-	bool resizing_workarea{false};
-	bool resizing_workarea_in;
-	long temp_workarea_in;
-	long temp_workarea_out;
-	long sequence_end;
+  bool resizing_workarea{false};
+  bool resizing_workarea_in;
+  long temp_workarea_in;
+  long temp_workarea_out;
+  long sequence_end;
 
-	double zoom{1};
+  double zoom{1};
 
-	long in_visible{0};
+  long in_visible{0};
 
-	void set_playhead(int mouse_x);
+  void set_playhead(int mouse_x);
 
-	int get_marker_offset();
+  int get_marker_offset();
 
-	QFontMetrics fm;
+  QFontMetrics fm;
 
-	int drag_start;
-	bool dragging_markers{false};
-	QVector<int> selected_markers;
-	QVector<long> selected_marker_original_times;
+  int drag_start;
+  bool dragging_markers{false};
+  QVector<int> selected_markers;
+  QVector<long> selected_marker_original_times;
 
-	long getHeaderFrameFromScreenPoint(int x);
-	int getHeaderScreenPointFromFrame(long frame);
+  long getHeaderFrameFromScreenPoint(int x);
+  int getHeaderScreenPointFromFrame(long frame);
 
-	int scroll{0};
+  int scroll{0};
 
-	int height_actual;
-	bool text_enabled;
+  QElapsedTimer snap_elapsed_;
+  bool snap_elapsed_valid_{false};
 
-signals:
+  int height_actual;
+  bool text_enabled;
+
+ signals:
 };
 
-#endif // TIMELINEHEADER_H
+#endif  // TIMELINEHEADER_H

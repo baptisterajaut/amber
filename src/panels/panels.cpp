@@ -20,15 +20,15 @@
 
 #include "panels.h"
 
-#include "engine/sequence.h"
-#include "engine/clip.h"
-#include "effects/transition.h"
-#include "global/config.h"
 #include "effects/effectloaders.h"
+#include "effects/transition.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
+#include "global/config.h"
 #include "global/debug.h"
 
-#include <QScrollBar>
 #include <QCoreApplication>
+#include <QScrollBar>
 
 Project* panel_project = nullptr;
 EffectControls* panel_effect_controls = nullptr;
@@ -37,8 +37,8 @@ Viewer* panel_footage_viewer = nullptr;
 Timeline* panel_timeline = nullptr;
 GraphEditor* panel_graph_editor = nullptr;
 
-void update_ui(bool modified) {
-  if (panel_effect_controls != nullptr) {
+void update_ui(bool modified, bool scrubbing) {
+  if (!scrubbing && panel_effect_controls != nullptr) {
     if (modified) {
       panel_effect_controls->SetClips();
     }
@@ -46,10 +46,10 @@ void update_ui(bool modified) {
   }
   if (panel_timeline != nullptr) panel_timeline->repaint_timeline();
   if (panel_sequence_viewer != nullptr) panel_sequence_viewer->update_viewer();
-  if (panel_graph_editor != nullptr) panel_graph_editor->update_panel();
+  if (!scrubbing && panel_graph_editor != nullptr) panel_graph_editor->update_panel();
 }
 
-QDockWidget *get_focused_panel(bool force_hover) {
+QDockWidget* get_focused_panel(bool force_hover) {
   QDockWidget* w = nullptr;
   if (amber::CurrentConfig.hover_focus || force_hover) {
     if (panel_project->underMouse()) {
@@ -120,8 +120,8 @@ void scroll_to_frame_internal(QScrollBar* bar, long frame, double zoom, int area
   }
 
   int screen_point = getScreenPointFromFrame(zoom, frame) - bar->value();
-  int min_x = area_width*0.1;
-  int max_x = area_width-min_x;
+  int min_x = area_width * 0.1;
+  int max_x = area_width - min_x;
   if (screen_point < min_x) {
     bar->setValue(getScreenPointFromFrame(zoom, frame) - min_x);
   } else if (screen_point > max_x) {

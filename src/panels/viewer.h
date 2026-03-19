@@ -21,38 +21,38 @@
 #ifndef VIEWER_H
 #define VIEWER_H
 
-#include <QTimer>
+#include <QElapsedTimer>
 #include <QIcon>
 #include <QLabel>
 #include <QPushButton>
+#include <QTimer>
 
+#include "project/media.h"
 #include "timeline/marker.h"
 #include "timeline/mediaimportdata.h"
-#include "project/media.h"
 
-#include "ui/panel.h"
-#include "ui/viewerwidget.h"
-#include "ui/timelinewidget.h"
-#include "ui/timelineheader.h"
 #include "ui/labelslider.h"
+#include "ui/panel.h"
 #include "ui/resizablescrollbar.h"
+#include "ui/timelineheader.h"
+#include "ui/timelinewidget.h"
+#include "ui/viewerwidget.h"
 
 bool frame_rate_is_droppable(double rate);
 long timecode_to_frame(const QString& s, int view, double frame_rate);
 QString frame_to_timecode(long f, int view, double frame_rate);
 
-class Viewer : public Panel
-{
+class Viewer : public Panel {
   Q_OBJECT
 
-public:
-  explicit Viewer(QWidget *parent = nullptr);
+ public:
+  explicit Viewer(QWidget* parent = nullptr);
   ~Viewer() override;
 
   bool is_focused();
   bool is_main_sequence();
   void set_main_sequence();
-  void set_media(Media *m);
+  void set_media(Media* m);
   void compose();
   void set_playpause_icon(bool play);
   void update_playhead_timecode(long p);
@@ -70,12 +70,11 @@ public:
   // playback functions
   void seek(long p);
   void play(bool in_to_out = false);
-  void pause();
+  void pause(bool clear_buffer = true);
   bool playing{false};
   long playhead_start;
   qint64 start_msecs;
   QTimer playback_updater;
-
 
   void cue_recording(long start, long end, int track);
   void uncue_recording();
@@ -85,7 +84,7 @@ public:
   int recording_track;
 
   void reset_all_audio();
-  void update_parents(bool reload_fx = false);
+  void update_parents(bool reload_fx = false, bool scrubbing = false);
 
   int get_playback_speed();
 
@@ -99,15 +98,14 @@ public:
 
   TimelineHeader* headers;
 
-
-
   void initiate_drag(amber::timeline::MediaImportType drag_type);
 
   void Retranslate() override;
-protected:
-  void resizeEvent(QResizeEvent *event) override;
 
-public slots:
+ protected:
+  void resizeEvent(QResizeEvent* event) override;
+
+ public slots:
   void play_wake();
   void go_to_start();
   void go_to_in();
@@ -123,9 +121,7 @@ public slots:
   void close_media();
   void update_viewer();
 
-
-
-private slots:
+ private slots:
   void update_playhead();
   void timer_update();
   void recording_flasher_update();
@@ -134,8 +130,7 @@ private slots:
   void drag_video_only();
   void drag_audio_only();
 
-private:
-
+ private:
   void update_window_title();
   void clean_created_seq();
   void set_sequence(bool main, SequencePtr s);
@@ -174,6 +169,9 @@ private:
 
   long previous_playhead;
   int playback_speed{0};
+
+  QElapsedTimer scrub_elapsed_;
+  bool scrub_elapsed_valid_{false};
 };
 
-#endif // VIEWER_H
+#endif  // VIEWER_H

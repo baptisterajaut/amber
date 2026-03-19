@@ -280,6 +280,7 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
     reverse_frame->nb_samples = current_audio_freq() * 10;
     av_channel_layout_from_mask(&reverse_frame->ch_layout, clip->sequence->audio_layout);
     av_frame_get_buffer(reverse_frame, 0);
+    memset(reverse_frame->data[0], 0, reverse_frame->linesize[0]);
     queue_.append(reverse_frame);
   }
 

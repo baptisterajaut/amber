@@ -36,6 +36,10 @@ extern "C" {
 #include <QTimer>
 #include <QtMath>
 
+#include "engine/clip.h"
+#include "engine/sequence.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/debug.h"
 #include "global/global.h"
@@ -47,16 +51,12 @@ extern "C" {
 #include "rendering/audio.h"
 #include "rendering/renderfunctions.h"
 #include "timeline.h"
-#include "engine/clip.h"
-#include "engine/sequence.h"
 #include "ui/audiomonitor.h"
 #include "ui/icons.h"
 #include "ui/labelslider.h"
 #include "ui/resizablescrollbar.h"
 #include "ui/timelineheader.h"
 #include "ui/viewercontainer.h"
-#include "engine/undo/undo.h"
-#include "engine/undo/undostack.h"
 
 #define FRAMES_IN_ONE_MINUTE 1798    // 1800 - 2
 #define FRAMES_IN_TEN_MINUTES 17978  // (FRAMES_IN_ONE_MINUTE * 10) - 2
@@ -114,23 +114,29 @@ bool Viewer::is_main_sequence() { return main_sequence; }
 void Viewer::set_main_sequence() { set_sequence(true, amber::ActiveSequence); }
 
 void Viewer::reset_all_audio() {
-  // reset all clip audio
   if (seq != nullptr) {
-    long last_frame = 0;
+    // Compute new buffer reference frame before any reset, so the cacher
+    // sees the updated value when it observes audio_reset_ == true.
+    long new_frame = seq->playhead;
+    if (playback_speed < 0) {
+      long last_frame = 0;
+      for (auto c : seq->clips) {
+        if (c != nullptr) {
+          last_frame = qMax(last_frame, c->timeline_out());
+        }
+      }
+      new_frame = last_frame - new_frame;
+    }
+    clear_audio_ibuffer(new_frame);
+
     for (auto c : seq->clips) {
       if (c != nullptr) {
         c->reset_audio();
-        last_frame = qMax(last_frame, c->timeline_out());
       }
     }
-
-    audio_ibuffer_frame = seq->playhead;
-    if (playback_speed < 0) {
-      audio_ibuffer_frame = last_frame - audio_ibuffer_frame;
-    }
-    audio_ibuffer_timecode = double(audio_ibuffer_frame) / seq->frame_rate;
+  } else {
+    clear_audio_ibuffer();
   }
-  clear_audio_ibuffer();
 }
 
 long timecode_to_frame(const QString& s, int view, double frame_rate) {
@@ -267,7 +273,7 @@ bool frame_rate_is_droppable(double rate) {
 
 void Viewer::seek(long p) {
   if (seq == nullptr) return;
-  pause();
+  pause(false);
   if (main_sequence) {
     seq->playhead = p;
   } else {
@@ -283,9 +289,15 @@ void Viewer::seek(long p) {
     }
   }
   reset_all_audio();
-  if (amber::CurrentConfig.enable_audio_scrubbing) audio_scrub = true;
+  bool fast_scrub = scrub_elapsed_valid_ && scrub_elapsed_.elapsed() < 16;
+  scrub_elapsed_.start();
+  scrub_elapsed_valid_ = true;
+  if (amber::CurrentConfig.enable_audio_scrubbing && !fast_scrub) {
+    audio_scrub_data_ready.store(false);
+    audio_scrub_id.fetch_add(1);
+  }
   last_playhead = seq->playhead;
-  update_parents(update_fx);
+  update_parents(update_fx, true);
 }
 
 void Viewer::go_to_start() {
@@ -421,12 +433,13 @@ void Viewer::play(bool in_to_out) {
 }
 
 void Viewer::play_wake() {
+  if (!playing) return;
   start_msecs = QDateTime::currentMSecsSinceEpoch();
   playback_updater.start();
   if (audio_thread != nullptr) audio_thread->notifyReceiver();
 }
 
-void Viewer::pause() {
+void Viewer::pause(bool clear_buffer) {
   playing = false;
   SetAudioWakeObject(nullptr);
   set_playpause_icon(true);
@@ -434,7 +447,9 @@ void Viewer::pause() {
   playback_speed = 0;
 
   // Flush audio buffer on pause to prevent stale samples from playing
-  clear_audio_ibuffer();
+  if (clear_buffer) {
+    clear_audio_ibuffer();
+  }
 
   // Reset VU meter immediately (null-check: panel_timeline is created after Viewer in alloc_panels)
   if (panel_timeline != nullptr && panel_timeline->audio_monitor != nullptr) {
@@ -500,9 +515,9 @@ void Viewer::update_header_zoom() {
   }
 }
 
-void Viewer::update_parents(bool reload_fx) {
+void Viewer::update_parents(bool reload_fx, bool scrubbing) {
   if (main_sequence) {
-    update_ui(reload_fx);
+    update_ui(reload_fx, scrubbing);
   } else {
     update_viewer();
     panel_timeline->repaint_timeline();
@@ -617,8 +632,10 @@ void Viewer::set_sb_max() {
 }
 
 void Viewer::set_playback_speed(int s) {
+  int clamped = qMin(3, qMax(s, -3));
+  if (clamped == playback_speed) return;  // no change, avoid needless audio reset
   pause();
-  playback_speed = qMin(3, qMax(s, -3));
+  playback_speed = clamped;
   if (playback_speed != 0) {
     play();
   }

@@ -21,12 +21,12 @@
 #ifndef AUDIO_H
 #define AUDIO_H
 
-#include <QVector>
-#include <QThread>
-#include <QWaitCondition>
-#include <QMutex>
-#include <QIODevice>
 #include <QAudioSink>
+#include <QIODevice>
+#include <QMutex>
+#include <QThread>
+#include <QVector>
+#include <QWaitCondition>
 
 #include "core/audio.h"
 #include "engine/sequence.h"
@@ -42,9 +42,15 @@ class AudioSenderThread : public QThread {
   QMutex lock;
  public slots:
   void notifyReceiver();
+
  private:
   QVector<qint16> samples;
   int send_audio_to_output(qint64 offset, int max);
+  bool scrub_grain_active();
+  unsigned current_scrub_id_{0};
+  int scrub_grain_total_{0};
+  int scrub_grain_played_{0};
+  QByteArray staging_buffer_;
 };
 
 extern QAudioSink* audio_output;
@@ -52,7 +58,7 @@ extern QIODevice* audio_io_device;
 extern AudioSenderThread* audio_thread;
 extern bool recording;
 
-void clear_audio_ibuffer();
+void clear_audio_ibuffer(long new_frame = 0);
 
 QObject* GetAudioWakeObject();
 void SetAudioWakeObject(QObject* o);

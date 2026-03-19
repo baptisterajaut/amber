@@ -502,11 +502,11 @@ void ExportThread::Export()
       while (!interrupt_ && file_audio_samples <= (timecode_secs*params_.audio_sampling_rate)) {
 
         // Copy samples from audio buffer to AVFrame
-        int adjusted_read = audio_ibuffer_read%audio_ibuffer_size;
+        int adjusted_read = audio_ibuffer_read.load() % audio_ibuffer_size;
         int copylen = qMin(aframe_bytes, audio_ibuffer_size-adjusted_read);
         memcpy(audio_frame->data[0], audio_ibuffer+adjusted_read, copylen);
         memset(audio_ibuffer+adjusted_read, 0, copylen);
-        audio_ibuffer_read += copylen;
+        audio_ibuffer_read.fetch_add(copylen);
 
         // If we reached the end of the buffer without reaching the end of the frame, do another copy from the start
         // of the buffer
@@ -514,7 +514,7 @@ void ExportThread::Export()
           int remainder_len = aframe_bytes-copylen;
           memcpy(audio_frame->data[0]+copylen, audio_ibuffer, remainder_len);
           memset(audio_ibuffer, 0, remainder_len);
-          audio_ibuffer_read += remainder_len;
+          audio_ibuffer_read.fetch_add(remainder_len);
         }
 
         // Convert raw audio samples to the destination codec's sample format
