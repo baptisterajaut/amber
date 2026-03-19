@@ -143,7 +143,7 @@ MediaPropertiesDialog::MediaPropertiesDialog(QWidget *parent, Media *i) :
 void MediaPropertiesDialog::accept() {
   Footage* f = item->to_footage();
 
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Edit Media Properties"));
 
   // set track enable
   for (int i=0;i<track_list->count();i++) {

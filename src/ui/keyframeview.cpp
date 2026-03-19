@@ -42,6 +42,8 @@
 #include "effects/keyframe.h"
 #include "ui/graphview.h"
 #include "ui/menu.h"
+#include "dialogs/keyframepropertiesdialog.h"
+#include "global/config.h"
 
 KeyframeView::KeyframeView(QWidget *parent) :
   QWidget(parent)
@@ -71,8 +73,17 @@ void KeyframeView::show_context_menu(const QPoint& pos) {
     hold->setData(EFFECT_KEYFRAME_HOLD);
     menu.addSeparator();
     menu.addAction("Graph Editor");
+    menu.addSeparator();
+    QAction* properties = menu.addAction(tr("Properties..."));
+    properties->setData(-2);  // sentinel to distinguish from type actions
 
     connect(&menu, &QMenu::triggered, this, &KeyframeView::menu_set_key_type);
+    connect(properties, &QAction::triggered, this, [this]() {
+      KeyframePropertiesDialog dlg(
+          this, selected_fields, selected_keyframes,
+          amber::ActiveSequence ? amber::ActiveSequence->frame_rate : 30.0);
+      dlg.exec();
+    });
     menu.exec(mapToGlobal(pos));
   }
 }
@@ -81,13 +92,23 @@ void KeyframeView::menu_set_key_type(QAction* a) {
   if (a->data().isNull()) {
     // load graph editor
     panel_graph_editor->show();
+  } else if (a->data().toInt() < 0) {
+    // handled elsewhere (e.g. Properties dialog)
+    return;
   } else {
-    ComboAction* ca = new ComboAction();
+    int new_type = a->data().toInt();
+    ComboAction* ca = new ComboAction(tr("Change Keyframe Type"));
     for (int i=0;i<selected_fields.size();i++) {
       EffectField* f = selected_fields.at(i);
-      ca->append(new SetInt(&f->keyframes[selected_keyframes.at(i)].type, a->data().toInt()));
+      ca->append(new SetInt(&f->keyframes[selected_keyframes.at(i)].type, new_type));
     }
     amber::UndoStack.push(ca);
+
+    // Sticky keyframe type: update config default
+    if (amber::CurrentConfig.sticky_keyframe_type) {
+      amber::CurrentConfig.default_keyframe_type = new_type;
+    }
+
     update_ui(false);
   }
 }
@@ -415,7 +436,7 @@ void KeyframeView::mouseMoveEvent(QMouseEvent* event) {
 
 void KeyframeView::mouseReleaseEvent(QMouseEvent*) {
   if (dragging) {
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Move Keyframe(s)"));
     for (int i=0;i<selected_fields.size();i++) {
       ca->append(new SetLong(
                    &selected_fields.at(i)->keyframes[selected_keyframes.at(i)].time,

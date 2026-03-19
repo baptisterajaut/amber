@@ -393,7 +393,9 @@ void Effect::refresh() {}
 void Effect::FieldChanged() { update_ui(false); }
 
 void Effect::delete_self() {
-  amber::UndoStack.push(new EffectDeleteCommand(this));
+  auto* cmd = new EffectDeleteCommand(this);
+  cmd->setText(tr("Delete Effect"));
+  amber::UndoStack.push(cmd);
   update_ui(true);
 }
 
@@ -404,6 +406,7 @@ void Effect::move_up() {
   }
 
   MoveEffectCommand* command = new MoveEffectCommand();
+  command->setText(tr("Move Effect Up"));
   command->clip = parent_clip;
   command->from = index_of_effect;
   command->to = command->from - 1;
@@ -419,6 +422,7 @@ void Effect::move_down() {
   }
 
   MoveEffectCommand* command = new MoveEffectCommand();
+  command->setText(tr("Move Effect Down"));
   command->clip = parent_clip;
   command->from = index_of_effect;
   command->to = command->from + 1;
@@ -460,7 +464,9 @@ void Effect::load_from_file() {
   if (!file.isEmpty()) {
     QFile file_handle(file);
     if (file_handle.open(QFile::ReadOnly)) {
-      amber::UndoStack.push(new SetEffectData(this, file_handle.readAll()));
+      auto* cmd = new SetEffectData(this, file_handle.readAll());
+      cmd->setText(tr("Load Effect Settings"));
+      amber::UndoStack.push(cmd);
 
       file_handle.close();
 
@@ -955,7 +961,7 @@ void Effect::gizmo_move(EffectGizmo* gizmo, int x_movement, int y_movement, doub
       }
 
       if (done && !gizmo_dragging_actions_.isEmpty()) {
-        ComboAction* ca = new ComboAction();
+        ComboAction* ca = new ComboAction(tr("Move Gizmo"));
 
         for (auto gizmo_dragging_action : gizmo_dragging_actions_) {
           gizmo_dragging_action->SetNewKeyframes();

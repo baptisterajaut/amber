@@ -107,8 +107,16 @@ set(OLIVE_SOURCES
   dialogs/demonotice.h
   dialogs/exportdialog.cpp
   dialogs/exportdialog.h
+  dialogs/exportsavepresetdialog.cpp
+  dialogs/exportsavepresetdialog.h
+  dialogs/footagerelinkdialog.cpp
+  dialogs/footagerelinkdialog.h
+  dialogs/keyframepropertiesdialog.cpp
+  dialogs/keyframepropertiesdialog.h
   dialogs/loaddialog.cpp
   dialogs/loaddialog.h
+  dialogs/markerpropertiesdialog.cpp
+  dialogs/markerpropertiesdialog.h
   dialogs/mediapropertiesdialog.cpp
   dialogs/mediapropertiesdialog.h
   dialogs/newsequencedialog.cpp
@@ -217,6 +225,8 @@ set(OLIVE_SOURCES
   panels/panels.h
   panels/project.cpp
   panels/project.h
+  panels/undohistorypanel.cpp
+  panels/undohistorypanel.h
   panels/timeline.cpp
   panels/timeline_clipboard.cpp
   panels/timeline_splitting.cpp
@@ -271,6 +281,8 @@ set(OLIVE_SOURCES
   ui/clickablelabel.h
   ui/collapsiblewidget.cpp
   ui/collapsiblewidget.h
+  ui/colorlabel.cpp
+  ui/colorlabel.h
   ui/columnedgridlayout.cpp
   ui/columnedgridlayout.h
   ui/colorbutton.cpp

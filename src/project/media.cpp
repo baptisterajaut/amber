@@ -283,7 +283,9 @@ bool Media::setData(int col, const QVariant &value) {
   if (col == 0) {
     QString n = value.toString();
     if (!n.isEmpty() && get_name() != n) {
-      amber::UndoStack.push(new MediaRename(this, value.toString()));
+      auto* cmd = new MediaRename(this, value.toString());
+      cmd->setText(QObject::tr("Rename Media"));
+      amber::UndoStack.push(cmd);
       return true;
     }
   }

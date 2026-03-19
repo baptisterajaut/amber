@@ -580,13 +580,16 @@ void ViewerWidget::mouseReleaseEvent(QMouseEvent* event) {
       if (g.position < 0 || g.position > max_val) {
         // Dragged off-screen → restore then push delete action
         g.position = dragging_guide_old_pos_;
-        amber::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), dragging_guide_index_));
+        auto* cmd = new DeleteGuideAction(viewer->seq.get(), dragging_guide_index_);
+        cmd->setText(tr("Delete Guide"));
+        amber::UndoStack.push(cmd);
       } else if (g.position != dragging_guide_old_pos_) {
         // Moved to a new position → restore then push move action
         int new_pos = g.position;
         g.position = dragging_guide_old_pos_;
-        amber::UndoStack.push(
-            new MoveGuideAction(viewer->seq.get(), dragging_guide_index_, dragging_guide_old_pos_, new_pos));
+        auto* cmd = new MoveGuideAction(viewer->seq.get(), dragging_guide_index_, dragging_guide_old_pos_, new_pos);
+        cmd->setText(tr("Move Guide"));
+        amber::UndoStack.push(cmd);
       }
     }
     dragging_guide_index_ = -1;
@@ -829,7 +832,9 @@ int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) cons
 
 void ViewerWidget::guide_action_delete() {
   if (hovered_guide_index_ < 0 || viewer->seq == nullptr) return;
-  amber::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), hovered_guide_index_));
+  auto* cmd = new DeleteGuideAction(viewer->seq.get(), hovered_guide_index_);
+  cmd->setText(tr("Delete Guide"));
+  amber::UndoStack.push(cmd);
   hovered_guide_index_ = -1;
   update();
 }
@@ -841,12 +846,14 @@ void ViewerWidget::guide_action_mirror() {
   if (was_mirrored && hovered_mirror_side_) {
     int dim = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
     int mirror_pos = dim - g.position;
-    auto* combo = new ComboAction();
+    auto* combo = new ComboAction(tr("Toggle Mirror"));
     combo->append(new MoveGuideAction(viewer->seq.get(), hovered_guide_index_, g.position, mirror_pos));
     combo->append(new SetGuideMirrorAction(viewer->seq.get(), hovered_guide_index_, false));
     amber::UndoStack.push(combo);
   } else {
-    amber::UndoStack.push(new SetGuideMirrorAction(viewer->seq.get(), hovered_guide_index_, !was_mirrored));
+    auto* cmd = new SetGuideMirrorAction(viewer->seq.get(), hovered_guide_index_, !was_mirrored);
+    cmd->setText(tr("Toggle Mirror"));
+    amber::UndoStack.push(cmd);
   }
   update();
 }
@@ -868,7 +875,9 @@ void ViewerWidget::show_guide_context_menu(int guide_index, const QPoint& global
     int val = QInputDialog::getInt(this, tr("Set Guide Value"), tr("Position (pixels):"), display_pos, 0, dim, 1, &ok);
     if (ok && val != display_pos) {
       int new_primary = (on_mirror && g.mirror) ? (dim - val) : val;
-      amber::UndoStack.push(new MoveGuideAction(viewer->seq.get(), guide_index, g.position, new_primary));
+      auto* cmd = new MoveGuideAction(viewer->seq.get(), guide_index, g.position, new_primary);
+      cmd->setText(tr("Set Guide Value"));
+      amber::UndoStack.push(cmd);
       update();
     }
   } else if (selected == mirror_action) {
@@ -878,16 +887,20 @@ void ViewerWidget::show_guide_context_menu(int guide_index, const QPoint& global
       // Unchecking mirror from the mirror side: move primary to mirror position, then disable mirror
       int dim = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
       int mirror_pos = dim - g.position;
-      auto* combo = new ComboAction();
+      auto* combo = new ComboAction(tr("Toggle Mirror"));
       combo->append(new MoveGuideAction(viewer->seq.get(), guide_index, g.position, mirror_pos));
       combo->append(new SetGuideMirrorAction(viewer->seq.get(), guide_index, false));
       amber::UndoStack.push(combo);
     } else {
-      amber::UndoStack.push(new SetGuideMirrorAction(viewer->seq.get(), guide_index, !was_mirrored));
+      auto* cmd = new SetGuideMirrorAction(viewer->seq.get(), guide_index, !was_mirrored);
+      cmd->setText(tr("Toggle Mirror"));
+      amber::UndoStack.push(cmd);
     }
     update();
   } else if (selected == delete_guide) {
-    amber::UndoStack.push(new DeleteGuideAction(viewer->seq.get(), guide_index));
+    auto* cmd = new DeleteGuideAction(viewer->seq.get(), guide_index);
+    cmd->setText(tr("Delete Guide"));
+    amber::UndoStack.push(cmd);
     update();
   }
 }
@@ -911,7 +924,9 @@ void ViewerWidget::finish_guide_creation() {
       Guide g;
       g.orientation = creating_guide_orientation_;
       g.position = creating_guide_pos_;
-      amber::UndoStack.push(new AddGuideAction(viewer->seq.get(), g));
+      auto* cmd = new AddGuideAction(viewer->seq.get(), g);
+      cmd->setText(tr("Add Guide"));
+      amber::UndoStack.push(cmd);
     }
   }
   creating_guide_ = false;

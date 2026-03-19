@@ -99,7 +99,7 @@ void EffectControls::set_zoom(bool in) {
 }
 
 void EffectControls::menu_select(QAction* q) {
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Add Effect"));
   for (auto c : selected_clips_) {
     if ((c->track() < 0) == (effect_menu_subtype == EFFECT_TYPE_VIDEO)) {
       const EffectMeta* meta = reinterpret_cast<const EffectMeta*>(q->data().value<quintptr>());
@@ -152,7 +152,7 @@ void EffectControls::copy(bool del) {
 
   ComboAction* ca = nullptr;
   if (del) {
-    ca = new ComboAction();
+    ca = new ComboAction(tr("Cut Effect(s)"));
   }
 
   for (auto open_effect : open_effects_) {
@@ -582,7 +582,7 @@ void EffectControls::DeleteEffect(ComboAction* ca, Effect* effect_ref) {
 }
 
 void EffectControls::DeleteSelectedEffects() {
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Delete Effect(s)"));
 
   for (auto open_effect : open_effects_) {
     if (open_effect->IsSelected()) {

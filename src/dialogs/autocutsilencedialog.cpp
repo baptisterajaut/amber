@@ -121,7 +121,7 @@ void AutoCutSilenceDialog::accept() {
 void AutoCutSilenceDialog::cut_silence() {
   if (amber::ActiveSequence == nullptr) return;
 
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Auto-Cut Silence"));
 
   // Loop over clips provided to this dialog
   for (int j : clips_) {

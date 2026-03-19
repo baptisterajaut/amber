@@ -8,6 +8,7 @@
 struct Marker {
   long frame;
   QString name;
+  int color_label{0};
 };
 
 #endif  // CORE_MARKER_H

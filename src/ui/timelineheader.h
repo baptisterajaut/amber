@@ -57,6 +57,7 @@ class TimelineHeader : public QWidget {
   void mousePressEvent(QMouseEvent*) override;
   void mouseMoveEvent(QMouseEvent*) override;
   void mouseReleaseEvent(QMouseEvent*) override;
+  void mouseDoubleClickEvent(QMouseEvent*) override;
   void focusOutEvent(QFocusEvent*) override;
 
  private:

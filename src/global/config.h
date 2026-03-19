@@ -620,6 +620,59 @@ struct Config {
   bool lock_guides{false};
 
   /**
+   * @brief Show color labels on clips and markers
+   *
+   * **TRUE** if clips and markers should display their assigned color label
+   * instead of the default track color.
+   */
+  bool show_color_labels{false};
+
+  /**
+   * @brief Default still image length
+   *
+   * The default duration in frames for still image clips imported into the timeline.
+   */
+  int default_still_length{100};
+
+  /**
+   * @brief Sticky keyframe type
+   *
+   * When **TRUE**, changing a keyframe's type in the properties dialog also updates
+   * `default_keyframe_type`, so newly created keyframes inherit the last-used type.
+   */
+  bool sticky_keyframe_type{true};
+
+  /**
+   * @brief Default keyframe interpolation type
+   *
+   * The interpolation type used when creating new keyframes.
+   * 0 = Linear, 1 = Bezier, 2 = Hold (matches EffectKeyframeType enum).
+   */
+  int default_keyframe_type{0};
+
+  /**
+   * @brief Enable auto-recovery
+   *
+   * **TRUE** if Olive should periodically save an auto-recovery file.
+   */
+  bool autorecovery_enabled{true};
+
+  /**
+   * @brief Auto-recovery interval in minutes
+   *
+   * How often (in minutes) Olive should save an auto-recovery file.
+   */
+  int autorecovery_interval{5};
+
+  /**
+   * @brief Maximum number of auto-recovery versions to keep
+   *
+   * Forward-compatible placeholder. Currently only a single autorecovery.ove file is used.
+   * Versioned autorecovery files are not yet implemented.
+   */
+  int autorecovery_max{5};
+
+  /**
    * @brief Load config from file
    *
    * Load configuration parameters from file

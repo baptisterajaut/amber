@@ -168,7 +168,7 @@ void TimelineWidget::drawClips(QPainter& p) {
         if (actual_clip_rect.right() > width()) actual_clip_rect.setRight(width());
         if (actual_clip_rect.y() < 0) actual_clip_rect.setY(0);
         if (actual_clip_rect.bottom() > height()) actual_clip_rect.setBottom(height());
-        p.fillRect(actual_clip_rect, (clip->enabled()) ? clip->color() : QColor(96, 96, 96));
+        p.fillRect(actual_clip_rect, (clip->enabled()) ? clip->display_color() : QColor(96, 96, 96));
 
         int thumb_x = clip_rect.x() + 1;
 
@@ -312,7 +312,8 @@ void TimelineWidget::drawClips(QPainter& p) {
           long marker_time = m.frame + clip->timeline_in() - clip->clip_in();
           int marker_x = panel_timeline->getTimelineScreenPointFromFrame(marker_time);
           if (marker_x > clip_rect.x() && marker_x < clip_rect.right()) {
-            draw_marker(p, marker_x, clip_rect.bottom()-p.fontMetrics().height(), clip_rect.bottom(), false);
+            draw_marker(p, marker_x, clip_rect.bottom() - p.fontMetrics().height(), clip_rect.bottom(), false,
+                        m.color_label);
           }
         }
         p.setBrush(Qt::NoBrush);

@@ -196,7 +196,7 @@ void Timeline::create_ghosts_from_media(Sequence* seq, long entry_point, QVector
       case MEDIA_TYPE_FOOTAGE:
         // is video source a still image?
         if (m->video_tracks.size() > 0 && m->video_tracks.at(0).infinite_length && m->audio_tracks.size() == 0) {
-          g.out = g.in + 100;
+          g.out = g.in + amber::CurrentConfig.default_still_length;
         } else {
           long length = m->get_length_in_frames(seq->frame_rate);
           g.out = entry_point + length - default_clip_in;
@@ -329,7 +329,7 @@ void Timeline::add_clips_from_ghosts(ComboAction* ca, Sequence* s) {
 }
 
 void Timeline::add_transition() {
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Add Transition"));
   bool adding = false;
 
   for (const auto & clip : amber::ActiveSequence->clips) {
@@ -378,7 +378,7 @@ void Timeline::nest() {
         earliest_point = qMin(amber::ActiveSequence->clips.at(selected_clip)->timeline_in(), earliest_point);
       }
 
-      ComboAction* ca = new ComboAction();
+      ComboAction* ca = new ComboAction(tr("Nest Clip(s)"));
 
       // create "nest" sequence with the same attributes as the current sequence
       SequencePtr s = std::make_shared<Sequence>();
@@ -551,7 +551,7 @@ void Timeline::delete_in_out_internal(bool ripple) {
       s.track = i;
       areas.append(s);
     }
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(ripple ? tr("Ripple Delete In/Out") : tr("Delete In/Out"));
     delete_areas_and_relink(ca, areas, true);
     if (ripple) ripple_clips(ca,
                              amber::ActiveSequence.get(),
@@ -572,6 +572,7 @@ void Timeline::toggle_enable_on_selected_clips() {
     if (!selected_clips.isEmpty()) {
       // if clips are selected, create an undoable action
       SetClipProperty* set_action = new SetClipProperty(kSetClipPropertyEnabled);
+      set_action->setText(tr("Toggle Clip(s)"));
 
       // add each selected clip to the action
       for (auto c : selected_clips) {
@@ -590,7 +591,7 @@ void Timeline::delete_selection(QVector<Selection>& selections, bool ripple_dele
     panel_graph_editor->set_row(nullptr);
     panel_effect_controls->Clear(true);
 
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(ripple_delete ? tr("Ripple Delete") : tr("Delete"));
 
     // delete the areas currently selected by `selections`
     // if we're ripple deleting, we don't want to delete the selections since we still need them for the ripple
@@ -860,7 +861,7 @@ void Timeline::edit_to_point_internal(bool in, bool ripple) {
       next_cut = qMin(sequence_end, next_cut);
 
       QVector<Selection> areas;
-      ComboAction* ca = new ComboAction();
+      ComboAction* ca = new ComboAction(ripple ? tr("Ripple Edit") : tr("Trim"));
       bool push_undo = true;
       long seek = amber::ActiveSequence->playhead;
 
@@ -1074,6 +1075,7 @@ void Timeline::edit_to_out_point() {
 
 void Timeline::toggle_links() {
   LinkCommand* command = new LinkCommand();
+  command->setText(tr("Toggle Links"));
   command->s = amber::ActiveSequence.get();
   for (int i=0;i<amber::ActiveSequence->clips.size();i++) {
     Clip* c = amber::ActiveSequence->clips.at(i).get();

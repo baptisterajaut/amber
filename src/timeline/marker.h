@@ -29,7 +29,7 @@
 class Sequence;
 using SequencePtr = std::shared_ptr<Sequence>;
 
-void draw_marker(QPainter& p, int x, int y, int bottom, bool selected);
+void draw_marker(QPainter& p, int x, int y, int bottom, bool selected, int color_label = 0);
 
 void set_marker_internal(Sequence *seq, const QVector<int>& clips);
 void set_marker_internal(Sequence* seq);

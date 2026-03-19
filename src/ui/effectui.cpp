@@ -155,7 +155,9 @@ EffectUI::EffectUI(Effect* e) :
     cw->setEnabled(b);
   });
   connect(chk, &QCheckBox::toggled, this, [e](bool checked) {
-    amber::UndoStack.push(new SetEffectEnabled(e, checked));
+    auto* cmd = new SetEffectEnabled(e, checked);
+    cmd->setText(checked ? QObject::tr("Enable Effect") : QObject::tr("Disable Effect"));
+    amber::UndoStack.push(cmd);
     update_ui(false);
   });
 }

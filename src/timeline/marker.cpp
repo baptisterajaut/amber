@@ -21,6 +21,7 @@
 #include "marker.h"
 
 #include "global/config.h"
+#include "ui/colorlabel.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
 #include "ui/mainwindow.h"
@@ -32,17 +33,15 @@
 #include <QInputDialog>
 #include <QCoreApplication>
 
-void draw_marker(QPainter &p, int x, int y, int bottom, bool selected) {
-  const QPoint points[5] = {
-    QPoint(x, bottom),
-    QPoint(x + MARKER_SIZE, bottom - MARKER_SIZE),
-    QPoint(x + MARKER_SIZE, y),
-    QPoint(x - MARKER_SIZE, y),
-    QPoint(x - MARKER_SIZE, bottom - MARKER_SIZE)
-  };
+void draw_marker(QPainter& p, int x, int y, int bottom, bool selected, int color_label) {
+  const QPoint points[5] = {QPoint(x, bottom), QPoint(x + MARKER_SIZE, bottom - MARKER_SIZE),
+                             QPoint(x + MARKER_SIZE, y), QPoint(x - MARKER_SIZE, y),
+                             QPoint(x - MARKER_SIZE, bottom - MARKER_SIZE)};
   p.setPen(Qt::black);
   if (selected) {
     p.setBrush(QColor(208, 255, 208));
+  } else if (amber::CurrentConfig.show_color_labels && color_label > 0) {
+    p.setBrush(amber::GetColorLabel(color_label));
   } else {
     p.setBrush(QColor(128, 224, 128));
   }
@@ -73,7 +72,7 @@ void set_marker_internal(Sequence* seq, const QVector<int>& clips) {
   // if we've decided to add a marker
   if (add_marker) {
 
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(QCoreApplication::translate("Marker", "Add Marker"));
 
     if (clips.size() > 0) {
 

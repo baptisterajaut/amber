@@ -372,7 +372,7 @@ void insert_clips(ComboAction* ca) {
 
 void TimelineWidget::dropEvent(QDropEvent* event) {
   if (panel_timeline->importing && panel_timeline->ghosts.size() > 0) {
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Add Clip(s)"));
 
     Sequence* s = amber::ActiveSequence.get();
 
@@ -1268,13 +1268,17 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
 
       if (panel_timeline->creating) {
         push_undo = mouseReleaseCreating(ca, shift);
+        if (push_undo) ca->setText(tr("Create Clip"));
       } else if (panel_timeline->moving_proc) {
         push_undo = mouseReleaseMoving(ca, alt, ctrl);
+        if (push_undo) ca->setText(tr("Move Clip(s)"));
       } else if (panel_timeline->selecting || panel_timeline->rect_select_proc) {
       } else if (panel_timeline->transition_tool_proc) {
         push_undo = mouseReleaseTransition(ca);
+        if (push_undo) ca->setText(tr("Add Transition"));
       } else if (panel_timeline->splitting) {
         push_undo = mouseReleaseSplitting(ca, alt);
+        if (push_undo) ca->setText(tr("Split Clip(s)"));
       }
 
       // remove duplicate selections
@@ -1288,6 +1292,7 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
       }
 
       if (push_undo) {
+        if (ca->text().isEmpty()) ca->setText(tr("Select"));
         amber::UndoStack.push(ca);
       } else {
         delete ca;

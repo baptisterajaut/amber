@@ -25,6 +25,7 @@
 #include "grapheditor.h"
 #include "project.h"
 #include "timeline.h"
+#include "undohistorypanel.h"
 #include "viewer.h"
 
 extern Project* panel_project;
@@ -33,6 +34,7 @@ extern Viewer* panel_sequence_viewer;
 extern Viewer* panel_footage_viewer;
 extern Timeline* panel_timeline;
 extern GraphEditor* panel_graph_editor;
+extern UndoHistoryPanel* panel_undo_history;
 
 void update_ui(bool modified, bool scrubbing = false);
 QDockWidget* get_focused_panel(bool force_hover = false);

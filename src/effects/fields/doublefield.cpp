@@ -118,6 +118,7 @@ void DoubleField::UpdateFromWidget(double d)
 
   if (!ls->IsDragging() && kdc_ != nullptr) {
     kdc_->SetNewKeyframes();
+    kdc_->setText(QObject::tr("Change Value"));
 
     amber::UndoStack.push(kdc_);
 

@@ -55,6 +55,7 @@
 #include "panels/panels.h"
 #include "ui/columnedgridlayout.h"
 #include "ui/mainwindow.h"
+#include "ui/labelslider.h"
 #include "dialogs/newsequencedialog.h"
 
 KeySequenceEditor::KeySequenceEditor(QWidget* parent, QAction* a)
@@ -272,7 +273,14 @@ void PreferencesDialog::accept() {
 
   amber::CurrentConfig.effect_textbox_lines = effect_textbox_lines_field->value();
   amber::CurrentConfig.frame_skip_step = frame_skip_step_field->value();
+  amber::CurrentConfig.default_still_length = static_cast<int>(default_still_length_slider->value());
+  amber::CurrentConfig.autorecovery_enabled = autorecovery_enabled_check->isChecked();
+  amber::CurrentConfig.autorecovery_interval = static_cast<int>(autorecovery_interval_slider->value());
+  amber::CurrentConfig.autorecovery_max = static_cast<int>(autorecovery_max_slider->value());
+  amber::Global->reconfigure_autorecovery();
   amber::CurrentConfig.snap_outgoing_modifier = snap_outgoing_modifier_combo->currentIndex();
+  amber::CurrentConfig.sticky_keyframe_type = sticky_keyframe_type_check->isChecked();
+  amber::CurrentConfig.default_keyframe_type = default_keyframe_type_combo->currentData().toInt();
   amber::CurrentConfig.language_file = language_combobox->currentData().toString();
 
   amber::CurrentConfig.default_sequence_width = default_sequence.width;
@@ -574,6 +582,20 @@ void PreferencesDialog::setup_ui() {
 
   row++;
 
+  // General -> Default Still Image Length
+  general_layout->addWidget(new QLabel(tr("Default Still Image Length:"), this), row, 0);
+  default_still_length_slider = new LabelSlider(this);
+  default_still_length_slider->SetDisplayType(LabelSlider::FrameNumber);
+  default_still_length_slider->SetMinimum(1);
+  default_still_length_slider->SetMaximum(9999);
+  default_still_length_slider->SetValue(amber::CurrentConfig.default_still_length);
+  if (amber::ActiveSequence != nullptr) {
+    default_still_length_slider->SetFrameRate(amber::ActiveSequence->frame_rate);
+  }
+  general_layout->addWidget(default_still_length_slider, row, 1, 1, 4);
+
+  row++;
+
   // General -> Use Software Fallbacks When Possible
   QCheckBox* use_software_fallbacks_checkbox = new QCheckBox(tr("Use Software Fallbacks When Possible"));
   AddBoolPair(use_software_fallbacks_checkbox, &amber::CurrentConfig.use_software_fallback, true);
@@ -593,6 +615,39 @@ void PreferencesDialog::setup_ui() {
   QPushButton* default_sequence_settings = new QPushButton(tr("Default Sequence Settings"));
   connect(default_sequence_settings, &QPushButton::clicked, this, &PreferencesDialog::edit_default_sequence_settings);
   general_layout->addWidget(default_sequence_settings);
+
+  row++;
+
+  // General -> Auto-Recovery
+  QGroupBox* autorecovery_group = new QGroupBox(tr("Auto-Recovery"), this);
+  QGridLayout* ar_grid = new QGridLayout(autorecovery_group);
+
+  autorecovery_enabled_check = new QCheckBox(tr("Enable Auto-Recovery"), this);
+  autorecovery_enabled_check->setChecked(amber::CurrentConfig.autorecovery_enabled);
+  ar_grid->addWidget(autorecovery_enabled_check, 0, 0, 1, 2);
+
+  ar_grid->addWidget(new QLabel(tr("Interval (minutes):"), this), 1, 0);
+  autorecovery_interval_slider = new LabelSlider(this);
+  autorecovery_interval_slider->SetMinimum(1);
+  autorecovery_interval_slider->SetMaximum(60);
+  autorecovery_interval_slider->SetValue(amber::CurrentConfig.autorecovery_interval);
+  autorecovery_interval_slider->setEnabled(amber::CurrentConfig.autorecovery_enabled);
+  ar_grid->addWidget(autorecovery_interval_slider, 1, 1);
+
+  ar_grid->addWidget(new QLabel(tr("Maximum Versions:"), this), 2, 0);
+  autorecovery_max_slider = new LabelSlider(this);
+  autorecovery_max_slider->SetMinimum(1);
+  autorecovery_max_slider->SetMaximum(20);
+  autorecovery_max_slider->SetValue(amber::CurrentConfig.autorecovery_max);
+  autorecovery_max_slider->setEnabled(amber::CurrentConfig.autorecovery_enabled);
+  ar_grid->addWidget(autorecovery_max_slider, 2, 1);
+
+  connect(autorecovery_enabled_check, &QCheckBox::toggled,
+          autorecovery_interval_slider, &QWidget::setEnabled);
+  connect(autorecovery_enabled_check, &QCheckBox::toggled,
+          autorecovery_max_slider, &QWidget::setEnabled);
+
+  general_layout->addWidget(autorecovery_group, row, 0, 1, 5);
 
   tabWidget->addTab(general_tab, tr("General"));
 
@@ -695,6 +750,32 @@ void PreferencesDialog::setup_ui() {
   frame_skip_layout->addWidget(frame_skip_step_field);
   frame_skip_layout->addStretch();
   behavior_tab_layout->Add(frame_skip_row);
+
+  // Keyframe defaults
+  QWidget* keyframe_defaults_row = new QWidget(behavior_tab);
+  QHBoxLayout* kf_layout = new QHBoxLayout(keyframe_defaults_row);
+  kf_layout->setContentsMargins(0, 0, 0, 0);
+
+  sticky_keyframe_type_check = new QCheckBox(tr("Use Last Keyframe Type as Default"), behavior_tab);
+  sticky_keyframe_type_check->setToolTip(tr("When enabled, changing a keyframe's type also updates the default type for new keyframes"));
+  sticky_keyframe_type_check->setChecked(amber::CurrentConfig.sticky_keyframe_type);
+  kf_layout->addWidget(sticky_keyframe_type_check);
+
+  kf_layout->addWidget(new QLabel(tr("Default Type:"), behavior_tab));
+  default_keyframe_type_combo = new QComboBox(behavior_tab);
+  default_keyframe_type_combo->addItem(tr("Linear"), 0);
+  default_keyframe_type_combo->addItem(tr("Bezier"), 1);
+  default_keyframe_type_combo->addItem(tr("Hold"), 2);
+  default_keyframe_type_combo->setCurrentIndex(qBound(0, amber::CurrentConfig.default_keyframe_type, 2));
+  default_keyframe_type_combo->setEnabled(!amber::CurrentConfig.sticky_keyframe_type);
+  kf_layout->addWidget(default_keyframe_type_combo);
+  kf_layout->addStretch();
+
+  connect(sticky_keyframe_type_check, &QCheckBox::toggled, this, [this](bool checked) {
+    default_keyframe_type_combo->setEnabled(!checked);
+  });
+
+  behavior_tab_layout->Add(keyframe_defaults_row);
 
   // Appearance
   QWidget* appearance_tab = new QWidget(this);

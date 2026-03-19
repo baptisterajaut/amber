@@ -47,5 +47,6 @@ void ColorField::UpdateFromWidget(const QColor& c)
   SetValueAt(Now(), c);
 
   kdc->SetNewKeyframes();
+  kdc->setText(QObject::tr("Change Color"));
   amber::UndoStack.push(kdc);
 }

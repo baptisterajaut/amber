@@ -42,6 +42,8 @@ extern "C" {
 #include <libavfilter/avfilter.h>
 }
 
+enum ClipLoopMode { kLoopNone = 0, kLoopLoop = 1, kLoopClamp = 2 };
+
 struct ClipSpeed {
   ClipSpeed();
   double value{1.0};
@@ -62,9 +64,18 @@ public:
   bool IsActiveAt(long timecode);
   bool IsSelected(bool containing = true);
 
-  const QColor& color();
+  const QColor& color() const;
   void set_color(int r, int g, int b);
   void set_color(const QColor& c);
+
+  QColor display_color() const;
+  int color_label() const;
+  void set_color_label(int label);
+  int* color_label_ptr();
+
+  int loop_mode() const;
+  void set_loop_mode(int mode);
+  int* loop_mode_ptr();
 
   Media* media();
   FootageStream* media_stream();
@@ -191,6 +202,8 @@ private:
 
   QVector<Marker> markers;
   QColor color_;
+  int color_label_{0};
+  int loop_mode_{kLoopNone};
   bool open_{false};
   bool cacher_uses_rgba_{false};
 };

@@ -39,6 +39,7 @@
 
 #include "core/appcontext.h"
 #include "dialogs/debugdialog.h"
+#include "dialogs/footagerelinkdialog.h"
 #include "global/config.h"
 #include "global/debug.h"
 #include "global/global.h"
@@ -47,6 +48,7 @@
 #include "panels/panels.h"
 #include "project/projectelements.h"
 #include "project/projectfilter.h"
+#include "project/projectmodel.h"
 #include "project/proxygenerator.h"
 #include "rendering/audio.h"
 #include "rendering/renderfunctions.h"
@@ -144,6 +146,7 @@ void MainWindow::setup_layout(bool reset) {
     panel_effect_controls->raise();
     addDockWidget(Qt::TopDockWidgetArea, panel_sequence_viewer);
     addDockWidget(Qt::BottomDockWidgetArea, panel_timeline);
+    tabifyDockWidget(panel_project, panel_undo_history);
 
     panel_project->show();
     panel_effect_controls->show();
@@ -151,6 +154,7 @@ void MainWindow::setup_layout(bool reset) {
     panel_sequence_viewer->show();
     panel_timeline->show();
     panel_graph_editor->hide();
+    panel_undo_history->hide();
 
     panel_project->setFloating(false);
     panel_effect_controls->setFloating(false);
@@ -508,6 +512,8 @@ void MainWindow::setup_menus() {
   import_action =
       MenuHelper::create_menu_action(file_menu, "import", panel_project, SLOT(import_dialog()), QKeySequence("Ctrl+I"));
 
+  relink_media_action = MenuHelper::create_menu_action(file_menu, "relinkmedia", this, SLOT(relink_media()));
+
   file_menu->addSeparator();
 
   export_action = MenuHelper::create_menu_action(file_menu, "export", amber::Global.get(), SLOT(open_export_dialog()),
@@ -778,6 +784,11 @@ void MainWindow::setup_menus() {
   window_sequenceviewer_action->setCheckable(true);
   window_sequenceviewer_action->setData(reinterpret_cast<quintptr>(panel_sequence_viewer));
 
+  window_undo_history_action =
+      MenuHelper::create_menu_action(window_menu, "panelundohistory", this, SLOT(toggle_panel_visibility()));
+  window_undo_history_action->setCheckable(true);
+  window_undo_history_action->setData(reinterpret_cast<quintptr>(panel_undo_history));
+
   window_menu->addSeparator();
 
   maximize_panel_ =
@@ -852,6 +863,10 @@ void MainWindow::setup_menus() {
   snap_toggle->setCheckable(true);
   snap_toggle->setData(reinterpret_cast<quintptr>(panel_timeline->snappingButton));
 
+  color_labels_toggle =
+      MenuHelper::create_menu_action(tools_menu, "colorlabels", this, SLOT(toggle_color_labels()));
+  color_labels_toggle->setCheckable(true);
+
   tools_menu->addSeparator();
 
   autocut_silence_ = MenuHelper::create_menu_action(tools_menu, "autocutsilence", amber::Global.get(),
@@ -914,6 +929,7 @@ void MainWindow::Retranslate() {
   save_project->setText(tr("&Save Project"));
   save_project_as->setText(tr("Save Project &As"));
   import_action->setText(tr("&Import..."));
+  relink_media_action->setText(tr("Relink Media..."));
   export_action->setText(tr("&Export..."));
   exit_action->setText(tr("E&xit"));
 
@@ -989,6 +1005,7 @@ void MainWindow::Retranslate() {
   window_graph_editor_action->setText(tr("Graph Editor"));
   window_footageviewer_action->setText(tr("Media Viewer"));
   window_sequenceviewer_action->setText(tr("Sequence Viewer"));
+  window_undo_history_action->setText(tr("Undo History"));
 
   maximize_panel_->setText(tr("Maximize Panel"));
   lock_panels_->setText(tr("Lock Panels"));
@@ -1005,6 +1022,7 @@ void MainWindow::Retranslate() {
   hand_tool_action->setText(tr("Hand Tool"));
   transition_tool_action->setText(tr("Transition Tool"));
   snap_toggle->setText(tr("Enable Snapping"));
+  color_labels_toggle->setText(tr("Color Labels"));
   autocut_silence_->setText(tr("Auto-Cut Silence"));
 
   no_autoscroll->setText(tr("No Auto-Scroll"));
@@ -1247,6 +1265,42 @@ void MainWindow::toolMenu_About_To_Be_Shown() {
   amber::MenuHelper.set_int_action_checked(no_autoscroll, amber::CurrentConfig.autoscroll);
   amber::MenuHelper.set_int_action_checked(page_autoscroll, amber::CurrentConfig.autoscroll);
   amber::MenuHelper.set_int_action_checked(smooth_autoscroll, amber::CurrentConfig.autoscroll);
+
+  color_labels_toggle->setChecked(amber::CurrentConfig.show_color_labels);
+}
+
+void MainWindow::toggle_color_labels() {
+  amber::CurrentConfig.show_color_labels = !amber::CurrentConfig.show_color_labels;
+  color_labels_toggle->setChecked(amber::CurrentConfig.show_color_labels);
+  update_ui(false);
+}
+
+static void collect_invalid_footage(Media* parent, QVector<QPair<Media*, Footage*>>& result) {
+  for (int i = 0; i < parent->childCount(); i++) {
+    Media* m = parent->child(i);
+    if (m->get_type() == MEDIA_TYPE_FOOTAGE) {
+      Footage* f = m->to_footage();
+      if (f->invalid) {
+        result.append(qMakePair(m, f));
+      }
+    } else if (m->get_type() == MEDIA_TYPE_FOLDER) {
+      collect_invalid_footage(m, result);
+    }
+  }
+}
+
+void MainWindow::relink_media() {
+  QVector<QPair<Media*, Footage*>> invalid;
+  Media* root = amber::project_model.get_root();
+  if (root != nullptr) {
+    collect_invalid_footage(root, invalid);
+  }
+  if (invalid.isEmpty()) {
+    QMessageBox::information(this, tr("Relink Media"), tr("All media is linked."));
+  } else {
+    FootageRelinkDialog dlg(this, invalid);
+    dlg.exec();
+  }
 }
 
 void MainWindow::toggle_panel_visibility() {

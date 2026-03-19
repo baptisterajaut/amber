@@ -23,6 +23,7 @@
 
 #include <QThread>
 #include <QDir>
+#include <QPair>
 #include <QXmlStreamReader>
 #include <QMutex>
 #include <QWaitCondition>
@@ -45,6 +46,7 @@ signals:
   void success();
   void error();
   void report_progress(int p);
+  void found_invalid_footage(QVector<QPair<Media*, Footage*>> invalid);
 private slots:
   void question_func(const QString &title, const QString &text, int buttons);
   void error_func();

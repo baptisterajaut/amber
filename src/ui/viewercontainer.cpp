@@ -98,13 +98,17 @@ void ViewerContainer::adjust() {
 
       connect(horizontal_ruler, &RulerWidget::guide_created, this, [this](Guide::Orientation o, int pos) {
         if (viewer->seq != nullptr) {
-          amber::UndoStack.push(new AddGuideAction(viewer->seq.get(), {o, pos}));
+          auto* cmd = new AddGuideAction(viewer->seq.get(), {o, pos});
+          cmd->setText(tr("Add Guide"));
+          amber::UndoStack.push(cmd);
           child->update();
         }
       });
       connect(vertical_ruler, &RulerWidget::guide_created, this, [this](Guide::Orientation o, int pos) {
         if (viewer->seq != nullptr) {
-          amber::UndoStack.push(new AddGuideAction(viewer->seq.get(), {o, pos}));
+          auto* cmd = new AddGuideAction(viewer->seq.get(), {o, pos});
+          cmd->setText(tr("Add Guide"));
+          amber::UndoStack.push(cmd);
           child->update();
         }
       });

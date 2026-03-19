@@ -2,6 +2,10 @@
 
 ComboAction::ComboAction() = default;
 
+ComboAction::ComboAction(const QString& text) {
+  setText(text);
+}
+
 ComboAction::~ComboAction() {
     for (auto command : commands) {
         delete command;

@@ -21,6 +21,7 @@
 #ifndef SPEEDDIALOG_H
 #define SPEEDDIALOG_H
 
+#include <QComboBox>
 #include <QDialog>
 #include <QCheckBox>
 
@@ -127,6 +128,11 @@ private:
    * @brief UI widget for setting whether to ripple Clips around these changes or not
    */
   QCheckBox* ripple;
+
+  /**
+   * @brief UI widget for setting the Clip's loop mode (None, Loop, Clamp)
+   */
+  QComboBox* loop_combo_;
 };
 
 #endif // SPEEDDIALOG_H

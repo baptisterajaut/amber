@@ -72,5 +72,6 @@ void BoolField::UpdateFromWidget(bool b)
   SetValueAt(Now(), b);
 
   kdc->SetNewKeyframes();
+  kdc->setText(QObject::tr("Change Value"));
   amber::UndoStack.push(kdc);
 }

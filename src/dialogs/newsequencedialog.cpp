@@ -108,7 +108,7 @@ void NewSequenceDialog::accept() {
     s->audio_frequency = audio_frequency_combobox->currentData().toInt();
     s->audio_layout = AV_CH_LAYOUT_STEREO;
 
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Create Sequence"));
     panel_project->create_sequence_internal(ca, s, true, nullptr);
     amber::UndoStack.push(ca);
 
@@ -116,7 +116,7 @@ void NewSequenceDialog::accept() {
 
     // The dialog was given an existing Sequence object, so we'll apply the changes to it
 
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Edit Sequence"));
 
     double multiplier = frame_rate_combobox->currentData().toDouble() / existing_sequence->frame_rate;
 

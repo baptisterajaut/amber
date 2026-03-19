@@ -38,6 +38,7 @@
 #include "dialogs/aboutdialog.h"
 #include "dialogs/speeddialog.h"
 #include "dialogs/actionsearch.h"
+#include "dialogs/footagerelinkdialog.h"
 #include "dialogs/loaddialog.h"
 #include "dialogs/autocutsilencedialog.h"
 #include "project/loadthread.h"
@@ -103,8 +104,18 @@ void OliveGlobal::check_for_autorecovery_file() {
         OpenProjectWorker(autorecovery_filename, true);
       }
     }
-    autorecovery_timer.setInterval(60000);
+    autorecovery_timer.setInterval(amber::CurrentConfig.autorecovery_interval * 60000);
     QObject::connect(&autorecovery_timer, &QTimer::timeout, this, &OliveGlobal::save_autorecovery_file);
+    if (amber::CurrentConfig.autorecovery_enabled) {
+      autorecovery_timer.start();
+    }
+  }
+}
+
+void OliveGlobal::reconfigure_autorecovery() {
+  autorecovery_timer.stop();
+  if (amber::CurrentConfig.autorecovery_enabled) {
+    autorecovery_timer.setInterval(amber::CurrentConfig.autorecovery_interval * 60000);
     autorecovery_timer.start();
   }
 }
@@ -113,7 +124,7 @@ void OliveGlobal::set_rendering_state(bool rendering) {
   audio_rendering = rendering;
   if (rendering) {
     autorecovery_timer.stop();
-  } else {
+  } else if (amber::CurrentConfig.autorecovery_enabled) {
     autorecovery_timer.start();
   }
 }
@@ -193,6 +204,11 @@ void OliveGlobal::LoadProject(const QString &fn, bool autorecovery)
   connect(lt, &LoadThread::error, &ld, &QDialog::reject);
   connect(lt, &LoadThread::error, this, &OliveGlobal::new_project);
   connect(lt, &LoadThread::report_progress, &ld, &LoadDialog::setValue);
+  connect(lt, &LoadThread::found_invalid_footage, this,
+          [](QVector<QPair<Media*, Footage*>> invalid) {
+            FootageRelinkDialog dlg(amber::MainWindow, invalid);
+            dlg.exec();
+          });
   lt->start();
 
   panel_project->ConnectFilterToModel();

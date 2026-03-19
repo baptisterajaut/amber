@@ -75,5 +75,6 @@ void StringField::UpdateFromWidget(const QString &s)
   SetValueAt(Now(), s);
 
   kdc->SetNewKeyframes();
+  kdc->setText(QObject::tr("Change Value"));
   amber::UndoStack.push(kdc);
 }

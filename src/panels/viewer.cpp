@@ -488,7 +488,9 @@ void Viewer::pause(bool clear_buffer) {
 
       QVector<ClipPtr> add_clips;
       add_clips.append(c);
-      amber::UndoStack.push(new AddClipCommand(seq.get(), add_clips));  // add clip
+      auto* cmd = new AddClipCommand(seq.get(), add_clips);
+      cmd->setText(tr("Add Recorded Clip"));
+      amber::UndoStack.push(cmd);  // add clip
     }
   }
 }
@@ -557,21 +559,27 @@ void Viewer::initiate_drag(amber::timeline::MediaImportType drag_type) {
 
 void Viewer::clear_in() {
   if (seq != nullptr && seq->using_workarea) {
-    amber::UndoStack.push(new SetTimelineInOutCommand(seq.get(), true, 0, seq->workarea_out));
+    auto* cmd = new SetTimelineInOutCommand(seq.get(), true, 0, seq->workarea_out);
+    cmd->setText(tr("Clear In Point"));
+    amber::UndoStack.push(cmd);
     update_parents();
   }
 }
 
 void Viewer::clear_out() {
   if (seq != nullptr && seq->using_workarea) {
-    amber::UndoStack.push(new SetTimelineInOutCommand(seq.get(), true, seq->workarea_in, seq->getEndFrame()));
+    auto* cmd = new SetTimelineInOutCommand(seq.get(), true, seq->workarea_in, seq->getEndFrame());
+    cmd->setText(tr("Clear Out Point"));
+    amber::UndoStack.push(cmd);
     update_parents();
   }
 }
 
 void Viewer::clear_inout_point() {
   if (seq != nullptr && seq->using_workarea) {
-    amber::UndoStack.push(new SetTimelineInOutCommand(seq.get(), false, 0, 0));
+    auto* cmd = new SetTimelineInOutCommand(seq.get(), false, 0, 0);
+    cmd->setText(tr("Clear In/Out"));
+    amber::UndoStack.push(cmd);
     update_parents();
   }
 }
@@ -817,8 +825,7 @@ void Viewer::set_media(Media* m) {
           c->set_timeline_in(0);
           c->set_timeline_out(footage->get_length_in_frames(new_sequence->frame_rate));
           if (c->timeline_out() <= 0) {
-            // FIXME: Move this magic number to Config
-            c->set_timeline_out(150);
+            c->set_timeline_out(amber::CurrentConfig.default_still_length);
           }
           c->set_track(-1);
           c->set_clip_in(0);

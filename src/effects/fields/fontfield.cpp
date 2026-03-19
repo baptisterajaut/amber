@@ -69,5 +69,6 @@ void FontField::UpdateFromWidget(const QString& s)
   SetValueAt(Now(), s);
 
   kdc->SetNewKeyframes();
+  kdc->setText(QObject::tr("Change Font"));
   amber::UndoStack.push(kdc);
 }

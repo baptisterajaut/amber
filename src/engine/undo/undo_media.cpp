@@ -36,19 +36,13 @@ AddMediaCommand::AddMediaCommand(MediaPtr iitem, Media *iparent) :
 }
 
 void AddMediaCommand::doUndo() {
-  if (!parent) {
-    qWarning() << "AddMediaCommand::doUndo: parent is null";
-    return;
-  }
+  // parent == nullptr is valid — means root of project model
   amber::project_model.removeChild(parent, item.get());
   done_ = false;
 }
 
 void AddMediaCommand::doRedo() {
-  if (!parent) {
-    qWarning() << "AddMediaCommand::doRedo: parent is null";
-    return;
-  }
+  // parent == nullptr is valid — appendChild interprets nullptr as root
   if (!done_) {
     amber::project_model.appendChild(parent, item);
     done_ = true;

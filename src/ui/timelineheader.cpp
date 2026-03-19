@@ -27,8 +27,10 @@
 #include <QScrollBar>
 #include <QtMath>
 
+#include "dialogs/markerpropertiesdialog.h"
 #include "engine/sequence.h"
 #include "engine/undo/undo.h"
+#include "engine/undo/undo_generic.h"
 #include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/debug.h"
@@ -38,6 +40,7 @@
 #include "panels/timeline.h"
 #include "panels/viewer.h"
 #include "project/media.h"
+#include "ui/colorlabel.h"
 #include "ui/menu.h"
 #include "ui/menuhelper.h"
 #include "ui/styling.h"
@@ -116,7 +119,9 @@ void TimelineHeader::set_in_point(long new_in) {
     new_out = viewer->seq->getEndFrame();
   }
 
-  amber::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, new_in, new_out));
+  auto* cmd = new SetTimelineInOutCommand(viewer->seq.get(), true, new_in, new_out);
+  cmd->setText(tr("Set In Point"));
+  amber::UndoStack.push(cmd);
   update_parents();
 }
 
@@ -128,7 +133,9 @@ void TimelineHeader::set_out_point(long new_out) {
     new_in = 0;
   }
 
-  amber::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, new_in, new_out));
+  auto* cmd = new SetTimelineInOutCommand(viewer->seq.get(), true, new_in, new_out);
+  cmd->setText(tr("Set Out Point"));
+  amber::UndoStack.push(cmd);
   update_parents();
 }
 
@@ -283,10 +290,12 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
   if (viewer->seq != nullptr) {
     dragging = false;
     if (resizing_workarea) {
-      amber::UndoStack.push(new SetTimelineInOutCommand(viewer->seq.get(), true, temp_workarea_in, temp_workarea_out));
+      auto* cmd = new SetTimelineInOutCommand(viewer->seq.get(), true, temp_workarea_in, temp_workarea_out);
+      cmd->setText(tr("Resize Work Area"));
+      amber::UndoStack.push(cmd);
     } else if (dragging_markers && selected_markers.size() > 0) {
       bool moved = false;
-      ComboAction* ca = new ComboAction();
+      ComboAction* ca = new ComboAction(tr("Move Marker(s)"));
       for (int i = 0; i < selected_markers.size(); i++) {
         Marker* m = &(*viewer->marker_ref)[selected_markers.at(i)];
         if (selected_marker_original_times.at(i) != m->frame) {
@@ -309,6 +318,29 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
   }
 }
 
+void TimelineHeader::mouseDoubleClickEvent(QMouseEvent* event) {
+  if (viewer != nullptr && viewer->seq != nullptr && viewer->marker_ref != nullptr &&
+      event->button() == Qt::LeftButton) {
+    int marker_y = get_marker_offset();
+    if (event->position().toPoint().y() > marker_y) {
+      for (int i = 0; i < viewer->marker_ref->size(); i++) {
+        int marker_pos = getHeaderScreenPointFromFrame(viewer->marker_ref->at(i).frame);
+        if (event->position().toPoint().x() > marker_pos - MARKER_SIZE &&
+            event->position().toPoint().x() < marker_pos + MARKER_SIZE) {
+          QVector<Marker*> ptrs;
+          ptrs.append(&(*viewer->marker_ref)[i]);
+          MarkerPropertiesDialog dlg(this, ptrs, viewer->seq->frame_rate);
+          dlg.exec();
+          update();
+          return;
+        }
+      }
+    }
+  }
+  // If no marker was hit, fall through to default (which triggers mousePressEvent behavior)
+  QWidget::mouseDoubleClickEvent(event);
+}
+
 void TimelineHeader::focusOutEvent(QFocusEvent*) {
   selected_markers.clear();
   update();
@@ -327,6 +359,7 @@ void TimelineHeader::delete_markers() {
   if (selected_markers.size() > 0) {
     // Send command to delete selected markers
     DeleteMarkerAction* dma = new DeleteMarkerAction(viewer->marker_ref);
+    dma->setText(tr("Delete Marker(s)"));
     dma->markers.append(selected_markers);
     amber::UndoStack.push(dma);
 
@@ -450,7 +483,7 @@ void TimelineHeader::paintEvent(QPaintEvent*) {
         }
       }
 
-      draw_marker(p, marker_x, yoff, height() - 1, selected);
+      draw_marker(p, marker_x, yoff, height() - 1, selected, m.color_label);
     }
 
     // draw playhead triangle
@@ -483,6 +516,41 @@ void TimelineHeader::show_context_menu(const QPoint& pos) {
   center_timecodes->setCheckable(true);
   center_timecodes->setChecked(amber::CurrentConfig.center_timeline_timecodes);
   center_timecodes->setData(reinterpret_cast<quintptr>(&amber::CurrentConfig.center_timeline_timecodes));
+
+  if (!selected_markers.isEmpty() && viewer != nullptr && viewer->marker_ref != nullptr) {
+    menu.addSeparator();
+
+    QMenu* color_menu = amber::BuildColorLabelMenu(&menu);
+    connect(color_menu, &QMenu::triggered, this, [this](QAction* action) {
+      int label = action->data().toInt();
+      if (viewer == nullptr || viewer->marker_ref == nullptr) return;
+      ComboAction* ca = new ComboAction(tr("Set Color Label"));
+      for (int idx : selected_markers) {
+        if (idx >= 0 && idx < viewer->marker_ref->size()) {
+          ca->append(new SetInt(&(*viewer->marker_ref)[idx].color_label, label));
+        }
+      }
+      amber::UndoStack.push(ca);
+      update();
+    });
+    menu.addMenu(color_menu);
+
+    QAction* props = menu.addAction(tr("Marker Properties..."));
+    connect(props, &QAction::triggered, this, [this]() {
+      if (viewer == nullptr || viewer->seq == nullptr || viewer->marker_ref == nullptr) return;
+      QVector<Marker*> ptrs;
+      for (int idx : selected_markers) {
+        if (idx >= 0 && idx < viewer->marker_ref->size()) {
+          ptrs.append(&(*viewer->marker_ref)[idx]);
+        }
+      }
+      if (!ptrs.isEmpty()) {
+        MarkerPropertiesDialog dlg(this, ptrs, viewer->seq->frame_rate);
+        dlg.exec();
+        update();
+      }
+    });
+  }
 
   menu.exec(mapToGlobal(pos));
 }

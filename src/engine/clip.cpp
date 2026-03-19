@@ -26,6 +26,7 @@
 #include "effects/transition.h"
 #include "project/footage.h"
 #include "global/config.h"
+#include "ui/colorlabel.h"
 #include "cacher.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
@@ -73,6 +74,8 @@ ClipPtr Clip::copy(Sequence* s) {
   copy->set_autoscaled(autoscaled());
   copy->set_speed(speed());
   copy->set_reversed(reversed());
+  copy->set_color_label(color_label());
+  copy->set_loop_mode(loop_mode());
 
   for (const auto& effect : effects) {
     copy->effects.append(effect->copy(copy.get()));
@@ -103,7 +106,22 @@ bool Clip::IsSelected(bool containing) {
   return this->sequence->IsClipSelected(this, containing);
 }
 
-const QColor& Clip::color() { return color_; }
+const QColor& Clip::color() const { return color_; }
+
+QColor Clip::display_color() const {
+  if (amber::CurrentConfig.show_color_labels && color_label_ > 0) {
+    return amber::GetColorLabel(color_label_);
+  }
+  return color();
+}
+
+int Clip::color_label() const { return color_label_; }
+void Clip::set_color_label(int label) { color_label_ = label; }
+int* Clip::color_label_ptr() { return &color_label_; }
+
+int Clip::loop_mode() const { return loop_mode_; }
+void Clip::set_loop_mode(int mode) { loop_mode_ = mode; }
+int* Clip::loop_mode_ptr() { return &loop_mode_; }
 
 void Clip::set_color(int r, int g, int b) {
   color_.setRed(r);

@@ -27,8 +27,10 @@
 #include "global/global.h"
 #include "panels/panels.h"
 #include "rendering/renderfunctions.h"
+#include "ui/colorlabel.h"
 #include "ui/menuhelper.h"
 #include "ui/menu.h"
+#include "engine/undo/undo_generic.h"
 #include "engine/undo/undostack.h"
 #include "dialogs/newsequencedialog.h"
 #include "dialogs/clippropertiesdialog.h"
@@ -96,6 +98,18 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
       // set autoscale to the first selected clip
       autoscaleAction->setChecked(selected_clips.at(0)->autoscaled());
 
+      QMenu* color_menu = amber::BuildColorLabelMenu(&menu);
+      connect(color_menu, &QMenu::triggered, this, [selected_clips](QAction* action) {
+        int label = action->data().toInt();
+        ComboAction* ca = new ComboAction(QObject::tr("Set Color Label"));
+        for (auto c : selected_clips) {
+          ca->append(new SetInt(c->color_label_ptr(), label));
+        }
+        amber::UndoStack.push(ca);
+        update_ui(false);
+      });
+      menu.addMenu(color_menu);
+
       amber::MenuHelper.make_clip_functions_menu(&menu);
 
       // stabilizer option
@@ -142,6 +156,7 @@ void TimelineWidget::toggle_autoscale() {
 
   if (!selected_clips.isEmpty()) {
     SetClipProperty* action = new SetClipProperty(kSetClipPropertyAutoscale);
+    action->setText(tr("Set Autoscale"));
 
     for (auto c : selected_clips) {
       action->AddSetting(c, !c->autoscaled());

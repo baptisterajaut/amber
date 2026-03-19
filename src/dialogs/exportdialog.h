@@ -123,6 +123,16 @@ private slots:
    */
   void open_advanced_video_dialog();
 
+  /**
+   * @brief Slot for when a preset is selected from the preset combo
+   */
+  void preset_selected(int index);
+
+  /**
+   * @brief Slot for the Save Preset button
+   */
+  void save_preset_clicked();
+
 private:
   /**
    * @brief Function to create UI objects.
@@ -270,6 +280,41 @@ private:
    * @brief Time value set when exporting begins to determine the total duration of the export
    */
   qint64 total_export_time_start;
+
+  /**
+   * @brief ComboBox for selecting an export preset
+   */
+  QComboBox* preset_combo_;
+
+  /**
+   * @brief Returns the directory where export presets are stored
+   */
+  static QString PresetDir();
+
+  /**
+   * @brief Sanitizes a preset name for use as a filename
+   */
+  static QString SanitizePresetName(const QString& name);
+
+  /**
+   * @brief Returns the list of saved preset filenames
+   */
+  QStringList GetPresetList();
+
+  /**
+   * @brief Saves the current export dialog state to an XML preset file
+   */
+  void SavePreset(const QString& name);
+
+  /**
+   * @brief Loads a preset from an XML file and populates the dialog
+   */
+  void LoadPreset(const QString& name);
+
+  /**
+   * @brief Populates the preset combo with "Default" and all saved presets
+   */
+  void PopulatePresetCombo();
 };
 
 #endif // EXPORTDIALOG_H

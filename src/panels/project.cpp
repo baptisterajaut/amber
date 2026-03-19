@@ -307,7 +307,7 @@ SequencePtr create_sequence_from_media(QVector<amber::timeline::MediaImportData>
 void Project::duplicate_selected() {
   QModelIndexList items = get_current_selected();
   bool duped = false;
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Duplicate Sequence"));
   for (const auto& item : items) {
     Media* i = item_to_media(item);
     if (i->get_type() == MEDIA_TYPE_SEQUENCE) {
@@ -339,6 +339,7 @@ void Project::replace_media(MediaPtr item, QString filename) {
   }
   if (!filename.isEmpty()) {
     ReplaceMediaCommand* rmc = new ReplaceMediaCommand(item, filename);
+    rmc->setText(tr("Replace Media"));
     amber::UndoStack.push(rmc);
   }
 }
@@ -384,6 +385,7 @@ void Project::open_properties() {
                                                  QLineEdit::Normal, item->get_name());
         if (!new_name.isEmpty()) {
           MediaRename* mr = new MediaRename(item, new_name);
+          mr->setText(tr("Rename Media"));
           amber::UndoStack.push(mr);
         }
       }
@@ -393,7 +395,9 @@ void Project::open_properties() {
 
 void Project::new_folder() {
   MediaPtr m = create_folder_internal(nullptr);
-  amber::UndoStack.push(new AddMediaCommand(m, get_selected_folder()));
+  auto* cmd = new AddMediaCommand(m, get_selected_folder());
+  cmd->setText(tr("New Folder"));
+  amber::UndoStack.push(cmd);
 
   QModelIndex index = amber::project_model.create_index(m->row(), 0, m.get());
   switch (amber::CurrentConfig.project_view_type) {
@@ -494,7 +498,7 @@ bool delete_clips_in_clipboard_with_media(ComboAction* ca, Media* m) {
 }
 
 void Project::delete_selected_media() {
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Delete Media"));
   QModelIndexList selected_items = get_current_selected();
 
   QList<Media*> items;
@@ -658,7 +662,7 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
 
   bool create_undo_action = (!recursive && replace == nullptr);
   ComboAction* ca = nullptr;
-  if (create_undo_action) ca = new ComboAction();
+  if (create_undo_action) ca = new ComboAction(tr("Import Media"));
 
   // Loop through received files
   for (const auto& i : files) {
@@ -947,7 +951,7 @@ void Project::delete_clips_using_selected_media() {
                           tr("No sequence is active, please open the sequence you want to delete clips from."),
                           QMessageBox::Ok);
   } else {
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Delete Clips"));
     bool deleted = false;
     QModelIndexList items = get_current_selected();
     for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
@@ -999,6 +1003,9 @@ void save_marker(QXmlStreamWriter& stream, const Marker& m) {
   stream.writeStartElement("marker");
   stream.writeAttribute("frame", QString::number(m.frame));
   stream.writeAttribute("name", m.name);
+  if (m.color_label > 0) {
+    stream.writeAttribute("label", QString::number(m.color_label));
+  }
   stream.writeEndElement();
 }
 
@@ -1122,11 +1129,17 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
                 stream.writeAttribute("r", QString::number(c->color().red()));
                 stream.writeAttribute("g", QString::number(c->color().green()));
                 stream.writeAttribute("b", QString::number(c->color().blue()));
+                if (c->color_label() > 0) {
+                  stream.writeAttribute("label", QString::number(c->color_label()));
+                }
 
                 stream.writeAttribute("autoscale", QString::number(c->autoscaled()));
                 stream.writeAttribute("speed", QString::number(c->speed().value, 'f', 10));
                 stream.writeAttribute("maintainpitch", QString::number(c->speed().maintain_audio_pitch));
                 stream.writeAttribute("reverse", QString::number(c->reversed()));
+                if (c->loop_mode() != kLoopNone) {
+                  stream.writeAttribute("loop", QString::number(c->loop_mode()));
+                }
 
                 if (c->media() != nullptr) {
                   stream.writeAttribute("type", QString::number(c->media()->get_type()));

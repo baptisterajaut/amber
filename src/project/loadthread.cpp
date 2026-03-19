@@ -206,6 +206,8 @@ Marker LoadThread::parse_marker(QXmlStreamReader& stream) {
       m.frame = attr.value().toLong();
     } else if (attr.name() == QLatin1String("name")) {
       m.name = attr.value().toString();
+    } else if (attr.name() == QLatin1String("label")) {
+      m.color_label = attr.value().toInt();
     }
   }
   return m;
@@ -394,6 +396,10 @@ void LoadThread::parse_clip_attributes(QXmlStreamReader& stream, ClipPtr c, int&
       speed_info.maintain_audio_pitch = (attr.value() == QLatin1String("1"));
     } else if (attr.name() == QLatin1String("reverse")) {
       c->set_reversed(attr.value() == QLatin1String("1"));
+    } else if (attr.name() == QLatin1String("loop")) {
+      c->set_loop_mode(attr.value().toInt());
+    } else if (attr.name() == QLatin1String("label")) {
+      c->set_color_label(attr.value().toInt());
     } else if (attr.name() == QLatin1String("sequence")) {
       media_type = MEDIA_TYPE_SEQUENCE;
 
@@ -743,7 +749,21 @@ void LoadThread::run() {
   }
 
   if (cont) {
+    // Collect invalid footage (files that couldn't be resolved) before analysis
+    QVector<QPair<Media*, Footage*>> invalid_footage;
+    for (auto loaded_media_item : loaded_media_items) {
+      Footage* f = loaded_media_item->to_footage();
+      if (!QFileInfo::exists(f->url)) {
+        f->invalid = true;
+        invalid_footage.append(qMakePair(loaded_media_item, f));
+      }
+    }
+
     emit success();  // run in main thread
+
+    if (!invalid_footage.isEmpty()) {
+      emit found_invalid_footage(invalid_footage);
+    }
 
     for (auto loaded_media_item : loaded_media_items) {
       PreviewGenerator::AnalyzeMedia(loaded_media_item);

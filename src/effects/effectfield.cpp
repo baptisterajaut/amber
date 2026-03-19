@@ -217,7 +217,7 @@ void EffectField::SetValueAt(double time, const QVariant &value)
       EffectKeyframe key;
       key.time = frame_timecode;
       key.data = value;
-      key.type = (keyframes.isEmpty()) ? EFFECT_KEYFRAME_LINEAR : keyframes.last().type;
+      key.type = (keyframes.isEmpty()) ? amber::CurrentConfig.default_keyframe_type : keyframes.last().type;
       keyframes.append(key);
     } else {
       EffectKeyframe& key = keyframes[keyframe_index];
@@ -254,7 +254,7 @@ void EffectField::PrepareDataForKeyframing(bool enabled, ComboAction *ca)
 
     key.time = NowInFrames();
     key.data = persistent_data_;
-    key.type = EFFECT_KEYFRAME_LINEAR;
+    key.type = amber::CurrentConfig.default_keyframe_type;
 
     keyframes.append(key);
 

@@ -75,6 +75,13 @@ public:
     void check_for_autorecovery_file();
 
     /**
+     * @brief Reconfigure the autorecovery timer based on current config settings
+     *
+     * Called after preferences are changed to update the timer interval and enable/disable state.
+     */
+    void reconfigure_autorecovery();
+
+    /**
      * @brief Set the application state depending on if the user is exporting a video
      *
      * Some background functions shouldn't run while Olive is exporting a video. This function will disable/enable them

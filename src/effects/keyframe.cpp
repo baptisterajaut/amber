@@ -48,7 +48,7 @@ void delete_keyframes(QVector<EffectField *>& selected_key_fields, QVector<int> 
   }
 
   if (fields.size() > 0) {
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(QObject::tr("Delete Keyframe(s)"));
     for (int i=0;i<key_indices.size();i++) {
       ca->append(new KeyframeDelete(fields.at(i), key_indices.at(i)));
     }

@@ -89,7 +89,7 @@ void ClipPropertiesDialog::accept()
   const QString& clip_name = clip_name_field_->text();
   double clip_duration = duration_field_->value();
 
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Edit Clip Properties"));
 
   for (auto clip : clips_) {
     // If the user entered a Clip name and the name is different from the Clip's name, create a rename command

@@ -83,6 +83,9 @@ constexpr BoolEntry kBoolEntries[] = {
     {"LockGuides", &Config::lock_guides},
     {"SnapToOutgoingClip", &Config::snap_to_outgoing_clip},
     {"EffectPanelShrinkable", &Config::effect_panel_shrinkable},
+    {"ShowColorLabels", &Config::show_color_labels},
+    {"AutorecoveryEnabled", &Config::autorecovery_enabled},
+    {"StickyKeyframeType", &Config::sticky_keyframe_type},
 };
 
 constexpr IntEntry kIntEntries[] = {
@@ -103,6 +106,10 @@ constexpr IntEntry kIntEntries[] = {
     {"DefaultSequenceAudioLayout", &Config::default_sequence_audio_channel_layout},
     {"FrameSkipStep", &Config::frame_skip_step},
     {"SnapOutgoingModifier", &Config::snap_outgoing_modifier},
+    {"DefaultStillLength", &Config::default_still_length},
+    {"AutorecoveryInterval", &Config::autorecovery_interval},
+    {"AutorecoveryMax", &Config::autorecovery_max},
+    {"DefaultKeyframeType", &Config::default_keyframe_type},
 };
 
 constexpr DoubleEntry kDoubleEntries[] = {
@@ -258,6 +265,13 @@ void Config::save(QString path) {
   stream.writeTextElement("SnapToOutgoingClip", QString::number(snap_to_outgoing_clip));
   stream.writeTextElement("SnapOutgoingModifier", QString::number(snap_outgoing_modifier));
   stream.writeTextElement("EffectPanelShrinkable", QString::number(effect_panel_shrinkable));
+  stream.writeTextElement("ShowColorLabels", QString::number(show_color_labels));
+  stream.writeTextElement("DefaultStillLength", QString::number(default_still_length));
+  stream.writeTextElement("AutorecoveryEnabled", QString::number(autorecovery_enabled));
+  stream.writeTextElement("AutorecoveryInterval", QString::number(autorecovery_interval));
+  stream.writeTextElement("AutorecoveryMax", QString::number(autorecovery_max));
+  stream.writeTextElement("StickyKeyframeType", QString::number(sticky_keyframe_type));
+  stream.writeTextElement("DefaultKeyframeType", QString::number(default_keyframe_type));
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc

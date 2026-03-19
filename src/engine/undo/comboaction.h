@@ -22,6 +22,7 @@ public:
      * @brief ComboAction Constructor. Currently empty.
      */
     ComboAction();
+    explicit ComboAction(const QString& text);
 
     /**
      * @brief ~ComboAction Destructor. Cleans up all QUndoCommand classes that have been added to it.

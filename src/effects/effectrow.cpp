@@ -79,7 +79,7 @@ void EffectRow::SetKeyframingEnabled(bool enabled) {
 
   if (enabled) {
 
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Enable Keyframes"));
 
     // Enable keyframing setting on this row
     ca->append(new SetIsKeyframing(this, true));
@@ -102,7 +102,7 @@ void EffectRow::SetKeyframingEnabled(bool enabled) {
                                  "Are you sure you want to do this?"),
                               QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes) {
 
-      ComboAction* ca = new ComboAction();
+      ComboAction* ca = new ComboAction(tr("Disable Keyframes"));
 
       // Prepare each field's data to stop keyframing
       for (int i=0;i<FieldCount();i++) {
@@ -178,7 +178,7 @@ void EffectRow::ToggleKeyframe() {
     }
   }
 
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Toggle Keyframe"));
 
   if (key_fields.isEmpty()) {
 

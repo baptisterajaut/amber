@@ -67,5 +67,6 @@ void ComboField::UpdateFromWidget(int index)
   SetValueAt(Now(), items_.at(index).data);
 
   kdc->SetNewKeyframes();
+  kdc->setText(QObject::tr("Change Value"));
   amber::UndoStack.push(kdc);
 }

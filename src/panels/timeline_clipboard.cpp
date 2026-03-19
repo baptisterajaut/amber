@@ -114,7 +114,7 @@ void Timeline::paste(bool insert) {
   if (amber::ActiveSequence == nullptr) return;
   if (clipboard.size() > 0) {
     if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
-      ComboAction* ca = new ComboAction();
+      ComboAction* ca = new ComboAction(tr("Paste"));
 
       // create copies and delete areas that we'll be pasting to
       QVector<Selection> delete_areas;
@@ -182,7 +182,7 @@ void Timeline::paste(bool insert) {
         panel_sequence_viewer->seek(paste_end);
       }
     } else if (clipboard_type == CLIPBOARD_TYPE_EFFECT) {
-      ComboAction* ca = new ComboAction();
+      ComboAction* ca = new ComboAction(tr("Paste Effect(s)"));
 
       bool replace = false;
       bool skip = false;

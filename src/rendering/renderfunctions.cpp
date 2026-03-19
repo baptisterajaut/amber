@@ -882,7 +882,27 @@ long playhead_to_clip_frame(Clip* c, long playhead) {
     qWarning() << "playhead_to_clip_frame: c is null";
     return 0;
   }
-  return (qMax(0L, playhead - c->timeline_in(true)) + c->clip_in(true));
+  long frame = (qMax(0L, playhead - c->timeline_in(true)) + c->clip_in(true));
+
+  // Loop/clamp wrapping
+  long source_length = c->media_length();
+  if (source_length > 0 && frame >= source_length) {
+    long usable = source_length - c->clip_in(true);
+    if (usable > 0) {
+      switch (c->loop_mode()) {
+        case kLoopLoop:
+          frame = c->clip_in(true) + ((frame - c->clip_in(true)) % usable);
+          break;
+        case kLoopClamp:
+          frame = source_length - 1;
+          break;
+        default:  // kLoopNone — existing behavior, returns past-end frame
+          break;
+      }
+    }
+  }
+
+  return frame;
 }
 
 double playhead_to_clip_seconds(Clip* c, long playhead) {

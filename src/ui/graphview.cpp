@@ -756,9 +756,11 @@ void GraphView::mouseMoveEvent(QMouseEvent *event) {
 
 void GraphView::mouseReleaseEvent(QMouseEvent *) {
   if (click_add_proc) {
-    amber::UndoStack.push(new KeyframeAdd(click_add_field, click_add_key));
+    auto* cmd = new KeyframeAdd(click_add_field, click_add_key);
+    cmd->setText(tr("Add Keyframe"));
+    amber::UndoStack.push(cmd);
   } else if (moved_keys && selected_keys.size() > 0) {
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Move Keyframe(s)"));
     switch (current_handle) {
     case kBezierHandleNone:
       for (int i=0;i<selected_keys.size();i++) {
@@ -899,7 +901,7 @@ void GraphView::set_row(EffectRow *r) {
 
 void GraphView::set_selected_keyframe_type(int type) {
   if (selected_keys.size() > 0) {
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Change Keyframe Type"));
     for (int i=0;i<selected_keys.size();i++) {
       EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)];
       ca->append(new SetInt(&key.type, type));

@@ -108,6 +108,7 @@ void ReplaceClipMediaDialog::accept() {
               new_item,
               use_same_media_in_points->isChecked()
               );
+        rcmc->setText(tr("Replace Clip Media"));
 
         for (auto c : amber::ActiveSequence->clips) {
           if (c != nullptr && c->media() == media) {

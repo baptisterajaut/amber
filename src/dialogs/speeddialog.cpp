@@ -76,6 +76,13 @@ SpeedDialog::SpeedDialog(QWidget *parent, QVector<Clip*> clips) : QDialog(parent
   main_layout->addWidget(maintain_pitch);
   main_layout->addWidget(ripple);
 
+  QHBoxLayout* loop_row = new QHBoxLayout();
+  loop_row->addWidget(new QLabel(tr("Loop Mode:"), this));
+  loop_combo_ = new QComboBox(this);
+  loop_combo_->addItems({tr("None"), tr("Loop"), tr("Clamp")});
+  loop_row->addWidget(loop_combo_);
+  main_layout->addLayout(loop_row);
+
   QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
   buttonBox->setCenterButtons(true);
   main_layout->addWidget(buttonBox);
@@ -168,6 +175,23 @@ int SpeedDialog::exec() {
       if (!qIsNaN(current_percent) && !qFuzzyCompare(clip_percent, current_percent)) {
         current_percent = qSNaN();
       }
+    }
+  }
+
+  // populate loop mode combo from clips
+  {
+    int first_loop = clips_.first()->loop_mode();
+    bool mixed = false;
+    for (int i = 1; i < clips_.size(); i++) {
+      if (clips_.at(i)->loop_mode() != first_loop) {
+        mixed = true;
+        break;
+      }
+    }
+    if (mixed) {
+      loop_combo_->setCurrentIndex(-1);  // no selection = mixed
+    } else {
+      loop_combo_->setCurrentIndex(first_loop);
     }
   }
 
@@ -348,7 +372,7 @@ void set_speed(ComboAction* ca, Clip* c, double speed, bool ripple, long& ep, lo
 }
 
 void SpeedDialog::accept() {
-  ComboAction* ca = new ComboAction();
+  ComboAction* ca = new ComboAction(tr("Change Speed"));
 
   // undoable action for setting "maintain audio pitch"
   SetClipProperty* audio_pitch_action = new SetClipProperty(kSetClipPropertyMaintainAudioPitch);
@@ -441,6 +465,15 @@ void SpeedDialog::accept() {
 
   ca->append(reversed_action);
   ca->append(audio_pitch_action);
+
+  // apply loop mode if user made a selection (currentIndex >= 0 means not mixed/unselected)
+  if (loop_combo_->currentIndex() >= 0) {
+    for (auto c : clips_) {
+      if (c->loop_mode() != loop_combo_->currentIndex()) {
+        ca->append(new SetInt(c->loop_mode_ptr(), loop_combo_->currentIndex()));
+      }
+    }
+  }
 
   amber::UndoStack.push(ca);
 

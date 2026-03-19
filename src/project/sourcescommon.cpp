@@ -63,7 +63,7 @@ void SourcesCommon::create_seq_from_selected() {
       media_list.append(project_parent->item_to_media(selected_item));
     }
 
-    ComboAction* ca = new ComboAction();
+    ComboAction* ca = new ComboAction(tr("Create Sequence"));
     SequencePtr s = create_sequence_from_media(media_list);
 
     // add clips to it
@@ -259,7 +259,9 @@ void SourcesCommon::mouseDoubleClickEvent(const QModelIndexList& selected_items)
   } else if (selected_items.size() == 1) {
     Media* media = project_parent->item_to_media(selected_items.at(0));
     if (media->get_type() == MEDIA_TYPE_SEQUENCE) {
-      amber::UndoStack.push(new ChangeSequenceAction(media->to_sequence()));
+      auto* cmd = new ChangeSequenceAction(media->to_sequence());
+      cmd->setText(tr("Open Sequence"));
+      amber::UndoStack.push(cmd);
     } else {
       OpenSelectedMediaInMediaViewer(project_parent->item_to_media(selected_items.at(0)));
     }
@@ -340,6 +342,7 @@ void SourcesCommon::dropEvent(QWidget* parent,
       }
       if (move_items.size() > 0) {
         MediaMove* mm = new MediaMove();
+        mm->setText(tr("Move Media"));
         mm->to = m.get();
         mm->items = move_items;
         amber::UndoStack.push(mm);
@@ -386,6 +389,7 @@ void SourcesCommon::rename_interval() {
 void SourcesCommon::item_renamed(Media* item) {
   if (editing_item == item) {
     MediaRename* mr = new MediaRename(item, "idk");
+    mr->setText(tr("Rename Media"));
     amber::UndoStack.push(mr);
     editing_item = nullptr;
   }

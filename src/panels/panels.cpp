@@ -36,6 +36,7 @@ Viewer* panel_sequence_viewer = nullptr;
 Viewer* panel_footage_viewer = nullptr;
 Timeline* panel_timeline = nullptr;
 GraphEditor* panel_graph_editor = nullptr;
+UndoHistoryPanel* panel_undo_history = nullptr;
 
 void update_ui(bool modified, bool scrubbing) {
   if (!scrubbing && panel_effect_controls != nullptr) {
@@ -99,6 +100,8 @@ void alloc_panels(QWidget* parent) {
   panel_timeline->setObjectName("timeline");
   panel_graph_editor = new GraphEditor(parent);
   panel_graph_editor->setObjectName("graph_editor");
+  panel_undo_history = new UndoHistoryPanel(parent);
+  panel_undo_history->hide();
 }
 
 void free_panels() {
@@ -112,6 +115,8 @@ void free_panels() {
   panel_effect_controls = nullptr;
   delete panel_timeline;
   panel_timeline = nullptr;
+  delete panel_undo_history;
+  panel_undo_history = nullptr;
 }
 
 void scroll_to_frame_internal(QScrollBar* bar, long frame, double zoom, int area_width) {

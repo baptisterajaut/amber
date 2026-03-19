@@ -198,6 +198,11 @@ class MainWindow : public QMainWindow {
   void toggle_panel_visibility();
 
   /**
+   * @brief Open the Relink Media dialog to find missing media files.
+   */
+  void relink_media();
+
+  /**
    * @brief Set panel lock
    *
    * @param locked
@@ -205,6 +210,7 @@ class MainWindow : public QMainWindow {
    * If **TRUE** prevents panels from being moved around. Defaults to **FALSE**.
    */
   void set_panels_locked(bool locked);
+  void toggle_color_labels();
 
  private:
   /**
@@ -240,6 +246,7 @@ class MainWindow : public QMainWindow {
   QAction* save_project;
   QAction* save_project_as;
   QAction* import_action;
+  QAction* relink_media_action;
   QAction* export_action;
   QAction* exit_action;
 
@@ -316,6 +323,7 @@ class MainWindow : public QMainWindow {
   QAction* window_graph_editor_action;
   QAction* window_footageviewer_action;
   QAction* window_sequenceviewer_action;
+  QAction* window_undo_history_action;
 
   QAction* maximize_panel_;
   QAction* lock_panels_;
@@ -333,6 +341,7 @@ class MainWindow : public QMainWindow {
   QAction* hand_tool_action;
   QAction* transition_tool_action;
   QAction* snap_toggle;
+  QAction* color_labels_toggle;
   QAction* rectified_waveforms;
   QAction* autocut_silence_;
   QAction* preferences_action_;

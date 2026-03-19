@@ -37,6 +37,7 @@
 #include "engine/sequence.h"
 
 class KeySequenceEditor;
+class LabelSlider;
 
 /**
  * @brief The PreferencesDialog class
@@ -254,6 +255,36 @@ private:
    * @brief UI widget for selecting the snap outgoing modifier key
    */
   QComboBox* snap_outgoing_modifier_combo;
+
+  /**
+   * @brief UI widget for editing the default still image length
+   */
+  LabelSlider* default_still_length_slider;
+
+  /**
+   * @brief UI widget for enabling/disabling auto-recovery
+   */
+  QCheckBox* autorecovery_enabled_check;
+
+  /**
+   * @brief UI widget for editing the auto-recovery interval
+   */
+  LabelSlider* autorecovery_interval_slider;
+
+  /**
+   * @brief UI widget for editing the maximum number of auto-recovery versions
+   */
+  LabelSlider* autorecovery_max_slider;
+
+  /**
+   * @brief UI widget for sticky keyframe type toggle
+   */
+  QCheckBox* sticky_keyframe_type_check;
+
+  /**
+   * @brief UI widget for default keyframe type selection
+   */
+  QComboBox* default_keyframe_type_combo;
 
   /**
    * @brief Stored default Sequence object
