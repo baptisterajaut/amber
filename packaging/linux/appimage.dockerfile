@@ -6,7 +6,7 @@
 #     --build-arg GIT_HASH=$(git rev-parse --short HEAD) .
 #   docker run --rm -v ./out:/out amber-appimage
 
-ARG VERSION=1.2.0
+ARG VERSION=dev
 
 FROM ubuntu:24.04
 
@@ -69,7 +69,8 @@ WORKDIR /src/build
 
 RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
       -DCMAKE_PREFIX_PATH=${Qt6_DIR} \
-      ${GIT_HASH:+-DGIT_HASH=${GIT_HASH}} .. && \
+      ${GIT_HASH:+-DGIT_HASH=${GIT_HASH}} \
+      -DAMBER_VERSION=${VERSION} .. && \
     make -j$(nproc)
 
 # Remove Qt's FFmpeg media plugin before bundling — we use our own FFmpeg

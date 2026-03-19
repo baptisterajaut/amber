@@ -11,11 +11,13 @@ permissions:
 jobs:
   appimage:
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event.release.tag_name || 'dev' }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Extract version
-        run: echo "VERSION=$(sed -n 's/.*project(.*VERSION \([0-9.]*\).*/\1/p' src/CMakeLists.txt)" >> "$GITHUB_ENV"
+      - name: Strip v prefix
+        run: echo "VERSION=${VERSION#v}" >> "$GITHUB_ENV"
 
       - name: Build AppImage
         run: |
@@ -34,11 +36,13 @@ jobs:
 
   windows:
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event.release.tag_name || 'dev' }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Extract version
-        run: echo "VERSION=$(sed -n 's/.*project(.*VERSION \([0-9.]*\).*/\1/p' src/CMakeLists.txt)" >> "$GITHUB_ENV"
+      - name: Strip v prefix
+        run: echo "VERSION=${VERSION#v}" >> "$GITHUB_ENV"
 
       - name: Build NSIS installer
         run: |
@@ -65,11 +69,13 @@ jobs:
           - runner: macos-15-intel
             arch: x86_64
     runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ github.event.release.tag_name || 'dev' }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Extract version
-        run: echo "VERSION=$(sed -n 's/.*project(.*VERSION \([0-9.]*\).*/\1/p' src/CMakeLists.txt)" >> "$GITHUB_ENV"
+      - name: Strip v prefix
+        run: echo "VERSION=${VERSION#v}" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: brew install qt@6 ffmpeg cmake
@@ -79,7 +85,8 @@ jobs:
           export CMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix ffmpeg)"
           cmake -S src -B build -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
-                -DGIT_HASH=$(git rev-parse --short HEAD)
+                -DGIT_HASH=$(git rev-parse --short HEAD) \
+                -DAMBER_VERSION=${{ env.VERSION }}
           cmake --build build -j$(sysctl -n hw.ncpu)
 
       - name: Create .app bundle

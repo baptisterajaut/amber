@@ -28,12 +28,14 @@ RUN dnf install -y unzip curl && \
     rm -rf /tmp/ffmpeg*
 
 ARG GIT_HASH
+ARG VERSION=dev
 
 COPY src/ /src
 WORKDIR /src/build
 
 RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release \
-      ${GIT_HASH:+-DGIT_HASH=${GIT_HASH}} .. && \
+      ${GIT_HASH:+-DGIT_HASH=${GIT_HASH}} \
+      -DAMBER_VERSION=${VERSION} .. && \
     make -j$(nproc)
 
 # --- Packaging stage ---

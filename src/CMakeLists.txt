@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
-project(amber-editor VERSION 1.2.4 LANGUAGES CXX)
+project(amber-editor LANGUAGES CXX)
+
+set(AMBER_VERSION "dev" CACHE STRING "Application version (pass -DAMBER_VERSION=x.y.z)")
 
 option(BUILD_DOXYGEN "Build Doxygen documentation" OFF)
 
@@ -78,7 +80,7 @@ if(NOT DEFINED GIT_HASH)
     )
   endif()
 endif()
-list(APPEND OLIVE_DEFINITIONS -DAPPVERSION="${PROJECT_VERSION}")
+list(APPEND OLIVE_DEFINITIONS -DAPPVERSION="${AMBER_VERSION}")
 if(DEFINED GIT_HASH)
   message("Amber: git hash = " "${GIT_HASH}")
   list(APPEND OLIVE_DEFINITIONS -DGITHASH="${GIT_HASH}")

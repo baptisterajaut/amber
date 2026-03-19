@@ -23,7 +23,8 @@ sha256sums=('SKIP')
 build() {
   cmake -B build -S amber/src \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DAMBER_VERSION="$pkgver"
   cmake --build build -j$(nproc)
 }
 
