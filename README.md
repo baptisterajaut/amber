@@ -18,7 +18,7 @@ Fork of [Olive Video Editor](https://github.com/olive-editor/olive) `0.1.x`, por
 - Hardware-accelerated video decoding (VAAPI, D3D11VA, VideoToolbox) — enabled by default
 - GPU YUV→RGB conversion via shader (bypasses CPU swscale for YUV420P/NV12)
 - Viewer guides (title-safe, action-safe, custom aspect ratios)
-- More coming — see [ROADMAP.md](ROADMAP.md)
+- Oak backports: undo history panel, marker/keyframe/speed dialogs, footage relink, export presets, color labels, configurable auto-recovery
 
 **Bug fixes:**
 - First-export audio corruption, race conditions, null pointers, memory leaks, Frei0r init, phantom audio on pause, waveform crash, VU meter thread safety, … (probably squashed enough of them for Claude to be declared an ecosystem menace at this point)
@@ -38,7 +38,7 @@ If your GPU is older than OpenGL 3.2 (Intel GMA era), use [version 1.1.0](https:
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for planned work (1.x Oak backports & cleanup → 2.0 GPU-native effects). Previous versions stay supported.
+1.x is feature-complete and in maintenance mode. A massive 2.0 is brewing — GPU-native effects, ShaderToy import, scopes, 3-point editing, rendering pipeline overhaul. See [ROADMAP.md](ROADMAP.md).
 
 ## Packages
 
