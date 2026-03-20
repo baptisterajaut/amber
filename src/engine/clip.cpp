@@ -629,8 +629,21 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
         // YUV->RGB conversion pass (dedicated buffers to avoid shared dynamic buffer hazard)
         {
           int format_type = is_nv12 ? 1 : 0;
+
+          // Determine YUV color space from decoded frame metadata
+          int color_space_val = 0;  // 0 = BT.709 (default)
+          if (frame->colorspace == AVCOL_SPC_BT470BG || frame->colorspace == AVCOL_SPC_SMPTE170M) {
+            color_space_val = 1;  // BT.601
+          } else if (frame->colorspace == AVCOL_SPC_UNSPECIFIED) {
+            // Infer from resolution: SD content (width <= 720) is typically BT.601
+            if (cacher.media_width() <= 720) {
+              color_space_val = 1;  // BT.601
+            }
+          }
+
           QByteArray fragData(16, 0);
           memcpy(fragData.data(), &format_type, 4);
+          memcpy(fragData.data() + 4, &color_space_val, 4);
 
           QRhiBuffer* yuvVbuf =
               rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));

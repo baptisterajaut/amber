@@ -326,6 +326,11 @@ void RenderThread::paint() {
 
   texture_failed = params.texture_failed;
 
+  // On OpenGL, framebuffer readback is bottom-to-top (row 0 = bottom).
+  // The viewer compensates via clipSpaceCorrMatrix() when displaying,
+  // but save-frame and export consume raw pixels and need top-to-bottom order.
+  const bool need_yflip = rhi_->isYUpInFramebuffer();
+
   // Save frame if requested
   if (!save_fn.isEmpty()) {
     if (texture_failed) {
@@ -335,6 +340,13 @@ void RenderThread::paint() {
       if (!data.isEmpty()) {
         QImage img(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height,
                    QImage::Format_RGBA8888);
+        if (need_yflip) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+          img = img.flipped(Qt::Vertical);
+#else
+          img = img.mirrored(false, true);
+#endif
+        }
         img.save(save_fn);
       }
       save_fn = "";
@@ -346,8 +358,20 @@ void RenderThread::paint() {
     QByteArray& data = cpu_frame_[active_idx];
     if (!data.isEmpty()) {
       int copy_width = pixel_buffer_linesize == 0 ? tex_width : pixel_buffer_linesize;
-      int bytes = copy_width * tex_height * 4;
-      memcpy(pixel_buffer, data.constData(), qMin(bytes, int(data.size())));
+      int row_bytes = copy_width * 4;
+      if (need_yflip) {
+        // Copy rows in reverse order: source bottom-to-top → dest top-to-bottom
+        const char* src = data.constData();
+        int src_stride = tex_width * 4;
+        char* dst = static_cast<char*>(pixel_buffer);
+        for (int y = 0; y < tex_height; y++) {
+          const char* src_row = src + static_cast<qsizetype>(tex_height - 1 - y) * src_stride;
+          memcpy(dst + static_cast<qsizetype>(y) * row_bytes, src_row, qMin(row_bytes, src_stride));
+        }
+      } else {
+        int bytes = row_bytes * tex_height;
+        memcpy(pixel_buffer, data.constData(), qMin(bytes, int(data.size())));
+      }
     }
     pixel_buffer = nullptr;
   }

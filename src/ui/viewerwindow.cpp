@@ -263,7 +263,7 @@ void ViewerWindow::render(QRhiCommandBuffer* cb) {
     }
   }
 
-  // TriangleStrip: BL, TL, BR, TR — texcoords Y-flipped (glReadPixels is bottom-to-top)
+  // TriangleStrip: BL, TL, BR, TR — texcoords V=1 at top to pair with clipSpaceCorrMatrix Y-flip
   float vertexData[] = {
       left, top, 0.0f, 1.0f,
       left, bottom, 0.0f, 0.0f,

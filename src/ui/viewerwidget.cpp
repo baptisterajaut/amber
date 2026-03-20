@@ -1007,7 +1007,7 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
     zoom_top = float(zoom_size * y_scroll + 1.0);
   }
 
-  // TriangleStrip: BL, TL, BR, TR — texcoords Y-flipped (glReadPixels is bottom-to-top)
+  // TriangleStrip: BL, TL, BR, TR — texcoords V=1 at top to pair with clipSpaceCorrMatrix Y-flip
   float vertexData[] = {
       zoom_left, zoom_bottom, 0.0f, 1.0f,
       zoom_left, zoom_top, 0.0f, 0.0f,

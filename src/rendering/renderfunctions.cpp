@@ -174,7 +174,8 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
 // Blit with hardware SrcOver alpha blending (One/OneMinusSrcAlpha for premultiplied sources).
 // Target MUST have PreserveColorContents so existing content acts as background.
 static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTarget* target,
-                             QRhiRenderPassDescriptor* rpd, QRhiTexture* srcTex, float opacity = 1.0f) {
+                             QRhiRenderPassDescriptor* rpd, QRhiTexture* srcTex, float opacity = 1.0f,
+                             bool skipClipSpaceCorr = false) {
   if (!params.rhi) {
     qWarning() << "rhi_blit_srcover: params.rhi is null";
     return;
@@ -242,7 +243,10 @@ static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTar
 
   QMatrix4x4 mvp;
   mvp.ortho(-1, 1, -1, 1, -1, 1);
-  QMatrix4x4 corrected_mvp = rhi->clipSpaceCorrMatrix() * mvp;
+  // Intentional clipSpaceCorrMatrix on this offscreen-to-offscreen pass: the extra Y-flip
+  // pairs with those in render_clip_to_backbuffer and the YUV->RGB pass to keep the total
+  // flip count even. Changing this requires adjusting the entire flip chain.
+  QMatrix4x4 corrected_mvp = (skipClipSpaceCorr ? depthCorrMatrix(rhi) : rhi->clipSpaceCorrMatrix()) * mvp;
 
   float colorMult[4] = {opacity, opacity, opacity, opacity};
 
@@ -312,7 +316,8 @@ static ClipRhiResources* get_or_create_clip_resources(Clip* c, QRhi* rhi, int wi
     for (int j = 0; j < fbo_count; j++) {
       res->tex[j] = rhi->newTexture(QRhiTexture::RGBA8, QSize(width, height), 1, QRhiTexture::RenderTarget);
       res->tex[j]->create();
-      res->rt[j] = rhi->newTextureRenderTarget({res->tex[j]});
+      res->rt[j] = rhi->newTextureRenderTarget(
+          {res->tex[j]}, QRhiTextureRenderTarget::PreserveColorContents);
       if (j == 0) {
         res->rpd = res->rt[j]->newCompatibleRenderPassDescriptor();
       }
@@ -389,12 +394,15 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
           params.cb->beginPass(res->rt[!fbo_switcher], clearColor, {1.0f, 0}, upload);
           params.cb->endPass();
 
-          // Copy composite to fbo if not already there
+          // Copy composite to fbo if not already there (fullscreen opaque blit overwrites all pixels,
+          // so PreserveColorContents is harmless — stale data from previous frames is replaced)
           if (composite_texture != res->tex[0] && composite_texture != res->tex[1]) {
-            rhi_blit_passthrough(params, res->rt[!fbo_switcher], res->rpd, composite_texture);
+            rhi_blit_passthrough(params, res->rt[!fbo_switcher], res->rpd, composite_texture,
+                                 1.0f, /*skipClipSpaceCorr=*/true);
           }
-          // Overlay superimpose (no clear — preserves existing content with alpha)
-          rhi_blit_passthrough(params, res->rt[!fbo_switcher], res->rpd, superimpose_texture);
+          // Overlay superimpose with alpha blending (PreserveColorContents keeps the composite)
+          rhi_blit_srcover(params, res->rt[!fbo_switcher], res->rpd, superimpose_texture,
+                           1.0f, /*skipClipSpaceCorr=*/true);
           composite_texture = res->tex[!fbo_switcher];
         }
       }
@@ -624,6 +632,9 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
       if (textureID != nullptr && !c->media()->to_footage()->alpha_is_premultiplied) {
         QMatrix4x4 blitMvp;
         blitMvp.ortho(-1, 1, -1, 1, -1, 1);
+        // Intentional clipSpaceCorrMatrix on this intermediate pass: the extra Y-flip pairs
+        // with the YUV->RGB pass flip (for YUV clips) or the texcoord swap (for RGBA clips)
+        // to keep the total flip count even. See also rhi_blit_srcover.
         QByteArray emptyFrag;  // premultiply.frag has no UBO (only sampler)
         rhi_blit(params, res->rt[0], res->rpd, textureID, params.passthroughVert, params.premultiplyFrag, blitMvp,
                  emptyFrag, 0);
@@ -643,7 +654,7 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
   coords.vertexBottomLeftZ = coords.vertexBottomRightZ = coords.vertexTopLeftZ = coords.vertexTopRightZ = 1;
   coords.textureTopLeftY = coords.textureTopRightY = coords.textureTopLeftX = coords.textureBottomLeftX = 0.0;
   coords.textureBottomLeftY = coords.textureBottomRightY = coords.textureTopRightX = coords.textureBottomRightX = 1.0;
-  coords.textureTopLeftQ = coords.textureTopRightQ = coords.textureTopLeftQ = coords.textureBottomLeftQ = 1;
+  coords.textureTopLeftQ = coords.textureTopRightQ = coords.textureBottomRightQ = coords.textureBottomLeftQ = 1;
   coords.blendmode = -1;
   coords.opacity = 1.0;
 
@@ -678,7 +689,7 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
   // Build per-clip MVP
   QMatrix4x4 clip_mvp = sequence_ortho;
   clip_mvp *= coords.transform;
-  if (c->autoscaled() && (video_width != s->width && video_height != s->height)) {
+  if (c->autoscaled() && (video_width != s->width || video_height != s->height)) {
     float width_multiplier = float(s->width) / float(video_width);
     float height_multiplier = float(s->height) / float(video_height);
     float scale_multiplier = qMin(width_multiplier, height_multiplier);
