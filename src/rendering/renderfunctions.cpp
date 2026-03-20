@@ -711,7 +711,9 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
   // On Vulkan/Metal/D3D, the YUV->RGB pass applies clipSpaceCorrMatrix (which flips Y),
   // but the CPU RGBA path uploads directly without a flip. Compensate by flipping
   // texture coords so both paths produce the same orientation.
-  if (!params.rhi->isYUpInNDC() && c->NeedsCpuRgba()) {
+  // Check the actual texture used (rgba_tex) rather than NeedsCpuRgba(), because images
+  // like PNG decode to RGBA without requiring ImageFlag effects.
+  if (!params.rhi->isYUpInNDC() && c->rgba_tex != nullptr && c->cached_rhi_tex == c->rgba_tex) {
     std::swap(coords.textureTopLeftY, coords.textureBottomLeftY);
     std::swap(coords.textureTopRightY, coords.textureBottomRightY);
   }

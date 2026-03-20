@@ -91,12 +91,14 @@ void PreviewGenerator::parse_media() {
           is_still_image = true;
         }
 
-        // FFmpeg wraps single images (JPEG, PNG, etc.) in the "image2" demuxer even when
-        // avg_frame_rate is non-zero. Check the format name as a more reliable indicator.
+        // FFmpeg 6+ uses per-codec pipe demuxers (png_pipe, jpeg_pipe, etc.) instead of
+        // the legacy "image2" demuxer. Check both to cover all FFmpeg versions.
         if (!is_still_image && fmt_ctx_->iformat != nullptr
-            && QString(fmt_ctx_->iformat->name).contains(QLatin1String("image2"))
             && !footage_->url.contains('%')) {
-          is_still_image = true;
+          QString fmt_name(fmt_ctx_->iformat->name);
+          if (fmt_name.contains(QLatin1String("image2")) || fmt_name.endsWith(QLatin1String("_pipe"))) {
+            is_still_image = true;
+          }
         }
 
         if (is_still_image) {
