@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Amber Video Editor — fork of Olive 0.1.x, free open-source non-linear video editor (GPLv3). C++11, Qt 6, FFmpeg, Qt RHI (Vulkan/Metal/D3D12/OpenGL). Targets performance on modest hardware (sub-3 MB binary, ~70 MB idle RAM).
+Amber Video Editor — fork of Olive 0.1.x, free open-source non-linear video editor (GPLv3). C++17, Qt 6, FFmpeg, Qt RHI (Vulkan/Metal/D3D12/OpenGL). Targets performance on modest hardware (sub-3 MB binary, ~70 MB idle RAM).
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md). 1.x: Oak backports, warnings cleanup (order TBD). 2.0: GPU-native effects, new editing features, .amb format. 1.x stays supported after 2.0.
+See [ROADMAP.md](ROADMAP.md). 1.x: feature-complete, bug fixes and security patches only. 2.0: ShaderToy import, new editing features (3-point editing, layout presets), scopes/monitoring, rendering pipeline optimizations, .amb format. 1.x stays supported after 2.0.
 
 ## Build
 
@@ -19,7 +19,7 @@ cmake --build build -j$(nproc)
 
 **Dependencies:** Qt 6.8+ (Core, Gui, GuiPrivate, Widgets, Multimedia, OpenGL, OpenGLWidgets, ShaderTools, ShaderToolsPrivate, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample). Optional: Frei0r plugins (disable with `-DNOFREI0R`), OpenColorIO (Windows only).
 
-No test suite exists in this branch.
+**Tests:** `src/tests/` — Qt Test framework. Unit tests for core/engine pure-math algorithms (`test_math`, `test_path`, `test_audio`, `test_core_headers`, `test_engine`). Run with `ctest --test-dir build`.
 
 ## Packaging
 
@@ -43,7 +43,7 @@ Tested on Arch Linux only. AppImage, Windows and macOS builds are best-effort.
 - **Qt 6.10 PipeWire audio backend**: Does not enumerate Bluetooth audio sinks. Workaround: `qputenv("QT_AUDIO_BACKEND", "pulseaudio")` in `main.cpp` forces PulseAudio engine (works through `pipewire-pulse`). Safe no-op on Windows/macOS.
 - **AppImage VAAPI**: `libva` must NOT be bundled in the AppImage (`--exclude-library "libva*"`). The host's libva loads its own GPU-specific drivers; bundling the container's libva breaks driver discovery.
 - **AppImage FFmpeg ABI**: Qt 6.10 bundles FFmpeg 7.x. `FindFFMPEG.cmake` uses `NO_CMAKE_PATH` to prevent cmake from finding Qt's FFmpeg instead of the system one. Removing Qt's `libffmpegmediaplugin.so` before linuxdeploy avoids bundling a second FFmpeg.
-- **Cacher reconfigure**: Adding/removing an ImageFlag effect (e.g. Frei0r) on a clip requires closing and reopening the clip so the cacher switches between YUV and RGBA pipeline. This is handled by `NeedsCacherReconfigure()` in `compose_sequence()`.
+- **Cacher reconfigure**: Adding/removing an ImageFlag effect (e.g. Frei0r) on a clip requires closing and reopening the clip so the cacher switches between YUV and RGBA pipeline. This is handled by `Clip::NeedsCacherReconfigure()`, checked in `compose_sequence()` (`rendering/renderfunctions.cpp`).
 - **Frei0r dimensions**: Frei0r instances are constructed with fixed dimensions. If `media_width()`/`media_height()` aren't available yet (project load before media analysis), `process_image()` lazily reconstructs the instance when dimensions change.
 
 ## Code style
@@ -56,20 +56,21 @@ clang-format with `.clang-format` in repo root (Google-based, 2-space indent, 12
 
 **Core layers:**
 
-- **Timeline model** (`timeline/`): `Sequence` (timeline with tracks), `Clip` (individual clip on a track), `Marker`, `Selection`. These are pure data structures.
-- **Project model** (`project/`): `Media` items in a `ProjectModel` (Qt Model/View). `Footage` holds decoded media metadata. `LoadThread` handles `.ov` project file parsing. `PreviewGenerator`/`ProxyGenerator` create thumbnails and proxy files.
-- **Rendering** (`rendering/`): `RenderThread` runs QRhi in a dedicated thread with offscreen frames. `ExportThread` encodes final output via FFmpeg. `Cacher` decodes and caches frames per-clip. Audio mixing in `audio.cpp`. GPU YUV→RGB conversion via `yuv2rgb.frag.qsb` shader (Y/U/V planes uploaded as `QRhiTexture`, converted in an offscreen pass). Core shaders (common.vert, passthrough, blending, premultiply, yuv2rgb) are pre-compiled to `.qsb` and embedded via QRC in `rendering/shaders/`.
-- **Effects** (`effects/`): `Effect` base class with `EffectRow`/`EffectField` for parameters and keyframing. Shader-based effects defined as XML+GLSL pairs in `effects/shaders/`. Built-in effects (transform, text, transitions) in `effects/internal/`. Frei0r plugin bridge in `frei0reffect.cpp`.
-- **UI panels** (`panels/`): `Project` (media browser), `Timeline`, `Viewer`, `EffectControls`, `GraphEditor`. Each panel is a dockable widget.
+- **Core data** (`core/`): Shared value types and utilities — `audio.cpp` (mixing), `appcontext.cpp`, `keyframe.h`, `marker.h`, `selection.h`, `guide.h`, `math.h`, `path.h`, `style.h`.
+- **Engine** (`engine/`): `Clip` (clip on a track), `Sequence` (timeline with tracks), `Cacher` (decode + cache per-clip). Undo system in `engine/undo/` — `ComboAction` groups steps, `UndoStack` manages history. Split into domain files: `undo_clip`, `undo_effect`, `undo_media`, `undo_timeline`, `undo_guide`, `undo_generic`.
+- **Timeline** (`timeline/`): `Marker`, `MediaImportData`. Lightweight — core types migrated to `engine/` and `core/`.
+- **Project model** (`project/`): `Media` items in a `ProjectModel` (Qt Model/View). `Footage` holds decoded media metadata. `LoadThread` handles `.ove` project file parsing. `PreviewGenerator`/`ProxyGenerator` create thumbnails and proxy files.
+- **Rendering** (`rendering/`): `RenderThread` runs QRhi in a dedicated thread with offscreen frames. `ExportThread` encodes final output via FFmpeg. `renderfunctions.cpp` implements `compose_sequence()` (compositing logic). GPU YUV→RGB conversion via `yuv2rgb.frag.qsb` shader (Y/U/V planes uploaded as `QRhiTexture`, converted in an offscreen pass). Core shaders (common.vert, passthrough, blending, premultiply, yuv2rgb) are pre-compiled to `.qsb` and embedded via QRC in `rendering/shaders/`.
+- **Effects** (`effects/`): `Effect` base class with `EffectRow`/`EffectField` for parameters and keyframing. Shader-based effects defined as XML+GLSL pairs in `effects/shaders/` (~29 active: blur, chroma key, color correction, distortions, etc.). Built-in effects (transform, text, corner pin, drop shadow, transitions, audio effects) in `effects/internal/`, some with their own `.frag`/`.vert` shaders and `internalshaders.qrc`. Frei0r plugin bridge in `effects/internal/frei0reffect.cpp`.
+- **UI panels** (`panels/`): `Project` (media browser), `Timeline`, `Viewer`, `EffectControls`, `GraphEditor`, `UndoHistoryPanel`. Each panel is a dockable widget.
 - **UI widgets** (`ui/`): `MainWindow` orchestrates layout. `TimelineWidget` handles track rendering/interaction. `ViewerWidget` displays composited frames via `QRhiWidget` (CPU readback from `RenderThread`). Custom widgets: `LabelSlider`, `KeyframeView`, `CollapsibleWidget`, etc.
-- **Undo** (`undo/`): Command pattern via `ComboAction` (groups multiple undo steps). All edits go through `UndoStack`.
 - **Dialogs** (`dialogs/`): Export, preferences, new sequence, media properties, etc.
 
 **Effect system:** Shader effects are discovered at runtime from `effects/shaders/*.xml`. Each XML declares parameters (fields) and references a `.frag` shader. The `effectloaders.cpp` file handles discovery and registration.
 
-**Project file format:** Custom XML-based `.ov` format (backward compatible with Olive 0.1). Save version `190219` (YYMMDD). Loading handled by `LoadThread`, saving by `OliveGlobal::save_project()`.
+**Project file format:** Custom XML-based `.ove` format (backward compatible with Olive 0.1). Save version `190219` (`amber::kSaveVersion` in `config.h`, YYMMDD). Loading handled by `LoadThread`, saving by `OliveGlobal::save_project()`.
 
-**Video decode pipeline:** `Cacher` (background thread) decodes frames via FFmpeg. Two paths based on `Clip::NeedsCpuRgba()`:
+**Video decode pipeline:** `Cacher` (`engine/cacher.cpp`, background thread) decodes frames via FFmpeg. Two paths based on `Clip::NeedsCpuRgba()`:
 - **GPU path** (default): AVFilter outputs YUV420P or NV12 → `Clip::Retrieve()` uploads Y/U/V planes to `QRhiTexture` → `yuv2rgb.frag.qsb` shader converts to RGBA in an offscreen pass → clip's `QRhiTexture` holds the result.
 - **CPU path** (when clip has ImageFlag effects like Frei0r): AVFilter outputs RGBA → effects process CPU buffer → uploaded to `QRhiTexture`.
 
