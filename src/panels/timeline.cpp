@@ -676,6 +676,10 @@ void Timeline::set_zoom_value(double v) {
 
   // repaint the timeline for the new zoom/location
   repaint_timeline();
+
+  // reset after all recursive calls have completed, so auto-scroll
+  // cannot interfere during the entire zoom operation
+  zoom_just_changed = false;
 }
 
 void Timeline::multiply_zoom(double m) {

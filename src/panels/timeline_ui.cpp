@@ -270,39 +270,35 @@ void Timeline::resizeEvent(QResizeEvent *) {
 
 void Timeline::repaint_timeline() {
   if (!block_repaints) {
-    bool draw = true;
-
     if (amber::ActiveSequence != nullptr
         && !horizontalScrollBar->isSliderDown()
         && !horizontalScrollBar->is_resizing()
         && panel_sequence_viewer->playing
         && !zoom_just_changed) {
-      // auto scroll
+      // auto scroll — setValue triggers a recursive repaint_timeline() via setScroll,
+      // so the widgets will be updated in that recursive call
       if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_PAGE_SCROLL) {
         int playhead_x = getTimelineScreenPointFromFrame(amber::ActiveSequence->playhead);
         if (playhead_x < 0 || playhead_x > (editAreas->width() - videoScrollbar->width())) {
+          int old_scroll = horizontalScrollBar->value();
           horizontalScrollBar->setValue(getScreenPointFromFrame(zoom, amber::ActiveSequence->playhead));
-          draw = false;
+          if (horizontalScrollBar->value() != old_scroll) return;
         }
       } else if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_SMOOTH_SCROLL) {
         if (center_scroll_to_playhead(horizontalScrollBar, zoom, amber::ActiveSequence->playhead)) {
-          draw = false;
+          return;
         }
       }
     }
 
-    if (draw) {
-      headers->update();
-      video_area->update();
-      audio_area->update();
+    headers->update();
+    video_area->update();
+    audio_area->update();
 
-      if (amber::ActiveSequence != nullptr
-          && !zoom_just_changed) {
-        set_sb_max();
-      }
+    if (amber::ActiveSequence != nullptr
+        && !zoom_just_changed) {
+      set_sb_max();
     }
-
-    zoom_just_changed = false;
   }
 }
 

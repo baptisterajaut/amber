@@ -49,8 +49,11 @@ void AudioMonitor::set_value(const QVector<double> &ivalues) {
   values_mutex.lock();
   values = ivalues;
   values_mutex.unlock();
-  update();
 
+  // Called from audio thread — dispatch repaint to GUI thread.
+  // Plain update() paints to the backing store but the RHI compositor
+  // may not flush this widget's region when a QRhiWidget is present.
+  QMetaObject::invokeMethod(this, "repaint", Qt::QueuedConnection);
   QMetaObject::invokeMethod(&clear_timer, "start", Qt::QueuedConnection);
 }
 
@@ -60,7 +63,7 @@ void AudioMonitor::clear() {
   values_mutex.lock();
   values.fill(1);
   values_mutex.unlock();
-  update();
+  repaint();
 }
 
 void AudioMonitor::resizeEvent(QResizeEvent *e) {
