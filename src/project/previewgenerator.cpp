@@ -79,6 +79,11 @@ void PreviewGenerator::parse_media() {
 
       bool append = false;
 
+      // Skip embedded cover art / thumbnails (e.g. DJI action cameras embed a JPG in MP4)
+      if (fmt_ctx_->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+        continue;
+      }
+
       if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO
           && fmt_ctx_->streams[i]->codecpar->width > 0
           && fmt_ctx_->streams[i]->codecpar->height > 0) {
