@@ -71,7 +71,7 @@ RUN cd /usr/share/nsis/Stubs && \
 # Build NSIS installer
 RUN cd /packaging/windows/nsis && \
     cp -r /out amber && \
-    curl -sL -o LICENSE "https://www.gnu.org/licenses/gpl-3.0.txt" && \
+    cp /src/LICENSE . && \
     makensis -DX64 amber.nsi && \
     cp *.exe /out/amber-setup.exe
 
