@@ -35,6 +35,8 @@ DemoNotice::DemoNotice(QWidget *parent) :
   QDialog(parent)
 {
   setWindowTitle(tr("Welcome to Amber!"));
+  setMinimumWidth(520);
+  setSizeGripEnabled(true);
 
   QVBoxLayout* vlayout = new QVBoxLayout(this);
 

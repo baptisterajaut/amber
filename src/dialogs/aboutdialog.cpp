@@ -34,6 +34,8 @@ AboutDialog::AboutDialog(QWidget *parent) :
   QDialog(parent)
 {
   setWindowTitle("About Amber");
+  setMinimumWidth(420);
+  setSizeGripEnabled(true);
 
   QVBoxLayout* layout = new QVBoxLayout(this);
   layout->setSpacing(20);
