@@ -520,20 +520,22 @@ void TimelineHeader::show_context_menu(const QPoint& pos) {
   if (!selected_markers.isEmpty() && viewer != nullptr && viewer->marker_ref != nullptr) {
     menu.addSeparator();
 
-    QMenu* color_menu = amber::BuildColorLabelMenu(&menu);
-    connect(color_menu, &QMenu::triggered, this, [this](QAction* action) {
-      int label = action->data().toInt();
-      if (viewer == nullptr || viewer->marker_ref == nullptr) return;
-      ComboAction* ca = new ComboAction(tr("Set Color Label"));
-      for (int idx : selected_markers) {
-        if (idx >= 0 && idx < viewer->marker_ref->size()) {
-          ca->append(new SetInt(&(*viewer->marker_ref)[idx].color_label, label));
+    if (amber::CurrentConfig.show_color_labels) {
+      QMenu* color_menu = amber::BuildColorLabelMenu(&menu);
+      connect(color_menu, &QMenu::triggered, this, [this](QAction* action) {
+        int label = action->data().toInt();
+        if (viewer == nullptr || viewer->marker_ref == nullptr) return;
+        ComboAction* ca = new ComboAction(tr("Set Color Label"));
+        for (int idx : selected_markers) {
+          if (idx >= 0 && idx < viewer->marker_ref->size()) {
+            ca->append(new SetInt(&(*viewer->marker_ref)[idx].color_label, label));
+          }
         }
-      }
-      amber::UndoStack.push(ca);
-      update();
-    });
-    menu.addMenu(color_menu);
+        amber::UndoStack.push(ca);
+        update();
+      });
+      menu.addMenu(color_menu);
+    }
 
     QAction* props = menu.addAction(tr("Marker Properties..."));
     connect(props, &QAction::triggered, this, [this]() {

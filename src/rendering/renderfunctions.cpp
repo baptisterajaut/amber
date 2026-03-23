@@ -625,7 +625,9 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
   if (c->media() != nullptr) {
     if (c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
       params.nests.append(c);
+      auto saved_gizmos = params.gizmos;
       textureID = amber::rendering::compose_sequence(params);
+      params.gizmos = saved_gizmos;
       params.nests.removeLast();
       fbo_switcher = true;
     } else if (c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
