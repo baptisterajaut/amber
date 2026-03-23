@@ -341,7 +341,7 @@ void EffectControls::setup_ui() {
   splitter->setChildrenCollapsible(false);
 
   scrollArea = new QScrollArea();
-  scrollArea->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Expanding);
+  scrollArea->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
   scrollArea->setFrameShape(QFrame::NoFrame);
   scrollArea->setFrameShadow(QFrame::Plain);
   scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -498,6 +498,9 @@ void EffectControls::setup_ui() {
   keyframeAreaLayout->addWidget(horizontalScrollBar);
 
   splitter->addWidget(keyframeArea);
+
+  splitter->setStretchFactor(0, 0);
+  splitter->setStretchFactor(1, 1);
 
   hlayout->addWidget(splitter);
 
