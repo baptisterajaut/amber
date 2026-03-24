@@ -1138,7 +1138,10 @@ void MainWindow::closeEvent(QCloseEvent* e) {
 
     stop_audio();
 
-    e->accept();
+    // Quit instead of accepting — accepting destroys the Vulkan surface
+    // mid-event-loop, causing a double-free crash on Wayland.
+    e->ignore();
+    QCoreApplication::quit();
   } else {
     e->ignore();
   }

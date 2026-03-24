@@ -246,5 +246,14 @@ int main(int argc, char *argv[]) {
     w.showMaximized();
   }
 
-  return a.exec();
+  int ret = a.exec();
+
+  // Null the Vulkan instance so QWaylandVulkanWindow::invalidateSurface()
+  // skips its vkDestroySurfaceKHR call, preventing a double-free.
+#if AMBER_HAS_VULKAN
+  if (w.windowHandle())
+    w.windowHandle()->setVulkanInstance(nullptr);
+#endif
+
+  return ret;
 }

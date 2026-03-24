@@ -21,6 +21,7 @@
 #include "viewerwindow.h"
 
 #include <QApplication>
+#include <QCloseEvent>
 #include <QFile>
 #include <QKeyEvent>
 #include <QLabel>
@@ -76,6 +77,14 @@ ViewerWindow::ViewerWindow(QWidget* parent) : QRhiWidget(parent) {
   fullscreen_msg_label_->adjustSize();
 }
 
+ViewerWindow::~ViewerWindow() {
+  // Null Vulkan instance to prevent surface double-free during teardown.
+#if AMBER_HAS_VULKAN
+  if (windowHandle())
+    windowHandle()->setVulkanInstance(nullptr);
+#endif
+}
+
 void ViewerWindow::set_frame(const char* data, int w, int h) {
   int bytes = w * h * 4;
   if (frame_data_.size() != bytes) frame_data_.resize(bytes);
@@ -110,6 +119,12 @@ void ViewerWindow::showEvent(QShowEvent*) {
   for (auto menubar_action : menubar_actions) {
     shortcut_copier(shortcuts_, menubar_action->menu());
   }
+}
+
+void ViewerWindow::closeEvent(QCloseEvent* e) {
+  // Hide instead of destroying to avoid Vulkan surface double-free.
+  e->ignore();
+  hide();
 }
 
 void ViewerWindow::keyPressEvent(QKeyEvent* e) {
