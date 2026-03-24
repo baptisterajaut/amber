@@ -34,9 +34,11 @@ class ViewerWindow : public QRhiWidget {
   Q_OBJECT
  public:
   ViewerWindow(QWidget* parent);
+  ~ViewerWindow() override;
   void set_frame(const char* data, int w, int h);
 
  protected:
+  void closeEvent(QCloseEvent*) override;
   void showEvent(QShowEvent*) override;
   void keyPressEvent(QKeyEvent*) override;
   void mousePressEvent(QMouseEvent*) override;
