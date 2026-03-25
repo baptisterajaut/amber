@@ -209,6 +209,8 @@ void AudioSenderThread::run() {
 }
 
 int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
+  audio_write_lock.lock();
+
   bool scrub_active = (scrub_grain_played_ < scrub_grain_total_);
 
   qint64 actual_write;
@@ -271,6 +273,8 @@ int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
 
   memset(audio_ibuffer + offset, 0, consumed);
   audio_ibuffer_read.fetch_add(consumed);
+
+  audio_write_lock.unlock();
 
   // Return 0 during scrub to prevent a second wrap-around drain
   return scrub_active ? 0 : actual_write;
