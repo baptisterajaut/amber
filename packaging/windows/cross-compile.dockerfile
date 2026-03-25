@@ -77,8 +77,9 @@ RUN cd /packaging/windows/nsis && \
     makensis -DX64 amber.nsi && \
     cp *.exe /out/amber-setup.exe
 
-# Build portable zip (same content as NSIS, minus the installer itself)
+# Build portable zip (same content as NSIS + LICENSE)
 RUN cd /packaging/windows/nsis && \
+    cp /src/LICENSE amber/ && \
     zip -r /out/amber-portable.zip amber/
 
 # --- Output stage (for --output) ---
