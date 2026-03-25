@@ -147,6 +147,10 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
       }
 
       menu.addAction(tr("Properties"), this, &TimelineWidget::show_clip_properties);
+
+      menu.addSeparator();
+      QAction* match_frame_action = menu.addAction(tr("Match Frame"));
+      connect(match_frame_action, &QAction::triggered, panel_timeline, &Timeline::match_frame);
     }
 
     menu.exec(mapToGlobal(pos));

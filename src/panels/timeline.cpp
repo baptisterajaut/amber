@@ -1260,6 +1260,34 @@ void Timeline::set_tool() {
   }
 }
 
+void Timeline::match_frame() {
+  if (!amber::ActiveSequence) return;
+
+  long playhead = amber::ActiveSequence->playhead;
+
+  // Find topmost video clip at playhead (lowest track index = topmost)
+  Clip* topmost = nullptr;
+  for (const auto& c : amber::ActiveSequence->clips) {
+    if (c == nullptr) continue;
+    if (c->track() >= 0) continue;  // skip audio tracks
+    if (playhead < c->timeline_in(true) || playhead >= c->timeline_out(true)) continue;
+    if (c->media() == nullptr || c->media()->get_type() != MEDIA_TYPE_FOOTAGE) continue;
+    if (topmost == nullptr || c->track() < topmost->track()) {
+      topmost = c.get();
+    }
+  }
+
+  if (topmost == nullptr) return;
+
+  // Calculate source frame: clip_in + offset within clip
+  long offset = playhead - topmost->timeline_in();
+  long source_frame = topmost->clip_in() + offset;
+
+  // Open in footage viewer at that frame
+  panel_footage_viewer->set_media(topmost->media());
+  panel_footage_viewer->seek(source_frame);
+}
+
 void amber::timeline::MultiplyTrackSizesByDPI()
 {
   kTrackDefaultHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();

@@ -239,6 +239,7 @@ public slots:
   void deselect();
   void toggle_links();
   void split_at_playhead();
+  void match_frame();
   void ripple_delete();
   void ripple_delete_empty_space();
   void toggle_enable_on_selected_clips();
