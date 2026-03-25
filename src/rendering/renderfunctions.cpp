@@ -624,9 +624,10 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
     c->Cache(qMax(playhead, c->timeline_in()), params.scrubbing, params.nests, params.playback_speed);
     if (!c->Retrieve(params.rhi, params.cb, &params)) {
       params.texture_failed = true;
-    } else {
-      textureID = c->cached_rhi_tex;
     }
+    // Always use cached texture — on Retrieve failure, hold the last decoded frame
+    // instead of skipping the clip (which lets lower tracks bleed through during scrub).
+    textureID = c->cached_rhi_tex;
   }
 
   // Create clip FBO resources if needed
