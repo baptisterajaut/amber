@@ -64,6 +64,7 @@ ARG GIT_HASH
 ARG VERSION
 
 COPY src/ /src
+COPY LICENSE /LICENSE
 COPY packaging/ /packaging
 WORKDIR /src/build
 

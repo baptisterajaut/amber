@@ -31,6 +31,7 @@ ARG GIT_HASH
 ARG VERSION=dev
 
 COPY src/ /src
+COPY LICENSE /LICENSE
 WORKDIR /src/build
 
 RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release \
@@ -73,13 +74,13 @@ RUN cd /usr/share/nsis/Stubs && \
 # Build NSIS installer
 RUN cd /packaging/windows/nsis && \
     cp -r /out amber && \
-    cp /src/LICENSE . && \
+    cp /LICENSE . && \
     makensis -DX64 amber.nsi && \
     cp *.exe /out/amber-setup.exe
 
 # Build portable zip (same content as NSIS + LICENSE)
 RUN cd /packaging/windows/nsis && \
-    cp /src/LICENSE amber/ && \
+    cp /LICENSE amber/ && \
     zip -r /out/amber-portable.zip amber/
 
 # --- Output stage (for --output) ---

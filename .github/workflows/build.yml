@@ -58,7 +58,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: windows-package
-          path: amber-setup.exe
+          path: |
+            amber-setup.exe
+            amber-portable.zip
 
   macos:
     strategy:
@@ -96,9 +98,14 @@ jobs:
           mkdir -p Amber.app/Contents/Resources
           cp Amber Amber.app/Contents/MacOS/Amber
           cp ../packaging/macos/olive.icns Amber.app/Contents/Resources/amber.icns
+          # License
+          cp ../LICENSE Amber.app/Contents/Resources/LICENSE
           # Shader effects (XML + GLSL)
           mkdir -p Amber.app/Contents/Effects
           cp effects/*.xml effects/*.frag effects/*.vert Amber.app/Contents/Effects/ 2>/dev/null || true
+          # Export presets
+          mkdir -p Amber.app/Contents/ExportPresets
+          cp ../src/exportpresets/* Amber.app/Contents/ExportPresets/ 2>/dev/null || true
           # Frei0r plugins (pre-built from upstream release)
           curl -sL -o /tmp/frei0r.zip \
             "https://github.com/dyne/frei0r/releases/download/v2.5.4/frei0r-v2.5.4_osx.zip"
@@ -166,4 +173,5 @@ jobs:
           files: |
             Amber-*.AppImage
             amber-setup.exe
+            amber-portable.zip
             Amber-*.dmg

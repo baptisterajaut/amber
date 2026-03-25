@@ -500,7 +500,6 @@ add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EXPORT_PRESETS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/exportpresets"
   COMMENT "Copying export presets to build directory"
 )
-install(FILES ${OLIVE_EXPORT_PRESETS} DESTINATION share/amber-editor/exportpresets)
 
 target_compile_definitions(${OLIVE_TARGET} PRIVATE ${OLIVE_DEFINITIONS})
 
@@ -545,6 +544,8 @@ endif()
 if(UNIX AND NOT APPLE)
   install(TARGETS ${OLIVE_TARGET} RUNTIME DESTINATION bin)
   install(FILES ${OLIVE_EFFECTS} DESTINATION share/amber-editor/effects)
+  install(FILES ${OLIVE_EXPORT_PRESETS} DESTINATION share/amber-editor/exportpresets)
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE DESTINATION share/amber-editor)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.desktop DESTINATION share/applications)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.appdata.xml DESTINATION share/metainfo)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.xml DESTINATION share/mime/packages)
