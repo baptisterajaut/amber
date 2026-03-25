@@ -87,6 +87,15 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
   QRhi* rhi = params.rhi;
   QRhiCommandBuffer* cb = params.cb;
 
+  // Dedicated buffers per pass — QRhi dynamic buffers are NOT snapshotted at record time,
+  // so sharing params.vertUbo/vbuf across passes with different MVPs causes all passes to
+  // see the last-written value at endOffscreenFrame(). This broke shader effects: the
+  // effect's depthCorrMatrix MVP was overwritten by the final srcover's clipSpaceCorrMatrix.
+  QRhiBuffer* vbuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+  vbuf->create();
+  QRhiBuffer* vertUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
+  vertUbo->create();
+
   // Create fragment UBO (skip if shader has no fragment uniforms)
   QRhiBuffer* fragUbo = nullptr;
   if (fragUboSize > 0) {
@@ -96,7 +105,7 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
 
   // Build SRB
   QVector<QRhiShaderResourceBinding> bindings;
-  bindings.append(QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, params.vertUbo));
+  bindings.append(QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, vertUbo));
   if (fragUboSize > 0) {
     bindings.append(QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, fragUbo));
   }
@@ -148,8 +157,8 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
   QMatrix4x4 corrected_mvp = (skipClipSpaceCorr ? depthCorrMatrix(rhi) : rhi->clipSpaceCorrMatrix()) * mvp;
 
   QRhiResourceUpdateBatch* u = rhi->nextResourceUpdateBatch();
-  u->updateDynamicBuffer(params.vbuf, 0, sizeof(blitQuad), blitQuad);
-  u->updateDynamicBuffer(params.vertUbo, 0, 64, corrected_mvp.constData());
+  u->updateDynamicBuffer(vbuf, 0, sizeof(blitQuad), blitQuad);
+  u->updateDynamicBuffer(vertUbo, 0, 64, corrected_mvp.constData());
   if (fragUboSize > 0 && !fragUboData.isEmpty()) {
     u->updateDynamicBuffer(fragUbo, 0, fragUboSize, fragUboData.constData());
   }
@@ -160,7 +169,7 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
   cb->setGraphicsPipeline(pipeline);
   cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
   cb->setShaderResources(srb);
-  const QRhiCommandBuffer::VertexInput vbufBinding(params.vbuf, 0);
+  const QRhiCommandBuffer::VertexInput vbufBinding(vbuf, 0);
   cb->setVertexInput(0, 1, &vbufBinding);
   cb->draw(4);
   cb->endPass();
@@ -168,6 +177,8 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
   // Defer cleanup — resources must survive until endOffscreenFrame()
   params.transientResources.append(pipeline);
   params.transientResources.append(srb);
+  params.transientResources.append(vbuf);
+  params.transientResources.append(vertUbo);
   if (fragUbo) params.transientResources.append(fragUbo);
 }
 
@@ -199,12 +210,17 @@ static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTar
   QRhi* rhi = params.rhi;
   QRhiCommandBuffer* cb = params.cb;
 
+  // Dedicated buffers per pass (same rationale as rhi_blit — see comment there).
+  QRhiBuffer* vbuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+  vbuf->create();
+  QRhiBuffer* vertUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
+  vertUbo->create();
   QRhiBuffer* fragUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
   fragUbo->create();
 
   QRhiShaderResourceBindings* srb = rhi->newShaderResourceBindings();
   srb->setBindings({
-      QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, params.vertUbo),
+      QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, vertUbo),
       QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, fragUbo),
       QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, srcTex, params.sampler),
   });
@@ -251,8 +267,8 @@ static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTar
   float colorMult[4] = {opacity, opacity, opacity, opacity};
 
   QRhiResourceUpdateBatch* u = rhi->nextResourceUpdateBatch();
-  u->updateDynamicBuffer(params.vbuf, 0, sizeof(blitQuad), blitQuad);
-  u->updateDynamicBuffer(params.vertUbo, 0, 64, corrected_mvp.constData());
+  u->updateDynamicBuffer(vbuf, 0, sizeof(blitQuad), blitQuad);
+  u->updateDynamicBuffer(vertUbo, 0, 64, corrected_mvp.constData());
   u->updateDynamicBuffer(fragUbo, 0, 16, colorMult);
 
   QSize sz = target->pixelSize();
@@ -261,13 +277,15 @@ static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTar
   cb->setGraphicsPipeline(pipeline);
   cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
   cb->setShaderResources(srb);
-  const QRhiCommandBuffer::VertexInput vbufBinding(params.vbuf, 0);
+  const QRhiCommandBuffer::VertexInput vbufBinding(vbuf, 0);
   cb->setVertexInput(0, 1, &vbufBinding);
   cb->draw(4);
   cb->endPass();
 
   params.transientResources.append(pipeline);
   params.transientResources.append(srb);
+  params.transientResources.append(vbuf);
+  params.transientResources.append(vertUbo);
   params.transientResources.append(fragUbo);
 }
 
@@ -516,9 +534,8 @@ static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture
 
   float colorMult[4] = {1, 1, 1, 1};
 
-  // Dedicated buffers per pass -- QRhi dynamic buffers are NOT snapshotted at
-  // record time, so sharing params.vertUbo/vbuf with rhi_blit_passthrough causes
-  // both passes to see the last-written values at endOffscreenFrame().
+  // Dedicated buffers per pass — QRhi dynamic buffers are NOT snapshotted at
+  // record time (all blit helpers also use per-pass buffers for the same reason).
   QRhiBuffer* clipVbuf = params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, sizeof(quad_verts));
   clipVbuf->create();
   QRhiBuffer* clipVertUbo = params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);

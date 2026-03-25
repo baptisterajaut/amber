@@ -87,9 +87,6 @@ private:
   QShader premultiplyFrag_;
   QShader yuvFrag_;
 
-  // Shared vertex buffer and UBO
-  QRhiBuffer* vbuf_{nullptr};
-  QRhiBuffer* vertUbo_{nullptr};
   QRhiSampler* sampler_{nullptr};
 
   // Main compositing target (double-buffered)

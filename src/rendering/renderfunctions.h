@@ -51,9 +51,7 @@ struct ComposeSequenceParams {
   int playback_speed;
   bool scrubbing{false};
 
-  // Shared vertex resources (created by RenderThread, reused)
-  QRhiBuffer* vbuf;       // TriangleStrip quad (4 verts x 4 floats)
-  QRhiBuffer* vertUbo;    // binding 0: mat4 mvp_matrix (64 bytes)
+  // Shared sampler (created by RenderThread, reused across all blit passes)
   QRhiSampler* sampler;
 
   // Core shaders (loaded from QRC .qsb)

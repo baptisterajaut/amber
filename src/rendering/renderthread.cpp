@@ -164,14 +164,6 @@ void RenderThread::run() {
       premultiplyFrag_ = loadQsb(QStringLiteral(":/shaders/premultiply.frag.qsb"));
       yuvFrag_ = loadQsb(QStringLiteral(":/shaders/yuv2rgb.frag.qsb"));
 
-      // Shared vertex buffer: 4 verts * 4 floats
-      vbuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
-      vbuf_->create();
-
-      // Vertex UBO: mat4 = 64 bytes
-      vertUbo_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
-      vertUbo_->create();
-
       // Sampler
       sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
                                    QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
@@ -277,8 +269,6 @@ void RenderThread::paint() {
   params.playback_speed = playback_speed_;
   params.scrubbing = scrubbing_;
 
-  params.vbuf = vbuf_;
-  params.vertUbo = vertUbo_;
   params.sampler = sampler_;
 
   params.passthroughVert = passthroughVert_;
@@ -457,10 +447,6 @@ void RenderThread::delete_ctx() {
 
   delete sampler_;
   sampler_ = nullptr;
-  delete vertUbo_;
-  vertUbo_ = nullptr;
-  delete vbuf_;
-  vbuf_ = nullptr;
 
   delete rhi_;
   rhi_ = nullptr;
