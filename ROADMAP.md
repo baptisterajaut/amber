@@ -10,24 +10,30 @@ Amber inherits Olive 0.1's greatest strength: everything is where you expect it.
 
 ## 1.x — Maintenance
 
-Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak backports (1.3.0), core/engine layer extraction — all shipped.
+Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak backports (1.3.0), core/engine layer extraction, QoL batch (1.4.0) — all shipped.
 
-### 1.4.0 — Quality-of-life
+### 1.4.0 — Quality-of-life (shipped)
 
-Self-contained features that don't touch existing architecture. Low risk, high value.
+- Export single frame (File → Export Frame, Ctrl+Shift+E)
+- Match frame (right-click → Match Frame, opens source in footage viewer)
+- Duplicate sequence (right-click → Duplicate, was already wired)
+- Built-in export presets (YouTube 1080p/4K, ProRes, VP9, MP3)
+- Portable Windows zip alongside NSIS installer
+- Shader effect Y-flip fix on Vulkan/Metal/D3D (#4)
+- Hold last frame during scrub (fixes title bleed-through)
+- Audio data race fix (lock ibuffer reads)
+- Nested clip gizmo fix, color label menu consistency, cover art import fix
+
+### 1.5.0 — Quality-of-life (next)
+
+Self-contained features that don't touch existing architecture.
 
 - **3-point editing** — wire footage viewer in/out marks to insert/overwrite actions on timeline. Infrastructure exists (Viewer in/out marks, paste insert mode, focus routing), needs ~200-300 lines of wiring.
 - **Subtitle import (.srt)** — new SubtitleEffect with shared style, import from File menu. ~500-600 lines.
-- **Duplicate sequence** — `Sequence::copy()` exists, needs a menu item. ~10 lines.
-- **Export single frame** — `RenderThread::save_fn` callback exists, needs a File menu action. ~20 lines.
-- **Match frame** — clip under playhead → open source in footage viewer at matching frame. ~50 lines.
-- **Freeze frame** — split at playhead + hold frame. ~80 lines.
-- **Built-in export presets** — ship preset XML files (YouTube 1080p, ProRes, etc.). 0 code changes.
+- **Freeze frame** — split at playhead + hold frame. Needs speed=0 guards in `media_length()`, `cacher.cpp`, and `cacher_audio.cpp` (division-by-zero). ~150 lines.
 - **Welcome screen** — QDialog at startup with recent projects + new project with sequence templates. ~200-300 lines.
-- **Nesting fixes** — gizmos don't display on nested sequence clips (transform values work, overlay doesn't — likely `GetSelectedGizmo()` skips `MEDIA_TYPE_SEQUENCE` clips). Circular reference detection in `compose_sequence()` (cycle in `params.nests` = skip, ~2 lines runtime + ~30 lines drop guard in `TimelineWidget::dropEvent()`), deletion protection for referenced sequences (~50 lines), sequence navigation stack in OliveGlobal + Escape to go back (~50 lines), breadcrumb in timeline header (~50 lines).
+- **Nesting fixes** — circular reference detection in `compose_sequence()`, deletion protection for referenced sequences, sequence navigation stack + Escape to go back, breadcrumb in timeline header.
 - **Flatten/unpack nested sequence** — inverse of nest(), restore inner clips to parent timeline. ~150 lines.
-- **Color labels menu consistency** — context menu still shows color label options when color labels are disabled in View. Hide or disable recolor options when `show_color_labels` is off.
-- **Audio data race fix** — lock `audio_write_lock` around AudioSenderThread buffer reads (correctness bug).
 
 ### 1.x maintenance
 
@@ -105,7 +111,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 
 ### Audio pipeline cleanup
 
-The audio pipeline's shared control variables (`audio_ibuffer_frame`, `audio_reset_`, `audio_ibuffer_read`) have been upgraded to `std::atomic<>`. However, `audio_ibuffer` (the 192KB ring buffer itself) is read by AudioSenderThread without `audio_write_lock`, creating a data race with Cacher writes. Fix: lock around `send_audio_to_output()` buffer reads.
+The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Remaining work:
 
 **Scrub performance:** Pre-allocate the staging buffer in `AudioSenderThread` (currently heap-allocates on every scrub frame). Skip audio grain entirely on fast scrub (<16ms between seeks) — only produce audio when scrub settles, like Premiere/Resolve.
 
