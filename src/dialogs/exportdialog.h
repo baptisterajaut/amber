@@ -287,9 +287,14 @@ private:
   QComboBox* preset_combo_;
 
   /**
-   * @brief Returns the directory where export presets are stored
+   * @brief Returns the directories where export presets are searched (built-in then user)
    */
-  static QString PresetDir();
+  static QStringList PresetDirs();
+
+  /**
+   * @brief Returns the user-writable directory where export presets are saved
+   */
+  static QString UserPresetDir();
 
   /**
    * @brief Sanitizes a preset name for use as a filename

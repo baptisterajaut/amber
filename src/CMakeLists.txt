@@ -494,6 +494,14 @@ add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
   COMMENT "Copying shader effects to build directory"
 )
 
+file(GLOB OLIVE_EXPORT_PRESETS "${CMAKE_CURRENT_SOURCE_DIR}/exportpresets/*")
+add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/exportpresets"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EXPORT_PRESETS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/exportpresets"
+  COMMENT "Copying export presets to build directory"
+)
+install(FILES ${OLIVE_EXPORT_PRESETS} DESTINATION share/amber-editor/exportpresets)
+
 target_compile_definitions(${OLIVE_TARGET} PRIVATE ${OLIVE_DEFINITIONS})
 
 if(APPLE)

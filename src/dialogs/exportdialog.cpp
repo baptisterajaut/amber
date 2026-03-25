@@ -25,6 +25,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
@@ -32,6 +33,7 @@ extern "C" {
 #include <QMessageBox>
 #include <QPushButton>
 #include <QRegularExpression>
+#include <QSet>
 #include <QStandardPaths>
 #include <QThread>
 #include <QVBoxLayout>
@@ -770,8 +772,17 @@ void ExportDialog::setup_ui() {
   connect(vcodecCombobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ExportDialog::vcodec_changed);
 }
 
-QString ExportDialog::PresetDir() {
+QString ExportDialog::UserPresetDir() {
   return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/exportpresets";
+}
+
+QStringList ExportDialog::PresetDirs() {
+  QStringList dirs;
+  QDir app_dir(QCoreApplication::applicationDirPath());
+  dirs.append(app_dir.filePath("exportpresets"));
+  dirs.append(app_dir.filePath("../share/amber-editor/exportpresets"));
+  dirs.append(UserPresetDir());
+  return dirs;
 }
 
 QString ExportDialog::SanitizePresetName(const QString& name) {
@@ -781,8 +792,20 @@ QString ExportDialog::SanitizePresetName(const QString& name) {
 }
 
 QStringList ExportDialog::GetPresetList() {
-  QDir dir(PresetDir());
-  return dir.entryList(QDir::Files, QDir::Name);
+  QSet<QString> seen;
+  QStringList result;
+  for (const QString& path : PresetDirs()) {
+    QDir dir(path);
+    if (!dir.exists()) continue;
+    for (const QString& entry : dir.entryList(QDir::Files, QDir::Name)) {
+      if (!seen.contains(entry)) {
+        seen.insert(entry);
+        result.append(entry);
+      }
+    }
+  }
+  result.sort();
+  return result;
 }
 
 void ExportDialog::PopulatePresetCombo() {
@@ -823,7 +846,7 @@ void ExportDialog::save_preset_clicked() {
 }
 
 void ExportDialog::SavePreset(const QString& name) {
-  QString dir_path = PresetDir();
+  QString dir_path = UserPresetDir();
   QDir dir(dir_path);
   if (!dir.exists()) {
     dir.mkpath(".");
@@ -869,7 +892,18 @@ void ExportDialog::SavePreset(const QString& name) {
 }
 
 void ExportDialog::LoadPreset(const QString& name) {
-  QString filepath = PresetDir() + "/" + name;
+  QString filepath;
+  for (const QString& dir : PresetDirs()) {
+    QString candidate = dir + "/" + name;
+    if (QFile::exists(candidate)) {
+      filepath = candidate;
+      break;
+    }
+  }
+  if (filepath.isEmpty()) {
+    QMessageBox::critical(this, tr("Error"), tr("Preset not found: %1").arg(name));
+    return;
+  }
   QFile file(filepath);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
     QMessageBox::critical(this, tr("Error"), tr("Could not open preset file:\n%1").arg(filepath));

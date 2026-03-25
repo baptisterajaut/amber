@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export_preset>
+  <format>13</format>
+  <range>0</range>
+  <video_enabled>1</video_enabled>
+  <video_codec_index>1</video_codec_index>
+  <width>1920</width>
+  <height>1080</height>
+  <frame_rate>30.000000</frame_rate>
+  <compression_type_index>0</compression_type_index>
+  <video_bitrate>12.000000</video_bitrate>
+  <audio_enabled>1</audio_enabled>
+  <audio_codec_index>0</audio_codec_index>
+  <sampling_rate>48000</sampling_rate>
+  <audio_bitrate>320</audio_bitrate>
+</export_preset>
