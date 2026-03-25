@@ -248,6 +248,7 @@ class MainWindow : public QMainWindow {
   QAction* import_action;
   QAction* relink_media_action;
   QAction* export_action;
+  QAction* export_frame_action;
   QAction* exit_action;
 
   // edit menu actions

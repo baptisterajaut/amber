@@ -518,6 +518,8 @@ void MainWindow::setup_menus() {
 
   export_action = MenuHelper::create_menu_action(file_menu, "export", amber::Global.get(), SLOT(open_export_dialog()),
                                                  QKeySequence("Ctrl+M"));
+  export_frame_action = MenuHelper::create_menu_action(file_menu, "exportframe",
+      panel_sequence_viewer->viewer_widget, SLOT(save_frame()), QKeySequence("Ctrl+Shift+E"));
 
   file_menu->addSeparator();
 
@@ -931,6 +933,7 @@ void MainWindow::Retranslate() {
   import_action->setText(tr("&Import..."));
   relink_media_action->setText(tr("Relink Media..."));
   export_action->setText(tr("&Export..."));
+  export_frame_action->setText(tr("Export &Frame..."));
   exit_action->setText(tr("E&xit"));
 
   edit_menu->setTitle(tr("&Edit"));
