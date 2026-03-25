@@ -41,7 +41,7 @@ RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release \
 # --- Packaging stage ---
 FROM build AS package
 
-RUN dnf install -y curl unzip mingw64-nsis mingw-nsis-base && dnf clean all
+RUN dnf install -y curl unzip zip mingw64-nsis mingw-nsis-base && dnf clean all
 
 COPY packaging/ /packaging/
 
@@ -61,7 +61,9 @@ RUN SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \
     cp "${SYSROOT}/lib/qt6/plugins/multimedia/"*.dll /out/multimedia/ 2>/dev/null || true && \
     cp /src/effects/shaders/*.xml /src/effects/shaders/*.frag /src/effects/shaders/*.vert /out/effects/ 2>/dev/null || true && \
     cp -r /tmp/frei0r/frei0r-*/. /out/effects/frei0r-1/ 2>/dev/null || true && \
-    cp /src/build/*.qm /out/ts/ 2>/dev/null || true
+    cp /src/build/*.qm /out/ts/ 2>/dev/null || true && \
+    mkdir -p /out/exportpresets && \
+    cp /src/exportpresets/* /out/exportpresets/ 2>/dev/null || true
 
 # makensis hardcodes x86-unicode but mingw64-nsis ships amd64-unicode
 RUN cd /usr/share/nsis/Stubs && \
@@ -75,6 +77,11 @@ RUN cd /packaging/windows/nsis && \
     makensis -DX64 amber.nsi && \
     cp *.exe /out/amber-setup.exe
 
+# Build portable zip (same content as NSIS, minus the installer itself)
+RUN cd /packaging/windows/nsis && \
+    zip -r /out/amber-portable.zip amber/
+
 # --- Output stage (for --output) ---
 FROM scratch AS installer
 COPY --from=package /out/amber-setup.exe /amber-setup.exe
+COPY --from=package /out/amber-portable.zip /amber-portable.zip

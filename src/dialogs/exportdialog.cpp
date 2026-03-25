@@ -779,9 +779,10 @@ QString ExportDialog::UserPresetDir() {
 QStringList ExportDialog::PresetDirs() {
   QStringList dirs;
   QDir app_dir(QCoreApplication::applicationDirPath());
-  dirs.append(app_dir.filePath("exportpresets"));
-  dirs.append(app_dir.filePath("../share/amber-editor/exportpresets"));
-  dirs.append(UserPresetDir());
+  dirs.append(app_dir.filePath("exportpresets"));                        // Windows / dev build
+  dirs.append(app_dir.filePath("../ExportPresets"));                     // macOS .app bundle
+  dirs.append(app_dir.filePath("../share/amber-editor/exportpresets"));  // Linux FHS / AppImage
+  dirs.append(UserPresetDir());                                          // user presets (all platforms)
   return dirs;
 }
 
