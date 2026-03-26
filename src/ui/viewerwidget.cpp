@@ -193,6 +193,7 @@ void ViewerWidget::save_frame() {
 }
 
 void ViewerWidget::queue_repaint() {
+  if (audio_rendering) return;  // export in progress — viewer frozen
   update();
   if (overlay_) overlay_->update();
 }
@@ -338,6 +339,7 @@ void ViewerWidget::resizeEvent(QResizeEvent* event) {
 }
 
 void ViewerWidget::frame_update() {
+  if (audio_rendering) return;  // export in progress — viewer frozen
   if (viewer->seq != nullptr) {
     if (waveform) {
       update();
