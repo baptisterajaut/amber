@@ -451,7 +451,14 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event) {
       if (clip_index >= 0) {
         ClipPtr c = amber::ActiveSequence->clips.at(clip_index);
         if (c != nullptr && c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
-          amber::Global->set_sequence(c->media()->to_sequence());
+          SequencePtr nested = c->media()->to_sequence();
+          long ph = amber::ActiveSequence->playhead;
+          if (ph >= c->timeline_in() && ph < c->timeline_out()) {
+            long mapped = ph + c->clip_in(true) - c->timeline_in(true);
+            mapped = rescale_frame_number(mapped, amber::ActiveSequence->frame_rate, nested->frame_rate);
+            nested->playhead = mapped;
+          }
+          amber::Global->set_sequence(nested);
         }
       }
     }
