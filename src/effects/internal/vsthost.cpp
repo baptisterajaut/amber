@@ -360,15 +360,17 @@ void VSTHost::change_plugin() {
     if (configurePluginCallbacks()) {
       startPlugin();
 
-      VSTRect* eRect = nullptr;
-      plugin->dispatcher(plugin, effEditGetRect, 0, 0, &eRect, 0);
-
       if (!data_cache.isEmpty()) {
         send_data_cache_to_plugin();
       }
 
-      CreateDialogIfNull();
-      dialog->setFixedSize(eRect->right - eRect->left, eRect->bottom - eRect->top);
+      VSTRect* eRect = nullptr;
+      plugin->dispatcher(plugin, effEditGetRect, 0, 0, &eRect, 0);
+
+      if (eRect != nullptr && eRect->right > eRect->left && eRect->bottom > eRect->top) {
+        CreateDialogIfNull();
+        dialog->setFixedSize(eRect->right - eRect->left, eRect->bottom - eRect->top);
+      }
 
     } else {
 
@@ -377,5 +379,6 @@ void VSTHost::change_plugin() {
 
     }
   }
-  show_interface_btn->SetEnabled(plugin != nullptr);
+  bool has_editor = (plugin != nullptr) && (plugin->flags & effFlagsHasEditor);
+  show_interface_btn->SetEnabled(has_editor);
 }
