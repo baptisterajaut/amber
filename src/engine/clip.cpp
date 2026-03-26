@@ -51,16 +51,9 @@ Clip::Clip(Sequence* s)
       closing_transition(nullptr)
 
 {
-  if (!s) {
-    qWarning() << "Clip::Clip: sequence is null";
-  }
 }
 
 ClipPtr Clip::copy(Sequence* s) {
-  if (!s) {
-    qWarning() << "Clip::copy: sequence is null";
-    return nullptr;
-  }
   ClipPtr copy = std::make_shared<Clip>(s);
 
   copy->set_enabled(enabled());
