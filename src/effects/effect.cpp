@@ -225,12 +225,14 @@ void Effect::parseFieldElement(QXmlStreamReader& reader, EffectRow* row) {
         }
       }
       field->SetValueAt(0, color);
+      field->SetDefaultData(color);
     } break;
     case EffectField::EFFECT_FIELD_STRING:
       field = new StringField(row, id);
       for (const auto& attr : attributes) {
         if (attr.name() == QLatin1String("default")) {
           field->SetValueAt(0, attr.value().toString());
+          field->SetDefaultData(attr.value().toString());
         }
       }
       break;
@@ -238,7 +240,9 @@ void Effect::parseFieldElement(QXmlStreamReader& reader, EffectRow* row) {
       field = new BoolField(row, id);
       for (const auto& attr : attributes) {
         if (attr.name() == QLatin1String("default")) {
-          field->SetValueAt(0, attr.value() == QLatin1String("1"));
+          bool v = attr.value() == QLatin1String("1");
+          field->SetValueAt(0, v);
+          field->SetDefaultData(v);
         }
       }
       break;
@@ -261,6 +265,7 @@ void Effect::parseFieldElement(QXmlStreamReader& reader, EffectRow* row) {
         }
       }
       combo_field->SetValueAt(0, combo_default_index);
+      combo_field->SetDefaultData(combo_default_index);
       field = combo_field;
     } break;
     case EffectField::EFFECT_FIELD_FONT:
@@ -268,6 +273,7 @@ void Effect::parseFieldElement(QXmlStreamReader& reader, EffectRow* row) {
       for (const auto& attr : attributes) {
         if (attr.name() == QLatin1String("default")) {
           field->SetValueAt(0, attr.value().toString());
+          field->SetDefaultData(attr.value().toString());
         }
       }
       break;
@@ -276,6 +282,7 @@ void Effect::parseFieldElement(QXmlStreamReader& reader, EffectRow* row) {
       for (const auto& attr : attributes) {
         if (attr.name() == QLatin1String("filename")) {
           field->SetValueAt(0, attr.value().toString());
+          field->SetDefaultData(attr.value().toString());
         }
       }
       break;

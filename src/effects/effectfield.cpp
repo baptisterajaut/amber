@@ -74,6 +74,22 @@ void EffectField::SetColumnSpan(int i)
   colspan_ = i;
 }
 
+void EffectField::SetDefaultData(const QVariant& d)
+{
+  default_data_ = d;
+  has_default_ = true;
+}
+
+QVariant EffectField::GetDefaultData() const
+{
+  return default_data_;
+}
+
+bool EffectField::HasDefault() const
+{
+  return has_default_;
+}
+
 QVariant EffectField::ConvertStringToValue(const QString &s)
 {
   return s;

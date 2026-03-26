@@ -253,6 +253,21 @@ public:
   void SetColumnSpan(int i);
 
   /**
+   * @brief Store the default value for this field (used by Reset to Defaults).
+   */
+  void SetDefaultData(const QVariant& d);
+
+  /**
+   * @brief Get the stored default value.
+   */
+  QVariant GetDefaultData() const;
+
+  /**
+   * @brief Whether a default value has been stored.
+   */
+  bool HasDefault() const;
+
+  /**
    * @brief Convert a value from this field to a string
    *
    * When saving effect data to a project file, the data needs to be converted to a string format for saving in XML.
@@ -513,6 +528,16 @@ private:
    * @brief Internal column span value
    */
   int colspan_{1};
+
+  /**
+   * @brief Stored default value for reset functionality
+   */
+  QVariant default_data_;
+
+  /**
+   * @brief Whether default_data_ has been explicitly set
+   */
+  bool has_default_{false};
 
 };
 

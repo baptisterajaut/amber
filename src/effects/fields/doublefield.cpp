@@ -31,6 +31,7 @@ void DoubleField::SetMaximum(double maximum)
 void DoubleField::SetDefault(double d)
 {
   default_ = d;
+  SetDefaultData(d);
 
   if (!value_set_) {
     SetValueAt(0, d);

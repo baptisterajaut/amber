@@ -1,18 +1,21 @@
 #include "effectui.h"
 
 #include <QPoint>
+#include <QtMath>
 
 #include "engine/clip.h"
 #include "ui/menuhelper.h"
 #include "ui/keyframenavigator.h"
 #include "ui/clickablelabel.h"
+#include "ui/icons.h"
 #include "ui/menu.h"
 #include "panels/panels.h"
 #include "engine/undo/undo_effect.h"
 #include "global/global.h"
 
 EffectUI::EffectUI(Effect* e) :
-  effect_(e)
+  effect_(e),
+  effect_reset_button_(nullptr)
 {
   Q_ASSERT(e != nullptr);
 
@@ -82,6 +85,21 @@ EffectUI::EffectUI(Effect* e) :
           this,
           &EffectUI::show_context_menu);
 
+  // Effect-level reset button in the title bar
+  if (e->meta->type == EFFECT_TYPE_EFFECT) {
+    QHBoxLayout* tbl = static_cast<QHBoxLayout*>(title_bar->layout());
+    effect_reset_button_ = new QPushButton(title_bar);
+    effect_reset_button_->setIcon(amber::icon::CreateIconFromSVG(":/icons/undo.svg", false));
+    effect_reset_button_->setIconSize(QSize(10, 10));
+    effect_reset_button_->setFixedSize(16, 16);
+    effect_reset_button_->setFlat(true);
+    effect_reset_button_->setToolTip(tr("Reset All to Defaults"));
+    effect_reset_button_->setVisible(false);
+    // Insert after header label (index 3 = after collapse_button, enabled_check, header)
+    tbl->insertWidget(3, effect_reset_button_);
+    connect(effect_reset_button_, &QPushButton::clicked, this, &EffectUI::ResetToDefaults);
+  }
+
   int maximum_column = 0;
 
   widgets_.resize(e->row_count());
@@ -113,6 +131,43 @@ EffectUI::EffectUI(Effect* e) :
 
     // Find maximum column to place keyframe controls
     maximum_column = qMax(row->FieldCount(), maximum_column);
+  }
+
+  // Per-row reset buttons (between field widgets and keyframe nav)
+  maximum_column++;
+  int reset_column = maximum_column;
+
+  row_reset_buttons_.resize(e->row_count());
+
+  for (int i=0;i<e->row_count();i++) {
+    EffectRow* row = e->row(i);
+
+    // Only create reset button for rows that have fields with defaults
+    bool has_defaults = false;
+    for (int j=0;j<row->FieldCount();j++) {
+      if (row->Field(j)->HasDefault()) {
+        has_defaults = true;
+        break;
+      }
+    }
+
+    if (has_defaults) {
+      QPushButton* btn = new QPushButton();
+      btn->setIcon(amber::icon::CreateIconFromSVG(":/icons/undo.svg", false));
+      btn->setIconSize(QSize(10, 10));
+      btn->setFixedSize(16, 16);
+      btn->setFlat(true);
+      btn->setToolTip(tr("Reset to Default"));
+      btn->setVisible(false);
+      layout_->addWidget(btn, i, reset_column);
+
+      int row_index = i;
+      connect(btn, &QPushButton::clicked, this, [this, row_index]() { ResetRow(row_index); });
+
+      row_reset_buttons_[i] = btn;
+    } else {
+      row_reset_buttons_[i] = nullptr;
+    }
   }
 
   // Create keyframe controls
@@ -214,13 +269,28 @@ int EffectUI::GetRowY(int row, QWidget* mapToWidget) {
       - title_bar->height();
 }
 
+bool EffectUI::IsFieldAtDefault(EffectField* field) {
+  if (!field->HasDefault()) return true;
+  QVariant current = field->GetValueAt(field->Now());
+  QVariant def = field->GetDefaultData();
+  if (field->type() == EffectField::EFFECT_FIELD_DOUBLE) {
+    double cur_d = current.toDouble();
+    double def_d = def.toDouble();
+    return (cur_d == def_d) || qFuzzyCompare(cur_d, def_d);
+  }
+  return current == def;
+}
+
 void EffectUI::UpdateFromEffect()
 {
   Effect* effect = GetEffect();
 
+  bool any_row_not_default = false;
+
   for (int j=0;j<effect->row_count();j++) {
 
     EffectRow* row = effect->row(j);
+    bool row_at_default = true;
 
     for (int k=0;k<row->FieldCount();k++) {
       EffectField* field = row->Field(k);
@@ -251,7 +321,25 @@ void EffectUI::UpdateFromEffect()
         }
 
       }
+
+      if (!IsFieldAtDefault(field)) {
+        row_at_default = false;
+      }
     }
+
+    // Update per-row reset button visibility
+    if (j < row_reset_buttons_.size() && row_reset_buttons_[j] != nullptr) {
+      row_reset_buttons_[j]->setVisible(!row_at_default);
+    }
+
+    if (!row_at_default) {
+      any_row_not_default = true;
+    }
+  }
+
+  // Update effect-level reset button visibility
+  if (effect_reset_button_ != nullptr) {
+    effect_reset_button_->setVisible(any_row_not_default);
   }
 }
 
@@ -287,6 +375,81 @@ void EffectUI::AttachKeyframeNavigationToRow(EffectRow *row, KeyframeNavigator *
   connect(nav, &KeyframeNavigator::keyframe_enabled_changed, row, &EffectRow::SetKeyframingEnabled);
   connect(nav, &KeyframeNavigator::clicked, row, &EffectRow::FocusRow);
   connect(row, &EffectRow::KeyframingSetChanged, nav, &KeyframeNavigator::enable_keyframes);
+}
+
+void EffectUI::ResetEffectFields(Effect* e) {
+  for (int i = 0; i < e->row_count(); i++) {
+    EffectRow* row = e->row(i);
+    for (int j = 0; j < row->FieldCount(); j++) {
+      EffectField* field = row->Field(j);
+      if (field->HasDefault()) {
+        field->SetValueAt(field->Now(), field->GetDefaultData());
+      }
+    }
+  }
+}
+
+void EffectUI::ResetRow(int row_index) {
+  ComboAction* ca = new ComboAction();
+
+  QVector<Effect*> effects;
+  effects.append(effect_);
+  effects.append(additional_effects_);
+
+  QVector<KeyframeDataChange*> kdcs;
+  for (auto* e : effects) {
+    EffectRow* row = e->row(row_index);
+    for (int j = 0; j < row->FieldCount(); j++) {
+      EffectField* field = row->Field(j);
+      if (field->HasDefault()) {
+        kdcs.append(new KeyframeDataChange(field));
+        field->SetValueAt(field->Now(), field->GetDefaultData());
+      }
+    }
+  }
+
+  for (auto* kdc : kdcs) {
+    kdc->SetNewKeyframes();
+    ca->append(kdc);
+  }
+
+  ca->setText(QObject::tr("Reset to Default"));
+  amber::UndoStack.push(ca);
+  update_ui(false);
+}
+
+void EffectUI::ResetToDefaults() {
+  ComboAction* ca = new ComboAction();
+
+  QVector<Effect*> effects;
+  effects.append(effect_);
+  effects.append(additional_effects_);
+
+  QVector<KeyframeDataChange*> kdcs;
+  for (auto* e : effects) {
+    for (int i = 0; i < e->row_count(); i++) {
+      EffectRow* row = e->row(i);
+      for (int j = 0; j < row->FieldCount(); j++) {
+        EffectField* field = row->Field(j);
+        if (field->HasDefault()) {
+          kdcs.append(new KeyframeDataChange(field));
+        }
+      }
+    }
+  }
+
+  for (auto* e : effects) {
+    ResetEffectFields(e);
+  }
+
+  for (auto* kdc : kdcs) {
+    kdc->SetNewKeyframes();
+    ca->append(kdc);
+  }
+
+  ca->setText(QObject::tr("Reset to Defaults"));
+  amber::UndoStack.push(ca);
+  update_ui(false);
 }
 
 void EffectUI::show_context_menu(const QPoint& pos) {
@@ -334,6 +497,10 @@ void EffectUI::show_context_menu(const QPoint& pos) {
 
       connect(delete_action, &QAction::triggered, additional_effect, &Effect::delete_self);
     }
+
+    menu.addSeparator();
+
+    menu.addAction(tr("Reset to Defaults"), this, &EffectUI::ResetToDefaults);
 
     menu.addSeparator();
 
