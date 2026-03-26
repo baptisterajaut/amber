@@ -150,6 +150,19 @@ void RenderThread::run() {
         rhi_ = QRhi::create(QRhi::OpenGLES2, &glParams);
       }
 
+      // Last resort: software Vulkan (llvmpipe) if OpenGL also failed
+#if AMBER_HAS_VULKAN
+      if (!rhi_ && amber::CurrentRuntimeConfig.vulkan_is_software) {
+        auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
+        if (vi && vi->isValid()) {
+          qWarning() << "OpenGL failed, falling back to software Vulkan (llvmpipe)";
+          QRhiVulkanInitParams vkParams;
+          vkParams.inst = vi;
+          rhi_ = QRhi::create(QRhi::Vulkan, &vkParams);
+        }
+      }
+#endif
+
       if (!rhi_) {
         qCritical() << "Failed to create QRhi with any backend";
         continue;
@@ -247,8 +260,13 @@ void RenderThread::paint() {
   QMutex& active_mutex = front_buffer_switcher ? front_mutex1 : front_mutex2;
   active_mutex.lock();
 
-  QRhiCommandBuffer* cb;
-  rhi_->beginOffscreenFrame(&cb);
+  QRhiCommandBuffer* cb = nullptr;
+  if (rhi_->beginOffscreenFrame(&cb) != QRhi::FrameOpSuccess) {
+    qWarning() << "beginOffscreenFrame failed, skipping frame";
+    active_mutex.unlock();
+    texture_failed = true;
+    return;
+  }
 
   // Clear the main target (use non-PreserveColorContents RT so clear actually happens)
   {

@@ -177,6 +177,11 @@ int main(int argc, char *argv[]) {
     if (!probe) {
       qWarning() << "Vulkan instance created but no usable GPU found, disabling Vulkan";
       amber::CurrentRuntimeConfig.vulkan_instance = nullptr;
+    } else if (probe->driverInfo().deviceType == QRhiDriverInfo::CpuDevice) {
+      qWarning() << "Vulkan device is software-only ("
+                 << probe->driverInfo().deviceName
+                 << "), preferring OpenGL (Vulkan kept as last-resort fallback)";
+      amber::CurrentRuntimeConfig.vulkan_is_software = true;
     }
   }
 #endif
@@ -210,7 +215,8 @@ int main(int argc, char *argv[]) {
     amber::CurrentRuntimeConfig.rhi_backend = RhiBackend::D3D12;
 #else
     amber::CurrentRuntimeConfig.rhi_backend =
-        (amber::CurrentRuntimeConfig.vulkan_instance != nullptr) ? RhiBackend::Vulkan : RhiBackend::OpenGL;
+        (amber::CurrentRuntimeConfig.vulkan_instance != nullptr && !amber::CurrentRuntimeConfig.vulkan_is_software)
+            ? RhiBackend::Vulkan : RhiBackend::OpenGL;
 #endif
   }
 

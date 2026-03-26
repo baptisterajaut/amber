@@ -718,6 +718,10 @@ struct RuntimeConfig {
   // QVulkanInstance* created in main() — used by RenderThread for offscreen Vulkan QRhi.
   // Stored as void* to avoid pulling QVulkanInstance into this header.
   void* vulkan_instance{nullptr};
+
+  // True when Vulkan probe found only a software device (llvmpipe/swrast).
+  // OpenGL is preferred, but Vulkan remains available as last-resort fallback.
+  bool vulkan_is_software{false};
 };
 
 namespace amber {
