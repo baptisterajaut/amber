@@ -77,8 +77,6 @@ void RenderThread::drainDeferredDeletes() {
 
 RenderThread::RenderThread()
     : front_buffer_switcher(false), queued(false) {
-  // Must be created on the GUI thread (QOffscreenSurface wraps a QWindow internally)
-  fallbackSurface_ = QRhiGles2InitParams::newFallbackSurface();
 }
 
 RenderThread::~RenderThread() {}
@@ -143,8 +141,11 @@ void RenderThread::run() {
           break;
       }
 
-      // OpenGL fallback
+      // OpenGL fallback — create surface on this thread so the GL context
+      // can be made current here (Qt requires thread affinity match).
       if (!rhi_) {
+        if (!fallbackSurface_)
+          fallbackSurface_ = QRhiGles2InitParams::newFallbackSurface();
         QRhiGles2InitParams glParams;
         glParams.fallbackSurface = fallbackSurface_;
         rhi_ = QRhi::create(QRhi::OpenGLES2, &glParams);
