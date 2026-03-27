@@ -416,7 +416,15 @@ void RenderThread::start_render(Sequence* s,
                                 bool scrubbing) {
   Q_UNUSED(idivider)
 
-  wait_lock_.lock();
+  // Export path (pixel_buffer != nullptr) needs the lock to prevent a lost-wakeup
+  // deadlock — there's only one start_render per frame and the export thread blocks
+  // waiting for completion. Viewer/scrubbing path must NOT lock — the render thread
+  // holds wait_lock_ during the entire paint() operation, so locking here would make
+  // scrubbing synchronous (UI blocks until previous frame finishes rendering).
+  bool needs_lock = (pixels != nullptr);
+  if (needs_lock) {
+    wait_lock_.lock();
+  }
 
   seq = s;
 
@@ -434,7 +442,9 @@ void RenderThread::start_render(Sequence* s,
 
   wait_cond_.wakeAll();
 
-  wait_lock_.unlock();
+  if (needs_lock) {
+    wait_lock_.unlock();
+  }
 }
 
 bool RenderThread::did_texture_fail() { return texture_failed; }

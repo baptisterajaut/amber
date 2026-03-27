@@ -205,11 +205,11 @@ void Frei0rEffect::refresh() {
 }
 
 void Frei0rEffect::destruct_module() {
-  if (isOpen) {
+  if (open) {
     f0rDestructFunc destruct = reinterpret_cast<f0rDestructFunc>(handle.resolve("f0r_destruct"));
     if (destruct != nullptr) destruct(instance);
 
-    isOpen = false;
+    open = false;
   }
 }
 
@@ -225,7 +225,7 @@ void Frei0rEffect::construct_module() {
     qWarning() << "Frei0r: f0r_construct returned null for" << meta->name;
     return;
   }
-  isOpen = true;
+  open = true;
 }
 
 #endif

@@ -607,7 +607,7 @@ void Timeline::delete_selection(QVector<Selection>& selections, bool ripple_dele
       for (int i=1;i<selections.size();i++) {
         const Selection& s = selections.at(i);
         ripple_point = qMin(ripple_point, s.in);
-        ripple_length = qMax(ripple_length, s.out - s.in);
+        ripple_length = qMin(ripple_length, s.out - s.in);
       }
 
       // it feels a little more intuitive with this here

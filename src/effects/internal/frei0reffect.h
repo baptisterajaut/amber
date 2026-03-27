@@ -47,6 +47,7 @@ private:
   f0rGetParamInfo get_param_info;
   void destruct_module();
   void construct_module();
+  bool open{false};
   int instance_width{0};
   int instance_height{0};
 };

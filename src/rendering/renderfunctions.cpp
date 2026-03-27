@@ -376,13 +376,13 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
         for (int i = 0; i < e->getIterations(); i++) {
           // Fill UBO data via the effect's process_shader
           QByteArray uboData;
-          uboData.resize(e->fragUboSize());
+          uboData.resize(qMax(e->fragUboSize(), e->vertUboSize()));
           uboData.fill(0);
           e->process_shader(timecode, coords, i, uboData);
 
           // Blit through effect shader into the next FBO (skip clipSpaceCorr — intermediate pass)
           rhi_blit(params, res->rt[fbo_switcher], res->rpd, composite_texture, e->vertexShader(), e->fragmentShader(),
-                   blitMvp, uboData, e->fragUboSize(), 1, nullptr, nullptr,
+                   blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()), 1, nullptr, nullptr,
                    /*skipClipSpaceCorr=*/true);
           composite_texture = res->tex[fbo_switcher];
           fbo_switcher = !fbo_switcher;

@@ -543,7 +543,7 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
 
     cacher.queue()->lock();
 
-    if (frame != nullptr) {
+    if (frame != nullptr && cacher.queue()->contains(frame)) {
       bool is_yuv420p = (frame->format == AV_PIX_FMT_YUV420P);
       bool is_nv12 = (frame->format == AV_PIX_FMT_NV12);
 

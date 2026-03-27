@@ -46,6 +46,14 @@ Tested on Arch Linux only. AppImage, Windows and macOS builds are best-effort.
 - **Cacher reconfigure**: Adding/removing an ImageFlag effect (e.g. Frei0r) on a clip requires closing and reopening the clip so the cacher switches between YUV and RGBA pipeline. This is handled by `Clip::NeedsCacherReconfigure()`, checked in `compose_sequence()` (`rendering/renderfunctions.cpp`).
 - **Frei0r dimensions**: Frei0r instances are constructed with fixed dimensions. If `media_width()`/`media_height()` aren't available yet (project load before media analysis), `process_image()` lazily reconstructs the instance when dimensions change.
 
+## Audits and bulk fixes
+
+Codebase audits must produce a **classified report first, not code**. Each finding must include: the file/function, what's wrong, the proposed fix, and a risk tier:
+- **Safe**: null checks, error handling on failure paths, resource leak on error paths — apply freely.
+- **Behavioral**: changes that alter runtime behavior — data ownership, lock/wait patterns, cross-thread semantics, hot-path control flow, merging variables across class hierarchies. For each, the report must explain: (1) what the current code does and why it might be intentional, (2) what the fix changes in observable behavior, (3) what breaks if the "bug" was actually by design. The user is not a C++ developer — "pointer ownership" means nothing, "scrubbing becomes synchronous" means everything. Frame findings in terms of user-visible impact.
+
+Safe fixes can be applied immediately (on a dedicated branch). Behavioral fixes are presented for validation — the user decides based on the impact description, not the C++ rationale.
+
 ## Code style
 
 clang-format with `.clang-format` in repo root (Google-based, 2-space indent, 120-col limit, attached braces, left pointer alignment). Run `clang-format -i <file>` to format.
