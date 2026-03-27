@@ -80,6 +80,13 @@ ViewerWidget::ViewerWidget(QWidget* parent)
   connect(this, &ViewerWidget::customContextMenuRequested, this, &ViewerWidget::show_context_menu);
 
   renderer = new RenderThread();
+  // Pre-create the GL fallback surface on the GUI thread to avoid the
+  // "QWindow-based QOffscreenSurface outside the gui thread" warning on
+  // Wayland.  Each RenderThread needs its own surface.
+  if (amber::CurrentRuntimeConfig.rhi_backend == RhiBackend::OpenGL) {
+    gl_fallback_surface_ = QRhiGles2InitParams::newFallbackSurface();
+    renderer->setGlFallbackSurface(gl_fallback_surface_);
+  }
   renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ViewerWidget::queue_repaint);
   connect(renderer, &RenderThread::finished, renderer, &RenderThread::deleteLater);
@@ -108,6 +115,7 @@ ViewerWidget::ViewerWidget(QWidget* parent)
 ViewerWidget::~ViewerWidget() {
   renderer->cancel();
   delete renderer;
+  delete gl_fallback_surface_;
 }
 
 void ViewerWidget::set_waveform_scroll(int s) {

@@ -24,6 +24,7 @@
 #include <atomic>
 #include <QThread>
 #include <QMutex>
+#include <QOffscreenSurface>
 #include <QWaitCondition>
 
 struct AVFormatContext;
@@ -75,6 +76,10 @@ public:
   ExportThread(const ExportParams& params, const VideoCodecParams& vparams, QObject* parent = nullptr);
   void run() override;
 
+  // Pre-created GL fallback surface (created on GUI thread, passed through to
+  // the internal RenderThread).  ExportThread does NOT take ownership.
+  void setGlFallbackSurface(QOffscreenSurface* surface);
+
   const QString& GetError();
 
   bool WasInterrupted();
@@ -125,6 +130,7 @@ private:
   QString export_error;
 
   std::atomic<bool> waiting_for_audio_;
+  QOffscreenSurface* gl_fallback_surface_{nullptr};
 private slots:
   void wake();
 };

@@ -116,6 +116,7 @@ class ViewerWidget : public QRhiWidget {
   int gizmo_y_mvmt;
   EffectGizmo* selected_gizmo{nullptr};
   RenderThread* renderer;
+  QOffscreenSurface* gl_fallback_surface_{nullptr};  // owned by us, created on GUI thread
   QRhi* rhi_{nullptr};
   bool rhi_initialized_{false};
 

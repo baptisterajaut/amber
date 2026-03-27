@@ -178,6 +178,16 @@ private:
   ExportThread* export_thread_;
 
   /**
+   * @brief GL fallback surface for the export RenderThread
+   *
+   * Created on the GUI thread before export starts, passed to ExportThread, deleted in
+   * export_thread_finished().  Avoids "QWindow outside gui thread" warning on Wayland.
+   */
+  QOffscreenSurface* export_gl_surface_{nullptr};
+
+  long pre_export_playhead_{0};
+
+  /**
    * @brief Struct for advanced video codec parameters.
    *
    * More advanced video encoding parameters to be sent to the ExportThread. These variables are not directly editable

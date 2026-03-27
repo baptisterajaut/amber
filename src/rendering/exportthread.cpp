@@ -51,6 +51,10 @@ ExportThread::ExportThread(const ExportParams &params,
 {
 }
 
+void ExportThread::setGlFallbackSurface(QOffscreenSurface* surface) {
+  gl_fallback_surface_ = surface;
+}
+
 bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, AVFrame* frame, AVPacket* packet, AVStream* stream) {
   ret = avcodec_send_frame(codec_ctx, frame);
   if (ret < 0) {
@@ -417,6 +421,9 @@ void ExportThread::Export()
 
   // Create a dedicated render thread for export (viewer composites on main thread now)
   RenderThread* renderer = new RenderThread();
+  if (gl_fallback_surface_) {
+    renderer->setGlFallbackSurface(gl_fallback_surface_);
+  }
   renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
@@ -572,8 +579,10 @@ cleanup_renderer:
   delete renderer;
 
 cleanup_state:
-  // Always clean up clip/rendering state, even on cancel
-  amber::Global->set_rendering_state(false);
+  // Clean up clip state.  Rendering state (audio_rendering flag + autorecovery
+  // timer) is restored on the main thread in ExportDialog::export_thread_finished
+  // — starting a QTimer from this thread triggers "Timers cannot be started
+  // from another thread".
   close_active_clips(amber::ActiveSequence.get());
 
   if (interrupt_) {

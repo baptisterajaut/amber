@@ -39,6 +39,13 @@ public:
   ~RenderThread() override;
   void run() override;
 
+  // Pre-set a fallback surface for the OpenGL backend.  Must be created on
+  // the GUI thread (via QRhiGles2InitParams::newFallbackSurface()) and passed
+  // here BEFORE start().  RenderThread does NOT take ownership — the caller
+  // must ensure the surface outlives the RenderThread and delete it on the
+  // GUI thread after cancel()/wait().
+  void setGlFallbackSurface(QOffscreenSurface* surface);
+
   QMutex* get_texture_mutex(int buffer_index);
 
   // CPU bridge: pixel data read back after compositing
@@ -81,6 +88,7 @@ private:
   // RHI resources
   QRhi* rhi_{nullptr};
   QOffscreenSurface* fallbackSurface_{nullptr};
+  bool owns_fallback_surface_{false};  // true when created internally (legacy path)
 
   // Core shaders loaded from QRC .qsb files
   QShader passthroughVert_;

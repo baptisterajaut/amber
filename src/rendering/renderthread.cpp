@@ -81,6 +81,11 @@ RenderThread::RenderThread()
 
 RenderThread::~RenderThread() {}
 
+void RenderThread::setGlFallbackSurface(QOffscreenSurface* surface) {
+  fallbackSurface_ = surface;
+  owns_fallback_surface_ = false;
+}
+
 void RenderThread::run() {
   wait_lock_.lock();
 
@@ -141,11 +146,15 @@ void RenderThread::run() {
           break;
       }
 
-      // OpenGL fallback — create surface on this thread so the GL context
-      // can be made current here (Qt requires thread affinity match).
+      // OpenGL fallback.  Prefer a surface pre-created on the GUI thread
+      // (via setGlFallbackSurface) to avoid the "QWindow outside gui thread"
+      // warning on Wayland.  Fall back to creating one here if the caller
+      // didn't provide one (produces a warning but still works).
       if (!rhi_) {
-        if (!fallbackSurface_)
+        if (!fallbackSurface_) {
           fallbackSurface_ = QRhiGles2InitParams::newFallbackSurface();
+          owns_fallback_surface_ = true;
+        }
         QRhiGles2InitParams glParams;
         glParams.fallbackSurface = fallbackSurface_;
         rhi_ = QRhi::create(QRhi::OpenGLES2, &glParams);
@@ -496,6 +505,9 @@ void RenderThread::delete_ctx() {
   delete rhi_;
   rhi_ = nullptr;
 
-  delete fallbackSurface_;
+  if (owns_fallback_surface_) {
+    delete fallbackSurface_;
+  }
   fallbackSurface_ = nullptr;
+  owns_fallback_surface_ = false;
 }

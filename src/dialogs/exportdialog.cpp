@@ -43,6 +43,7 @@ extern "C" {
 
 #include "dialogs/advancedvideodialog.h"
 #include "dialogs/exportsavepresetdialog.h"
+#include "global/config.h"
 #include "global/global.h"
 #include "panels/panels.h"
 #include "rendering/audio.h"
@@ -347,14 +348,22 @@ void ExportDialog::export_thread_finished() {
                           QMessageBox::Ok);
   }
 
+  // Restore rendering state on the main thread (ExportThread can't do this —
+  // set_rendering_state(false) starts autorecovery_timer, a QTimer owned by
+  // the main thread, which triggers "Timers cannot be started from another
+  // thread" if called from ExportThread).
+  amber::Global->set_rendering_state(false);
+
   // Clear audio buffer
   clear_audio_ibuffer();
 
   // Re-enable/disable UI widgets based on the rendering state
   prep_ui_for_render(false);
 
-  // Trigger viewer repaint after export
-  panel_sequence_viewer->viewer_widget->update();
+  // Restore playhead to its pre-export position
+  if (panel_sequence_viewer != nullptr && amber::ActiveSequence) {
+    panel_sequence_viewer->seek(pre_export_playhead_);
+  }
 
   // Update the application UI
   update_ui(false);
@@ -364,6 +373,10 @@ void ExportDialog::export_thread_finished() {
 
   // Free the export thread
   export_thread_->deleteLater();
+
+  // Free the GL fallback surface (must be deleted on GUI thread — we're on it)
+  delete export_gl_surface_;
+  export_gl_surface_ = nullptr;
 
   // If the export succeeded, close the dialog
   if (succeeded) {
@@ -509,6 +522,13 @@ void ExportDialog::StartExport() {
     // Create export thread
     export_thread_ = new ExportThread(params, vcodec_params, this);
 
+    // Pre-create a GL fallback surface on the GUI thread for the export's
+    // RenderThread.  Avoids "QWindow outside gui thread" warning on Wayland.
+    if (amber::CurrentRuntimeConfig.rhi_backend == RhiBackend::OpenGL) {
+      export_gl_surface_ = QRhiGles2InitParams::newFallbackSurface();
+      export_thread_->setGlFallbackSurface(export_gl_surface_);
+    }
+
     // Connect export thread signals/slots
     connect(export_thread_, &QThread::finished, this, &ExportDialog::export_thread_finished);
     connect(export_thread_, &ExportThread::ProgressChanged, this, &ExportDialog::update_progress_bar);
@@ -533,6 +553,9 @@ void ExportDialog::StartExport() {
     }
 
     amber::Global->set_rendering_state(true);
+
+    // Save playhead position so we can restore it after export
+    pre_export_playhead_ = amber::ActiveSequence ? amber::ActiveSequence->playhead : 0;
 
     // Seek to export start frame (safe now — audio_rendering is true so
     // ViewerWidget::frame_update() will early-return, but the UI updates
