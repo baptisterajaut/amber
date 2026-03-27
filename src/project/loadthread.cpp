@@ -237,12 +237,13 @@ QString LoadThread::resolve_footage_url(const QString& raw_url) {
     return QFileInfo(raw_url).absoluteFilePath();
   }
 
-  // tries to locate file using a file path relative to the project's current folder
-  QString proj_dir_test = proj_dir.absoluteFilePath(raw_url);
+  // Resolve relative paths against the project's current folder, normalizing ".." sequences
+  // so symlinks in the project path don't cause the resolved path to land in the wrong place.
+  QString proj_dir_test = QDir::cleanPath(proj_dir.absoluteFilePath(raw_url));
 
-  // tries to locate file using a file path relative to the folder the project was saved in
+  // Same resolution against the folder the project was originally saved in
   // (unaffected by moving the project file)
-  QString internal_proj_dir_test = internal_proj_dir.absoluteFilePath(raw_url);
+  QString internal_proj_dir_test = QDir::cleanPath(internal_proj_dir.absoluteFilePath(raw_url));
 
   // tries to locate file using the file name directly in the project's current folder
   QString proj_dir_direct_test = proj_dir.filePath(QFileInfo(raw_url).fileName());
@@ -262,8 +263,11 @@ QString LoadThread::resolve_footage_url(const QString& raw_url) {
     return internal_proj_dir_test;
   }
 
-  qInfo() << "Failed to match" << raw_url << "to file";
-  return raw_url;
+  qInfo() << "Failed to match" << raw_url << "to file (tried" << proj_dir_test << "and" << internal_proj_dir_test << ")";
+  // Return the cleaned absolute path even though the file doesn't exist — this keeps f->url
+  // as an absolute path so subsequent saves produce a correct relative path instead of
+  // double-encoding the relative URL and corrupting it further with each save-load cycle.
+  return proj_dir_test;
 }
 
 void LoadThread::parse_clip_links(QXmlStreamReader& stream, Clip* c) {

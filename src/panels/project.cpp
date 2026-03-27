@@ -1041,7 +1041,7 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
           stream.writeAttribute("id", QString::number(media_id));
           stream.writeAttribute("folder", QString::number(folder));
           stream.writeAttribute("name", f->name);
-          stream.writeAttribute("url", proj_dir.relativeFilePath(f->url));
+          stream.writeAttribute("url", proj_dir.relativeFilePath(QDir::cleanPath(f->url)));
           stream.writeAttribute("duration", QString::number(f->length));
           stream.writeAttribute("using_inout", QString::number(f->using_inout));
           stream.writeAttribute("in", QString::number(f->in));
