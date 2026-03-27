@@ -110,6 +110,10 @@ QVariant EffectField::GetValueAt(double timecode)
     double progress;
     GetKeyframeData(timecode, before_keyframe, after_keyframe, progress);
 
+    if (before_keyframe == -1) {
+      return persistent_data_;
+    }
+
     const QVariant& before_data = keyframes.at(before_keyframe).data;
     switch (type_) {
     case EFFECT_FIELD_DOUBLE:
@@ -252,12 +256,14 @@ void EffectField::SetValueAt(double time, const QVariant &value)
 double EffectField::Now()
 {
   Clip* c = GetParentRow()->GetParentEffect()->parent_clip;
+  if (c->sequence == nullptr) return 0.0;
   return playhead_to_clip_seconds(c, c->sequence->playhead);
 }
 
 long EffectField::NowInFrames()
 {
   Clip* c = GetParentRow()->GetParentEffect()->parent_clip;
+  if (c->sequence == nullptr) return 0;
   return playhead_to_clip_frame(c, c->sequence->playhead);
 }
 
@@ -348,11 +354,15 @@ double EffectField::GetValidKeyframeHandlePosition(int key, bool post) {
 }
 
 double EffectField::FrameToSeconds(long frame) {
-  return (double(frame) / GetParentRow()->GetParentEffect()->parent_clip->sequence->frame_rate);
+  Sequence* seq = GetParentRow()->GetParentEffect()->parent_clip->sequence;
+  if (seq == nullptr) return 0.0;
+  return (double(frame) / seq->frame_rate);
 }
 
 long EffectField::SecondsToFrame(double seconds) {
-  return qRound(seconds * GetParentRow()->GetParentEffect()->parent_clip->sequence->frame_rate);
+  Sequence* seq = GetParentRow()->GetParentEffect()->parent_clip->sequence;
+  if (seq == nullptr) return 0;
+  return qRound(seconds * seq->frame_rate);
 }
 
 void EffectField::GetKeyframeData(double timecode, int &before, int &after, double &progress) {
@@ -391,8 +401,8 @@ void EffectField::GetKeyframeData(double timecode, int &before, int &after, doub
     after = after_keyframe_index;
   } else {
     // no keyframes found — caller should check before != -1
-    before = 0;
-    after = 0;
+    before = -1;
+    after = -1;
   }
 }
 

@@ -133,6 +133,8 @@ void stop_audio() {
 
     audio_output->stop();
     delete audio_output;
+    audio_output = nullptr;
+    audio_io_device = nullptr;
     audio_device_set = false;
   }
 }
@@ -149,7 +151,11 @@ void clear_audio_ibuffer(long new_frame) {
   if (audio_thread != nullptr) audio_thread->lock.unlock();
 }
 
-int current_audio_freq() { return audio_rendering ? audio_rendering_rate.load() : audio_output->format().sampleRate(); }
+int current_audio_freq() {
+  if (audio_rendering) return audio_rendering_rate.load();
+  if (audio_output != nullptr) return audio_output->format().sampleRate();
+  return 48000;
+}
 
 qint64 get_buffer_offset_from_frame(double framerate, long frame) {
   long ibuf_frame = audio_ibuffer_frame.load();
@@ -233,8 +239,9 @@ int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
 
       qint64 src = offset + p * 4;
       for (int ch = 0; ch < 2; ch++) {
-        qint64 bi = src + ch * 2;
-        qint16 raw = qint16(((audio_ibuffer[bi + 1] & 0xFF) << 8) | (audio_ibuffer[bi] & 0xFF));
+        qint64 bi = (src + ch * 2) % audio_ibuffer_size;
+        qint64 bi1 = (bi + 1) % audio_ibuffer_size;
+        qint16 raw = qint16(((audio_ibuffer[bi1] & 0xFF) << 8) | (audio_ibuffer[bi] & 0xFF));
         qint16 windowed = qint16(raw * w);
         staging_buffer_[p * 4 + ch * 2] = char(windowed & 0xFF);
         staging_buffer_[p * 4 + ch * 2 + 1] = char((windowed >> 8) & 0xFF);

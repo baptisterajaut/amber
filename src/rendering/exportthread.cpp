@@ -441,10 +441,13 @@ void ExportThread::Export()
     if (params_.video_enabled) {
       do {
         // TODO optimize by rendering the next frame while encoding the last
-        renderer->start_render(amber::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0, true);
+        render_complete_ = false;
+        renderer->start_render(amber::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0);
 
-        // Wait for RenderThread to return
-        waitCond.wait(&mutex);
+        // Wait for RenderThread to return (predicate guards against lost wakeup)
+        while (!render_complete_ && !interrupt_) {
+          waitCond.wait(&mutex);
+        }
 
         if (interrupt_) {
           renderer->cancel();
@@ -503,7 +506,7 @@ void ExportThread::Export()
     // If we're exporting audio, copy audio from the buffer into an AVFrame for encoding
     if (params_.audio_enabled) {
 
-      if (waiting_for_audio_ && !interrupt_) {
+      while (waiting_for_audio_ && !interrupt_) {
         waitCond.wait(&mutex);
       }
 
@@ -724,6 +727,7 @@ void ExportThread::play_wake()
 
 void ExportThread::wake() {
   mutex.lock();
+  render_complete_ = true;
   waitCond.wakeAll();
   mutex.unlock();
 }

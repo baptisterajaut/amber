@@ -337,8 +337,9 @@ void ExportDialog::format_changed(int index) {
 }
 
 void ExportDialog::export_thread_finished() {
-  // Determine if the export succeeded
-  bool succeeded = (progressBar->value() == 100);
+  // Determine if the export succeeded: no error and not cancelled
+  bool succeeded = !export_thread_->WasInterrupted() && export_thread_->GetError().isEmpty();
+  export_success_ = succeeded;
 
   // If it failed and we didn't cancel it, it must have errored out. Show an error message.
   if (!succeeded && !export_thread_->WasInterrupted()) {

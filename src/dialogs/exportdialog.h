@@ -282,6 +282,11 @@ private:
   qint64 total_export_time_start;
 
   /**
+   * @brief Whether the last export completed successfully (no error, no interruption)
+   */
+  bool export_success_{false};
+
+  /**
    * @brief ComboBox for selecting an export preset
    */
   QComboBox* preset_combo_;

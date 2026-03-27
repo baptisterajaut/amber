@@ -262,8 +262,9 @@ protected:
   // enable effect to update constantly
   virtual bool AlwaysUpdate();
 
-private:
+protected:
   bool isOpen{false};
+private:
   QVector<EffectRow*> rows;
   QVector<EffectGizmo*> gizmos;
   bool bound{false};

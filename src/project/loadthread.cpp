@@ -785,9 +785,11 @@ void LoadThread::run() {
 }
 
 void LoadThread::cancel() {
+  cancelled_ = true;
+  mutex.lock();
   question_answered_ = true;
   waitCond.wakeAll();
-  cancelled_ = true;
+  mutex.unlock();
 }
 
 void LoadThread::question_func(const QString& title, const QString& text, int buttons) {
@@ -795,8 +797,8 @@ void LoadThread::question_func(const QString& title, const QString& text, int bu
   question_btn =
       QMessageBox::warning(amber::MainWindow, title, text, static_cast<enum QMessageBox::StandardButton>(buttons));
   question_answered_ = true;
-  mutex.unlock();
   waitCond.wakeAll();
+  mutex.unlock();
 }
 
 void LoadThread::error_func() {

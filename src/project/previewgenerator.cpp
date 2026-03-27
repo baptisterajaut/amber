@@ -288,10 +288,24 @@ bool PreviewGenerator::setup_stream_codecs(AVCodecContext** codec_ctx, qint16***
 
         // alloc the context and load the params into it
         codec_ctx[i] = avcodec_alloc_context3(codec);
-        avcodec_parameters_to_context(codec_ctx[i], fmt_ctx_->streams[i]->codecpar);
+        if (codec_ctx[i] == nullptr) {
+          qWarning() << "Failed to allocate codec context for stream" << i;
+          continue;
+        }
+        if (avcodec_parameters_to_context(codec_ctx[i], fmt_ctx_->streams[i]->codecpar) < 0) {
+          qWarning() << "Failed to copy codec parameters for stream" << i;
+          avcodec_free_context(&codec_ctx[i]);
+          codec_ctx[i] = nullptr;
+          continue;
+        }
 
         // open the decoder
-        avcodec_open2(codec_ctx[i], codec, nullptr);
+        if (avcodec_open2(codec_ctx[i], codec, nullptr) < 0) {
+          qWarning() << "Failed to open codec for stream" << i;
+          avcodec_free_context(&codec_ctx[i]);
+          codec_ctx[i] = nullptr;
+          continue;
+        }
 
         // audio specific functions
         if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -424,7 +438,12 @@ void PreviewGenerator::process_audio_frame(AVFrame* temp_frame, FootageStream* s
   // `config.waveform_resolution` determines how many samples per second are stored in waveform.
   // `sample_rate` is samples per second, so `interval` is how many samples are averaged in
   // each "point" of the waveform
-  int interval = qFloor((temp_frame->sample_rate/amber::CurrentConfig.waveform_resolution)/4)*4;
+  if (amber::CurrentConfig.waveform_resolution <= 0) {
+    swr_free(&swr_ctx);
+    av_frame_free(&swr_frame);
+    return;
+  }
+  int interval = qMax(4, qFloor((temp_frame->sample_rate/amber::CurrentConfig.waveform_resolution)/4)*4);
 
   // get the amount of bytes in an audio sample
   int sample_size = av_get_bytes_per_sample(static_cast<AVSampleFormat>(swr_frame->format));
@@ -504,6 +523,10 @@ void PreviewGenerator::retrieve_media_duration(int64_t* media_lengths) {
       double time_base = av_q2d(fmt_ctx_->streams[maximum_stream]->time_base);
       footage_->length = qRound(double(fmt_ctx_->streams[maximum_stream]->duration) * time_base * AV_TIME_BASE);
     }
+  }
+
+  if (footage_->length == 0) {
+    qWarning() << "Could not determine duration for stream" << maximum_stream;
   }
 
   finalize_media();
@@ -603,8 +626,9 @@ void PreviewGenerator::generate_waveform() {
     av_packet_free(&packet);
 
     for (unsigned int i=0;i<fmt_ctx_->nb_streams;i++) {
-      if (waveform_cache_data[i] != nullptr && codec_ctx[i] != nullptr) {
-        for (int j=0;j<codec_ctx[i]->ch_layout.nb_channels;j++) {
+      if (waveform_cache_data[i] != nullptr) {
+        int nb_channels = fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels;
+        for (int j=0;j<nb_channels;j++) {
           delete [] waveform_cache_data[i][j];
         }
         delete [] waveform_cache_data[i];

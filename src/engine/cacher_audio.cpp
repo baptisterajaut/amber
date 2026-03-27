@@ -223,8 +223,10 @@ bool Cacher::cacheAudioAccumulateReverse(AVFrame* frame, AVFrame*& out_frame, in
         qWarning() << "Cacher::cacheAudioAccumulateReverse: to_footage() is null";
       }
     }
+    // Clamp to >= 0: if reverse_target_ < rev_frame->pts (e.g. seek during reverse near clip start),
+    // the subtraction goes negative, nb_samples wraps, and the downstream mix loop overruns memory.
     rev_frame->nb_samples =
-        qRound64(double(reverse_target_ - rev_frame->pts) * timebase * (current_audio_freq() / playback_speed_));
+        qMax(0LL, qRound64(double(reverse_target_ - rev_frame->pts) * timebase * (current_audio_freq() / playback_speed_)));
 #ifdef AUDIOWARNINGS
     dout << "post cutoff deets::" << rev_frame->nb_samples;
 #endif
@@ -425,6 +427,11 @@ Cacher::AudioMixResult Cacher::cacheAudioMixToBuffer(AVFrame* frame, int& nb_byt
   int sample_skip = 4 * qMax(0, qAbs(playback_speed_) - 1);
   int sample_byte_size = av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format));
 
+  // NOTE: This loop reads all channels interleaved from frame->data[0], which is only correct for
+  // packed sample formats (AV_SAMPLE_FMT_S16). Planar formats (AV_SAMPLE_FMT_S16P) store each channel
+  // in a separate data[] plane. Currently safe because the audio filter graph's abuffersink is
+  // configured with kDestSampleFmt = AV_SAMPLE_FMT_S16 (packed) in cacher.cpp. If the sink format
+  // ever changes to planar, this loop must be rewritten to read from data[i] per channel.
   while (frame_sample_index_ < nb_bytes && audio_buffer_write < audio_ibuffer_read.load() + (audio_ibuffer_size >> 1) &&
          audio_buffer_write < buffer_timeline_out) {
     for (int i = 0; i < frame->ch_layout.nb_channels; i++) {

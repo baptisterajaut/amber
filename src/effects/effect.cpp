@@ -22,6 +22,7 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFileDialog>
 #include <QGridLayout>
@@ -362,11 +363,13 @@ void Effect::AddRow(EffectRow* row) {
 }
 
 void Effect::copy_field_keyframes(EffectPtr e) {
-  for (int i = 0; i < rows.size(); i++) {
+  int row_count = qMin(rows.size(), e->rows.size());
+  for (int i = 0; i < row_count; i++) {
     EffectRow* row = rows.at(i);
     EffectRow* copy_row = e->rows.at(i);
     copy_row->SetKeyframingInternal(row->IsKeyframing());
-    for (int j = 0; j < row->FieldCount(); j++) {
+    int field_count = qMin(row->FieldCount(), copy_row->FieldCount());
+    for (int j = 0; j < field_count; j++) {
       // Get field from this (the source) effect
       EffectField* field = row->Field(j);
 
@@ -714,7 +717,8 @@ QShader Effect::bakeOrLoadCached(const QString& path, QShader::Stage stage) {
   }
   QByteArray source = src.readAll();
 
-  QString hash = QString::number(qHash(source), 16);
+  QByteArray hashBytes = QCryptographicHash::hash(source, QCryptographicHash::Sha1);
+  QString hash = hashBytes.toHex();
   QString cachePath = cacheDir + "/" + hash + ".qsb";
 
   // Try loading from cache

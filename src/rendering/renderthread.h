@@ -39,22 +39,24 @@ public:
   ~RenderThread() override;
   void run() override;
 
-  QMutex* get_texture_mutex();
+  QMutex* get_texture_mutex(int buffer_index);
 
   // CPU bridge: pixel data read back after compositing
-  const char* get_frame_data() const;
+  const char* get_frame_data(int buffer_index) const;
   int get_frame_width() const;
   int get_frame_height() const;
 
   Effect* gizmos{nullptr};
   void paint();
+  // Returns the current front buffer index (snapshot of the atomic switcher).
+  int front_buffer_index() const;
+
   void start_render(Sequence* s,
                     int playback_speed,
                     const QString& save = nullptr,
                     void* pixels = nullptr,
                     int pixel_linesize = 0,
                     int idivider = 0,
-                    bool wait = false,
                     bool scrubbing = false);
   bool did_texture_fail();
   void cancel();

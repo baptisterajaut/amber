@@ -122,6 +122,7 @@ private:
 
   QMutex mutex;
   QWaitCondition waitCond;
+  bool render_complete_{false};
 
   QString export_error;
 

@@ -80,6 +80,7 @@ void Cacher::CacheVideoWorker() {
     int64_t latest_pts = INT64_MIN;
     int frames_greater_than_target = 0;
 
+    queue_.lock();
     for (int i=0;i<queue_.size();i++) {
       // cache earliest and latest timestamps in the queue
       earliest_pts = qMin(earliest_pts, queue_.at(i)->pts);
@@ -90,6 +91,7 @@ void Cacher::CacheVideoWorker() {
         frames_greater_than_target++;
       }
     }
+    queue_.unlock();
 
     // If we have to seek ahead, we may want to re-use the frame we retrieved later in the pipeline.
     AVFrame* decoded_frame;
@@ -267,6 +269,7 @@ void Cacher::CacheVideoWorker() {
 
               int previous_frame_count = 0;
 
+              queue_.lock();
               if (decoded_frame->pts < target_pts) {
                 // if this frame is before the target frame, make sure we don't add too many of them
                 previous_frame_count = queue_.size();
@@ -286,11 +289,10 @@ void Cacher::CacheVideoWorker() {
 
               // remove frames while the amount of previous frames exceeds the maximum
               while (previous_frame_count > minimum_ts) {
-                queue_.lock();
                 queue_.removeFirst();
-                queue_.unlock();
                 previous_frame_count--;
               }
+              queue_.unlock();
 
             }
 
@@ -403,8 +405,9 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
       && av_pix_fmt_desc_get(static_cast<AVPixelFormat>(f->format))->flags & AV_PIX_FMT_FLAG_HWACCEL) {
     AVFrame* sw_frame = av_frame_alloc();
     if (av_hwframe_transfer_data(sw_frame, f, 0) < 0) {
-      qWarning() << "Failed to transfer hw frame to software, disabling hwaccel for this clip";
+      qWarning() << "Failed to transfer hw frame to software";
       av_frame_free(&sw_frame);
+      result = AVERROR(ENOTSUP);
     } else {
       av_frame_copy_props(sw_frame, f);
       av_frame_unref(f);

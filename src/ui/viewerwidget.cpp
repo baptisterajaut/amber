@@ -346,7 +346,7 @@ void ViewerWidget::frame_update() {
     } else {
       bool scrubbing = !viewer->playing;
       renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(),
-                             nullptr, nullptr, 0, 0, false, scrubbing);
+                             nullptr, nullptr, 0, 0, scrubbing);
     }
 
     amber::rendering::compose_audio(viewer, viewer->seq.get(), viewer->get_playback_speed(), false);
@@ -457,7 +457,7 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   if (waveform) {
     seek_from_click(qRound(event->position().x()));
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-    container->dragScrollPress(event->position().toPoint());
+    container->dragScrollPress(event->position().toPoint() * container->zoom);
   } else if (viewer->seq != nullptr && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
     double multiplier_x = double(viewer->seq->width) / double(width());
     double multiplier_y = double(viewer->seq->height) / double(height());
@@ -559,7 +559,7 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
     if (waveform) {
       seek_from_click(qRound(event->position().x()));
     } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-      container->dragScrollMove(event->position().toPoint());
+      container->dragScrollMove(event->position().toPoint() * container->zoom);
     } else if (event->buttons() & Qt::LeftButton) {
       if (gizmos == nullptr) {
         viewer->initiate_drag(amber::timeline::kImportBoth);
@@ -952,10 +952,13 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
   }
 
   // --- CPU bridge: get frame pixels from RenderThread ---
-  QMutex *frame_lock = renderer->get_texture_mutex();
+  // Snapshot the front buffer index once to avoid TOCTOU race: the render thread
+  // can flip front_buffer_switcher between get_texture_mutex() and get_frame_data().
+  int buf_idx = renderer->front_buffer_index();
+  QMutex *frame_lock = renderer->get_texture_mutex(buf_idx);
   frame_lock->lock();
 
-  const char* frame_data = renderer->get_frame_data();
+  const char* frame_data = renderer->get_frame_data(buf_idx);
   int fw = renderer->get_frame_width();
   int fh = renderer->get_frame_height();
   bool has_frame = (frame_data != nullptr && fw > 0 && fh > 0 && viewer->seq != nullptr);

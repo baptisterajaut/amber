@@ -243,12 +243,16 @@ void RenderThread::run() {
   wait_lock_.unlock();
 }
 
-QMutex* RenderThread::get_texture_mutex() {
-  return front_buffer_switcher ? &front_mutex2 : &front_mutex1;
+QMutex* RenderThread::get_texture_mutex(int buffer_index) {
+  return buffer_index ? &front_mutex2 : &front_mutex1;
 }
 
-const char* RenderThread::get_frame_data() const {
-  const QByteArray& buf = cpu_frame_[front_buffer_switcher ? 1 : 0];
+int RenderThread::front_buffer_index() const {
+  return front_buffer_switcher.load() ? 1 : 0;
+}
+
+const char* RenderThread::get_frame_data(int buffer_index) const {
+  const QByteArray& buf = cpu_frame_[buffer_index];
   return buf.isEmpty() ? nullptr : buf.constData();
 }
 
@@ -409,7 +413,6 @@ void RenderThread::start_render(Sequence* s,
                                 void* pixels,
                                 int pixel_linesize,
                                 int idivider,
-                                bool wait,
                                 bool scrubbing) {
   Q_UNUSED(idivider)
 

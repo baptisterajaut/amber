@@ -378,12 +378,12 @@ class Cacher : public QThread {
   /**
    * @brief FFmpeg hardware device context for GPU-accelerated decoding (nullptr if software)
    */
-  AVBufferRef* hw_device_ctx;
+  AVBufferRef* hw_device_ctx{nullptr};
 
   /**
    * @brief FFmpeg stream - used for media decoding
    */
-  AVStream* stream;
+  AVStream* stream{nullptr};
 
   /**
    * @brief FFmpeg packet - used for media decoding
@@ -421,19 +421,19 @@ class Cacher : public QThread {
    *
    * Raw decoded frames are added to this for conversion/filtering
    */
-  AVFilterContext* buffersrc_ctx;
+  AVFilterContext* buffersrc_ctx{nullptr};
 
   /**
    * @brief FFmpeg buffer sink
    *
    * Converted/filtered frames are retrieved from here and sent to Cacher::queue.
    */
-  AVFilterContext* buffersink_ctx;
+  AVFilterContext* buffersink_ctx{nullptr};
 
   /**
    * @brief FFmpeg codec reference
    */
-  const AVCodec* codec;
+  const AVCodec* codec{nullptr};
 
   /**
    * @brief Options set by the cacher for FFmpeg's decoders (settings like multithreading or other optimizations)

@@ -47,7 +47,7 @@ void Cacher::SetRetrievedFrame(AVFrame *f)
 {
   retrieve_lock_.lock();
   if (retrieved_frame == nullptr) {
-    retrieved_frame = f;
+    retrieved_frame = (f != nullptr) ? av_frame_clone(f) : nullptr;
     retrieve_wait_.wakeAll();
   }
   retrieve_lock_.unlock();
@@ -81,7 +81,6 @@ void Cacher::openWorkerToneClip() {
   av_channel_layout_from_mask(&frame_->ch_layout, clip->sequence->audio_layout);
   frame_->sample_rate = current_audio_freq();
   frame_->nb_samples = 2048;
-  av_frame_make_writable(frame_);
   if (av_frame_get_buffer(frame_, 0)) {
     qCritical() << "Could not allocate buffer for tone clip";
   }
@@ -490,7 +489,9 @@ void Cacher::CacheWorker() {
 }
 
 void Cacher::CloseWorker() {
-  retrieved_frame = nullptr;
+  if (retrieved_frame != nullptr) {
+    av_frame_free(&retrieved_frame);
+  }
   queue_.lock();
   queue_.clear();
   queue_.unlock();
@@ -589,7 +590,10 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
       && clip->media_stream()->infinite_length) {
     queue_.lock();
     if (queue_.size() > 0) {
-      retrieved_frame = queue_.at(0);
+      if (retrieved_frame != nullptr) {
+        av_frame_free(&retrieved_frame);
+      }
+      retrieved_frame = av_frame_clone(queue_.at(0));
     }
     queue_.unlock();
     if (retrieved_frame != nullptr) {
@@ -609,7 +613,9 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
     // see if we already have this frame
     retrieve_lock_.lock();
     queue_.lock();
-    retrieved_frame = nullptr;
+    if (retrieved_frame != nullptr) {
+      av_frame_free(&retrieved_frame);
+    }
     int64_t target_pts = seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
     for (int i=0;i<queue_.size();i++) {
 
@@ -617,14 +623,14 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
 
         // the queue has a frame with the exact timestamp
 
-        retrieved_frame = queue_.at(i);
+        retrieved_frame = av_frame_clone(queue_.at(i));
         wait_for_cacher_to_respond = false;
         break;
       } else if (i > 0 && queue_.at(i-1)->pts < target_pts && queue_.at(i)->pts > target_pts) {
 
         // the queue has a frame with a close timestamp that we'll assume is different due to a rounding error
 
-        retrieved_frame = queue_.at(i-1);
+        retrieved_frame = av_frame_clone(queue_.at(i-1));
         wait_for_cacher_to_respond = false;
         break;
       }
