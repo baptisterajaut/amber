@@ -620,10 +620,12 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
     qWarning() << "composite_video_clip: final_target is null";
     return;
   }
-  QRhiTexture* textureID = nullptr;
-
   int video_width = c->media_width();
   int video_height = c->media_height();
+
+  if (playhead < c->timeline_in(true) || playhead >= c->timeline_out(true)) return;
+
+  QRhiTexture* textureID = nullptr;
 
   if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
     c->Cache(qMax(playhead, c->timeline_in()), params.scrubbing, params.nests, params.playback_speed);
@@ -639,8 +641,6 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
   if (c->fbo_rhi == nullptr) {
     get_or_create_clip_resources(c, params.rhi, video_width, video_height);
   }
-
-  if (playhead < c->timeline_in(true) || playhead >= c->timeline_out(true)) return;
 
   bool fbo_switcher = false;
   ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
