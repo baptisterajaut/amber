@@ -517,7 +517,29 @@ void ExportDialog::StartExport() {
     // Close all effects in effect controls (prevents UI threading issues)
     panel_effect_controls->Clear();
 
+    // Pause playback and seek BEFORE starting the export thread.
+    // These trigger widget repaints (timeline scroll, play button icon,
+    // viewer update) which must happen on the main/GUI thread.  Running
+    // them on ExportThread causes QRhiWidget::paintEvent on the wrong
+    // thread → "Cannot make QOpenGLContext current in a different thread".
+    if (panel_sequence_viewer != nullptr) {
+      panel_sequence_viewer->pause();
+    }
+
+    // Set audio rendering rate before seek — seek can trigger
+    // compose_audio() which reads current_audio_freq().
+    if (params.audio_enabled) {
+      audio_rendering_rate = params.audio_sampling_rate;
+    }
+
     amber::Global->set_rendering_state(true);
+
+    // Seek to export start frame (safe now — audio_rendering is true so
+    // ViewerWidget::frame_update() will early-return, but the UI updates
+    // like timeline scroll still happen correctly on the main thread).
+    if (panel_sequence_viewer != nullptr && panel_sequence_viewer->seq != nullptr) {
+      panel_sequence_viewer->seek(params.start_frame);
+    }
 
     // Close all currently open clips
     close_active_clips(amber::ActiveSequence.get());

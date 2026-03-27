@@ -30,7 +30,6 @@ extern "C" {
 
 #include <QApplication>
 #include <QDateTime>
-#include <QOffscreenSurface>
 #include <QPainter>
 #include <QtMath>
 
@@ -49,10 +48,7 @@ ExportThread::ExportThread(const ExportParams &params,
   params_(params),
   vcodec_params_(vparams),
   interrupt_(false)
-  
 {
-  // Create offscreen surface for rendering while exporting
-  surface.create();
 }
 
 bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, AVFrame* frame, AVPacket* packet, AVStream* stream) {
@@ -674,19 +670,10 @@ void ExportThread::Cleanup()
 }
 
 void ExportThread::run() {
-  // Ensure sequence isn't currently playing
-  amber::app_ctx->pausePlayback();
-
-  // Set audio rendering rate BEFORE seeking, because seek() can trigger
-  // compose_audio() which opens clips and configures audio filter graphs
-  // using current_audio_freq(). Without this, the first export uses
-  // audio_rendering_rate=0, causing accelerated/pitched audio.
-  if (params_.audio_enabled) {
-    audio_rendering_rate = params_.audio_sampling_rate;
-  }
-
-  // Seek to the first frame we're exporting
-  amber::app_ctx->seekPlayhead(params_.start_frame);
+  // Pause/seek/audio_rendering_rate are set on the main thread in
+  // ExportDialog before start() — calling UI methods (pausePlayback,
+  // seekPlayhead) from this thread would trigger widget repaints on the
+  // wrong thread, crashing the OpenGL backend.
 
   // Lock mutex (used for thread synchronizations)
   mutex.lock();

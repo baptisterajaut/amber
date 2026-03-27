@@ -23,7 +23,6 @@
 
 #include <atomic>
 #include <QThread>
-#include <QOffscreenSurface>
 #include <QMutex>
 #include <QWaitCondition>
 
@@ -93,7 +92,6 @@ private:
   void Export();
   void Cleanup();
 
-  QOffscreenSurface surface;
   std::atomic<bool> interrupt_;
 
   // params imported from dialogs
