@@ -348,10 +348,10 @@ void RenderThread::paint() {
 
   texture_failed = params.texture_failed;
 
-  // On OpenGL, framebuffer readback is bottom-to-top (row 0 = bottom).
-  // The viewer compensates via clipSpaceCorrMatrix() when displaying,
-  // but save-frame and export consume raw pixels and need top-to-bottom order.
-  const bool need_yflip = rhi_->isYUpInFramebuffer();
+  // readBackTexture() returns top-to-bottom data on all backends (both OpenGL
+  // and Vulkan/Metal/D3D). No row reversal needed for export or save-frame.
+  // Note: this differs from framebuffer readback (glReadPixels), which IS
+  // bottom-to-top on OpenGL — but we read from a texture, not the framebuffer.
 
   // Save frame if requested
   if (!save_fn.isEmpty()) {
@@ -362,13 +362,6 @@ void RenderThread::paint() {
       if (!data.isEmpty()) {
         QImage img(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height,
                    QImage::Format_RGBA8888);
-        if (need_yflip) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
-          img = img.flipped(Qt::Vertical);
-#else
-          img = img.mirrored(false, true);
-#endif
-        }
         img.save(save_fn);
       }
       save_fn = "";
@@ -381,35 +374,19 @@ void RenderThread::paint() {
     if (!data.isEmpty()) {
       int copy_width = pixel_buffer_linesize == 0 ? tex_width : pixel_buffer_linesize;
       int row_bytes = copy_width * 4;
-      if (need_yflip) {
-        // Copy rows in reverse order: source bottom-to-top → dest top-to-bottom
+      int src_stride = tex_width * 4;
+      if (row_bytes > src_stride) {
+        // Per-row copy with padding zero-fill when destination has padding
         const char* src = data.constData();
-        int src_stride = tex_width * 4;
         char* dst = static_cast<char*>(pixel_buffer);
-        int copy_per_row = qMin(row_bytes, src_stride);
         for (int y = 0; y < tex_height; y++) {
-          const char* src_row = src + static_cast<qsizetype>(tex_height - 1 - y) * src_stride;
           char* dst_row = dst + static_cast<qsizetype>(y) * row_bytes;
-          memcpy(dst_row, src_row, copy_per_row);
-          if (row_bytes > src_stride) {
-            memset(dst_row + src_stride, 0, row_bytes - src_stride);
-          }
+          memcpy(dst_row, src + static_cast<qsizetype>(y) * src_stride, src_stride);
+          memset(dst_row + src_stride, 0, row_bytes - src_stride);
         }
       } else {
-        int src_stride = tex_width * 4;
-        if (row_bytes > src_stride) {
-          // Per-row copy with padding zero-fill when destination has padding
-          const char* src = data.constData();
-          char* dst = static_cast<char*>(pixel_buffer);
-          for (int y = 0; y < tex_height; y++) {
-            char* dst_row = dst + static_cast<qsizetype>(y) * row_bytes;
-            memcpy(dst_row, src + static_cast<qsizetype>(y) * src_stride, src_stride);
-            memset(dst_row + src_stride, 0, row_bytes - src_stride);
-          }
-        } else {
-          int bytes = row_bytes * tex_height;
-          memcpy(pixel_buffer, data.constData(), qMin(bytes, int(data.size())));
-        }
+        int bytes = row_bytes * tex_height;
+        memcpy(pixel_buffer, data.constData(), qMin(bytes, int(data.size())));
       }
     }
     pixel_buffer = nullptr;
