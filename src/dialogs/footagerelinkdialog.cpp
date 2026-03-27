@@ -79,6 +79,7 @@ void FootageRelinkDialog::browse_clicked() {
   f->url = path;
   f->invalid = false;
   f->ready = false;
+  relinked_any_ = true;
 
   // Re-trigger media analysis and preview generation
   PreviewGenerator::AnalyzeMedia(m);

@@ -208,6 +208,9 @@ void OliveGlobal::LoadProject(const QString &fn, bool autorecovery)
           [](QVector<QPair<Media*, Footage*>> invalid) {
             FootageRelinkDialog dlg(amber::MainWindow, invalid);
             dlg.exec();
+            if (dlg.relinked_any()) {
+              amber::Global->set_modified(true);
+            }
           });
   lt->start();
 

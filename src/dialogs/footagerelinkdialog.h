@@ -36,6 +36,8 @@ class FootageRelinkDialog : public QDialog {
   // Pass Media* alongside Footage* so PreviewGenerator can be re-triggered after relinking
   FootageRelinkDialog(QWidget* parent, QVector<QPair<Media*, Footage*>> invalid_footage);
 
+  bool relinked_any() const { return relinked_any_; }
+
  private slots:
   void browse_clicked();
 
@@ -46,6 +48,7 @@ class FootageRelinkDialog : public QDialog {
 
   QTreeWidget* tree_;
   QVector<QPair<Media*, Footage*>> footage_;
+  bool relinked_any_ = false;
 };
 
 #endif  // FOOTAGERELINKDIALOG_H
