@@ -100,6 +100,7 @@ private:
   QWaitCondition waitCond;
 
   bool cancelled_{false};
+  bool question_answered_{false};
   bool xml_error;
 
   QMessageBox::StandardButton question_btn;

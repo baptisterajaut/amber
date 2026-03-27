@@ -11,8 +11,8 @@ std::atomic<bool> audio_scrub_data_ready{false};
 int scrub_grain_samples(int sample_rate) { return (sample_rate * 80 + 999) / 1000; }
 
 int scrub_grain_bytes(int sample_rate) { return scrub_grain_samples(sample_rate) * 4; }
-bool audio_rendering = false;
-int audio_rendering_rate = 0;
+std::atomic<bool> audio_rendering{false};
+std::atomic<int> audio_rendering_rate{0};
 QMutex audio_write_lock;
 
 double log_volume(double linear) {

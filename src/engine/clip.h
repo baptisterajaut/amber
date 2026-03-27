@@ -21,6 +21,7 @@
 #ifndef CLIP_H
 #define CLIP_H
 
+#include <atomic>
 #include <memory>
 #include <QWaitCondition>
 #include <QMutex>
@@ -154,7 +155,7 @@ public:
   bool UsesCacher();
 
   // temporary variables
-  int load_id;
+  int load_id{0};
   bool undeletable{false};
   bool replaced{false};
 
@@ -180,7 +181,7 @@ public:
   // RGBA texture (CPU path)
   QRhiTexture* rgba_tex{nullptr};
 
-  long texture_frame;
+  long texture_frame{-1};
 
 private:
   // timeline variables (should be copied in copy())
@@ -191,20 +192,20 @@ private:
   int track_{0};
   QString name_;
   Media* media_{nullptr};
-  int media_stream_;
+  int media_stream_{0};
   ClipSpeed speed_;
-  double cached_fr_;
+  double cached_fr_{0};
   bool reverse_{false};
-  bool autoscale_;
+  bool autoscale_{true};
 
   Cacher cacher;
-  long cacher_frame;
+  std::atomic<long> cacher_frame{0};
 
   QVector<Marker> markers;
   QColor color_;
   int color_label_{0};
   int loop_mode_{kLoopNone};
-  bool open_{false};
+  std::atomic<bool> open_{false};
   bool cacher_uses_rgba_{false};
 };
 

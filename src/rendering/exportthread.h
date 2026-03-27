@@ -125,7 +125,7 @@ private:
 
   QString export_error;
 
-  bool waiting_for_audio_;
+  std::atomic<bool> waiting_for_audio_;
 private slots:
   void wake();
 };

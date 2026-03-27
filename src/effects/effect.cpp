@@ -53,6 +53,7 @@
 #include "ui/viewerwidget.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
+#include "rendering/renderthread.h"
 
 #include "effects/internal/audionoiseeffect.h"
 #include "effects/internal/cornerpineffect.h"
@@ -730,6 +731,8 @@ QShader Effect::bakeOrLoadCached(const QString& path, QShader::Stage stage) {
   baker.setGeneratedShaders({
       {QShader::SpirvShader, QShaderVersion(100)},
       {QShader::GlslShader, QShaderVersion(150)},
+      {QShader::HlslShader, QShaderVersion(50)},
+      {QShader::MslShader, QShaderVersion(12)},
   });
   QShader result = baker.bake();
   if (!result.isValid()) {
@@ -911,7 +914,7 @@ QRhiTexture* Effect::process_superimpose(QRhi* rhi, QRhiResourceUpdateBatch* u, 
   }
 
   if (superimposeTex_ == nullptr || dimensions_changed) {
-    delete superimposeTex_;
+    RenderThread::DeferRhiResourceDeletion(superimposeTex_);
     superimposeTex_ = rhi->newTexture(QRhiTexture::RGBA8, QSize(width, height));
     superimposeTex_->create();
     redrew_image = true;
@@ -1033,7 +1036,7 @@ bool Effect::valueHasChanged(double timecode) {
 }
 
 void Effect::delete_texture() {
-  delete superimposeTex_;
+  RenderThread::DeferRhiResourceDeletion(superimposeTex_);
   superimposeTex_ = nullptr;
 }
 

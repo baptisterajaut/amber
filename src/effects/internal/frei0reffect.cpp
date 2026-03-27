@@ -133,6 +133,7 @@ void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *outpu
   // (e.g., effect was created during project load before media was analyzed)
   int w = parent_clip->media_width();
   int h = parent_clip->media_height();
+  if (w <= 0 || h <= 0) return;
   if (w != instance_width || h != instance_height) {
     destruct_module();
     construct_module();
@@ -220,6 +221,10 @@ void Frei0rEffect::construct_module() {
   if (construct == nullptr) return;
   instance = construct(instance_width, instance_height);
 
+  if (instance == nullptr) {
+    qWarning() << "Frei0r: f0r_construct returned null for" << meta->name;
+    return;
+  }
   open = true;
 }
 

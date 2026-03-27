@@ -233,6 +233,8 @@ void ViewerContainer::resizeEvent(QResizeEvent *event) {
 }
 
 void ViewerContainer::scroll_changed() {
-  child->set_scroll(double(horizontal_scrollbar->value()) / double(horizontal_scrollbar->maximum()),
-                    double(vertical_scrollbar->value()) / double(vertical_scrollbar->maximum()));
+  double hmax = horizontal_scrollbar->maximum();
+  double vmax = vertical_scrollbar->maximum();
+  child->set_scroll(hmax > 0 ? double(horizontal_scrollbar->value()) / hmax : 0.0,
+                    vmax > 0 ? double(vertical_scrollbar->value()) / vmax : 0.0);
 }

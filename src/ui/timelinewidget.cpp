@@ -583,7 +583,7 @@ void TimelineWidget::mousePressPointer(int hovered_clip, bool shift, bool alt, i
         // if user is using the pointer tool, they may be trying to select a transition
         // check if the use is hovering over a transition
         if (panel_timeline->tool == TIMELINE_TOOL_POINTER) {
-          if (panel_timeline->transition_select == kTransitionOpening) {
+          if (panel_timeline->transition_select == kTransitionOpening && clip->opening_transition != nullptr) {
             // move the selection to only select the transitoin
             s.out = clip->timeline_in() + clip->opening_transition->get_true_length();
 
@@ -591,7 +591,7 @@ void TimelineWidget::mousePressPointer(int hovered_clip, bool shift, bool alt, i
             if (clip->opening_transition->secondary_clip != nullptr) {
               s.in -= clip->opening_transition->get_true_length();
             }
-          } else if (panel_timeline->transition_select == kTransitionClosing) {
+          } else if (panel_timeline->transition_select == kTransitionClosing && clip->closing_transition != nullptr) {
             // move the selection to only select the transitoin
             s.in = clip->timeline_out() - clip->closing_transition->get_true_length();
 

@@ -209,15 +209,6 @@ bool Cacher::cacheAudioAccumulateReverse(AVFrame* frame, AVFrame*& out_frame, in
   rev_frame->nb_samples += frame->nb_samples;
 
   if ((frame_->pts >= reverse_target_) || (ret == AVERROR_EOF)) {
-    /*
-#ifdef AUDIOWARNINGS
-    dout << "time for the end of rev cache" << rev_frame->nb_samples << clip->rev_target << frame_->pts <<
-frame_->pkt_duration << frame_->nb_samples; dout << "diff:" << (frame_->pkt_pts + frame_->pkt_duration) -
-reverse_target; #endif int cutoff = qRound64((((frame_->pkt_pts + frame_->pkt_duration) - reverse_target) * timebase) *
-audio_output->format().sampleRate()); if (cutoff > 0) { #ifdef AUDIOWARNINGS dout << "cut off" << cutoff << "samples
-(rate:" << audio_output->format().sampleRate() << ")"; #endif rev_frame->nb_samples -= cutoff;
-    }
-*/
 
 #ifdef AUDIOWARNINGS
     dout << "pre cutoff deets::: rev_frame.pts:" << rev_frame->pts << "rev_frame.nb_samples" << rev_frame->nb_samples
@@ -272,7 +263,8 @@ bool Cacher::cacheAudioPostDecode(AVFrame* frame, int& nb_bytes, bool reverse_au
     double frame_sts = ((frame->pts - stream_start) * timebase);
 
     int nb_samples = qRound64((target_sts - frame_sts) * current_audio_freq());
-    frame_sample_index_ = nb_samples * 4;
+    frame_sample_index_ = nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
+                          frame->ch_layout.nb_channels;
 #ifdef AUDIOWARNINGS
     dout << "fsts:" << frame_sts << "tsts:" << target_sts << "nbs:" << nb_samples << "nbb:" << nb_bytes
          << "rev_targetToSec:" << (reverse_target * timebase);
@@ -491,8 +483,10 @@ void Cacher::CacheAudioWorker() {
 
   // for audio clips, something may have triggered an audio reset (common if the user seeked)
   if (audio_reset_) {
+    audio_write_lock.lock();
     Reset();
     audio_reset_ = false;
+    audio_write_lock.unlock();
     audio_just_reset = true;
   }
 

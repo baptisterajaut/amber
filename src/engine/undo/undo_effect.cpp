@@ -58,10 +58,11 @@ void AddEffectCommand::doUndo() {
     qWarning() << "AddEffectCommand::doUndo: clip is null";
     return;
   }
-  clip->effects.last()->close();
   if (pos < 0) {
+    clip->effects.last()->close();
     clip->effects.removeLast();
   } else {
+    clip->effects.at(pos)->close();
     clip->effects.removeAt(pos);
   }
 }

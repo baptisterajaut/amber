@@ -56,6 +56,7 @@ void Cacher::SetRetrievedFrame(AVFrame *f)
 void Cacher::WakeMainThread()
 {
   main_thread_lock_.lock();
+  main_thread_woken_ = true;
   main_thread_wait_.wakeAll();
   main_thread_lock_.unlock();
 }
@@ -126,6 +127,7 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
     char err[1024];
     av_strerror(errCode, err, 1024);
     qCritical() << "Could not open" << filename << "-" << err;
+    avformat_close_input(&formatCtx);
     return false;
   }
 
@@ -133,9 +135,15 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
 
   stream = formatCtx->streams[ms->file_index];
   codec = avcodec_find_decoder(stream->codecpar->codec_id);
+  if (codec == nullptr) {
+    qCritical() << "Could not find decoder for codec ID" << stream->codecpar->codec_id;
+    avformat_close_input(&formatCtx);
+    return false;
+  }
   codecCtx = avcodec_alloc_context3(codec);
   if (codecCtx == nullptr) {
     qCritical() << "Could not allocate codec context";
+    avformat_close_input(&formatCtx);
     return false;
   }
   avcodec_parameters_to_context(codecCtx, stream->codecpar);
@@ -148,8 +156,7 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
 
   // Enable extra optimization code on h264
   if (stream->codecpar->codec_id == AV_CODEC_ID_H264) {
-    av_dict_set(&opts, "tune", "fastdecode", 0);
-    av_dict_set(&opts, "tune", "zerolatency", 0);
+    av_dict_set(&opts, "tune", "fastdecode,zerolatency", 0);
   }
 
   // Try hardware-accelerated decoding if enabled and this is a video stream
@@ -181,6 +188,8 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
   if (avcodec_open2(codecCtx, codec, &opts) < 0) {
     qCritical() << "Could not open codec";
     av_dict_free(&opts);
+    avcodec_free_context(&codecCtx);
+    avformat_close_input(&formatCtx);
     return false;
   }
   av_dict_free(&opts);
@@ -382,20 +391,31 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
         snprintf(speed_param, sizeof(speed_param), "%f", base);
         for (int i = 0; i < whole2; i++) {
           AVFilterContext* tempo_filter = nullptr;
-          avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
-                                       filter_graph);
+          if (avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
+                                           filter_graph) < 0) {
+            qCritical() << "Could not create atempo filter in chain";
+            ok = false;
+            break;
+          }
           avfilter_link(previous_filter, 0, tempo_filter, 0);
           previous_filter = tempo_filter;
         }
       }
 
-      snprintf(speed_param, sizeof(speed_param), "%f", qPow(base, speedlog));
-      last_filter = nullptr;
-      avfilter_graph_create_filter(&last_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
-                                   filter_graph);
-      avfilter_link(previous_filter, 0, last_filter, 0);
+      if (ok) {
+        snprintf(speed_param, sizeof(speed_param), "%f", qPow(base, speedlog));
+        last_filter = nullptr;
+        if (avfilter_graph_create_filter(&last_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
+                                         filter_graph) < 0) {
+          qCritical() << "Could not create final atempo filter";
+          ok = false;
+        }
+      }
 
-      avfilter_link(last_filter, 0, buffersink_ctx, 0);
+      if (ok) {
+        avfilter_link(previous_filter, 0, last_filter, 0);
+        avfilter_link(last_filter, 0, buffersink_ctx, 0);
+      }
     }
   }
 
@@ -615,6 +635,7 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
 
   if (wait_for_cacher_to_respond) {
     main_thread_lock_.lock();
+    main_thread_woken_ = false;
   }
 
   // wake up cacher
@@ -623,7 +644,9 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   // if not, wait for cacher to respond
   if (wait_for_cacher_to_respond) {
     interrupt_ = true;
-    main_thread_wait_.wait(&main_thread_lock_, 2000);
+    if (!main_thread_woken_) {
+      main_thread_wait_.wait(&main_thread_lock_, 2000);
+    }
   }
 
   if (wait_for_cacher_to_respond) {

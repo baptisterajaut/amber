@@ -187,8 +187,11 @@ void LoadThread::update_current_element_count(QXmlStreamReader& stream) {
 }
 
 void LoadThread::show_message(const QString& title, const QString& body, int buttons) {
+  question_answered_ = false;
   emit start_question(title, body, buttons);
-  waitCond.wait(&mutex);
+  while (!question_answered_) {
+    waitCond.wait(&mutex);
+  }
 }
 
 bool LoadThread::is_element(QXmlStreamReader& stream) {
@@ -782,6 +785,7 @@ void LoadThread::run() {
 }
 
 void LoadThread::cancel() {
+  question_answered_ = true;
   waitCond.wakeAll();
   cancelled_ = true;
 }
@@ -790,6 +794,7 @@ void LoadThread::question_func(const QString& title, const QString& text, int bu
   mutex.lock();
   question_btn =
       QMessageBox::warning(amber::MainWindow, title, text, static_cast<enum QMessageBox::StandardButton>(buttons));
+  question_answered_ = true;
   mutex.unlock();
   waitCond.wakeAll();
 }

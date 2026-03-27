@@ -373,10 +373,11 @@ void ViewerWidget::context_destroy() {
 
 EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
   if (gizmos != nullptr) {
-    double multiplier = double(viewer->seq->width) / double(width());
-    QPoint mouse_pos(qRound(x * multiplier), qRound((height() - y) * multiplier));
-    int dot_size = 2 * qRound(GIZMO_DOT_SIZE * multiplier);
-    int target_size = 2 * qRound(GIZMO_TARGET_SIZE * multiplier);
+    double multiplier_x = double(viewer->seq->width) / double(width());
+    double multiplier_y = double(viewer->seq->height) / double(height());
+    QPoint mouse_pos(qRound(x * multiplier_x), qRound((height() - y) * multiplier_y));
+    int dot_size = 2 * qRound(GIZMO_DOT_SIZE * multiplier_x);
+    int target_size = 2 * qRound(GIZMO_TARGET_SIZE * multiplier_x);
     for (int i = 0; i < gizmos->gizmo_count(); i++) {
       EffectGizmo* g = gizmos->gizmo(i);
 
@@ -408,10 +409,11 @@ EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
 
 void ViewerWidget::move_gizmos(QMouseEvent* event, bool done) {
   if (selected_gizmo != nullptr) {
-    double multiplier = double(viewer->seq->width) / double(width());
+    double multiplier_x = double(viewer->seq->width) / double(width());
+    double multiplier_y = double(viewer->seq->height) / double(height());
 
-    int x_movement = qRound((event->position().toPoint().x() - drag_start_x) * multiplier);
-    int y_movement = qRound((event->position().toPoint().y() - drag_start_y) * multiplier);
+    int x_movement = qRound((event->position().toPoint().x() - drag_start_x) * multiplier_x);
+    int y_movement = qRound((event->position().toPoint().y() - drag_start_y) * multiplier_y);
 
     gizmos->gizmo_move(selected_gizmo, x_movement, y_movement,
                        get_timecode(gizmos->parent_clip, gizmos->parent_clip->sequence->playhead), done);
@@ -455,11 +457,12 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   if (waveform) {
     seek_from_click(qRound(event->position().x()));
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-    container->dragScrollPress(event->position().toPoint() * container->zoom);
+    container->dragScrollPress(event->position().toPoint());
   } else if (viewer->seq != nullptr && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
-    double multiplier = double(viewer->seq->width) / double(width());
-    int video_x = qRound(event->position().x() * multiplier);
-    int image_y = qRound(event->position().y() * multiplier);
+    double multiplier_x = double(viewer->seq->width) / double(width());
+    double multiplier_y = double(viewer->seq->height) / double(height());
+    int video_x = qRound(event->position().x() * multiplier_x);
+    int image_y = qRound(event->position().y() * multiplier_y);
 
     if (event->buttons() & Qt::RightButton) {
       bool hit_mirror = false;
@@ -508,9 +511,10 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
   }
 
   if (viewer->seq != nullptr && width() > 0) {
-    double multiplier = double(viewer->seq->width) / double(width());
-    int video_x = qRound(event->position().x() * multiplier);
-    int image_y = qRound(event->position().y() * multiplier);
+    double multiplier_x = double(viewer->seq->width) / double(width());
+    double multiplier_y = double(viewer->seq->height) / double(height());
+    int video_x = qRound(event->position().x() * multiplier_x);
+    int image_y = qRound(event->position().y() * multiplier_y);
 
     if (dragging_guide_index_ >= 0) {
       Guide& g = viewer->seq->guides[dragging_guide_index_];
@@ -555,7 +559,7 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
     if (waveform) {
       seek_from_click(qRound(event->position().x()));
     } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-      container->dragScrollMove(event->position().toPoint() * container->zoom);
+      container->dragScrollMove(event->position().toPoint());
     } else if (event->buttons() & Qt::LeftButton) {
       if (gizmos == nullptr) {
         viewer->initiate_drag(amber::timeline::kImportBoth);
@@ -795,7 +799,6 @@ void ViewerWidget::draw_gizmos(QPainter& p) {
     }
   }
 
-  p.end();
 }
 
 int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {

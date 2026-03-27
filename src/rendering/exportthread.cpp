@@ -79,8 +79,12 @@ bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, 
 
     av_packet_rescale_ts(packet, codec_ctx->time_base, stream->time_base);
 
-    av_interleaved_write_frame(ofmt_ctx, packet);
+    ret = av_interleaved_write_frame(ofmt_ctx, packet);
     av_packet_unref(packet);
+    if (ret < 0) {
+      qCritical() << "Failed to write packet." << ret;
+      return false;
+    }
   }
   return true;
 }
@@ -99,12 +103,12 @@ bool ExportThread::SetupVideo() {
 
   // create video stream
   video_stream = avformat_new_stream(fmt_ctx, vcodec);
-  video_stream->id = 0;
   if (!video_stream) {
     qCritical() << "Could not allocate video stream";
     export_error = tr("could not allocate video stream");
     return false;
   }
+  video_stream->id = 0;
 
   // allocate context
   //	vcodec_ctx = video_stream->codec;
@@ -181,11 +185,15 @@ bool ExportThread::SetupVideo() {
     return false;
   }
   video_frame = av_frame_alloc();
-  av_frame_make_writable(video_frame);
   video_frame->format = AV_PIX_FMT_RGBA;
   video_frame->width = amber::ActiveSequence->width;
   video_frame->height = amber::ActiveSequence->height;
-  av_frame_get_buffer(video_frame, 0);
+  ret = av_frame_get_buffer(video_frame, 0);
+  if (ret < 0) {
+    qCritical() << "Could not allocate video frame buffer." << ret;
+    export_error = tr("could not allocate video frame buffer (%1)").arg(QString::number(ret));
+    return false;
+  }
 
   video_pkt = av_packet_alloc();
 
@@ -297,7 +305,12 @@ bool ExportThread::SetupAudio() {
           );
     av_channel_layout_uninit(&in_ch_layout);
   }
-  swr_init(swr_ctx);
+  ret = swr_init(swr_ctx);
+  if (ret < 0) {
+    qCritical() << "Could not initialize audio resampler." << ret;
+    export_error = tr("could not initialize audio resampler (%1)").arg(QString::number(ret));
+    return false;
+  }
 
   // initialize raw audio frame
   audio_frame = av_frame_alloc();
@@ -571,17 +584,16 @@ cleanup_state:
   // If audio is enabled, flush the rest of the audio out of swresample
   if (params_.audio_enabled) {
 
+    int flush_iter = 0;
     do {
-
-      swr_convert_frame(swr_ctx, swr_frame, nullptr);
-      if (swr_frame->nb_samples == 0) break;
+      ret = swr_convert_frame(swr_ctx, swr_frame, nullptr);
+      if (ret < 0 || swr_frame->nb_samples == 0) break;
       swr_frame->pts = file_audio_samples;
       if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) {
         return;
       }
       file_audio_samples += swr_frame->nb_samples;
-
-    } while (swr_frame->nb_samples > 0);
+    } while (swr_frame->nb_samples > 0 && ++flush_iter < 1000);
 
   }
 

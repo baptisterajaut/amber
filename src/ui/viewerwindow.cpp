@@ -117,7 +117,9 @@ void ViewerWindow::showEvent(QShowEvent*) {
 
   QList<QAction*> menubar_actions = amber::MainWindow->menuBar()->actions();
   for (auto menubar_action : menubar_actions) {
-    shortcut_copier(shortcuts_, menubar_action->menu());
+    if (menubar_action->menu() != nullptr) {
+      shortcut_copier(shortcuts_, menubar_action->menu());
+    }
   }
 }
 

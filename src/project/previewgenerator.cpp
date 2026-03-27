@@ -493,7 +493,18 @@ void PreviewGenerator::retrieve_media_duration(int64_t* media_lengths) {
   }
 
   // FIXME: length is currently retrieved as a frame count rather than a timestamp
-  footage_->length = qRound(double(media_lengths[maximum_stream]) / av_q2d(fmt_ctx_->streams[maximum_stream]->avg_frame_rate) * AV_TIME_BASE);
+  AVRational afr = fmt_ctx_->streams[maximum_stream]->avg_frame_rate;
+  if (afr.num != 0 && afr.den != 0) {
+    footage_->length = qRound(double(media_lengths[maximum_stream]) / av_q2d(afr) * AV_TIME_BASE);
+  } else {
+    AVRational rfr = fmt_ctx_->streams[maximum_stream]->r_frame_rate;
+    if (rfr.num != 0 && rfr.den != 0) {
+      footage_->length = qRound(double(media_lengths[maximum_stream]) / av_q2d(rfr) * AV_TIME_BASE);
+    } else if (fmt_ctx_->streams[maximum_stream]->duration > 0) {
+      double time_base = av_q2d(fmt_ctx_->streams[maximum_stream]->time_base);
+      footage_->length = qRound(double(fmt_ctx_->streams[maximum_stream]->duration) * time_base * AV_TIME_BASE);
+    }
+  }
 
   finalize_media();
 }
@@ -522,10 +533,16 @@ void PreviewGenerator::generate_waveform() {
     bool end_of_file = false;
 
     // get the ball rolling
+    int initial_ret;
     do {
-      av_read_frame(fmt_ctx_, packet);
+      initial_ret = av_read_frame(fmt_ctx_, packet);
+      if (initial_ret < 0) break;
     } while (codec_ctx[packet->stream_index] == nullptr);
-    avcodec_send_packet(codec_ctx[packet->stream_index], packet);
+    if (initial_ret < 0) {
+      end_of_file = true;
+    } else {
+      avcodec_send_packet(codec_ctx[packet->stream_index], packet);
+    }
 
     while (!end_of_file) {
       while (codec_ctx[packet->stream_index] == nullptr || avcodec_receive_frame(codec_ctx[packet->stream_index], temp_frame) == AVERROR(EAGAIN)) {
@@ -583,7 +600,6 @@ void PreviewGenerator::generate_waveform() {
       }
     }
 
-    av_frame_free(&temp_frame);
     av_packet_free(&packet);
 
     for (unsigned int i=0;i<fmt_ctx_->nb_streams;i++) {
@@ -604,6 +620,8 @@ void PreviewGenerator::generate_waveform() {
       audio_track.preview_done = true;
     }
   }
+
+  av_frame_free(&temp_frame);
 
   if (retrieve_duration_) {
     retrieve_media_duration(media_lengths);

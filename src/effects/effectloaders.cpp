@@ -146,7 +146,7 @@ void load_shader_effects_worker(const QString& effects_path) {
         QFile file(effects_path + "/" + entrie);
         if (!file.open(QIODevice::ReadOnly)) {
           qCritical() << "Could not open" << entrie;
-          return;
+          continue;
         }
 
         QXmlStreamReader reader(&file);

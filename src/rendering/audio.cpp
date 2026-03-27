@@ -129,6 +129,7 @@ void stop_audio() {
     }
 
     audio_thread->stop();
+    audio_thread = nullptr;
 
     audio_output->stop();
     delete audio_output;
@@ -148,7 +149,7 @@ void clear_audio_ibuffer(long new_frame) {
   if (audio_thread != nullptr) audio_thread->lock.unlock();
 }
 
-int current_audio_freq() { return audio_rendering ? audio_rendering_rate : audio_output->format().sampleRate(); }
+int current_audio_freq() { return audio_rendering ? audio_rendering_rate.load() : audio_output->format().sampleRate(); }
 
 qint64 get_buffer_offset_from_frame(double framerate, long frame) {
   long ibuf_frame = audio_ibuffer_frame.load();

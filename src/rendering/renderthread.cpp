@@ -373,13 +373,30 @@ void RenderThread::paint() {
         const char* src = data.constData();
         int src_stride = tex_width * 4;
         char* dst = static_cast<char*>(pixel_buffer);
+        int copy_per_row = qMin(row_bytes, src_stride);
         for (int y = 0; y < tex_height; y++) {
           const char* src_row = src + static_cast<qsizetype>(tex_height - 1 - y) * src_stride;
-          memcpy(dst + static_cast<qsizetype>(y) * row_bytes, src_row, qMin(row_bytes, src_stride));
+          char* dst_row = dst + static_cast<qsizetype>(y) * row_bytes;
+          memcpy(dst_row, src_row, copy_per_row);
+          if (row_bytes > src_stride) {
+            memset(dst_row + src_stride, 0, row_bytes - src_stride);
+          }
         }
       } else {
-        int bytes = row_bytes * tex_height;
-        memcpy(pixel_buffer, data.constData(), qMin(bytes, int(data.size())));
+        int src_stride = tex_width * 4;
+        if (row_bytes > src_stride) {
+          // Per-row copy with padding zero-fill when destination has padding
+          const char* src = data.constData();
+          char* dst = static_cast<char*>(pixel_buffer);
+          for (int y = 0; y < tex_height; y++) {
+            char* dst_row = dst + static_cast<qsizetype>(y) * row_bytes;
+            memcpy(dst_row, src + static_cast<qsizetype>(y) * src_stride, src_stride);
+            memset(dst_row + src_stride, 0, row_bytes - src_stride);
+          }
+        } else {
+          int bytes = row_bytes * tex_height;
+          memcpy(pixel_buffer, data.constData(), qMin(bytes, int(data.size())));
+        }
       }
     }
     pixel_buffer = nullptr;
@@ -396,6 +413,8 @@ void RenderThread::start_render(Sequence* s,
                                 bool scrubbing) {
   Q_UNUSED(idivider)
 
+  wait_lock_.lock();
+
   seq = s;
 
   playback_speed_ = playback_speed;
@@ -410,15 +429,9 @@ void RenderThread::start_render(Sequence* s,
 
   queued = true;
 
-  if (wait) {
-    wait_lock_.lock();
-  }
-
   wait_cond_.wakeAll();
 
-  if (wait) {
-    wait_lock_.unlock();
-  }
+  wait_lock_.unlock();
 }
 
 bool RenderThread::did_texture_fail() { return texture_failed; }

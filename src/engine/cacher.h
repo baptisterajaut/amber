@@ -296,6 +296,13 @@ class Cacher : public QThread {
   QMutex main_thread_lock_;
 
   /**
+   * @brief Predicate flag for main_thread_wait_ to prevent lost wakeups.
+   *
+   * Set to false by Cache() before waiting, set to true by WakeMainThread().
+   */
+  bool main_thread_woken_{false};
+
+  /**
    * @brief Retrieve() wait condition
    *
    * Used with retrieve_lock_ to block Retrieve() if the cacher hasn't retrieved the correct frame yet.

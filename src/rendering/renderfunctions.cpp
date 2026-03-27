@@ -368,7 +368,7 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
 
       bool has_shader = can_process_shaders && e->is_glsl_linked();
 
-      if (has_shader && composite_texture != nullptr) {
+      if (has_shader && composite_texture != nullptr && c->fbo_rhi != nullptr) {
         ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
         QMatrix4x4 blitMvp;
         blitMvp.ortho(-1, 1, -1, 1, -1, 1);
@@ -376,13 +376,13 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
         for (int i = 0; i < e->getIterations(); i++) {
           // Fill UBO data via the effect's process_shader
           QByteArray uboData;
-          uboData.resize(qMax(e->fragUboSize(), e->vertUboSize()));
+          uboData.resize(e->fragUboSize());
           uboData.fill(0);
           e->process_shader(timecode, coords, i, uboData);
 
           // Blit through effect shader into the next FBO (skip clipSpaceCorr — intermediate pass)
           rhi_blit(params, res->rt[fbo_switcher], res->rpd, composite_texture, e->vertexShader(), e->fragmentShader(),
-                   blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()), 1, nullptr, nullptr,
+                   blitMvp, uboData, e->fragUboSize(), 1, nullptr, nullptr,
                    /*skipClipSpaceCorr=*/true);
           composite_texture = res->tex[fbo_switcher];
           fbo_switcher = !fbo_switcher;
@@ -393,6 +393,11 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
         QRhiResourceUpdateBatch* upload = params.rhi->nextResourceUpdateBatch();
         QRhiTexture* superimpose_texture = e->process_superimpose(params.rhi, upload, timecode);
         // Submit upload in a dummy pass
+        if (c->fbo_rhi == nullptr) {
+          upload->release();
+          e->endEffect();
+          return;
+        }
         ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
 
         if (superimpose_texture == nullptr) {

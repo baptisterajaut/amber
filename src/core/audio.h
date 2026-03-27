@@ -15,8 +15,8 @@ extern std::atomic<bool> audio_scrub_data_ready;
 
 int scrub_grain_samples(int sample_rate);
 int scrub_grain_bytes(int sample_rate);
-extern bool audio_rendering;
-extern int audio_rendering_rate;
+extern std::atomic<bool> audio_rendering;
+extern std::atomic<int> audio_rendering_rate;
 extern QMutex audio_write_lock;
 
 #endif  // CORE_AUDIO_H
