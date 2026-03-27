@@ -1,6 +1,8 @@
 #ifndef COLORFIELD_H
 #define COLORFIELD_H
 
+#include <QMetaObject>
+
 #include "../effectfield.h"
 
 /**
@@ -63,6 +65,11 @@ private slots:
    * connected to the ColorButton::color_changed() signal.
    */
   void UpdateFromWidget(const QColor &c);
+
+private:
+  QMetaObject::Connection pick_connection_;
+  QMetaObject::Connection cancel_connection_;
+  void disconnectPick();
 };
 
 #endif // COLORFIELD_H

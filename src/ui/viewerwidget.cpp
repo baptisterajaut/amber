@@ -447,6 +447,11 @@ bool ViewerWidget::event(QEvent* e) {
 }
 
 void ViewerWidget::keyPressEvent(QKeyEvent* event) {
+  if (color_pick_mode_ && event->key() == Qt::Key_Escape) {
+    exitColorPickMode();
+    emit colorPickCancelled();
+    return;
+  }
   if (hovered_guide_index_ >= 0 && viewer->seq != nullptr && !amber::CurrentConfig.lock_guides) {
     QKeySequence pressed(event->key() | event->modifiers());
     if (pressed == guide_delete_action_->shortcut()) {
@@ -462,6 +467,21 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
 }
 
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
+  if (color_pick_mode_) {
+    if (event->button() == Qt::LeftButton) {
+      QColor c = readPixelAt(qRound(event->position().x()), qRound(event->position().y()));
+      if (c.isValid()) {
+        emit colorPicked(c);
+      } else {
+        emit colorPickCancelled();
+      }
+      exitColorPickMode();
+    } else if (event->button() == Qt::RightButton) {
+      exitColorPickMode();
+      emit colorPickCancelled();
+    }
+    return;
+  }
   if (waveform) {
     seek_from_click(qRound(event->position().x()));
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
@@ -513,6 +533,10 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
 }
 
 void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
+  if (color_pick_mode_) {
+    // Keep crosshair cursor, don't process any other mouse move logic
+    return;
+  }
   unsetCursor();
   if (panel_timeline->tool == TIMELINE_TOOL_HAND) {
     setCursor(Qt::OpenHandCursor);
@@ -949,6 +973,48 @@ void ViewerWidget::finish_guide_creation() {
 void ViewerWidget::cancel_guide_creation() {
   creating_guide_ = false;
   update();
+}
+
+void ViewerWidget::startColorPick() {
+  if (color_pick_mode_) {
+    emit colorPickCancelled();
+  }
+  color_pick_mode_ = true;
+  setCursor(Qt::CrossCursor);
+}
+
+void ViewerWidget::exitColorPickMode() {
+  color_pick_mode_ = false;
+  unsetCursor();
+}
+
+QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
+  if (viewer->seq == nullptr || width() <= 0 || height() <= 0) {
+    return QColor();
+  }
+
+  int video_x = qRound(widget_x * double(viewer->seq->width) / double(width()));
+  int video_y = qRound(widget_y * double(viewer->seq->height) / double(height()));
+
+  int fw = renderer->get_frame_width();
+  int fh = renderer->get_frame_height();
+
+  video_x = qBound(0, video_x, fw - 1);
+  video_y = qBound(0, video_y, fh - 1);
+
+  int idx = renderer->front_buffer_index();
+  QMutex* mutex = renderer->get_texture_mutex(idx);
+  QMutexLocker lock(mutex);
+
+  const char* data = renderer->get_frame_data(idx);
+  if (data == nullptr) {
+    return QColor();
+  }
+
+  // RGBA8888, no Y-flip — readBackTexture() is top-to-bottom on all backends
+  int offset = (video_y * fw + video_x) * 4;
+  return QColor(static_cast<unsigned char>(data[offset]), static_cast<unsigned char>(data[offset + 1]),
+                static_cast<unsigned char>(data[offset + 2]), static_cast<unsigned char>(data[offset + 3]));
 }
 
 void ViewerWidget::render(QRhiCommandBuffer *cb) {

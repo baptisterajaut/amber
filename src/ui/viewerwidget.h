@@ -72,6 +72,12 @@ class ViewerWidget : public QRhiWidget {
   void cancel_guide_creation();
   QAction* guide_delete_action_;
   QAction* guide_mirror_action_;
+
+  void startColorPick();
+
+ signals:
+  void colorPicked(const QColor& color);
+  void colorPickCancelled();
  public slots:
   void set_waveform_scroll(int s);
   void set_fullscreen(int screen = 0);
@@ -108,6 +114,9 @@ class ViewerWidget : public QRhiWidget {
   bool creating_guide_{false};
   Guide::Orientation creating_guide_orientation_;
   int creating_guide_pos_{0};
+  bool color_pick_mode_{false};
+  void exitColorPickMode();
+  QColor readPixelAt(int widget_x, int widget_y);
   void seek_from_click(int x);
   Effect* gizmos{nullptr};
   int drag_start_x;
