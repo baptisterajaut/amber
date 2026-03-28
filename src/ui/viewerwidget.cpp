@@ -670,7 +670,7 @@ void ViewerWidget::draw_waveform_func(QPainter& p) {
   wr.setX(wr.x() - waveform_scroll);
 
   p.setPen(Qt::green);
-  draw_waveform(waveform_clip, waveform_ms, waveform_clip->timeline_out(), &p, wr, waveform_scroll,
+  draw_waveform(waveform_clip, waveform_ms, waveform_clip->media_length(), &p, wr, waveform_scroll,
                 width() + waveform_scroll, waveform_zoom);
   p.setPen(Qt::red);
   int playhead_x = getScreenPointFromFrame(waveform_zoom, viewer->seq->playhead) - waveform_scroll;

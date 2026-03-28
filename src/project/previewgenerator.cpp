@@ -443,7 +443,7 @@ void PreviewGenerator::process_audio_frame(AVFrame* temp_frame, FootageStream* s
     av_frame_free(&swr_frame);
     return;
   }
-  int interval = qMax(4, qFloor((temp_frame->sample_rate/amber::CurrentConfig.waveform_resolution)/4)*4);
+  int interval = qMax(1, temp_frame->sample_rate / amber::CurrentConfig.waveform_resolution);
 
   // get the amount of bytes in an audio sample
   int sample_size = av_get_bytes_per_sample(static_cast<AVSampleFormat>(swr_frame->format));
@@ -543,12 +543,15 @@ void PreviewGenerator::generate_waveform() {
 
   // stores samples while scanning before they get sent to preview file
   qint16*** waveform_cache_data = new qint16** [fmt_ctx_->nb_streams];
-  int waveform_cache_count = 0;
+  int* waveform_cache_count = new int[fmt_ctx_->nb_streams]{0};
 
   bool create_previews = setup_stream_codecs(codec_ctx, waveform_cache_data);
 
   if (create_previews) {
-    // TODO may be unnecessary - doesn't av_read_frame allocate a packet itself?
+    // Seek back to the beginning — avformat_find_stream_info() may have consumed
+    // initial packets, leaving the read position past the start of the file.
+    avformat_seek_file(fmt_ctx_, -1, INT64_MIN, 0, 0, 0);
+
     AVPacket* packet = av_packet_alloc();
 
     bool done = true;
@@ -594,7 +597,7 @@ void PreviewGenerator::generate_waveform() {
             media_lengths[packet->stream_index]++;
           } else if (fmt_ctx_->streams[packet->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
             process_audio_frame(temp_frame, s, packet->stream_index,
-                                waveform_cache_data, waveform_cache_count, packet);
+                                waveform_cache_data, waveform_cache_count[packet->stream_index], packet);
 
             if (cancelled_) {
               end_of_file = true;
@@ -652,6 +655,7 @@ void PreviewGenerator::generate_waveform() {
   }
 
   delete [] waveform_cache_data;
+  delete [] waveform_cache_count;
   delete [] media_lengths;
   delete [] codec_ctx;
 }
