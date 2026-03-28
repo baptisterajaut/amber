@@ -632,7 +632,13 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
     retrieve_lock_.unlock();
   }
 
-  if (wait_for_cacher_to_respond) {
+  // Audio scrub: fire-and-forget — never block the UI thread.
+  // The cacher decodes the grain asynchronously; if the user seeks again
+  // before it's ready, reset_all_audio() cancels the in-flight decode.
+  // Same pattern as start_render() for video.
+  bool audio_scrub = (scrubbing && clip->track() >= 0);
+
+  if (wait_for_cacher_to_respond && !audio_scrub) {
     main_thread_lock_.lock();
     main_thread_woken_ = false;
   }
@@ -640,15 +646,15 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   // wake up cacher
   wait_cond_.wakeAll();
 
-  // if not, wait for cacher to respond
-  if (wait_for_cacher_to_respond) {
+  // wait for cacher to respond (video and audio playback only, not audio scrub)
+  if (wait_for_cacher_to_respond && !audio_scrub) {
     interrupt_ = true;
     if (!main_thread_woken_) {
       main_thread_wait_.wait(&main_thread_lock_, 2000);
     }
   }
 
-  if (wait_for_cacher_to_respond) {
+  if (wait_for_cacher_to_respond && !audio_scrub) {
     main_thread_lock_.unlock();
   }
 }

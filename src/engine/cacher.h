@@ -334,6 +334,16 @@ class Cacher : public QThread {
   bool scrubbing_;
 
   /**
+   * @brief Last audio_scrub_id this cacher contributed to
+   *
+   * Prevents a cacher from decoding the same scrub grain twice, while still
+   * allowing multiple cachers (overlapping clips) to each contribute once per
+   * scrub event. Replaces the old global audio_scrub_data_ready gate that
+   * blocked all but the first cacher to finish.
+   */
+  unsigned last_scrub_id_{0};
+
+  /**
    * @brief Current Sequence playback speed set by Cache()
    */
   int playback_speed_;

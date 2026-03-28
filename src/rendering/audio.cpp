@@ -187,7 +187,12 @@ bool AudioSenderThread::scrub_grain_active() {
     scrub_grain_total_ = scrub_grain_samples(audio_output->format().sampleRate());
     return true;
   }
-  return scrub_grain_played_ < scrub_grain_total_;
+  if (scrub_grain_played_ < scrub_grain_total_) {
+    return true;
+  }
+  // Grain finished playing — clear the flag so the next seek triggers a new grain
+  audio_scrub_data_ready.store(false);
+  return false;
 }
 
 void AudioSenderThread::run() {
@@ -250,8 +255,17 @@ int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
       pairs_to_write = p + 1;
     }
 
-    actual_write = (pairs_to_write > 0) ? audio_io_device->write(staging_buffer_.constData(), pairs_to_write * 4) : 0;
-    consumed = pairs_to_write * 4;  // only consume what the grain used
+    // Append silence tail when the grain just finished to prevent the audio
+    // device from underrunning between grains (causes audible pop/click).
+    // The staging buffer is already zero-filled beyond pairs_to_write.
+    int tail_pairs = 0;
+    if (scrub_grain_played_ >= scrub_grain_total_ && pairs_to_write > 0) {
+      int rate = audio_output->format().sampleRate();
+      tail_pairs = qMin(rate / 100, pairs_in_chunk - pairs_to_write);  // ~10 ms
+    }
+    int total_bytes = (pairs_to_write + tail_pairs) * 4;
+    actual_write = (total_bytes > 0) ? audio_io_device->write(staging_buffer_.constData(), total_bytes) : 0;
+    consumed = pairs_to_write * 4;  // only advance ibuffer read by grain data
   } else {
     // Normal playback: write raw ibuffer directly to device
     actual_write = audio_io_device->write(reinterpret_cast<const char*>(audio_ibuffer) + offset, max);

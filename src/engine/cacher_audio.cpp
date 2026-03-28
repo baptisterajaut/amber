@@ -497,9 +497,11 @@ void Cacher::CacheAudioWorker() {
     audio_just_reset = true;
   }
 
-  // Skip grain decode if the previous grain hasn't been consumed yet by the sender.
-  // The next seek will clear audio_scrub_data_ready and trigger a fresh decode.
-  if (scrubbing_ && audio_scrub_data_ready.load()) {
+  // Skip if this cacher already contributed to the current scrub event.
+  // Each cacher tracks the last audio_scrub_id it handled, so multiple cachers
+  // (overlapping clips at split boundaries) each contribute once per seek.
+  unsigned current_scrub = audio_scrub_id.load();
+  if (scrubbing_ && last_scrub_id_ == current_scrub) {
     return;
   }
 
@@ -608,10 +610,16 @@ void Cacher::CacheAudioWorker() {
     }
   }
 
-  // Signal that scrub audio is ready after the full grain has been decoded
+  // Mark this cacher as having contributed to the current scrub event.
+  // Only signal the audio sender if actual audio was mixed — an out-of-range
+  // clip (e.g. past timeline_out at a split boundary) must not claim the grain
+  // is ready, or it blocks the in-range clip from contributing.
   if (scrubbing_) {
-    audio_scrub_data_ready.store(true);
-    if (audio_thread != nullptr) audio_thread->notifyReceiver();
+    last_scrub_id_ = audio_scrub_id.load();
+    if (scrub_bytes_mixed > 0) {
+      audio_scrub_data_ready.store(true);
+      if (audio_thread != nullptr) audio_thread->notifyReceiver();
+    }
   }
 
   // If there's a QObject waiting for audio to be rendered, wake it now

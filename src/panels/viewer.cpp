@@ -288,12 +288,16 @@ void Viewer::seek(long p) {
       update_fx = true;
     }
   }
-  reset_all_audio();
   bool fast_scrub = scrub_elapsed_valid_ && scrub_elapsed_.elapsed() < 16;
   scrub_elapsed_.start();
   scrub_elapsed_valid_ = true;
-  if (amber::CurrentConfig.enable_audio_scrubbing && !fast_scrub) {
-    audio_scrub_data_ready.store(false);
+
+  // Only reset audio and trigger a new scrub grain when no grain is currently
+  // playing.  While a grain is in flight the playhead moves freely but we don't
+  // touch the audio buffer — same decoupling as video (viewer lags, playhead doesn't).
+  bool scrub_audio = amber::CurrentConfig.enable_audio_scrubbing && !fast_scrub && !audio_scrub_data_ready.load();
+  if (scrub_audio) {
+    reset_all_audio();
     audio_scrub_id.fetch_add(1);
   }
   last_playhead = seq->playhead;
