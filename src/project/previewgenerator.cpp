@@ -149,6 +149,13 @@ void PreviewGenerator::parse_media() {
         append = true;
       }
 
+      // Store per-stream duration (container duration may differ from individual stream durations,
+      // e.g. when a subtitle track is longer than the audio/video)
+      if (append && fmt_ctx_->streams[i]->duration != AV_NOPTS_VALUE) {
+        double tb = av_q2d(fmt_ctx_->streams[i]->time_base);
+        ms.stream_duration = qRound64(fmt_ctx_->streams[i]->duration * tb * AV_TIME_BASE);
+      }
+
       if (append) {
         QVector<FootageStream>& stream_list = (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) ?
               footage_->audio_tracks : footage_->video_tracks;

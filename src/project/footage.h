@@ -57,6 +57,7 @@ struct FootageStream {
   int audio_channels;
   int audio_layout;
   int audio_frequency;
+  int64_t stream_duration{-1};  // per-stream duration in AV_TIME_BASE units (-1 = unavailable)
   bool enabled;
 
   // preview thumbnail/waveform

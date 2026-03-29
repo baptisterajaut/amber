@@ -258,8 +258,17 @@ void TimelineWidget::drawClips(QPainter& p) {
               // draw waveform
               p.setPen(QColor(80, 80, 80));
 
+              // Use per-stream audio duration for waveform mapping — container duration
+              // may be longer due to subtitle tracks or metadata padding
+              long waveform_length = media_length;
+              if (ms->stream_duration > 0) {
+                double fr = clip->sequence->frame_rate / clip->speed().value;
+                waveform_length = static_cast<long>(std::floor(
+                    (double(ms->stream_duration) / double(AV_TIME_BASE)) * fr / clip->media()->to_footage()->speed));
+              }
+
               int waveform_start = -qMin(clip_rect.x(), 0);
-              int waveform_limit = qMin(clip_rect.width(), getScreenPointFromFrame(panel_timeline->zoom, media_length - clip->clip_in()));
+              int waveform_limit = qMin(clip_rect.width(), getScreenPointFromFrame(panel_timeline->zoom, waveform_length - clip->clip_in()));
 
               if ((clip_rect.x() + waveform_limit) > width()) {
                 waveform_limit -= (clip_rect.x() + waveform_limit - width());
@@ -268,7 +277,7 @@ void TimelineWidget::drawClips(QPainter& p) {
                 if (waveform_limit > 0) checkerboard_rect.setLeft(checkerboard_rect.left() + waveform_limit);
               }
 
-              draw_waveform(clip, ms, media_length, &p, clip_rect, waveform_start, waveform_limit, panel_timeline->zoom);
+              draw_waveform(clip, ms, waveform_length, &p, clip_rect, waveform_start, waveform_limit, panel_timeline->zoom);
             }
           }
           if (draw_checkerboard) {
