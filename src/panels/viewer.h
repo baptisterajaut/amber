@@ -68,7 +68,7 @@ class Viewer : public Panel {
   void show_videoaudio_buttons(bool s);
 
   // playback functions
-  void seek(long p);
+  void seek(long p, bool scrub_audio = true);
   void play(bool in_to_out = false);
   void pause(bool clear_buffer = true);
   bool playing{false};

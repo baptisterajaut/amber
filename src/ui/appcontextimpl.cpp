@@ -50,7 +50,7 @@ void AppContextImpl::deselectArea(long in, long out, int track) {
 
 void AppContextImpl::seekPlayhead(long frame) {
   if (panel_sequence_viewer != nullptr) {
-    panel_sequence_viewer->seek(frame);
+    panel_sequence_viewer->seek(frame, false);
   }
 }
 

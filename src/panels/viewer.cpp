@@ -271,7 +271,7 @@ bool frame_rate_is_droppable(double rate) {
   return (qFuzzyCompare(rate, 23.976) || qFuzzyCompare(rate, 29.97) || qFuzzyCompare(rate, 59.94));
 }
 
-void Viewer::seek(long p) {
+void Viewer::seek(long p, bool enable_scrub_audio) {
   if (seq == nullptr) return;
   pause(false);
   if (main_sequence) {
@@ -295,13 +295,15 @@ void Viewer::seek(long p) {
   // Only reset audio and trigger a new scrub grain when no grain is currently
   // playing.  While a grain is in flight the playhead moves freely but we don't
   // touch the audio buffer — same decoupling as video (viewer lags, playhead doesn't).
-  bool scrub_audio = amber::CurrentConfig.enable_audio_scrubbing && !fast_scrub && !audio_scrub_data_ready.load();
-  if (scrub_audio) {
-    reset_all_audio();
-    audio_scrub_id.fetch_add(1);
+  if (enable_scrub_audio) {
+    bool scrub_audio = amber::CurrentConfig.enable_audio_scrubbing && !fast_scrub && !audio_scrub_data_ready.load();
+    if (scrub_audio) {
+      reset_all_audio();
+      audio_scrub_id.fetch_add(1);
+    }
   }
   last_playhead = seq->playhead;
-  update_parents(update_fx, true);
+  update_parents(update_fx, fast_scrub);
 }
 
 void Viewer::go_to_start() {
