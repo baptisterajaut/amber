@@ -29,6 +29,8 @@
 #include <QXmlStreamWriter>
 #include <QWindow>
 
+#include <cstring>
+
 #include "rendering/audio.h"
 #include "ui/mainwindow.h"
 #include "global/global.h"
@@ -74,26 +76,64 @@ intptr_t hostCallback(AEffect* effect, int32_t opcode, int32_t index, intptr_t v
     effect->dispatcher(effect, effEditIdle, 0, 0, nullptr, 0);
     break;
   case audioMasterWantMidi:
-    // no midi support, return 0
-    break;
+    return 0;
+  case audioMasterGetTime: {
+    static VstTimeInfo timeInfo;
+    memset(&timeInfo, 0, sizeof(timeInfo));
+    timeInfo.samplePos = 0.0;
+    timeInfo.sampleRate = current_audio_freq();
+    timeInfo.tempo = 120.0;
+    timeInfo.timeSigNumerator = 4;
+    timeInfo.timeSigDenominator = 4;
+    timeInfo.flags = 0;
+    return reinterpret_cast<intptr_t>(&timeInfo);
+  }
+  case audioMasterIOChanged:
+    return 1;
+  case audioMasterSizeWindow:
+    // would need a back-pointer from AEffect to VSTHost to resize the dialog
+    return 0;
   case audioMasterGetSampleRate:
     return current_audio_freq();
   case audioMasterGetBlockSize:
     return BLOCK_SIZE;
   case audioMasterGetCurrentProcessLevel:
-    // process level happens to be 0
-    break;
-  case audioMasterGetProductString:
-    strncpy(static_cast<char*>(ptr), "AMBERTEAM", 63);
+    return 0;
+  case audioMasterGetVendorString:
+    strncpy(static_cast<char*>(ptr), "Amber Video Editor", 63);
     static_cast<char*>(ptr)[63] = '\0';
-    break;
+    return 1;
+  case audioMasterGetProductString:
+    strncpy(static_cast<char*>(ptr), "Amber", 63);
+    static_cast<char*>(ptr)[63] = '\0';
+    return 1;
+  case audioMasterGetVendorVersion:
+    return 1400;
+  case audioMasterCanDo: {
+    const char* str = static_cast<const char*>(ptr);
+    if (strcmp(str, "sendVstTimeInfo") == 0) return 1;
+    if (strcmp(str, "sizeWindow") == 0) return 1;
+    if (strcmp(str, "acceptIOChanges") == 0) return 1;
+    if (strcmp(str, "startStopProcess") == 0) return 1;
+    if (strcmp(str, "sendVstEvents") == 0) return -1;
+    if (strcmp(str, "sendVstMidiEvent") == 0) return -1;
+    if (strcmp(str, "receiveVstEvents") == 0) return -1;
+    if (strcmp(str, "receiveVstMidiEvent") == 0) return -1;
+    if (strcmp(str, "offline") == 0) return -1;
+    if (strcmp(str, "shellCategory") == 0) return -1;
+    if (strcmp(str, "openFileSelector") == 0) return -1;
+    if (strcmp(str, "closeFileSelector") == 0) return -1;
+    return 0;
+  }
+  case audioMasterGetLanguage:
+    return kVstLangEnglish;
+  case audioMasterUpdateDisplay:
+    return 0;
   case audioMasterBeginEdit:
-    // we don't really care about this
-    // but we are aware of it
-    break;
-  case audioMasterEndEdit: // change made
+    return 0;
+  case audioMasterEndEdit:
     amber::Global->set_modified(true);
-    break;
+    return 0;
   default:
     qInfo() << "Plugin requested unhandled opcode" << opcode;
   }
