@@ -39,6 +39,8 @@ Self-contained features that don't touch existing architecture.
 
 Bug fixes and security patches only.
 
+- **Bold timecodes** — increase font weight on timecode displays (viewer, effect controls). Trivial QSS/font change. (#12)
+
 ## 2.0
 
 Major release. Ships progressively via preview releases — features land as they're ready, users always have a working 1.x to fall back on.
@@ -82,6 +84,8 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Lift / gamma / gain (3-way color correction)
 - Color correction tool (curves, scopes — waveform, vectorscope, histogram)
 - Subtitle effect with .srt import (SubtitleEffect — shared style, dedicated floating editor for bulk operations, fine-tuning via Effect Controls)
+- **Text stroke** — QPainterPath outline on rich text effect (#12)
+- **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
 
 ### Scopes & monitoring
 
@@ -92,7 +96,8 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 - FPS counter overlay
 
 ### Editing features
-- Track mute/solo/lock (per-track header controls + skip logic in compose_sequence)
+- Track mute/solo/lock with track headers (per-track header controls showing V1/A1 labels, show/hide for video, mute/solo for audio + skip logic in compose_sequence) (#12)
+- Linked clip vertical drag — V+A clips move together across tracks when dragging a linked pair, standard NLE behavior (#12)
 - Layout presets (Default, 3-Point Editing, Color)
 - Color labels on media in project panel (field exists on Clip, needs UI on Media)
 - Proxy toggle (switch proxy/full-res during playback without rebuild)
@@ -124,6 +129,19 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 - Render queue — non-modal export with queue UI, continue editing during render
 - Batch export — multi-sequence export in one operation
 
+### UI polish
+- **Effect controls alignment** — align labels and values in a grid layout (labels left-aligned, values right-aligned with consistent weight). Touches `CollapsibleWidget` + `EffectRow` layout. (#12)
+- **Audio plugin parameters in EffectControls** — expose VST2 parameters as native EffectField rows instead of "open GUI" button only. Depends on plugin API exposing param metadata. (#12)
+
 ### .ove → .amb project format
 
 New XML schema for GPU effect parameters. `.ove` import preserved for backward compatibility.
+
+## Future (post-2.0)
+
+Features that require major architectural work or are outside the current scope.
+
+- **LADSPA audio plugin support** — lightweight C API, dlopen-based. Most realistic audio plugin standard to add beyond VST2. VST3/LV2/CLAP deferred — hosting SDKs are heavy and conflict with the lightweight footprint goal. (#12)
+- **2.5D compositing** — per-layer Z-depth with perspective camera. Requires 3D projection matrix in `compose_sequence()`, Z-order per clip, camera node. Major architectural change. (#12)
+- **Text animation** — letter-by-letter, word-by-word, line-by-line transforms + typewriter effect. Requires a mini animation engine within the text effect. (#12)
+- **2.5D motion tracker** — point/planar tracking with compositing integration. Requires optical flow or feature matching (CPU-bound). (#12)
