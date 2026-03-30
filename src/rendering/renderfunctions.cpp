@@ -643,11 +643,13 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
     // Invalidate if compositing resolution changed
     ClipRhiResources* existing = static_cast<ClipRhiResources*>(c->fbo_rhi);
     if (existing->tex[0] != nullptr && existing->tex[0]->pixelSize() != comp_size) {
+      QVector<QRhiResource*> to_delete;
       for (int j = 0; j < existing->count; j++) {
-        delete existing->rt[j];
-        delete existing->tex[j];
+        to_delete.append(existing->rt[j]);
+        to_delete.append(existing->tex[j]);
       }
-      delete existing->rpd;
+      if (existing->rpd) to_delete.append(existing->rpd);
+      RenderThread::DeferRhiResourceDeletion(to_delete);
       delete existing;
       c->fbo_rhi = nullptr;
     }

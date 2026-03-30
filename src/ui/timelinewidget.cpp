@@ -458,7 +458,7 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event) {
             mapped = rescale_frame_number(mapped, amber::ActiveSequence->frame_rate, nested->frame_rate);
             nested->playhead = mapped;
           }
-          amber::Global->set_sequence(nested);
+          amber::Global->set_sequence(nested, true);
         }
       } else {
         // Double-click on empty space: go back to parent sequence

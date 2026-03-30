@@ -331,7 +331,7 @@ public slots:
      *
      * The Sequence to set as the active Sequence.
      */
-    void set_sequence(SequencePtr s);
+    void set_sequence(SequencePtr s, bool record_history = false);
 
     void go_back_sequence();
 

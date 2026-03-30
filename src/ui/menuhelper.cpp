@@ -115,7 +115,7 @@ void MenuHelper::InitializeSharedMenus()
   freeze_frame_ = create_menu_action(nullptr, "freezeframe", panel_timeline, SLOT(freeze_frame()), QKeySequence("Shift+F"));
   freeze_frame_->setParent(this);
 
-  go_back_sequence_ = create_menu_action(nullptr, "gobackseq", amber::Global.get(), SLOT(go_back_sequence()), QKeySequence(Qt::Key_Escape));
+  go_back_sequence_ = create_menu_action(nullptr, "gobackseq", amber::Global.get(), SLOT(go_back_sequence()), QKeySequence(Qt::Key_Backspace));
   go_back_sequence_->setParent(this);
 
   Retranslate();

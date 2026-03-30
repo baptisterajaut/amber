@@ -193,6 +193,11 @@ void Config::load(QString path) {
     qCritical() << "Error parsing config XML." << stream.errorString();
   }
   f.close();
+
+  // Clamp preview resolution divider to valid values
+  if (preview_resolution_divider != 1 && preview_resolution_divider != 2 && preview_resolution_divider != 4) {
+    preview_resolution_divider = 1;
+  }
 }
 
 void Config::save(QString path) {

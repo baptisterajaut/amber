@@ -478,7 +478,17 @@ void Timeline::unnest() {
     // Frame rate conversion factor
     double rate_factor = amber::ActiveSequence->frame_rate / inner_seq->frame_rate;
 
-    for (const auto& inner_clip : inner_seq->clips) {
+    // Track remapping: offset inner tracks relative to the nested clip's position
+    // Video: inner -1 (V1) → nested_clip->track(), inner -2 → nested_clip->track()-1, etc.
+    // Audio: inner 0 (A1) → -(nested_clip->track()+1), inner 1 → -(nested_clip->track()+1)+1, etc.
+    int video_offset = nested_clip->track() - (-1);  // e.g. nested on -3 → offset = -2
+    int audio_offset = -(nested_clip->track() + 1);  // e.g. nested on -3 → audio starts at 2
+
+    // Build mapping from inner clip index → new_clips index (for relinking)
+    QMap<int, int> inner_to_new;
+
+    for (int i = 0; i < inner_seq->clips.size(); i++) {
+      const auto& inner_clip = inner_seq->clips.at(i);
       if (inner_clip == nullptr) continue;
 
       long in = inner_clip->timeline_in();
@@ -489,6 +499,10 @@ void Timeline::unnest() {
 
       ClipPtr c = inner_clip->copy(amber::ActiveSequence.get());
 
+      // Remap track to parent sequence
+      int inner_track = inner_clip->track();
+      c->set_track(inner_track < 0 ? inner_track + video_offset : inner_track + audio_offset);
+
       // Trim to visible range
       if (in < visible_start) {
         c->set_clip_in(c->clip_in() + (visible_start - in));
@@ -498,13 +512,25 @@ void Timeline::unnest() {
         out = visible_end;
       }
 
-      // Rescale and offset to parent timeline
+      // Rescale timeline positions to parent frame rate (clip_in stays in source media coordinates)
       c->set_timeline_in(nest_in + qRound((in - visible_start) * rate_factor));
       c->set_timeline_out(nest_in + qRound((out - visible_start) * rate_factor));
-      c->set_clip_in(qRound(c->clip_in() * rate_factor));
       c->refresh();
 
+      inner_to_new.insert(i, new_clips.size());
       new_clips.append(c);
+    }
+
+    // Re-establish A/V linking using inner sequence's link info
+    for (auto it = inner_to_new.constBegin(); it != inner_to_new.constEnd(); ++it) {
+      const auto& inner_clip = inner_seq->clips.at(it.key());
+      ClipPtr& new_clip = new_clips[it.value()];
+      for (int linked_inner_idx : inner_clip->linked) {
+        auto mapped = inner_to_new.find(linked_inner_idx);
+        if (mapped != inner_to_new.end()) {
+          new_clip->linked.append(mapped.value());
+        }
+      }
     }
 
     // Delete the nested clip from the parent
@@ -1412,11 +1438,9 @@ void Timeline::three_point_edit(bool insert) {
   bool source_has_out = false;
 
   if (src_seq->using_workarea) {
-    if (src_seq->workarea_in > 0) {
-      src_in = src_seq->workarea_in;
-      source_has_in = true;
-    }
-    if (src_seq->workarea_out > 0 && src_seq->workarea_out > src_in) {
+    src_in = src_seq->workarea_in;
+    source_has_in = true;
+    if (src_seq->workarea_out > src_in) {
       src_out = src_seq->workarea_out;
       source_has_out = true;
     }
@@ -1534,11 +1558,11 @@ void Timeline::freeze_frame() {
 
   long playhead = amber::ActiveSequence->playhead;
 
-  // Find all clips at the playhead
+  // Find video clips at the playhead (audio is not frozen — it would produce a buzz artifact)
   QVector<int> clip_indexes;
   for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     Clip* c = amber::ActiveSequence->clips.at(i).get();
-    if (c != nullptr && c->timeline_in() < playhead && c->timeline_out() > playhead) {
+    if (c != nullptr && c->track() < 0 && c->timeline_in() < playhead && c->timeline_out() > playhead) {
       clip_indexes.append(i);
     }
   }

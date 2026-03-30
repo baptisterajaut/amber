@@ -165,11 +165,11 @@ QRhiTexture* SubtitleEffect::process_superimpose(QRhi* rhi, QRhiResourceUpdateBa
   bool cue_changed = (new_cue != active_cue_index_);
   active_cue_index_ = new_cue;
 
-  // Store pending cue text for main-thread UI update (render thread cannot touch widgets)
+  // Update main-thread UI with active cue text (capture by value to avoid cross-thread data race)
   if (cue_changed) {
-    pending_cue_text_ = new_cue >= 0 ? cues_[new_cue].text.left(80) : QString();
-    QMetaObject::invokeMethod(this, [this]() {
-      current_cue_field_->SetValueAt(0, pending_cue_text_);
+    QString cue_text = new_cue >= 0 ? cues_[new_cue].text.left(80) : QString();
+    QMetaObject::invokeMethod(this, [this, cue_text]() {
+      current_cue_field_->SetValueAt(0, cue_text);
     }, Qt::QueuedConnection);
   }
 
@@ -278,7 +278,11 @@ void SubtitleEffect::redraw(double timecode) {
 
     int blur_softness = qFloor(shadow_softness_field_->GetDoubleAt(timecode));
     if (blur_softness > 0) {
+      p.end();
       amber::ui::blur(img, img.rect(), blur_softness, true);
+      p.begin(&img);
+      p.setRenderHint(QPainter::Antialiasing);
+      p.translate(translate_x + sx, translate_y + sy);
     }
 
     p.setCompositionMode(QPainter::CompositionMode_SourceIn);
@@ -304,7 +308,7 @@ void SubtitleEffect::redraw(double timecode) {
       op.setRenderHint(QPainter::Antialiasing);
       op.translate(translate_x, translate_y);
 
-      int steps = qMax(8, ow * 4);
+      int steps = qBound(8, ow * 4, 24);
       for (int s = 0; s < steps; s++) {
         double a = 2.0 * M_PI * s / steps;
         int ox = qRound(qCos(a) * ow);

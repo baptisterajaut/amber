@@ -27,7 +27,6 @@ class SubtitleEffect : public Effect {
 
   QVector<SubtitleCue> cues_;
   int active_cue_index_{-1};
-  QString pending_cue_text_;
 
   // Style fields
   FontField* font_field_;

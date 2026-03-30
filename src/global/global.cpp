@@ -386,10 +386,10 @@ void OliveGlobal::open_preferences() {
   pd.exec();
 }
 
-void OliveGlobal::set_sequence(SequencePtr s)
+void OliveGlobal::set_sequence(SequencePtr s, bool record_history)
 {
-  // Push current sequence onto history stack (for nested sequence navigation)
-  if (amber::ActiveSequence != nullptr && s != nullptr && amber::ActiveSequence != s) {
+  // Push current sequence onto history stack only for explicit user navigation (double-click into nested seq)
+  if (record_history && amber::ActiveSequence != nullptr && s != nullptr && amber::ActiveSequence != s) {
     sequence_history_.append(amber::ActiveSequence);
   }
 
