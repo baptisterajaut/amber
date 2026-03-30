@@ -10,7 +10,7 @@ Amber inherits Olive 0.1's greatest strength: everything is where you expect it.
 
 ## 1.x — Maintenance
 
-Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak backports (1.3.0), core/engine layer extraction, QoL batch (1.4.0) — all shipped.
+Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak backports (1.3.0), core/engine layer extraction, QoL batch (1.4.0), subtitles + 3-point editing + freeze frame + nesting + preview resolution (1.5.0) — all shipped.
 
 ### 1.4.0 — Quality-of-life (shipped)
 
@@ -24,16 +24,16 @@ Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak ba
 - Audio data race fix (lock ibuffer reads)
 - Nested clip gizmo fix, color label menu consistency, cover art import fix
 
-### 1.5.0 — Quality-of-life (next)
+### 1.5.0 — Quality-of-life (shipped)
 
-Self-contained features that don't touch existing architecture.
-
-- **3-point editing** — wire footage viewer in/out marks to insert/overwrite actions on timeline. Infrastructure exists (Viewer in/out marks, paste insert mode, focus routing), needs ~200-300 lines of wiring.
-- **Subtitle import (.srt)** — new SubtitleEffect with shared style, import from File menu. ~500-600 lines.
-- **Freeze frame** — split at playhead + hold frame. Needs speed=0 guards in `media_length()`, `cacher.cpp`, and `cacher_audio.cpp` (division-by-zero). ~150 lines.
-- **Welcome screen** — QDialog at startup with recent projects + new project with sequence templates. ~200-300 lines.
-- **Nesting fixes** — circular reference detection in `compose_sequence()`, deletion protection for referenced sequences, sequence navigation stack + Escape to go back, breadcrumb in timeline header.
-- **Flatten/unpack nested sequence** — inverse of nest(), restore inner clips to parent timeline. ~150 lines.
+- Subtitle import (.srt) with SubtitleEffect rendering
+- 3-point editing (Insert Edit `,`, Overwrite Edit `.` from footage viewer)
+- Freeze frame (Shift+F toggle, speed=0 guards, "(Frozen)" label)
+- Nesting fixes (circular reference detection, deletion protection, navigation stack + Escape/double-click, breadcrumb)
+- Unnest/flatten nested sequence
+- Set Duration shortcut (Ctrl+R)
+- Preview resolution (Full / 1/2 / 1/4) in View menu
+- Contextual Clip/In-Out submenus in Edit menu
 
 ### 1.x maintenance
 
@@ -130,6 +130,7 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 - Batch export — multi-sequence export in one operation
 
 ### UI polish
+- **Welcome screen** — QDialog at startup with recent projects + new project with sequence templates.
 - **Effect controls alignment** — align labels and values in a grid layout (labels left-aligned, values right-aligned with consistent weight). Touches `CollapsibleWidget` + `EffectRow` layout. (#12)
 - **Audio plugin parameters in EffectControls** — expose VST2 parameters as native EffectField rows instead of "open GUI" button only. Depends on plugin API exposing param metadata. (#12)
 
