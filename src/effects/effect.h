@@ -21,28 +21,28 @@
 #ifndef EFFECT_H
 #define EFFECT_H
 
-#include <memory>
-#include <QObject>
-#include <QString>
-#include <QVector>
-#include <QColor>
-#include <QMutex>
-#include <QThread>
-#include <QLabel>
-#include <QWidget>
-#include <QGridLayout>
-#include <QPushButton>
-#include <QMouseEvent>
-#include <QXmlStreamReader>
-#include <QXmlStreamWriter>
-#include <random>
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
+#include <QColor>
+#include <QGridLayout>
+#include <QLabel>
+#include <QMouseEvent>
+#include <QMutex>
+#include <QObject>
+#include <QPushButton>
+#include <QString>
+#include <QThread>
+#include <QVector>
+#include <QWidget>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
+#include <memory>
+#include <random>
 
 #include "core/audio.h"
-#include "ui/collapsiblewidget.h"
-#include "effectrow.h"
 #include "effectgizmo.h"
+#include "effectrow.h"
+#include "ui/collapsiblewidget.h"
 
 class Clip;
 
@@ -69,11 +69,7 @@ enum EffectType : uint8_t {
   EFFECT_TYPE_TRANSITION
 };
 
-enum EffectKeyframeType : uint8_t {
-  EFFECT_KEYFRAME_LINEAR,
-  EFFECT_KEYFRAME_BEZIER,
-  EFFECT_KEYFRAME_HOLD
-};
+enum EffectKeyframeType : uint8_t { EFFECT_KEYFRAME_LINEAR, EFFECT_KEYFRAME_BEZIER, EFFECT_KEYFRAME_HOLD };
 
 enum EffectInternal : uint8_t {
   EFFECT_INTERNAL_TRANSFORM,
@@ -91,6 +87,7 @@ enum EffectInternal : uint8_t {
   EFFECT_INTERNAL_CORNERPIN,
   EFFECT_INTERNAL_FREI0R,
   EFFECT_INTERNAL_RICHTEXT,
+  EFFECT_INTERNAL_SUBTITLE,
   EFFECT_INTERNAL_COUNT
 };
 
@@ -143,8 +140,8 @@ struct UniformEntry {
 
 class Effect : public QObject {
   Q_OBJECT
-public:
-  Effect(Clip *c, const EffectMeta* em);
+ public:
+  Effect(Clip* c, const EffectMeta* em);
   ~Effect() override;
 
   Clip* parent_clip;
@@ -173,7 +170,7 @@ public:
   virtual void custom_load(QXmlStreamReader& stream);
   virtual void save(QXmlStreamWriter& stream);
 
-  void load_from_string(const QByteArray &s);
+  void load_from_string(const QByteArray& s);
   QByteArray save_to_string();
 
   // shader handling (QRhi)
@@ -194,12 +191,7 @@ public:
 
   static QShader bakeOrLoadCached(const QString& path, QShader::Stage stage);
 
-  enum VideoEffectFlags : uint8_t {
-    ShaderFlag        = 0x1,
-    CoordsFlag        = 0x2,
-    SuperimposeFlag   = 0x4,
-    ImageFlag         = 0x8
-  };
+  enum VideoEffectFlags : uint8_t { ShaderFlag = 0x1, CoordsFlag = 0x2, SuperimposeFlag = 0x4, ImageFlag = 0x8 };
   int Flags();
   void SetFlags(int flags);
 
@@ -212,7 +204,8 @@ public:
   virtual void process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData);
   virtual void process_coords(double timecode, GLTextureCoords& coords, int data);
   virtual QRhiTexture* process_superimpose(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode);
-  virtual void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes, int channel_count);
+  virtual void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes,
+                             int channel_count);
 
   virtual void gizmo_draw(double timecode, GLTextureCoords& coords);
   void gizmo_move(EffectGizmo* sender, int x_movement, int y_movement, double timecode, bool done);
@@ -220,29 +213,29 @@ public:
   bool are_gizmos_enabled();
 
   template <typename T>
-  T randomNumber()
-  {
+  T randomNumber() {
     static std::random_device device;
     static std::mt19937 generator(device());
     static std::uniform_int_distribution<> distribution(std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
     return distribution(generator);
   }
 
-  static EffectPtr Create(Clip *c, const EffectMeta *em);
+  static EffectPtr Create(Clip* c, const EffectMeta* em);
   static const EffectMeta* GetInternalMeta(int internal_id, int type);
-public slots:
+ public slots:
   void FieldChanged();
   void SetEnabled(bool b);
   void SetExpanded(bool e);
-signals:
+ signals:
   void EnabledChanged(bool);
-public slots:
+ public slots:
   void delete_self();
   void move_up();
   void move_down();
   void save_to_file();
   void load_from_file();
-protected:
+
+ protected:
   // shader paths (from effect XML)
   QString vertPath;
   QString fragPath;
@@ -250,7 +243,7 @@ protected:
   // QRhi shaders
   QShader vertexShader_;
   QShader fragmentShader_;
-  QVector<UniformEntry> uniformEntries_;   // fragment UBO members (binding 1)
+  QVector<UniformEntry> uniformEntries_;      // fragment UBO members (binding 1)
   QVector<UniformEntry> vertUniformEntries_;  // vertex UBO members (binding 1, for cornerpin)
   int fragUboSize_{0};
   int vertUboSize_{0};
@@ -262,7 +255,10 @@ protected:
   // enable effect to update constantly
   virtual bool AlwaysUpdate();
 
-private:
+  // superimpose functions
+  bool valueHasChanged(double timecode);
+
+ private:
   bool isOpen{false};
   QVector<EffectRow*> rows;
   QVector<EffectGizmo*> gizmos;
@@ -299,10 +295,9 @@ private:
 
   // superimpose functions
   virtual void redraw(double timecode);
-  bool valueHasChanged(double timecode);
   QVector<QVariant> cachedValues;
   void delete_texture();
   void validate_meta_path();
 };
 
-#endif // EFFECT_H
+#endif  // EFFECT_H

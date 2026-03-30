@@ -63,6 +63,8 @@
 #include "ui/appcontextimpl.h"
 #include "ui/viewerwidget.h"
 #include "engine/undo/undostack.h"
+#include "effects/internal/srtparser.h"
+#include "effects/internal/subtitleeffect.h"
 
 MainWindow* amber::MainWindow;
 
@@ -512,6 +514,9 @@ void MainWindow::setup_menus() {
   import_action =
       MenuHelper::create_menu_action(file_menu, "import", panel_project, SLOT(import_dialog()), QKeySequence("Ctrl+I"));
 
+  import_subtitle_action =
+      MenuHelper::create_menu_action(file_menu, "importsubtitle", this, SLOT(import_subtitle()));
+
   relink_media_action = MenuHelper::create_menu_action(file_menu, "relinkmedia", this, SLOT(relink_media()));
 
   file_menu->addSeparator();
@@ -931,6 +936,7 @@ void MainWindow::Retranslate() {
   save_project->setText(tr("&Save Project"));
   save_project_as->setText(tr("Save Project &As"));
   import_action->setText(tr("&Import..."));
+  import_subtitle_action->setText(tr("Import Subtitle (.srt)..."));
   relink_media_action->setText(tr("Relink Media..."));
   export_action->setText(tr("&Export..."));
   export_frame_action->setText(tr("Export &Frame..."));
@@ -1307,6 +1313,95 @@ void MainWindow::relink_media() {
     FootageRelinkDialog dlg(this, invalid);
     dlg.exec();
   }
+}
+
+void MainWindow::import_subtitle() {
+  if (amber::ActiveSequence == nullptr) {
+    QMessageBox::warning(this, tr("No Sequence"),
+                         tr("Please open a sequence before importing subtitles."));
+    return;
+  }
+
+  QString filepath = QFileDialog::getOpenFileName(
+      this, tr("Import Subtitle"), QString(),
+      tr("SRT Subtitle Files (*.srt);;All Files (*)"));
+
+  if (filepath.isEmpty()) return;
+
+  SrtParseResult result = parse_srt(filepath);
+
+  if (result.cues.isEmpty()) {
+    QMessageBox::warning(this, tr("Import Failed"),
+                         tr("No valid subtitle cues found in the file."));
+    return;
+  }
+
+  if (result.skipped > 0) {
+    QMessageBox::information(this, tr("Import Subtitle"),
+                             tr("Imported %1 cues, %2 skipped (malformed).")
+                                 .arg(result.cues.size())
+                                 .arg(result.skipped));
+  }
+
+  Sequence* seq = amber::ActiveSequence.get();
+  long playhead = seq->playhead;
+
+  // Calculate clip duration from last cue's end_ms
+  qint64 last_end_ms = 0;
+  for (const SubtitleCue& cue : result.cues) {
+    if (cue.end_ms > last_end_ms) last_end_ms = cue.end_ms;
+  }
+  long duration_frames = qRound64(last_end_ms * seq->frame_rate / 1000.0);
+
+  // Find first free video track at playhead (start at -1, go down)
+  int track = -1;
+  while (track > -100) {
+    bool collision = false;
+    long check_in = playhead;
+    long check_out = playhead + duration_frames;
+    for (const ClipPtr& c : seq->clips) {
+      if (c != nullptr && c->track() == track && check_in < c->timeline_out() && check_out > c->timeline_in()) {
+        collision = true;
+        break;
+      }
+    }
+    if (!collision) break;
+    track--;
+  }
+
+  // Create clip
+  ClipPtr clip = std::make_shared<Clip>(seq);
+  clip->set_media(nullptr, 0);
+  clip->set_timeline_in(playhead);
+  clip->set_timeline_out(playhead + duration_frames);
+  clip->set_clip_in(0);
+  clip->set_track(track);
+  clip->set_name(QFileInfo(filepath).baseName());
+  clip->set_color(220, 180, 60);
+
+  // Add Transform effect (standard for video clips)
+  if (amber::CurrentConfig.add_default_effects_to_clips) {
+    clip->effects.append(Effect::Create(
+        clip.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TRANSFORM, EFFECT_TYPE_EFFECT)));
+  }
+
+  // Add SubtitleEffect with parsed cues
+  EffectPtr sub_effect = Effect::Create(
+      clip.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SUBTITLE, EFFECT_TYPE_EFFECT));
+  static_cast<SubtitleEffect*>(sub_effect.get())->SetCues(result.cues);
+  clip->effects.append(sub_effect);
+
+  // Add via undo system
+  ComboAction* ca = new ComboAction(tr("Import Subtitle"));
+  QVector<ClipPtr> clips_to_add;
+  clips_to_add.append(clip);
+  ca->append(new AddClipCommand(seq, clips_to_add));
+  amber::UndoStack.push(ca);
+
+  update_ui(true);
+
+  // Scroll video area to reveal the track where the subtitle was placed
+  panel_timeline->scroll_to_track(track);
 }
 
 void MainWindow::toggle_panel_visibility() {

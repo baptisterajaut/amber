@@ -111,6 +111,10 @@ void load_internal_effects() {
   em.internal = EFFECT_INTERNAL_SOLID;
   effects.append(em);
 
+  em.name = "Subtitle";
+  em.internal = EFFECT_INTERNAL_SUBTITLE;
+  effects.append(em);
+
   // internal transitions
   em.type = EFFECT_TYPE_TRANSITION;
   em.category = "";

@@ -182,6 +182,10 @@ set(OLIVE_SOURCES
   effects/internal/shakeeffect.h
   effects/internal/solideffect.cpp
   effects/internal/solideffect.h
+  effects/internal/srtparser.cpp
+  effects/internal/srtparser.h
+  effects/internal/subtitleeffect.cpp
+  effects/internal/subtitleeffect.h
   effects/internal/texteffect.cpp
   effects/internal/texteffect.h
   effects/internal/timecodeeffect.cpp

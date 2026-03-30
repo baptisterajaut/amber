@@ -60,3 +60,12 @@ add_executable(amber-engine-tests
 target_include_directories(amber-engine-tests PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-engine-tests PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-engine-tests COMMAND amber-engine-tests)
+
+add_executable(amber-test-srt
+  test_srt.cpp
+  ${CMAKE_SOURCE_DIR}/effects/internal/srtparser.cpp
+  ${CMAKE_SOURCE_DIR}/effects/internal/srtparser.h
+)
+target_include_directories(amber-test-srt PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-srt PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-srt COMMAND amber-test-srt)

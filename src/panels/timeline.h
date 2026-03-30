@@ -225,6 +225,7 @@ public:
   QPushButton* snappingButton;
 
   void scroll_to_frame(long frame);
+  void scroll_to_track(int track);
   void select_from_playhead();
 
   bool can_ripple_empty_space(long frame, int track);

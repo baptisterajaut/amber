@@ -481,6 +481,19 @@ void Timeline::scroll_to_frame(long frame) {
   scroll_to_frame_internal(horizontalScrollBar, frame, zoom, timeline_area->width());
 }
 
+void Timeline::scroll_to_track(int track) {
+  if (track < 0) {
+    // Video track — compute pixel offset from bottom for the target track
+    int offset = 0;
+    for (int t = -1; t > track; t--) {
+      offset += GetTrackHeight(t);
+    }
+    // Video area is bottom-aligned: scrollbar minimum is negative, 0 = bottom
+    int target = -(offset);
+    videoScrollbar->setValue(qMin(target, videoScrollbar->value()));
+  }
+}
+
 void Timeline::select_from_playhead() {
   amber::ActiveSequence->selections.clear();
   for (int i=0;i<amber::ActiveSequence->clips.size();i++) {

@@ -201,6 +201,7 @@ class MainWindow : public QMainWindow {
    * @brief Open the Relink Media dialog to find missing media files.
    */
   void relink_media();
+  void import_subtitle();
 
   /**
    * @brief Set panel lock
@@ -246,6 +247,7 @@ class MainWindow : public QMainWindow {
   QAction* save_project;
   QAction* save_project_as;
   QAction* import_action;
+  QAction* import_subtitle_action;
   QAction* relink_media_action;
   QAction* export_action;
   QAction* export_frame_action;

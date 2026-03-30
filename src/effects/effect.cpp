@@ -64,6 +64,7 @@
 #include "effects/internal/richtexteffect.h"
 #include "effects/internal/shakeeffect.h"
 #include "effects/internal/solideffect.h"
+#include "effects/internal/subtitleeffect.h"
 #include "effects/internal/texteffect.h"
 #include "effects/internal/timecodeeffect.h"
 #include "effects/internal/toneeffect.h"
@@ -129,6 +130,8 @@ EffectPtr Effect::Create(Clip* c, const EffectMeta* em) {
 #endif
       case EFFECT_INTERNAL_RICHTEXT:
         return std::make_shared<RichTextEffect>(c, em);
+      case EFFECT_INTERNAL_SUBTITLE:
+        return std::make_shared<SubtitleEffect>(c, em);
     }
   } else if (!em->filename.isEmpty()) {
     // load effect from file
