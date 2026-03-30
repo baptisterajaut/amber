@@ -103,6 +103,9 @@ void MenuHelper::InitializeSharedMenus()
   three_point_overwrite_ = create_menu_action(nullptr, "3ptoverwrite", panel_timeline, SLOT(three_point_overwrite()), QKeySequence("."));
   three_point_overwrite_->setParent(this);
 
+  freeze_frame_ = create_menu_action(nullptr, "freezeframe", panel_timeline, SLOT(freeze_frame()), QKeySequence("Shift+F"));
+  freeze_frame_->setParent(this);
+
   Retranslate();
 }
 
@@ -127,6 +130,7 @@ void MenuHelper::make_clip_functions_menu(QMenu *parent) {
   parent->addAction(link_unlink_);
   parent->addAction(enable_disable_);
   parent->addAction(nest_);
+  parent->addAction(freeze_frame_);
 }
 
 void MenuHelper::make_edit_functions_menu(QMenu *parent, bool objects_are_selected) {
@@ -190,6 +194,7 @@ void MenuHelper::Retranslate()
   split_->setText(tr("Split"));
   three_point_insert_->setText(tr("Insert Edit"));
   three_point_overwrite_->setText(tr("Overwrite Edit"));
+  freeze_frame_->setText(tr("Freeze Frame"));
 }
 
 void MenuHelper::toggle_bool_action() {

@@ -261,7 +261,7 @@ void TimelineWidget::drawClips(QPainter& p) {
               // Use per-stream audio duration for waveform mapping — container duration
               // may be longer due to subtitle tracks or metadata padding
               long waveform_length = media_length;
-              if (ms->stream_duration > 0) {
+              if (ms->stream_duration > 0 && !qFuzzyIsNull(clip->speed().value)) {
                 double fr = clip->sequence->frame_rate / clip->speed().value;
                 waveform_length = static_cast<long>(std::floor(
                     (double(ms->stream_duration) / double(AV_TIME_BASE)) * fr / clip->media()->to_footage()->speed));
@@ -350,7 +350,9 @@ void TimelineWidget::drawClips(QPainter& p) {
             p.drawLine(text_rect.x(), underline_y, text_rect.x() + underline_width, underline_y);
           }
           QString name = clip->name();
-          if (clip->speed().value != 1.0 || clip->reversed()) {
+          if (qFuzzyIsNull(clip->speed().value)) {
+            name += " (Frozen)";
+          } else if (clip->speed().value != 1.0 || clip->reversed()) {
             name += " (";
             if (clip->reversed()) name += "-";
             name += QString::number(clip->speed().value*100) + "%)";

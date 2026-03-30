@@ -952,6 +952,16 @@ double playhead_to_clip_seconds(Clip* c, long playhead) {
     qWarning() << "playhead_to_clip_seconds: c->sequence is null";
     return 0.0;
   }
+
+  // Freeze frame: speed=0 means hold the frame at clip_in
+  if (qFuzzyIsNull(c->speed().value)) {
+    double secs = double(c->clip_in()) / c->sequence->frame_rate;
+    if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
+      secs *= c->media()->to_footage()->speed;
+    }
+    return secs;
+  }
+
   long clip_frame = playhead_to_clip_frame(c, playhead);
 
   if (c->reversed()) {

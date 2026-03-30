@@ -345,7 +345,7 @@ void set_speed(ComboAction* ca, Clip* c, double speed, bool ripple, long& ep, lo
   panel_timeline->deselect_area(c->timeline_in(), c->timeline_out(), c->track());
 
   long proposed_out = c->timeline_out();
-  double multiplier = (c->speed().value / speed);
+  double multiplier = qFuzzyIsNull(speed) ? 1.0 : (c->speed().value / speed);
   proposed_out = qRound(c->timeline_in() + (c->length() * multiplier));
   ca->append(new SetSpeedAction(c, speed));
   if (!ripple && proposed_out > c->timeline_out()) {

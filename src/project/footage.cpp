@@ -56,6 +56,7 @@ void Footage::reset() {
 
 long Footage::get_length_in_frames(double frame_rate) {
   if (length >= 0) {
+    if (qFuzzyIsNull(speed)) return LONG_MAX;
     return static_cast<long>(std::floor((double(length) / double(AV_TIME_BASE)) * frame_rate / speed));
   }
   return 0;

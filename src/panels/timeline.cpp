@@ -1436,6 +1436,94 @@ void Timeline::three_point_edit(bool insert) {
   panel_sequence_viewer->seek(timeline_out);
 }
 
+void Timeline::freeze_frame() {
+  if (amber::ActiveSequence == nullptr) return;
+
+  // If selected clips are frozen, unfreeze them instead (toggle)
+  QVector<Clip*> selected = amber::ActiveSequence->SelectedClips();
+  if (!selected.isEmpty()) {
+    bool any_frozen = false;
+    for (auto* c : selected) {
+      if (qFuzzyIsNull(c->speed().value)) {
+        any_frozen = true;
+        break;
+      }
+    }
+    if (any_frozen) {
+      unfreeze_frame();
+      return;
+    }
+  }
+
+  long playhead = amber::ActiveSequence->playhead;
+
+  // Find all clips at the playhead
+  QVector<int> clip_indexes;
+  for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
+    Clip* c = amber::ActiveSequence->clips.at(i).get();
+    if (c != nullptr && c->timeline_in() < playhead && c->timeline_out() > playhead) {
+      clip_indexes.append(i);
+    }
+  }
+  if (clip_indexes.isEmpty()) return;
+
+  ComboAction* ca = new ComboAction(tr("Freeze Frame"));
+  QVector<int> pre_clips;
+  QVector<ClipPtr> post_clips;
+
+  for (int idx : clip_indexes) {
+    ClipPtr post = split_clip(ca, true, idx, playhead);
+    if (post != nullptr) {
+      pre_clips.append(idx);
+      post_clips.append(post);
+    }
+  }
+
+  if (post_clips.isEmpty()) {
+    delete ca;
+    return;
+  }
+
+  // Relink split clips
+  relink_clips_using_ids(pre_clips, post_clips);
+
+  // Set speed=0 on all post clips (the frozen halves)
+  for (auto& post : post_clips) {
+    ClipSpeed frozen;
+    frozen.value = 0.0;
+    frozen.maintain_audio_pitch = false;
+    post->set_speed(frozen);
+  }
+
+  ca->append(new AddClipCommand(amber::ActiveSequence.get(), post_clips));
+  amber::UndoStack.push(ca);
+  update_ui(true);
+}
+
+void Timeline::unfreeze_frame() {
+  if (amber::ActiveSequence == nullptr) return;
+
+  QVector<Clip*> frozen_clips = amber::ActiveSequence->SelectedClips();
+  if (frozen_clips.isEmpty()) return;
+
+  ComboAction* ca = new ComboAction(tr("Unfreeze Frame"));
+  bool changed = false;
+
+  for (auto* c : frozen_clips) {
+    if (qFuzzyIsNull(c->speed().value)) {
+      ca->append(new SetSpeedAction(c, 1.0));
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    amber::UndoStack.push(ca);
+    update_ui(true);
+  } else {
+    delete ca;
+  }
+}
+
 void amber::timeline::MultiplyTrackSizesByDPI()
 {
   kTrackDefaultHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();

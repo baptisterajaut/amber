@@ -266,6 +266,9 @@ public slots:
   void three_point_insert();
   void three_point_overwrite();
 
+  void freeze_frame();
+  void unfreeze_frame();
+
   void zoom_in();
   void zoom_out();
 

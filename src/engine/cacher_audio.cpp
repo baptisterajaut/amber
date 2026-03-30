@@ -225,8 +225,9 @@ bool Cacher::cacheAudioAccumulateReverse(AVFrame* frame, AVFrame*& out_frame, in
     }
     // Clamp to >= 0: if reverse_target_ < rev_frame->pts (e.g. seek during reverse near clip start),
     // the subtraction goes negative, nb_samples wraps, and the downstream mix loop overruns memory.
+    double freq_ratio = qFuzzyIsNull(playback_speed_) ? 0.0 : (current_audio_freq() / playback_speed_);
     rev_frame->nb_samples =
-        qMax(0LL, qRound64(double(reverse_target_ - rev_frame->pts) * timebase * (current_audio_freq() / playback_speed_)));
+        qMax(0LL, qRound64(double(reverse_target_ - rev_frame->pts) * timebase * freq_ratio));
 #ifdef AUDIOWARNINGS
     dout << "post cutoff deets::" << rev_frame->nb_samples;
 #endif

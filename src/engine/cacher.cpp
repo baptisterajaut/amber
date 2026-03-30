@@ -316,7 +316,7 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
   double playback_speed = 1.0;
   if (ok) {
     playback_speed = clip->speed().value * m->speed;
-    if (!qFuzzyCompare(playback_speed, 1.0) && !clip->speed().maintain_audio_pitch) {
+    if (!qFuzzyIsNull(playback_speed) && !qFuzzyCompare(playback_speed, 1.0) && !clip->speed().maintain_audio_pitch) {
       target_sample_rate = qRound64(target_sample_rate / playback_speed);
     }
   }
@@ -374,7 +374,7 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
   }
 
   if (ok) {
-    if (qFuzzyCompare(playback_speed, 1.0) || !clip->speed().maintain_audio_pitch) {
+    if (qFuzzyCompare(playback_speed, 1.0) || qFuzzyIsNull(playback_speed) || !clip->speed().maintain_audio_pitch) {
       avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
     } else {
       AVFilterContext* previous_filter = buffersrc_ctx;

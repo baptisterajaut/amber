@@ -329,6 +329,8 @@ double Clip::media_frame_rate() {
 
 long Clip::media_length() {
   if (this->sequence != nullptr) {
+    if (qFuzzyIsNull(speed_.value)) return LONG_MAX;
+
     double fr = this->sequence->frame_rate;
 
     fr /= speed_.value;

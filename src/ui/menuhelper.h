@@ -230,6 +230,7 @@ private:
 
   QAction* three_point_insert_;
   QAction* three_point_overwrite_;
+  QAction* freeze_frame_;
 
 private slots:
 

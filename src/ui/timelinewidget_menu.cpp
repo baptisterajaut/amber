@@ -89,6 +89,19 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 
       menu.addAction(tr("&Speed/Duration"), amber::Global.get(), &OliveGlobal::open_speed_dialog);
 
+      bool any_frozen = false;
+      for (auto c : selected_clips) {
+        if (qFuzzyIsNull(c->speed().value)) {
+          any_frozen = true;
+          break;
+        }
+      }
+      if (any_frozen) {
+        menu.addAction(tr("Unfreeze Frame"), panel_timeline, &Timeline::unfreeze_frame);
+      } else {
+        menu.addAction(tr("Freeze Frame"), panel_timeline, &Timeline::freeze_frame);
+      }
+
       if (audio_clips_are_selected) {
         menu.addAction(tr("Auto-Cut Silence"), amber::Global.get(), &OliveGlobal::open_autocut_silence_dialog);
       }
