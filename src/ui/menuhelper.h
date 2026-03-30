@@ -23,8 +23,11 @@
 
 #include <QObject>
 #include <QMenuBar>
+#include <QVector>
 
 #include "ui/menu.h"
+
+class Clip;
 
 class MenuHelper : public QObject {
   Q_OBJECT
@@ -69,6 +72,7 @@ public:
    * The menu to add items to.
    */
   void make_clip_functions_menu(QMenu* parent);
+  void updateClipActions(const QVector<Clip*>& selected_clips);
 
   /**
    * @brief Creates standard edit menu (cut, copy, paste, etc.)

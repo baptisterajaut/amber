@@ -475,6 +475,12 @@ void MainWindow::Restyle() {
 void MainWindow::editMenu_About_To_Be_Shown() {
   undo_action->setEnabled(amber::UndoStack.canUndo());
   redo_action->setEnabled(amber::UndoStack.canRedo());
+
+  QVector<Clip*> selected;
+  if (amber::ActiveSequence != nullptr) {
+    selected = amber::ActiveSequence->SelectedClips();
+  }
+  amber::MenuHelper.updateClipActions(selected);
 }
 
 void MainWindow::setup_menus() {

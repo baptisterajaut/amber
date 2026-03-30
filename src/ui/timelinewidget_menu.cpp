@@ -126,6 +126,7 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
       }
 
       amber::MenuHelper.make_clip_functions_menu(&menu);
+      amber::MenuHelper.updateClipActions(selected_clips);
 
       // stabilizer option
       /*int video_clip_count = 0;

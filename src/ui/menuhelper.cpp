@@ -28,6 +28,9 @@
 
 #include "global/config.h"
 #include "project/clipboard.h"
+#include "project/media.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 #include "ui/mainwindow.h"
 #include "global/global.h"
 #include "panels/panels.h"
@@ -138,6 +141,66 @@ void MenuHelper::make_clip_functions_menu(QMenu *parent) {
   parent->addAction(nest_);
   parent->addAction(unnest_);
   parent->addAction(freeze_frame_);
+
+  // Nest/unnest visibility is updated dynamically by updateNestActions()
+}
+
+void MenuHelper::updateClipActions(const QVector<Clip*>& selected_clips) {
+  bool show_nest = false;
+  bool show_unnest = false;
+
+  if (!selected_clips.isEmpty()) {
+    // Unnest: at least one selected clip is a nested sequence
+    for (auto* c : selected_clips) {
+      if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
+        show_unnest = true;
+        break;
+      }
+    }
+
+    // Nest: multiple independent clips (not just a single linked A/V pair)
+    if (selected_clips.size() > 1) {
+      // Check if all selected clips are linked to each other (single linked group)
+      bool all_same_group = true;
+      Clip* first = selected_clips.at(0);
+      int first_idx = -1;
+      for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
+        if (amber::ActiveSequence->clips.at(i).get() == first) {
+          first_idx = i;
+          break;
+        }
+      }
+      if (first_idx >= 0) {
+        for (int i = 1; i < selected_clips.size(); i++) {
+          int idx = -1;
+          for (int j = 0; j < amber::ActiveSequence->clips.size(); j++) {
+            if (amber::ActiveSequence->clips.at(j).get() == selected_clips.at(i)) {
+              idx = j;
+              break;
+            }
+          }
+          if (!first->linked.contains(idx)) {
+            all_same_group = false;
+            break;
+          }
+        }
+      }
+      show_nest = !all_same_group;
+    }
+  }
+
+  nest_->setVisible(show_nest);
+  unnest_->setVisible(show_unnest);
+
+  // Freeze/unfreeze: show unfreeze if any selected clip is frozen
+  bool any_frozen = false;
+  for (auto* c : selected_clips) {
+    if (qFuzzyIsNull(c->speed().value)) {
+      any_frozen = true;
+      break;
+    }
+  }
+  freeze_frame_->setText(any_frozen ? tr("Unfreeze Frame") : tr("Freeze Frame"));
 }
 
 void MenuHelper::make_edit_functions_menu(QMenu *parent, bool objects_are_selected) {
