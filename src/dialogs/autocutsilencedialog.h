@@ -21,22 +21,23 @@
 #ifndef SILENCEDIALOG_H
 #define SILENCEDIALOG_H
 
-#include <QDialog>
 #include <QCheckBox>
+#include <QDialog>
+#include <QSpinBox>
 
 #include "engine/clip.h"
 #include "ui/labelslider.h"
 
-class AutoCutSilenceDialog : public QDialog
-{
+class AutoCutSilenceDialog : public QDialog {
   Q_OBJECT
-public:
+ public:
   AutoCutSilenceDialog(QWidget* parent, QVector<int> clips);
-public slots:
+ public slots:
   int exec() override;
-private slots:
+ private slots:
   void accept() override;
-private:
+
+ private:
   void cut_silence();
 
   QVector<int> clips_;
@@ -45,6 +46,8 @@ private:
   LabelSlider* release_threshold;
   LabelSlider* attack_time;
   LabelSlider* release_time;
+  QCheckBox* ripple_delete_checkbox;
+  QSpinBox* gap_size_spinbox;
 
   int default_attack_threshold;
   int current_attack_threshold;
@@ -54,6 +57,8 @@ private:
   int current_attack_time;
   int default_release_time;
   int current_release_time;
+  bool ripple_delete_enabled;
+  int current_gap_size;
 };
 
-#endif // SILENCEDIALOG_H
+#endif  // SILENCEDIALOG_H
