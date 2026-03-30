@@ -228,6 +228,9 @@ private:
   QAction* ripple_delete_;
   QAction* split_;
 
+  QAction* three_point_insert_;
+  QAction* three_point_overwrite_;
+
 private slots:
 
 

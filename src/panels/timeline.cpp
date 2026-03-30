@@ -1303,6 +1303,139 @@ void Timeline::match_frame() {
   panel_footage_viewer->seek(source_frame);
 }
 
+void Timeline::three_point_insert() {
+  three_point_edit(true);
+}
+
+void Timeline::three_point_overwrite() {
+  three_point_edit(false);
+}
+
+void Timeline::three_point_edit(bool insert) {
+  if (amber::ActiveSequence == nullptr) return;
+  if (panel_footage_viewer->media == nullptr) return;
+  if (panel_footage_viewer->media->get_type() != MEDIA_TYPE_FOOTAGE) return;
+
+  Footage* footage = panel_footage_viewer->media->to_footage();
+  SequencePtr src_seq = panel_footage_viewer->seq;
+  if (src_seq == nullptr) return;
+
+  bool has_video = footage->video_tracks.size() > 0;
+  bool has_audio = footage->audio_tracks.size() > 0;
+  if (!has_video && !has_audio) return;
+
+  // Compute source frame rate from the wrapper sequence
+  double src_rate = src_seq->frame_rate;
+  double dst_rate = amber::ActiveSequence->frame_rate;
+
+  // Determine source range in source-rate frames
+  long src_in = 0;
+  long src_out = src_seq->clips.isEmpty() ? 0 : src_seq->clips.at(0)->timeline_out();
+  bool source_has_in = false;
+  bool source_has_out = false;
+
+  if (src_seq->using_workarea) {
+    if (src_seq->workarea_in > 0) {
+      src_in = src_seq->workarea_in;
+      source_has_in = true;
+    }
+    if (src_seq->workarea_out > 0 && src_seq->workarea_out > src_in) {
+      src_out = src_seq->workarea_out;
+      source_has_out = true;
+    }
+  }
+
+  // No marks at all: nothing to do
+  if (!source_has_in && !source_has_out && !amber::ActiveSequence->using_workarea) return;
+
+  // If no source marks but sequence has workarea, use sequence range as duration limit
+  long duration_src = src_out - src_in;
+  if (!source_has_in && !source_has_out && amber::ActiveSequence->using_workarea) {
+    long seq_duration = amber::ActiveSequence->workarea_out - amber::ActiveSequence->workarea_in;
+    // Convert sequence duration to source frame rate
+    duration_src = rescale_frame_number(seq_duration, dst_rate, src_rate);
+    src_out = src_in + duration_src;
+  } else if (source_has_in && !source_has_out && amber::ActiveSequence->using_workarea) {
+    // Source in + sequence duration
+    long seq_duration = amber::ActiveSequence->workarea_out - amber::ActiveSequence->workarea_in;
+    duration_src = rescale_frame_number(seq_duration, dst_rate, src_rate);
+    src_out = src_in + duration_src;
+  }
+
+  // Compute target position
+  long target_pos = amber::ActiveSequence->playhead;
+  if (amber::ActiveSequence->using_workarea && amber::ActiveSequence->workarea_in >= 0) {
+    target_pos = amber::ActiveSequence->workarea_in;
+  }
+
+  // Convert to destination frame rate
+  long clip_in_dst = rescale_frame_number(src_in, src_rate, dst_rate);
+  long duration_dst = rescale_frame_number(src_out - src_in, src_rate, dst_rate);
+  if (duration_dst <= 0) return;
+
+  long timeline_in = target_pos;
+  long timeline_out = target_pos + duration_dst;
+
+  ComboAction* ca = new ComboAction(insert ? tr("Insert Edit") : tr("Overwrite Edit"));
+  QVector<ClipPtr> new_clips;
+
+  // Create video clip
+  if (has_video) {
+    const FootageStream& vs = footage->video_tracks.at(0);
+    ClipPtr vc = std::make_shared<Clip>(amber::ActiveSequence.get());
+    vc->set_media(panel_footage_viewer->media, vs.file_index);
+    vc->set_timeline_in(timeline_in);
+    vc->set_timeline_out(timeline_out);
+    vc->set_clip_in(clip_in_dst);
+    vc->set_track(-1);
+    vc->refresh();
+    new_clips.append(vc);
+  }
+
+  // Create audio clip
+  if (has_audio) {
+    const FootageStream& as = footage->audio_tracks.at(0);
+    ClipPtr ac = std::make_shared<Clip>(amber::ActiveSequence.get());
+    ac->set_media(panel_footage_viewer->media, as.file_index);
+    ac->set_timeline_in(timeline_in);
+    ac->set_timeline_out(timeline_out);
+    ac->set_clip_in(clip_in_dst);
+    ac->set_track(0);
+    ac->refresh();
+    new_clips.append(ac);
+  }
+
+  // Link video and audio clips
+  if (has_video && has_audio) {
+    new_clips[0]->linked.append(1);
+    new_clips[1]->linked.append(0);
+  }
+
+  if (insert) {
+    // Split existing clips and ripple to make room
+    split_cache.clear();
+    split_all_clips_at_point(ca, target_pos);
+    ripple_clips(ca, amber::ActiveSequence.get(), target_pos, duration_dst);
+  } else {
+    // Delete areas under the new clips
+    QVector<Selection> delete_areas;
+    for (const auto& c : new_clips) {
+      Selection s;
+      s.in = c->timeline_in();
+      s.out = c->timeline_out();
+      s.track = c->track();
+      delete_areas.append(s);
+    }
+    delete_areas_and_relink(ca, delete_areas, false);
+  }
+
+  ca->append(new AddClipCommand(amber::ActiveSequence.get(), new_clips));
+  amber::UndoStack.push(ca);
+
+  update_ui(true);
+  panel_sequence_viewer->seek(timeline_out);
+}
+
 void amber::timeline::MultiplyTrackSizesByDPI()
 {
   kTrackDefaultHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();

@@ -97,6 +97,12 @@ void MenuHelper::InitializeSharedMenus()
   split_ = create_menu_action(nullptr, "split", panel_timeline, SLOT(split_at_playhead()), QKeySequence("Ctrl+K"));
   split_->setParent(this);
 
+  three_point_insert_ = create_menu_action(nullptr, "3ptinsert", panel_timeline, SLOT(three_point_insert()), QKeySequence(","));
+  three_point_insert_->setParent(this);
+
+  three_point_overwrite_ = create_menu_action(nullptr, "3ptoverwrite", panel_timeline, SLOT(three_point_overwrite()), QKeySequence("."));
+  three_point_overwrite_->setParent(this);
+
   Retranslate();
 }
 
@@ -131,6 +137,9 @@ void MenuHelper::make_edit_functions_menu(QMenu *parent, bool objects_are_select
 
   parent->addAction(paste_);
   parent->addAction(paste_insert_);
+  parent->addSeparator();
+  parent->addAction(three_point_insert_);
+  parent->addAction(three_point_overwrite_);
 
   if (objects_are_selected) {
     parent->addAction(duplicate_);
@@ -179,6 +188,8 @@ void MenuHelper::Retranslate()
   delete_->setText(tr("Delete"));
   ripple_delete_->setText(tr("Ripple Delete"));
   split_->setText(tr("Split"));
+  three_point_insert_->setText(tr("Insert Edit"));
+  three_point_overwrite_->setText(tr("Overwrite Edit"));
 }
 
 void MenuHelper::toggle_bool_action() {

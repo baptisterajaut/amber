@@ -263,6 +263,9 @@ public slots:
 
   void nest();
 
+  void three_point_insert();
+  void three_point_overwrite();
+
   void zoom_in();
   void zoom_out();
 
@@ -278,6 +281,7 @@ private slots:
   void set_tool();
 
 private:
+  void three_point_edit(bool insert);
   void ChangeTrackHeightUniformly(int diff);
   void set_zoom_value(double v);
   QVector<QPushButton*> tool_buttons;
