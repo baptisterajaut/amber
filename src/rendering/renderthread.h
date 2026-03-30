@@ -125,6 +125,7 @@ private:
   int playback_speed_;
   int tex_width{-1};
   int tex_height{-1};
+  int divider_{1};
   QAtomicInt queued;
   bool texture_failed{false};
   bool scrubbing_{false};

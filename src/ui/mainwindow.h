@@ -131,6 +131,8 @@ class MainWindow : public QMainWindow {
   void changeEvent(QEvent* e) override;
 
  private slots:
+  void set_preview_resolution();
+
   /**
    * @brief Maximizes the currently hovered panel.
    *
@@ -281,6 +283,11 @@ class MainWindow : public QMainWindow {
   QAction* no_autoscroll;
   QAction* page_autoscroll;
   QAction* smooth_autoscroll;
+
+  QMenu* preview_resolution_menu;
+  QAction* preview_res_full_;
+  QAction* preview_res_half_;
+  QAction* preview_res_quarter_;
 
   QMenu* title_safe_area_menu;
   QAction* title_safe_off;

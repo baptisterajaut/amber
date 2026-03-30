@@ -237,6 +237,7 @@ private:
   QAction* three_point_overwrite_;
   QAction* freeze_frame_;
   QAction* go_back_sequence_;
+  QAction* speed_duration_;
 
 private slots:
 

@@ -194,11 +194,13 @@ void RenderThread::run() {
     }
 
     if (rhi_ != nullptr) {
-      // Recreate buffers if sequence size changed
-      if (seq->width != tex_width || seq->height != tex_height) {
+      // Recreate buffers if sequence size or divider changed
+      int target_w = seq->width / divider_;
+      int target_h = seq->height / divider_;
+      if (target_w != tex_width || target_h != tex_height) {
         delete_buffers();
-        tex_width = seq->width;
-        tex_height = seq->height;
+        tex_width = target_w;
+        tex_height = target_h;
       }
 
       // Create front buffers (double-buffered compositing targets)
@@ -400,7 +402,12 @@ void RenderThread::start_render(Sequence* s,
                                 int pixel_linesize,
                                 int idivider,
                                 bool scrubbing) {
-  Q_UNUSED(idivider)
+  // Apply preview resolution divider for playback (not export)
+  if (pixels == nullptr) {
+    divider_ = qMax(1, idivider);
+  } else {
+    divider_ = 1;  // Always export at full resolution
+  }
 
   // Export path (pixel_buffer != nullptr) needs the lock to prevent a lost-wakeup
   // deadlock — there's only one start_render per frame and the export thread blocks

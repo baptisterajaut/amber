@@ -354,7 +354,7 @@ void ViewerWidget::frame_update() {
     } else {
       bool scrubbing = !viewer->playing;
       renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(),
-                             nullptr, nullptr, 0, 0, scrubbing);
+                             nullptr, nullptr, 0, amber::CurrentConfig.preview_resolution_divider, scrubbing);
     }
 
     amber::rendering::compose_audio(viewer, viewer->seq.get(), viewer->get_playback_speed(), false);

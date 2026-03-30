@@ -684,6 +684,11 @@ struct Config {
   void load(QString path);
 
   /**
+   * @brief Preview resolution divider (1 = Full, 2 = Half, 4 = Quarter)
+   */
+  int preview_resolution_divider{1};
+
+  /**
    * @brief Save config to file
    *
    * Save current configuration parameters to file

@@ -109,6 +109,9 @@ void MenuHelper::InitializeSharedMenus()
   three_point_overwrite_ = create_menu_action(nullptr, "3ptoverwrite", panel_timeline, SLOT(three_point_overwrite()), QKeySequence("."));
   three_point_overwrite_->setParent(this);
 
+  speed_duration_ = create_menu_action(nullptr, "speedduration", amber::Global.get(), SLOT(open_speed_dialog()), QKeySequence("Ctrl+R"));
+  speed_duration_->setParent(this);
+
   freeze_frame_ = create_menu_action(nullptr, "freezeframe", panel_timeline, SLOT(freeze_frame()), QKeySequence("Shift+F"));
   freeze_frame_->setParent(this);
 
@@ -138,6 +141,7 @@ void MenuHelper::make_clip_functions_menu(QMenu *parent) {
   parent->addAction(add_default_transition_);
   parent->addAction(link_unlink_);
   parent->addAction(enable_disable_);
+  parent->addAction(speed_duration_);
   parent->addAction(nest_);
   parent->addAction(unnest_);
   parent->addAction(freeze_frame_);
@@ -201,6 +205,7 @@ void MenuHelper::updateClipActions(const QVector<Clip*>& selected_clips) {
     }
   }
   freeze_frame_->setText(any_frozen ? tr("Unfreeze Frame") : tr("Freeze Frame"));
+  speed_duration_->setVisible(!selected_clips.isEmpty());
 }
 
 void MenuHelper::make_edit_functions_menu(QMenu *parent, bool objects_are_selected) {
@@ -253,6 +258,7 @@ void MenuHelper::Retranslate()
   add_default_transition_->setText(tr("Add Default Transition"));
   link_unlink_->setText(tr("Link/Unlink"));
   enable_disable_->setText(tr("Enable/Disable"));
+  speed_duration_->setText(tr("Speed/Duration"));
   nest_->setText(tr("Nest"));
   unnest_->setText(tr("Unnest"));
   cut_->setText(tr("Cu&t"));

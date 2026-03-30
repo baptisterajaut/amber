@@ -647,6 +647,29 @@ void MainWindow::setup_menus() {
 
   view_menu->addSeparator();
 
+  preview_resolution_menu = MenuHelper::create_submenu(view_menu);
+  QActionGroup* preview_res_group = new QActionGroup(this);
+
+  preview_res_full_ = MenuHelper::create_menu_action(preview_resolution_menu, "previewfull",
+      this, SLOT(set_preview_resolution()));
+  preview_res_full_->setData(1);
+  preview_res_full_->setCheckable(true);
+  preview_res_group->addAction(preview_res_full_);
+
+  preview_res_half_ = MenuHelper::create_menu_action(preview_resolution_menu, "previewhalf",
+      this, SLOT(set_preview_resolution()));
+  preview_res_half_->setData(2);
+  preview_res_half_->setCheckable(true);
+  preview_res_group->addAction(preview_res_half_);
+
+  preview_res_quarter_ = MenuHelper::create_menu_action(preview_resolution_menu, "previewquarter",
+      this, SLOT(set_preview_resolution()));
+  preview_res_quarter_->setData(4);
+  preview_res_quarter_->setCheckable(true);
+  preview_res_group->addAction(preview_res_quarter_);
+
+  view_menu->addSeparator();
+
   title_safe_area_menu = MenuHelper::create_submenu(view_menu);
 
   QActionGroup* title_safe_group = new QActionGroup(this);
@@ -974,6 +997,11 @@ void MainWindow::Retranslate() {
   nondrop_frame_action->setText(tr("Non-Drop Frame"));
   milliseconds_action->setText(tr("Milliseconds"));
 
+  preview_resolution_menu->setTitle(tr("Preview Resolution"));
+  preview_res_full_->setText(tr("Full"));
+  preview_res_half_->setText(tr("1/2 (Half)"));
+  preview_res_quarter_->setText(tr("1/4 (Quarter)"));
+
   title_safe_area_menu->setTitle(tr("Title/Action Safe Area"));
   title_safe_off->setText(tr("Off"));
   title_safe_default->setText(tr("Default"));
@@ -1267,6 +1295,17 @@ void MainWindow::viewMenu_About_To_Be_Shown() {
   full_screen->setChecked(windowState() == Qt::WindowFullScreen);
 
   show_all->setChecked(panel_timeline->showing_all);
+
+  int div = amber::CurrentConfig.preview_resolution_divider;
+  preview_res_full_->setChecked(div <= 1);
+  preview_res_half_->setChecked(div == 2);
+  preview_res_quarter_->setChecked(div == 4);
+}
+
+void MainWindow::set_preview_resolution() {
+  QAction* action = static_cast<QAction*>(sender());
+  amber::CurrentConfig.preview_resolution_divider = action->data().toInt();
+  update_ui(false);
 }
 
 void MainWindow::toolMenu_About_To_Be_Shown() {
