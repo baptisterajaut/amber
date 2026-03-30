@@ -24,6 +24,10 @@ if(UNIX AND NOT APPLE AND NOT DEFINED OpenGL_GL_PREFERENCE)
 endif()
 find_package(OpenGL REQUIRED)
 
+if(UNIX AND NOT APPLE)
+  find_package(X11 REQUIRED)
+endif()
+
 find_package(Qt6 REQUIRED
   COMPONENTS
   Core
@@ -532,6 +536,7 @@ target_link_libraries(${OLIVE_TARGET}
   FFMPEG::avfilter
   FFMPEG::swscale
   FFMPEG::swresample
+  $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
 )
 
 if(WIN32 AND OPENCOLORIO_FOUND)

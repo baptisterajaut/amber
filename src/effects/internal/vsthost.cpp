@@ -44,7 +44,8 @@
 #include <CoreFoundation/CoreFoundation.h>
 class NSWindow;
 #elif defined(Q_OS_LINUX)
-#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #endif
 
 #define BLOCK_SIZE 512
@@ -196,12 +197,21 @@ void VSTHost::loadPlugin() {
 }
 
 void VSTHost::freePlugin() {
+  if (idle_timer) {
+    idle_timer->stop();
+  }
   if (plugin != nullptr) {
     stopPlugin();
     data_cache.clear();
     modulePtr.unload();
     plugin = nullptr;
   }
+#if defined(Q_OS_LINUX)
+  if (x11_display_ && x11_window_) {
+    XDestroyWindow(static_cast<Display*>(x11_display_), static_cast<Window>(x11_window_));
+    x11_window_ = 0;
+  }
+#endif
 }
 
 bool VSTHost::configurePluginCallbacks() {
@@ -312,6 +322,13 @@ VSTHost::~VSTHost() {
   delete [] inputs;
 
   freePlugin();
+
+#if defined(Q_OS_LINUX)
+  if (x11_display_) {
+    XCloseDisplay(static_cast<Display*>(x11_display_));
+    x11_display_ = nullptr;
+  }
+#endif
 }
 
 void VSTHost::process_audio(double, double, quint8* samples, int nb_bytes, int) {
@@ -373,19 +390,126 @@ void VSTHost::save(QXmlStreamWriter &stream) {
 }
 
 void VSTHost::show_interface(bool show) {
-  CreateDialogIfNull();
-  dialog->setVisible(show);
-
   if (show) {
+#if defined(Q_OS_LINUX)
+    // Direct X11 window for plugin embedding.
+    // Works on native X11 and Wayland (via XWayland).
+    // 24-bit visual (no alpha) prevents compositor transparency.
+    if (!x11_display_) {
+      x11_display_ = XOpenDisplay(nullptr);
+      if (!x11_display_) {
+        QMessageBox::critical(amber::MainWindow, tr("VST Error"),
+          tr("Cannot open X11 display. VST plugin interfaces require X11."));
+        show_interface_btn->SetChecked(false);
+        return;
+      }
+    }
+
+    auto dpy = static_cast<Display*>(x11_display_);
+
+    if (!x11_window_) {
+      VSTRect* eRect = nullptr;
+      dispatcher(plugin, effEditGetRect, 0, 0, &eRect, 0);
+      int w = 400, h = 300;
+      if (eRect && eRect->right > eRect->left && eRect->bottom > eRect->top) {
+        w = eRect->right - eRect->left;
+        h = eRect->bottom - eRect->top;
+      }
+
+      // Scale for HiDPI — Xft.dpi is set by the DE on both X11 and XWayland
+      char* dpi_str = XGetDefault(dpy, "Xft", "dpi");
+      if (dpi_str) {
+        int xft_dpi = 0;
+        for (const char* p = dpi_str; *p >= '0' && *p <= '9'; p++)
+          xft_dpi = xft_dpi * 10 + (*p - '0');
+        if (xft_dpi > 96) {
+          w = w * xft_dpi / 96;
+          h = h * xft_dpi / 96;
+        }
+      }
+
+      int screen = DefaultScreen(dpy);
+
+      // 24-bit TrueColor = opaque, no alpha channel for the compositor
+      XVisualInfo vinfo;
+      if (!XMatchVisualInfo(dpy, screen, 24, TrueColor, &vinfo)) {
+        vinfo.visual = DefaultVisual(dpy, screen);
+        vinfo.depth = DefaultDepth(dpy, screen);
+      }
+
+      Colormap cmap = XCreateColormap(dpy, RootWindow(dpy, screen), vinfo.visual, AllocNone);
+      XSetWindowAttributes attrs = {};
+      attrs.colormap = cmap;
+      attrs.background_pixel = BlackPixel(dpy, screen);
+      attrs.border_pixel = 0;
+
+      x11_window_ = XCreateWindow(dpy, RootWindow(dpy, screen),
+        0, 0, w, h, 0, vinfo.depth, InputOutput, vinfo.visual,
+        CWColormap | CWBackPixel | CWBorderPixel, &attrs);
+
+      XStoreName(dpy, static_cast<Window>(x11_window_), "VST Plugin");
+
+      // WM close button support
+      Atom wmDelete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+      x11_wm_delete_ = wmDelete;
+      XSetWMProtocols(dpy, static_cast<Window>(x11_window_), &wmDelete, 1);
+    }
+
+    XMapRaised(dpy, static_cast<Window>(x11_window_));
+    XSync(dpy, False);
+
+    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(x11_window_), 0);
+
+#else  // Windows, macOS, Haiku — use QDialog
+    CreateDialogIfNull();
+    dialog->show();
+    WId nativeWin = dialog->winId();
 #if defined(Q_OS_WIN)
-    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<HWND>(dialog->windowHandle()->winId()), 0);
+    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<HWND>(nativeWin), 0);
 #elif defined(Q_OS_MACOS)
-    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<NSWindow*>(dialog->windowHandle()->winId()), 0);
-#elif defined(Q_OS_LINUX) || defined(__HAIKU__)
-    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(dialog->windowHandle()->winId()), 0);
+    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<NSWindow*>(nativeWin), 0);
+#else
+    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(nativeWin), 0);
 #endif
+#endif  // Q_OS_LINUX
+
+    // Idle timer: pumps effEditIdle for plugin UI repaints
+    if (!idle_timer) {
+      idle_timer = new QTimer(this);
+      connect(idle_timer, &QTimer::timeout, this, [this]() {
+        if (!plugin) return;
+        dispatcher(plugin, effEditIdle, 0, 0, nullptr, 0);
+#if defined(Q_OS_LINUX)
+        // Poll for WM close button
+        if (x11_display_ && x11_window_) {
+          XEvent event;
+          while (XCheckTypedWindowEvent(static_cast<Display*>(x11_display_),
+                   static_cast<Window>(x11_window_), ClientMessage, &event)) {
+            if (static_cast<unsigned long>(event.xclient.data.l[0]) == x11_wm_delete_) {
+              show_interface_btn->SetChecked(false);
+              return;
+            }
+          }
+        }
+#endif
+      });
+    }
+    idle_timer->start(50);
+
   } else {
+    if (idle_timer) idle_timer->stop();
+
     dispatcher(plugin, effEditClose, 0, 0, nullptr, 0);
+
+#if defined(Q_OS_LINUX)
+    if (x11_display_ && x11_window_) {
+      auto dpy = static_cast<Display*>(x11_display_);
+      XUnmapWindow(dpy, static_cast<Window>(x11_window_));
+      XSync(dpy, False);
+    }
+#else
+    if (dialog) dialog->hide();
+#endif
   }
 }
 
@@ -407,10 +531,12 @@ void VSTHost::change_plugin() {
       VSTRect* eRect = nullptr;
       plugin->dispatcher(plugin, effEditGetRect, 0, 0, &eRect, 0);
 
+#if !defined(Q_OS_LINUX)
       if (eRect != nullptr && eRect->right > eRect->left && eRect->bottom > eRect->top) {
         CreateDialogIfNull();
         dialog->setFixedSize(eRect->right - eRect->left, eRect->bottom - eRect->top);
       }
+#endif
 
     } else {
 

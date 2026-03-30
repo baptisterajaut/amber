@@ -23,6 +23,7 @@
 
 #include <QDialog>
 #include <QLibrary>
+#include <QTimer>
 
 #include "effects/effect.h"
 #include "include/vestige.h"
@@ -67,6 +68,13 @@ private:
   void send_data_cache_to_plugin();
 
   QLibrary modulePtr;
+  QTimer* idle_timer{nullptr};
+
+#if defined(Q_OS_LINUX)
+  void* x11_display_{nullptr};
+  unsigned long x11_window_{0};
+  unsigned long x11_wm_delete_{0};
+#endif
 };
 
 #endif // VSTHOSTWIN_H
