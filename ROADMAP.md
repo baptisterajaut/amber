@@ -35,6 +35,12 @@ Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak ba
 - Preview resolution (Full / 1/2 / 1/4) in View menu
 - Contextual Clip/In-Out submenus in Edit menu
 
+### 1.6.0 — Quality-of-life
+
+- Track Select Tool — new timeline tool, selects all clips from click point rightward on the track (Shift = all tracks) (#15)
+- Auto Cut Silence ripple delete — toggle in existing Auto Cut Silence dialog to ripple-delete the silent sections instead of just cutting (#15)
+- Shift+Arrow multi-frame skip — bind Shift+Left/Right as alias for Jump Backward/Forward (existing `Ctrl+[`/`Ctrl+]`, configurable step in preferences) (#15)
+
 ### 1.x maintenance
 
 Bug fixes and security patches only.
@@ -101,6 +107,8 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 - Layout presets (Default, 3-Point Editing, Color)
 - Color labels on media in project panel (field exists on Clip, needs UI on Media)
 - Proxy toggle (switch proxy/full-res during playback without rebuild)
+- Markers with duration — range markers with in/out points, Premiere-style section marking (#15)
+- Effect presets save/load — serialize effect parameters, apply saved presets to clips (#15)
 
 ### Rendering pipeline optimizations
 
@@ -133,6 +141,7 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 - **Welcome screen** — QDialog at startup with recent projects + new project with sequence templates.
 - **Effect controls alignment** — align labels and values in a grid layout (labels left-aligned, values right-aligned with consistent weight). Touches `CollapsibleWidget` + `EffectRow` layout. (#12)
 - **Audio plugin parameters in EffectControls** — expose VST2 parameters as native EffectField rows instead of "open GUI" button only. Depends on plugin API exposing param metadata. (#12)
+- **Graph Editor improvements** — better curve editing UX, currently minimal on 0.1.x (#15)
 
 ### .ove → .amb project format
 
