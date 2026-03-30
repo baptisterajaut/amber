@@ -637,9 +637,23 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
     textureID = c->cached_rhi_tex;
   }
 
-  // Create clip FBO resources if needed
+  // Create clip FBO resources at compositing resolution (respects preview divider)
+  QSize comp_size = params.main_tex->pixelSize();
+  if (c->fbo_rhi != nullptr) {
+    // Invalidate if compositing resolution changed
+    ClipRhiResources* existing = static_cast<ClipRhiResources*>(c->fbo_rhi);
+    if (existing->tex[0] != nullptr && existing->tex[0]->pixelSize() != comp_size) {
+      for (int j = 0; j < existing->count; j++) {
+        delete existing->rt[j];
+        delete existing->tex[j];
+      }
+      delete existing->rpd;
+      delete existing;
+      c->fbo_rhi = nullptr;
+    }
+  }
   if (c->fbo_rhi == nullptr) {
-    get_or_create_clip_resources(c, params.rhi, video_width, video_height);
+    get_or_create_clip_resources(c, params.rhi, comp_size.width(), comp_size.height());
   }
 
   bool fbo_switcher = false;
