@@ -128,25 +128,33 @@ void MenuHelper::make_new_menu(QMenu *parent) {
   parent->addAction(new_folder_);
 }
 
-void MenuHelper::make_inout_menu(QMenu *parent) {
-  parent->addAction(set_in_point_);
-  parent->addAction(set_out_point_);
-  parent->addSeparator();
-  parent->addAction(reset_in_point_);
-  parent->addAction(reset_out_point_);
-  parent->addAction(clear_inout_point);
+void MenuHelper::make_inout_menu(QMenu *parent, bool as_submenu) {
+  QMenu* target = parent;
+  if (as_submenu) {
+    inout_submenu_ = create_submenu(parent);
+    target = inout_submenu_;
+  }
+  target->addAction(set_in_point_);
+  target->addAction(set_out_point_);
+  target->addSeparator();
+  target->addAction(reset_in_point_);
+  target->addAction(reset_out_point_);
+  target->addAction(clear_inout_point);
 }
 
-void MenuHelper::make_clip_functions_menu(QMenu *parent) {
-  parent->addAction(add_default_transition_);
-  parent->addAction(link_unlink_);
-  parent->addAction(enable_disable_);
-  parent->addAction(speed_duration_);
-  parent->addAction(nest_);
-  parent->addAction(unnest_);
-  parent->addAction(freeze_frame_);
-
-  // Nest/unnest visibility is updated dynamically by updateNestActions()
+void MenuHelper::make_clip_functions_menu(QMenu *parent, bool as_submenu) {
+  QMenu* target = parent;
+  if (as_submenu) {
+    clip_submenu_ = create_submenu(parent);
+    target = clip_submenu_;
+  }
+  target->addAction(add_default_transition_);
+  target->addAction(link_unlink_);
+  target->addAction(enable_disable_);
+  target->addAction(speed_duration_);
+  target->addAction(nest_);
+  target->addAction(unnest_);
+  target->addAction(freeze_frame_);
 }
 
 void MenuHelper::updateClipActions(const QVector<Clip*>& selected_clips) {
@@ -258,6 +266,8 @@ void MenuHelper::Retranslate()
   add_default_transition_->setText(tr("Add Default Transition"));
   link_unlink_->setText(tr("Link/Unlink"));
   enable_disable_->setText(tr("Enable/Disable"));
+  if (clip_submenu_) clip_submenu_->setTitle(tr("Clip"));
+  if (inout_submenu_) inout_submenu_->setTitle(tr("In/Out Points"));
   speed_duration_->setText(tr("Speed/Duration"));
   nest_->setText(tr("Nest"));
   unnest_->setText(tr("Unnest"));

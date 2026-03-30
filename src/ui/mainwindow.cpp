@@ -558,7 +558,7 @@ void MainWindow::setup_menus() {
 
   edit_menu->addSeparator();
 
-  amber::MenuHelper.make_clip_functions_menu(edit_menu);
+  amber::MenuHelper.make_clip_functions_menu(edit_menu, true);
 
   edit_menu->addSeparator();
 
@@ -573,10 +573,10 @@ void MainWindow::setup_menus() {
 
   edit_menu->addSeparator();
 
-  amber::MenuHelper.make_inout_menu(edit_menu);
+  amber::MenuHelper.make_inout_menu(edit_menu, true);
   delete_inout_point_ =
-      MenuHelper::create_menu_action(edit_menu, "deleteinout", panel_timeline, SLOT(delete_inout()), QKeySequence(";"));
-  ripple_delete_inout_point_ = MenuHelper::create_menu_action(edit_menu, "rippledeleteinout", panel_timeline,
+      MenuHelper::create_menu_action(amber::MenuHelper.inout_submenu_, "deleteinout", panel_timeline, SLOT(delete_inout()), QKeySequence(";"));
+  ripple_delete_inout_point_ = MenuHelper::create_menu_action(amber::MenuHelper.inout_submenu_, "rippledeleteinout", panel_timeline,
                                                               SLOT(ripple_delete_inout()), QKeySequence("'"));
 
   edit_menu->addSeparator();

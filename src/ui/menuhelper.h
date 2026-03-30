@@ -32,6 +32,9 @@ class Clip;
 class MenuHelper : public QObject {
   Q_OBJECT
 public:
+  QMenu* clip_submenu_{nullptr};
+  QMenu* inout_submenu_{nullptr};
+
   void InitializeSharedMenus();
 
   /**
@@ -56,7 +59,7 @@ public:
    *
    * The menu to add items to.
    */
-  void make_inout_menu(QMenu* parent);
+  void make_inout_menu(QMenu* parent, bool as_submenu = false);
 
   /**
    * @brief Creates a menu of clip functions
@@ -71,7 +74,7 @@ public:
    *
    * The menu to add items to.
    */
-  void make_clip_functions_menu(QMenu* parent);
+  void make_clip_functions_menu(QMenu* parent, bool as_submenu = false);
   void updateClipActions(const QVector<Clip*>& selected_clips);
 
   /**

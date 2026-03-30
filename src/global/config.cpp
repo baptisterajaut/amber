@@ -110,6 +110,7 @@ constexpr IntEntry kIntEntries[] = {
     {"AutorecoveryInterval", &Config::autorecovery_interval},
     {"AutorecoveryMax", &Config::autorecovery_max},
     {"DefaultKeyframeType", &Config::default_keyframe_type},
+    {"PreviewResolutionDivider", &Config::preview_resolution_divider},
 };
 
 constexpr DoubleEntry kDoubleEntries[] = {
