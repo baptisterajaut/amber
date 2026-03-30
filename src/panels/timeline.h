@@ -23,6 +23,7 @@
 
 #include <QVector>
 #include <QTime>
+#include <QLabel>
 #include <QPushButton>
 
 #include "ui/timelinewidget.h"
@@ -211,6 +212,7 @@ public:
   bool block_repaints{false};
 
   TimelineHeader* headers;
+  QLabel* breadcrumb_label;
   AudioMonitor* audio_monitor;
   ResizableScrollBar* horizontalScrollBar;
 

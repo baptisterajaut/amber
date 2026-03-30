@@ -150,6 +150,12 @@ void Timeline::setup_ui() {
   timeline_area_layout->setSpacing(0);
   timeline_area_layout->setContentsMargins(0, 0, 0, 0);
 
+  breadcrumb_label = new QLabel();
+  breadcrumb_label->setContentsMargins(4, 2, 4, 2);
+  breadcrumb_label->setStyleSheet("QLabel { color: #aaa; font-size: 11px; }");
+  breadcrumb_label->hide();
+  timeline_area_layout->addWidget(breadcrumb_label);
+
   headers = new TimelineHeader();
   timeline_area_layout->addWidget(headers);
 
@@ -314,6 +320,23 @@ void Timeline::update_sequence() {
   recordButton->setEnabled(!null_sequence);
   addButton->setEnabled(!null_sequence);
   headers->setEnabled(!null_sequence);
+
+  // Update breadcrumb
+  const auto& history = amber::Global->sequence_history();
+  if (history.isEmpty()) {
+    breadcrumb_label->hide();
+  } else {
+    QString crumb;
+    for (const auto& seq : history) {
+      if (!crumb.isEmpty()) crumb += " > ";
+      crumb += seq->name;
+    }
+    if (!null_sequence) {
+      crumb += " > " + amber::ActiveSequence->name;
+    }
+    breadcrumb_label->setText(crumb);
+    breadcrumb_label->show();
+  }
 
   UpdateTitle();
 }

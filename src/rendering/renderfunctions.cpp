@@ -647,12 +647,25 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
 
   if (c->media() != nullptr) {
     if (c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
-      params.nests.append(c);
-      auto saved_gizmos = params.gizmos;
-      textureID = amber::rendering::compose_sequence(params);
-      params.gizmos = saved_gizmos;
-      params.nests.removeLast();
-      fbo_switcher = true;
+      // Circular reference guard: skip if this sequence is already in the nesting stack
+      Sequence* nested_seq = c->media()->to_sequence().get();
+      bool circular = false;
+      for (auto* nest : params.nests) {
+        if (nest->media() != nullptr && nest->media()->to_sequence().get() == nested_seq) {
+          circular = true;
+          break;
+        }
+      }
+      if (nested_seq == params.seq) circular = true;
+
+      if (!circular) {
+        params.nests.append(c);
+        auto saved_gizmos = params.gizmos;
+        textureID = amber::rendering::compose_sequence(params);
+        params.gizmos = saved_gizmos;
+        params.nests.removeLast();
+        fbo_switcher = true;
+      }
     } else if (c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
       if (textureID != nullptr && !c->media()->to_footage()->alpha_is_premultiplied) {
         QMatrix4x4 blitMvp;
@@ -774,9 +787,22 @@ static void process_audio_clip(Clip* c, long playhead, ComposeSequenceParams& pa
     return;
   }
   if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
-    params.nests.append(c);
-    amber::rendering::compose_sequence(params);
-    params.nests.removeLast();
+    // Circular reference guard
+    Sequence* nested_seq = c->media()->to_sequence().get();
+    bool circular = false;
+    for (auto* nest : params.nests) {
+      if (nest->media() != nullptr && nest->media()->to_sequence().get() == nested_seq) {
+        circular = true;
+        break;
+      }
+    }
+    if (nested_seq == params.seq) circular = true;
+
+    if (!circular) {
+      params.nests.append(c);
+      amber::rendering::compose_sequence(params);
+      params.nests.removeLast();
+    }
   } else {
     bool got_mutex2 = false;
 

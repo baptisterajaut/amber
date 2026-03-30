@@ -460,6 +460,9 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event) {
           }
           amber::Global->set_sequence(nested);
         }
+      } else {
+        // Double-click on empty space: go back to parent sequence
+        amber::Global->go_back_sequence();
       }
     }
   }

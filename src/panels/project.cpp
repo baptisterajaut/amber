@@ -610,6 +610,45 @@ void Project::delete_selected_media() {
       }
     }
 
+    // Check if any sequence being deleted is referenced by other sequences
+    for (int i = 0; i < items.size(); i++) {
+      Media* item = items.at(i);
+      if (item->get_type() != MEDIA_TYPE_SEQUENCE) continue;
+
+      for (int j = 0; j < sequence_items.size(); j++) {
+        Media* seq_media = sequence_items.at(j);
+        if (items.contains(seq_media)) continue;  // also being deleted, skip
+
+        Sequence* s = seq_media->to_sequence().get();
+        for (int k = 0; k < s->clips.size(); k++) {
+          ClipPtr c = s->clips.at(k);
+          if (c != nullptr && c->media() == item) {
+            QMessageBox confirm(this);
+            confirm.setWindowTitle(tr("Delete sequence in use?"));
+            confirm.setText(tr("The sequence '%1' is used as a nested sequence in '%2'. "
+                               "Deleting it will remove all instances. Are you sure?")
+                               .arg(item->to_sequence()->name, s->name));
+            confirm.addButton(QMessageBox::Yes);
+            QAbstractButton* cancel_button = confirm.addButton(QMessageBox::Cancel);
+            confirm.exec();
+            if (confirm.clickedButton() == cancel_button) {
+              delete ca;
+              return;
+            }
+            // User confirmed — delete clips referencing this sequence
+            redraw = true;
+            for (int m = 0; m < s->clips.size(); m++) {
+              ClipPtr mc = s->clips.at(m);
+              if (mc != nullptr && mc->media() == item) {
+                ca->append(new DeleteClipAction(s, m));
+              }
+            }
+            break;  // Only ask once per referencing sequence
+          }
+        }
+      }
+    }
+
     for (auto item : items) {
       ca->append(new DeleteMediaCommand(item->parentItem()->get_shared_ptr(item)));
 

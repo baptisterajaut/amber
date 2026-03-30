@@ -388,6 +388,16 @@ void OliveGlobal::open_preferences() {
 
 void OliveGlobal::set_sequence(SequencePtr s)
 {
+  // Push current sequence onto history stack (for nested sequence navigation)
+  if (amber::ActiveSequence != nullptr && s != nullptr && amber::ActiveSequence != s) {
+    sequence_history_.append(amber::ActiveSequence);
+  }
+
+  // Clearing sequence (e.g. new project) resets the history
+  if (s == nullptr) {
+    sequence_history_.clear();
+  }
+
   panel_graph_editor->set_row(nullptr);
   panel_effect_controls->Clear(true);
 
@@ -395,6 +405,35 @@ void OliveGlobal::set_sequence(SequencePtr s)
   panel_sequence_viewer->set_main_sequence();
   panel_timeline->update_sequence();
   panel_timeline->setFocus();
+}
+
+void OliveGlobal::go_back_sequence()
+{
+  if (sequence_history_.isEmpty()) return;
+  SequencePtr prev = sequence_history_.takeLast();
+
+  panel_graph_editor->set_row(nullptr);
+  panel_effect_controls->Clear(true);
+
+  amber::ActiveSequence = prev;
+  panel_sequence_viewer->set_main_sequence();
+  panel_timeline->update_sequence();
+  panel_timeline->setFocus();
+}
+
+bool OliveGlobal::can_go_back() const
+{
+  return !sequence_history_.isEmpty();
+}
+
+const QVector<SequencePtr>& OliveGlobal::sequence_history() const
+{
+  return sequence_history_;
+}
+
+void OliveGlobal::clear_sequence_history()
+{
+  sequence_history_.clear();
 }
 
 void OliveGlobal::OpenProjectWorker(QString fn, bool autorecovery) {

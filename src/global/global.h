@@ -333,6 +333,14 @@ public slots:
      */
     void set_sequence(SequencePtr s);
 
+    void go_back_sequence();
+
+    bool can_go_back() const;
+
+    const QVector<SequencePtr>& sequence_history() const;
+
+    void clear_sequence_history();
+
 private:
     /**
      * @brief Internal function to handle loading a project from file
@@ -429,6 +437,8 @@ private:
      * autorecovery, but still hasn't been saved into the original file yet.
      */
     bool changed_since_last_autorecovery{false};
+
+    QVector<SequencePtr> sequence_history_;
 
 private slots:
 
