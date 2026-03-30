@@ -1123,7 +1123,8 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
 
   // Retry render if texture failed
   if (renderer->did_texture_fail() && !viewer->playing) {
-    renderer->start_render(viewer->seq.get(), viewer->get_playback_speed());
+    renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(),
+                           nullptr, nullptr, 0, amber::CurrentConfig.preview_resolution_divider);
   }
 
   // Schedule overlay repaint
