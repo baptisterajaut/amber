@@ -218,6 +218,7 @@ private:
   QAction* link_unlink_;
   QAction* enable_disable_;
   QAction* nest_;
+  QAction* unnest_;
 
   QAction* cut_;
   QAction* copy_;

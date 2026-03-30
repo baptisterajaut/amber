@@ -73,6 +73,9 @@ void MenuHelper::InitializeSharedMenus()
   nest_ = create_menu_action(nullptr, "nest", panel_timeline, SLOT(nest()));
   nest_->setParent(this);
 
+  unnest_ = create_menu_action(nullptr, "unnest", panel_timeline, SLOT(unnest()));
+  unnest_->setParent(this);
+
   cut_ = create_menu_action(nullptr, "cut", &amber::FocusFilter, SLOT(cut()), QKeySequence("Ctrl+X"));
   cut_->setParent(this);
 
@@ -133,6 +136,7 @@ void MenuHelper::make_clip_functions_menu(QMenu *parent) {
   parent->addAction(link_unlink_);
   parent->addAction(enable_disable_);
   parent->addAction(nest_);
+  parent->addAction(unnest_);
   parent->addAction(freeze_frame_);
 }
 
@@ -187,6 +191,7 @@ void MenuHelper::Retranslate()
   link_unlink_->setText(tr("Link/Unlink"));
   enable_disable_->setText(tr("Enable/Disable"));
   nest_->setText(tr("Nest"));
+  unnest_->setText(tr("Unnest"));
   cut_->setText(tr("Cu&t"));
   copy_->setText(tr("Cop&y"));
   paste_->setText(tr("&Paste"));

@@ -450,6 +450,83 @@ void Timeline::nest() {
   }
 }
 
+void Timeline::unnest() {
+  if (amber::ActiveSequence == nullptr) return;
+
+  QVector<int> selected_clips = amber::ActiveSequence->SelectedClipIndexes();
+  if (selected_clips.isEmpty()) return;
+
+  ComboAction* ca = new ComboAction(tr("Unnest Clip(s)"));
+  QVector<ClipPtr> new_clips;
+  bool any_unnested = false;
+
+  for (int idx : selected_clips) {
+    Clip* nested_clip = amber::ActiveSequence->clips.at(idx).get();
+    if (nested_clip == nullptr) continue;
+    if (nested_clip->media() == nullptr) continue;
+    if (nested_clip->media()->get_type() != MEDIA_TYPE_SEQUENCE) continue;
+
+    Sequence* inner_seq = nested_clip->media()->to_sequence().get();
+    if (inner_seq == nullptr) continue;
+
+    long nest_in = nested_clip->timeline_in();
+    long nest_clip_in = nested_clip->clip_in();
+    long nest_duration = nested_clip->timeline_out() - nested_clip->timeline_in();
+    long visible_start = nest_clip_in;
+    long visible_end = nest_clip_in + nest_duration;
+
+    // Frame rate conversion factor
+    double rate_factor = amber::ActiveSequence->frame_rate / inner_seq->frame_rate;
+
+    for (const auto& inner_clip : inner_seq->clips) {
+      if (inner_clip == nullptr) continue;
+
+      long in = inner_clip->timeline_in();
+      long out = inner_clip->timeline_out();
+
+      // Skip clips outside visible range
+      if (out <= visible_start || in >= visible_end) continue;
+
+      ClipPtr c = inner_clip->copy(amber::ActiveSequence.get());
+
+      // Trim to visible range
+      if (in < visible_start) {
+        c->set_clip_in(c->clip_in() + (visible_start - in));
+        in = visible_start;
+      }
+      if (out > visible_end) {
+        out = visible_end;
+      }
+
+      // Rescale and offset to parent timeline
+      c->set_timeline_in(nest_in + qRound((in - visible_start) * rate_factor));
+      c->set_timeline_out(nest_in + qRound((out - visible_start) * rate_factor));
+      c->set_clip_in(qRound(c->clip_in() * rate_factor));
+      c->refresh();
+
+      new_clips.append(c);
+    }
+
+    // Delete the nested clip from the parent
+    ca->append(new DeleteClipAction(amber::ActiveSequence.get(), idx));
+    any_unnested = true;
+  }
+
+  if (!any_unnested) {
+    delete ca;
+    return;
+  }
+
+  ca->append(new AddClipCommand(amber::ActiveSequence.get(), new_clips));
+
+  panel_graph_editor->set_row(nullptr);
+  panel_effect_controls->Clear(true);
+  amber::ActiveSequence->selections.clear();
+
+  amber::UndoStack.push(ca);
+  update_ui(true);
+}
+
 // update_sequence() moved to timeline_ui.cpp
 
 int Timeline::get_snap_range() {

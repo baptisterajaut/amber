@@ -264,6 +264,7 @@ public slots:
   void add_transition();
 
   void nest();
+  void unnest();
 
   void three_point_insert();
   void three_point_overwrite();
