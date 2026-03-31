@@ -20,16 +20,20 @@
 
 #include "autocutsilencedialog.h"
 
-#include <QHBoxLayout>
+#include <QDialogButtonBox>
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QDialogButtonBox>
+#include <QSettings>
+
+#include <algorithm>
 
 #include "engine/sequence.h"
-#include "rendering/renderfunctions.h"
+#include "engine/undo/undo_clip.h"
 #include "panels/panels.h"
 #include "panels/timeline.h"
+#include "rendering/renderfunctions.h"
 
 AutoCutSilenceDialog::AutoCutSilenceDialog(QWidget *parent, QVector<int> clips) :
   QDialog(parent),
@@ -62,6 +66,19 @@ AutoCutSilenceDialog::AutoCutSilenceDialog(QWidget *parent, QVector<int> clips) 
   grid->addWidget(release_time, 3, 1);
 
   main_layout->addLayout(grid);
+
+  ripple_delete_checkbox = new QCheckBox(tr("Ripple Delete Silence Cuts"), this);
+  main_layout->addWidget(ripple_delete_checkbox);
+
+  QHBoxLayout* gap_layout = new QHBoxLayout();
+  gap_layout->addWidget(new QLabel(tr("Gap Between Clips (frames):"), this));
+  gap_size_spinbox = new QSpinBox(this);
+  gap_size_spinbox->setMinimum(0);
+  gap_size_spinbox->setMaximum(1000);
+  gap_size_spinbox->setValue(0);
+  gap_layout->addWidget(gap_size_spinbox);
+  gap_layout->addStretch();
+  main_layout->addLayout(gap_layout);
 
   QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
   buttonBox->setCenterButtons(true);
@@ -102,6 +119,10 @@ int AutoCutSilenceDialog::exec()
   release_time->SetDefault(default_release_time);
   release_time->SetValue(current_release_time);
 
+  QSettings settings;
+  ripple_delete_checkbox->setChecked(settings.value("AutoCutSilence/RippleDelete", false).toBool());
+  gap_size_spinbox->setValue(settings.value("AutoCutSilence/GapSize", 0).toInt());
+
   return QDialog::exec();
 }
 
@@ -111,6 +132,12 @@ void AutoCutSilenceDialog::accept() {
   current_attack_time = attack_time->value();
   current_release_threshold = release_threshold->value();
   current_release_time = release_time->value();
+  ripple_delete_enabled = ripple_delete_checkbox->isChecked();
+  current_gap_size = gap_size_spinbox->value();
+
+  QSettings settings;
+  settings.setValue("AutoCutSilence/RippleDelete", ripple_delete_enabled);
+  settings.setValue("AutoCutSilence/GapSize", current_gap_size);
 
   cut_silence();
 
@@ -122,6 +149,14 @@ void AutoCutSilenceDialog::cut_silence() {
   if (amber::ActiveSequence == nullptr) return;
 
   ComboAction* ca = new ComboAction(tr("Auto-Cut Silence"));
+
+  // Silence segments collected across all clips for ripple delete
+  struct SilenceSegment {
+    long in;
+    long out;
+    int track;
+  };
+  QVector<SilenceSegment> silence_segments;
 
   // Loop over clips provided to this dialog
   for (int j : clips_) {
@@ -135,7 +170,8 @@ void AutoCutSilenceDialog::cut_silence() {
 
       QVector<long> split_positions;
 
-      int clip_start = clip->timeline_in();
+      long clip_start = clip->timeline_in();
+      long clip_end = clip->timeline_out();
       const FootageStream* ms = clip->media_stream();
 
       long media_length = clip->media_length();
@@ -146,6 +182,11 @@ void AutoCutSilenceDialog::cut_silence() {
 
       bool attack = false;    // status flags
       bool release = false;
+      long audio_seg_start = -1; // track current audio segment start for ripple delete
+
+      // Audio segments collected during detection (for building silence as complement)
+      struct AudioSegment { long in; long out; };
+      QVector<AudioSegment> audio_segments;
 
       QVector<qint8> vols;
       vols.resize(sample_size);
@@ -163,9 +204,6 @@ void AutoCutSilenceDialog::cut_silence() {
         }
         vols[circular_index] = tmp;
 
-        //for debug:
-        //qInfo() << "i:" << i <<" - "<< i/30 <<":"<< i%30 << " - volume:" << vols[circular_index] <<"\n";
-
         int overthreshold = 0;
         int cut_idx = 0;  //how much to cut (backwards)
 
@@ -180,10 +218,10 @@ void AutoCutSilenceDialog::cut_silence() {
           }
           // if we reached threshold over the set tolerance
           if(overthreshold >= current_attack_time){
-            split_positions.append(i-cut_idx);
+            audio_seg_start = qMax(i-cut_idx, clip_start);
+            split_positions.append(audio_seg_start);
             attack = true;
             release = false;
-            //qInfo() << "\n\n Current vol: "<<vols[circular_index]<<" attack at " << i-cut_idx << "\n\n";
           }
           overthreshold = 0;
           cut_idx = 0;
@@ -195,12 +233,38 @@ void AutoCutSilenceDialog::cut_silence() {
           }
           // if we reached threshold over the set tolerance
           if(overthreshold >= current_release_time){        // must be <= sample_size
+            if (audio_seg_start >= 0) {
+              audio_segments.append({audio_seg_start, i});
+            }
+            audio_seg_start = -1;
             attack = false;
             release = true;
             split_positions.append(i);
-            //qInfo() << "\n\n Current vol: "<<vols[circular_index]<<" release at " << i << "\n\n";
           }
           overthreshold = 0;
+        }
+      }
+
+      // If audio was still playing at end of clip, close the segment
+      if (attack && audio_seg_start >= 0) {
+        audio_segments.append({audio_seg_start, clip_start + media_length});
+      }
+
+      // Build silence segments as the complement of audio segments within [clip_start, clip_end].
+      // This is independent of the split_positions alternation pattern (which depends on
+      // whether the clip starts with silence or audio).
+      if (ripple_delete_enabled && !audio_segments.isEmpty()) {
+        int track = clip->track();
+        long cursor = clip_start;
+        for (const auto& seg : audio_segments) {
+          long seg_in = qMax(seg.in, clip_start);
+          if (cursor < seg_in) {
+            silence_segments.append({cursor, seg_in, track});
+          }
+          cursor = seg.out;
+        }
+        if (cursor < clip_end) {
+          silence_segments.append({cursor, clip_end, track});
         }
       }
 
@@ -213,5 +277,53 @@ void AutoCutSilenceDialog::cut_silence() {
     amber::UndoStack.push(ca);
   } else {
     delete ca;
+  }
+
+  // Ripple delete: find and remove silence clips, shift everything back
+  if (!ripple_delete_enabled || silence_segments.isEmpty()) return;
+
+  // Sort back-to-front so ripples don't invalidate earlier positions
+  std::sort(silence_segments.begin(), silence_segments.end(),
+            [](const SilenceSegment& a, const SilenceSegment& b) {
+              return a.in > b.in;
+            });
+
+  ComboAction* delete_ca = new ComboAction(tr("Auto-Cut Silence (Ripple Delete)"));
+
+  for (const auto& seg : silence_segments) {
+    long silence_length = seg.out - seg.in;
+    long ripple_amount = qMax(0L, silence_length - (long)current_gap_size);
+
+    // Find the clip matching this silence segment
+    for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
+      ClipPtr c = amber::ActiveSequence->clips.at(i);
+      if (c != nullptr && c->track() == seg.track
+          && c->timeline_in() == seg.in && c->timeline_out() == seg.out) {
+
+        // Delete this clip and all its linked clips (e.g. corresponding video track)
+        delete_ca->append(new DeleteClipAction(amber::ActiveSequence.get(), i));
+        for (int link : c->linked) {
+          if (link >= 0 && link < amber::ActiveSequence->clips.size()) {
+            ClipPtr linked_clip = amber::ActiveSequence->clips.at(link);
+            if (linked_clip != nullptr
+                && linked_clip->timeline_in() == seg.in
+                && linked_clip->timeline_out() == seg.out) {
+              delete_ca->append(new DeleteClipAction(amber::ActiveSequence.get(), link));
+            }
+          }
+        }
+
+        if (ripple_amount > 0) {
+          ripple_clips(delete_ca, amber::ActiveSequence.get(), seg.in, -ripple_amount);
+        }
+        break;
+      }
+    }
+  }
+
+  if (delete_ca->hasActions()) {
+    amber::UndoStack.push(delete_ca);
+  } else {
+    delete delete_ca;
   }
 }
