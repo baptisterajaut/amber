@@ -212,9 +212,9 @@ AutoCutSilenceDialog::CutResult AutoCutSilenceDialog::cut_silence() {
       vols.resize(sample_size);
       vols.fill(0);
 
-      // loop through the entire sequence
-      for (long i=clip_start;i<media_length+clip_start;i++) {
-        long start = ((i-clip_start)*chunk_size);     //audio samples are read relative to the clip, not absolute to the timeline
+      // loop through the visible portion of the clip
+      for (long i=clip_start;i<clip_end;i++) {
+        long start = ((i-clip_start+clip->clip_in())*chunk_size);  // offset by clip_in to handle trimmed clips
         int circular_index = i%sample_size;
 
         // read the current sample into the circular array
@@ -268,7 +268,7 @@ AutoCutSilenceDialog::CutResult AutoCutSilenceDialog::cut_silence() {
 
       // If audio was still playing at end of clip, close the segment
       if (attack && audio_seg_start >= 0) {
-        audio_segments.append({audio_seg_start, clip_start + media_length});
+        audio_segments.append({audio_seg_start, clip_end});
       }
 
       // Build silence segments as the complement of audio segments within [clip_start, clip_end].
