@@ -37,15 +37,18 @@ Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak ba
 
 ### 1.6.0 — Quality-of-life
 
+- ~~Auto Cut Silence ripple delete + configurable gap between clips, feedback dialogs when no cuts produced~~
 - Track Select Tool — new timeline tool, selects all clips from click point rightward on the track (Shift = all tracks) (#15)
-- Auto Cut Silence ripple delete — toggle in existing Auto Cut Silence dialog to ripple-delete the silent sections instead of just cutting (#15)
 - Shift+Arrow multi-frame skip — bind Shift+Left/Right as alias for Jump Backward/Forward (existing `Ctrl+[`/`Ctrl+]`, configurable step in preferences) (#15)
+- **Canvas Painter for viewer overlays (Qt 6.11)** — replace QPainter with Qt Canvas Painter (GPU-accelerated 2D on QRhi, 2-10x faster) for title-safe, guides, gizmos. Drop-in API swap, same drawing logic. Tech preview — API may shift in 6.12.
+- **Callback-based audio I/O (Qt 6.11)** — `QAudioSink::start()` now accepts a callback for real-time audio processing, replacing QIODevice push/pull. Adopt for audio monitoring and scrub playback — cleaner, lower latency.
 
 ### 1.x maintenance
 
 Bug fixes and security patches only.
 
 - **Bold timecodes** — increase font weight on timecode displays (viewer, effect controls). Trivial QSS/font change. (#12)
+- **PipeWire Bluetooth audio** — Qt 6.11 ships a new PipeWire backend. Test if Bluetooth sink enumeration works; if so, remove the `QT_AUDIO_BACKEND=pulseaudio` workaround in `main.cpp`.
 
 ## 2.0
 
@@ -89,7 +92,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Progress bar
 - Lift / gamma / gain (3-way color correction)
 - Color correction tool (curves, scopes — waveform, vectorscope, histogram)
-- Subtitle effect with .srt import (SubtitleEffect — shared style, dedicated floating editor for bulk operations, fine-tuning via Effect Controls)
+- Subtitle editor — dedicated floating window for bulk subtitle editing (import is shipped in 1.5.0, this is the full editing UI)
 - **Text stroke** — QPainterPath outline on rich text effect (#12)
 - **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
 
@@ -120,7 +123,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 
 **Lower-res readback during scrub:** Full GPU→CPU→GPU round-trip on every frame (8.3 MB for 1080p). Half-res readback during scrub would cut bandwidth 4x.
 
-**Viewer overlays via QRhi:** The viewer overlay (title-safe, guides, gizmos) currently uses a sibling QWidget with QPainter. Render directly in the QRhi pipeline — eliminates the extra compositing layer and fixes the QWidget-over-QRhiWidget issue on Vulkan backend.
+**Viewer overlays via QRhi:** The viewer overlay (title-safe, guides, gizmos) currently uses a sibling QWidget with QPainter. 1.6.0 swaps QPainter for Canvas Painter (Qt 6.11); 2.0 goes further by rendering overlays directly in the QRhi compositing pass — eliminates the extra widget layer and fixes QWidget-over-QRhiWidget on Vulkan backend.
 
 ### FFmpeg API migration
 
@@ -130,7 +133,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 
 The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Remaining work:
 
-**Scrub performance:** Pre-allocate the staging buffer in `AudioSenderThread` (currently heap-allocates on every scrub frame). Skip audio grain entirely on fast scrub (<16ms between seeks) — only produce audio when scrub settles, like Premiere/Resolve.
+**Scrub performance:** Pre-allocate the staging buffer in `AudioSenderThread` (currently heap-allocates on every scrub frame). Skip audio grain entirely on fast scrub (<16ms between seeks) — only produce audio when scrub settles, like Premiere/Resolve. 1.6.0 adopts Qt 6.11 callback-based `QAudioSink::start()` (drop-in); 2.0 redesigns the audio threading model around it.
 
 ### Export improvements
 - Hardware encoding (NVENC, VAAPI, QSV) — hwaccel decoding exists, expose FFmpeg encoder variants in export dialog
