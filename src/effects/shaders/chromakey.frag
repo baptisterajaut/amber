@@ -38,23 +38,25 @@ float rgb2cr (vec3 c) {
 	return (0.5 + 0.5*c.r - 0.4541529083*c.g - 0.0458470917*c.b);
 }
 
-float colorclose(float Cb_p,float Cr_p,float Cb_key,float Cr_key,float tola,float tolb) {
-	/*decides if a color is close to the specified hue*/
-	float temp = sqrt(((Cb_key-Cb_p)*(Cb_key-Cb_p))+((Cr_key-Cr_p)*(Cr_key-Cr_p)));
+float colorclose(float Y_p, float Cb_p, float Cr_p, float Y_key, float Cb_key, float Cr_key, float tola, float tolb) {
+	/*decides if a color is close to the specified key color in YCbCr space*/
+	float temp = sqrt((Cb_key-Cb_p)*(Cb_key-Cb_p) + (Cr_key-Cr_p)*(Cr_key-Cr_p) + (Y_key-Y_p)*(Y_key-Y_p));
 	if (temp < tola) {return (0.0);}
 	if (temp < tolb) {return ((temp-tola)/(tolb-tola));}
 	return (1.0);
 }
 
 void main(void) {
+	float y_key = rgb2y(key_color);
 	float cb_key = rgb2cb(key_color);
 	float cr_key = rgb2cr(key_color);
 
 	vec4 texture_color = texture(tex, vTexCoord);
 
+	float y = rgb2y(texture_color.rgb);
 	float cb = rgb2cb(texture_color.rgb);
 	float cr = rgb2cr(texture_color.rgb);
-	float mask = colorclose(cb, cr, cb_key, cr_key, (tola/100.0), (tolb/100.0));
+	float mask = colorclose(y, cb, cr, y_key, cb_key, cr_key, (tola/100.0), (tolb/100.0));
 
 	if (mode == 0) { // composite
 		//float submask = 1.0-mask;

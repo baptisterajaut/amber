@@ -321,65 +321,35 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
     }
   }
 
-  // FFmpeg 8+ requires abuffersink options to be set BEFORE initialization.
-  // Use avfilter_graph_alloc_filter + set options + avfilter_init_str.
+  // Create abuffersink (no constraints — aformat filter handles conversion)
   if (ok) {
-    buffersink_ctx = avfilter_graph_alloc_filter(filter_graph, avfilter_get_by_name("abuffersink"), "out");
-    if (buffersink_ctx == nullptr) {
+    if (avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out",
+                                     nullptr, nullptr, filter_graph) < 0) {
       qCritical() << "Could not create audio buffer sink";
       ok = false;
     }
   }
 
+  // Explicit aformat filter: converts sample format, channel layout, and sample rate.
+  // This is more robust than relying on abuffersink constraints + FFmpeg auto-conversion,
+  // which can fail silently across FFmpeg versions (especially mono→stereo).
+  AVFilterContext* aformat_ctx = nullptr;
   if (ok) {
-    // Set sample format -- try new option name first (FFmpeg 7.1+), then legacy (FFmpeg 5/6)
-    const char* fmt_name = av_get_sample_fmt_name(kDestSampleFmt);
-    if (av_opt_set(buffersink_ctx, "sample_formats", fmt_name, AV_OPT_SEARCH_CHILDREN) < 0) {
-      enum AVSampleFormat sample_fmts[] = {kDestSampleFmt, static_cast<AVSampleFormat>(-1)};
-      if (av_opt_set_bin(buffersink_ctx, "sample_fmts", reinterpret_cast<const uint8_t*>(sample_fmts),
-                         sizeof(sample_fmts), AV_OPT_SEARCH_CHILDREN) < 0) {
-        qCritical() << "Could not set output sample format";
-        ok = false;
-      }
+    char aformat_args[128];
+    snprintf(aformat_args, sizeof(aformat_args), "sample_fmts=%s:channel_layouts=stereo:sample_rates=%d",
+             av_get_sample_fmt_name(kDestSampleFmt), target_sample_rate);
+    if (avfilter_graph_create_filter(&aformat_ctx, avfilter_get_by_name("aformat"), "aformat",
+                                     aformat_args, nullptr, filter_graph) < 0) {
+      qCritical() << "Could not create aformat filter";
+      ok = false;
     }
   }
 
+  // Build filter chain: abuffer → [atempo chain] → aformat → abuffersink
   if (ok) {
-    // Set channel layout
-    if (av_opt_set(buffersink_ctx, "channel_layouts", "stereo", AV_OPT_SEARCH_CHILDREN) < 0) {
-      if (av_opt_set(buffersink_ctx, "ch_layouts", "stereo", AV_OPT_SEARCH_CHILDREN) < 0) {
-        qCritical() << "Could not set output channel layout";
-        ok = false;
-      }
-    }
-  }
+    AVFilterContext* last_filter = buffersrc_ctx;
 
-  if (ok) {
-    // Set sample rate
-    char rate_str[16];
-    snprintf(rate_str, sizeof(rate_str), "%d", target_sample_rate);
-    if (av_opt_set(buffersink_ctx, "samplerates", rate_str, AV_OPT_SEARCH_CHILDREN) < 0) {
-      int sample_rates[] = {target_sample_rate, 0};
-      if (av_opt_set_bin(buffersink_ctx, "sample_rates", reinterpret_cast<const uint8_t*>(sample_rates),
-                         sizeof(sample_rates), AV_OPT_SEARCH_CHILDREN) < 0) {
-        qCritical() << "Could not set output sample rates";
-        ok = false;
-      }
-    }
-  }
-
-  if (ok && avfilter_init_str(buffersink_ctx, nullptr) < 0) {
-    qCritical() << "Could not initialize audio buffer sink";
-    ok = false;
-  }
-
-  if (ok) {
-    if (qFuzzyCompare(playback_speed, 1.0) || qFuzzyIsNull(playback_speed) || !clip->speed().maintain_audio_pitch) {
-      avfilter_link(buffersrc_ctx, 0, buffersink_ctx, 0);
-    } else {
-      AVFilterContext* previous_filter = buffersrc_ctx;
-      AVFilterContext* last_filter = buffersrc_ctx;
-
+    if (!qFuzzyCompare(playback_speed, 1.0) && !qFuzzyIsNull(playback_speed) && clip->speed().maintain_audio_pitch) {
       char speed_param[10];
       double base = (playback_speed > 1.0) ? 2.0 : 0.5;
       double speedlog = log(playback_speed) / log(base);
@@ -396,25 +366,28 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
             ok = false;
             break;
           }
-          avfilter_link(previous_filter, 0, tempo_filter, 0);
-          previous_filter = tempo_filter;
+          avfilter_link(last_filter, 0, tempo_filter, 0);
+          last_filter = tempo_filter;
         }
       }
 
       if (ok) {
         snprintf(speed_param, sizeof(speed_param), "%f", qPow(base, speedlog));
-        last_filter = nullptr;
-        if (avfilter_graph_create_filter(&last_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
+        AVFilterContext* tempo_filter = nullptr;
+        if (avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
                                          filter_graph) < 0) {
           qCritical() << "Could not create final atempo filter";
           ok = false;
+        } else {
+          avfilter_link(last_filter, 0, tempo_filter, 0);
+          last_filter = tempo_filter;
         }
       }
+    }
 
-      if (ok) {
-        avfilter_link(previous_filter, 0, last_filter, 0);
-        avfilter_link(last_filter, 0, buffersink_ctx, 0);
-      }
+    if (ok) {
+      avfilter_link(last_filter, 0, aformat_ctx, 0);
+      avfilter_link(aformat_ctx, 0, buffersink_ctx, 0);
     }
   }
 

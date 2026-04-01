@@ -81,7 +81,7 @@ void CornerPinEffect::process_coords(double timecode, GLTextureCoords &coords, i
   coords.vertexBottomRightY += bottom_right_y->GetDoubleAt(timecode);
 }
 
-void CornerPinEffect::process_shader(double timecode, GLTextureCoords &coords, int, QByteArray& uboData) {
+void CornerPinEffect::process_shader(double timecode, GLTextureCoords &coords, int, QByteArray& uboData, QSize) {
   // CornerPin UBO layout at binding 1 (shared between vert and frag):
   // vec2 p0 (offset 0), vec2 p1 (offset 8), vec2 p2 (offset 16), vec2 p3 (offset 24), bool perspective (offset 32)
   int ubo_size = qMax(fragUboSize(), vertUboSize());

@@ -201,7 +201,8 @@ class Effect : public QObject {
   const char* ffmpeg_filter;
 
   virtual void process_image(double timecode, uint8_t* input, uint8_t* output, int size);
-  virtual void process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData);
+  virtual void process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData,
+                              QSize renderSize = QSize());
   virtual void process_coords(double timecode, GLTextureCoords& coords, int data);
   virtual QRhiTexture* process_superimpose(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode);
   virtual void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes,

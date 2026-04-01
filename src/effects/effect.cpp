@@ -840,20 +840,24 @@ EffectPtr Effect::copy(Clip* c) {
   return copy;
 }
 
-void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData) {
+void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData,
+                            QSize renderSize) {
   if (uboData.size() < fragUboSize_) uboData.resize(fragUboSize_);
+
+  // Use actual FBO/render size for resolution uniforms (shaders that use gl_FragCoord need this
+  // to match the framebuffer dimensions, not the source media dimensions).
+  float resW = renderSize.isValid() ? float(renderSize.width()) : float(parent_clip->media_width());
+  float resH = renderSize.isValid() ? float(renderSize.height()) : float(parent_clip->media_height());
 
   // Set automatic uniforms by looking up their entries
   for (const auto& entry : uniformEntries_) {
     if (entry.name == QLatin1String("resolution")) {
-      float res[2] = {float(parent_clip->media_width()), float(parent_clip->media_height())};
+      float res[2] = {resW, resH};
       memcpy(uboData.data() + entry.offset, res, qMin(entry.size, 8));
     } else if (entry.name == QLatin1String("resolution_x")) {
-      float v = float(parent_clip->media_width());
-      memcpy(uboData.data() + entry.offset, &v, 4);
+      memcpy(uboData.data() + entry.offset, &resW, 4);
     } else if (entry.name == QLatin1String("resolution_y")) {
-      float v = float(parent_clip->media_height());
-      memcpy(uboData.data() + entry.offset, &v, 4);
+      memcpy(uboData.data() + entry.offset, &resH, 4);
     } else if (entry.name == QLatin1String("time")) {
       float v = float(timecode);
       memcpy(uboData.data() + entry.offset, &v, 4);

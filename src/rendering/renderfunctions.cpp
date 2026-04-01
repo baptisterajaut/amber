@@ -378,7 +378,7 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
           QByteArray uboData;
           uboData.resize(qMax(e->fragUboSize(), e->vertUboSize()));
           uboData.fill(0);
-          e->process_shader(timecode, coords, i, uboData);
+          e->process_shader(timecode, coords, i, uboData, res->tex[0]->pixelSize());
 
           // Blit through effect shader into the next FBO (skip clipSpaceCorr — intermediate pass)
           rhi_blit(params, res->rt[fbo_switcher], res->rpd, composite_texture, e->vertexShader(), e->fragmentShader(),

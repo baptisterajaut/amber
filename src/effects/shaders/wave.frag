@@ -20,14 +20,8 @@ void main(void) {
 	}
 
 	if (y < 0.0 || y > 1.0 || x < 0.0 || x > 1.0) {
-		discard;
+		fragColor = vec4(0.0);
 	} else {
-		vec4 textureColor = texture(myTexture, vec2(x, y));
-		fragColor = vec4(
-			textureColor.r,
-			textureColor.g,
-			textureColor.b,
-			textureColor.a
-		);
+		fragColor = texture(myTexture, vec2(x, y));
 	}
 }
