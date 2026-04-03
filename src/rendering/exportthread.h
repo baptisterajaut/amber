@@ -115,8 +115,8 @@ private:
   AVFrame* audio_frame{nullptr};
   AVFrame* swr_frame{nullptr};
   AVCodecContext* acodec_ctx{nullptr};
-  AVPacket* video_pkt;
-  AVPacket* audio_pkt;
+  AVPacket* video_pkt{nullptr};
+  AVPacket* audio_pkt{nullptr};
   SwrContext* swr_ctx{nullptr};
 
   int aframe_bytes;

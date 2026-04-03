@@ -41,6 +41,10 @@ extern "C" {
 #include "rendering/audio.h"
 #include "global/debug.h"
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 ExportThread::ExportThread(const ExportParams &params,
                            const VideoCodecParams& vparams,
                            QObject *parent) :
@@ -694,6 +698,13 @@ void ExportThread::run() {
 
   // Clean up anything that was allocated in Export() (whether it succeeded or not)
   Cleanup();
+
+#ifdef __GLIBC__
+  // Return freed heap pages to the OS. Export churns through many short-lived
+  // allocations (QRhi resources, YUV plane copies) and glibc keeps those pages
+  // in its free lists, inflating RSS after export.
+  malloc_trim(0);
+#endif
 }
 
 const QString &ExportThread::GetError() {

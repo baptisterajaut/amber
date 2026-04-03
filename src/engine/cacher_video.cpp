@@ -56,6 +56,8 @@ void Cacher::CacheVideoWorker() {
         queue_.unlock();
 
         SetRetrievedFrame(still_image_frame);
+      } else {
+        av_frame_free(&still_image_frame);
       }
 
     }
@@ -198,6 +200,11 @@ void Cacher::CacheVideoWorker() {
       start_loop = false;
     }
 
+    // Free the seeked frame if we won't enter the decode loop
+    if (have_existing_frame_to_use && !start_loop) {
+      av_frame_free(&decoded_frame);
+      have_existing_frame_to_use = false;
+    }
 
     if (start_loop) {
 
@@ -220,6 +227,7 @@ void Cacher::CacheVideoWorker() {
           // again, an EOF isn't an "error" but will how we add frames (see below)
 
           qCritical() << "Failed to retrieve frame from buffersink." << retrieve_code;
+          av_frame_free(&decoded_frame);
           break;
 
         } else if (decoded_frame->pts != AV_NOPTS_VALUE) {
