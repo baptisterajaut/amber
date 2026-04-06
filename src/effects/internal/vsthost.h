@@ -36,6 +36,7 @@ class VSTHost : public Effect {
 public:
   VSTHost(Clip* c, const EffectMeta* em);
   ~VSTHost() override;
+  EffectPtr copy(Clip* c) override;
   void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes, int channel_count) override;
 
   void custom_load(QXmlStreamReader& stream) override;

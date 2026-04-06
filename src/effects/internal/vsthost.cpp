@@ -313,6 +313,26 @@ VSTHost::VSTHost(Clip* c, const EffectMeta *em) :
   connect(show_interface_btn, &ButtonField::Toggled, this, &VSTHost::show_interface);
 }
 
+EffectPtr VSTHost::copy(Clip* c) {
+  EffectPtr cp = Effect::copy(c);
+  VSTHost* vst_copy = static_cast<VSTHost*>(cp.get());
+
+  // Copy plugin preset data (not handled by copy_field_keyframes)
+  if (plugin != nullptr) {
+    char* p = nullptr;
+    int32_t length = int32_t(dispatcher(plugin, effGetChunk, 0, 0, &p, 0));
+    vst_copy->data_cache = QByteArray(p, length);
+  } else if (!data_cache.isEmpty()) {
+    vst_copy->data_cache = data_cache;
+  }
+
+  // Load plugin on the copy — file path was copied to persistent_data_
+  // by copy_field_keyframes() but change_plugin() was never triggered
+  vst_copy->change_plugin();
+
+  return cp;
+}
+
 VSTHost::~VSTHost() {
   for(int channel = 0; channel < CHANNEL_COUNT; channel++) {
     delete [] inputs[channel];
