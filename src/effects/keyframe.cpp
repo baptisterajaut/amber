@@ -22,18 +22,18 @@
 
 #include <QVector>
 
+#include "core/appcontext.h"
 #include "effectfields.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
-#include "panels/panels.h"
 
-void delete_keyframes(QVector<EffectField *>& selected_key_fields, QVector<int> &selected_keys) {
+void delete_keyframes(QVector<EffectField*>& selected_key_fields, QVector<int>& selected_keys) {
   QVector<EffectField*> fields;
   QVector<int> key_indices;
 
-  for (int i=0;i<selected_keys.size();i++) {
+  for (int i = 0; i < selected_keys.size(); i++) {
     bool added = false;
-    for (int j=0;j<key_indices.size();j++) {
+    for (int j = 0; j < key_indices.size(); j++) {
       if (key_indices.at(j) < selected_keys.at(i)) {
         key_indices.insert(j, selected_keys.at(i));
         fields.insert(j, selected_key_fields.at(i));
@@ -49,12 +49,12 @@ void delete_keyframes(QVector<EffectField *>& selected_key_fields, QVector<int> 
 
   if (fields.size() > 0) {
     ComboAction* ca = new ComboAction(QObject::tr("Delete Keyframe(s)"));
-    for (int i=0;i<key_indices.size();i++) {
+    for (int i = 0; i < key_indices.size(); i++) {
       ca->append(new KeyframeDelete(fields.at(i), key_indices.at(i)));
     }
     amber::UndoStack.push(ca);
     selected_keys.clear();
     selected_key_fields.clear();
-    update_ui(false);
+    amber::app_ctx->updateUi(false);
   }
 }

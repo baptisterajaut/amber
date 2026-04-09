@@ -20,9 +20,8 @@
 
 #include "loadthread.h"
 
+#include "core/appcontext.h"
 #include "global/global.h"
-
-#include "ui/mainwindow.h"
 
 #include "panels/panels.h"
 
@@ -263,7 +262,8 @@ QString LoadThread::resolve_footage_url(const QString& raw_url) {
     return internal_proj_dir_test;
   }
 
-  qInfo() << "Failed to match" << raw_url << "to file (tried" << proj_dir_test << "and" << internal_proj_dir_test << ")";
+  qInfo() << "Failed to match" << raw_url << "to file (tried" << proj_dir_test << "and" << internal_proj_dir_test
+          << ")";
   // Return the cleaned absolute path even though the file doesn't exist — this keeps f->url
   // as an absolute path so subsequent saves produce a correct relative path instead of
   // double-encoding the relative URL and corrupting it further with each save-load cycle.
@@ -451,9 +451,9 @@ bool LoadThread::parse_clip(QXmlStreamReader& stream, SequencePtr s) {
       if (stream.name() == QLatin1String("linked")) {
         parse_clip_links(stream, c.get());
         if (cancelled_) return false;
-      } else if (stream.isStartElement() && (stream.name() == QLatin1String("effect") ||
-                                             stream.name() == QLatin1String("opening") ||
-                                             stream.name() == QLatin1String("closing"))) {
+      } else if (stream.isStartElement() &&
+                 (stream.name() == QLatin1String("effect") || stream.name() == QLatin1String("opening") ||
+                  stream.name() == QLatin1String("closing"))) {
         load_effect(stream, c.get());
       } else if (stream.name() == QLatin1String("marker") && stream.isStartElement()) {
         c->get_markers().append(parse_marker(stream));
@@ -811,8 +811,8 @@ void LoadThread::cancel() {
 
 void LoadThread::question_func(const QString& title, const QString& text, int buttons) {
   mutex.lock();
-  question_btn =
-      QMessageBox::warning(amber::MainWindow, title, text, static_cast<enum QMessageBox::StandardButton>(buttons));
+  question_btn = QMessageBox::warning(amber::app_ctx->getMainWindow(), title, text,
+                                      static_cast<enum QMessageBox::StandardButton>(buttons));
   question_answered_ = true;
   waitCond.wakeAll();
   mutex.unlock();
@@ -821,11 +821,9 @@ void LoadThread::question_func(const QString& title, const QString& text, int bu
 void LoadThread::error_func() {
   if (xml_error) {
     qCritical() << "Error parsing XML." << error_str;
-    QMessageBox::critical(amber::MainWindow, tr("XML Parsing Error"),
-                          tr("Couldn't load '%1'. %2").arg(filename_, error_str), QMessageBox::Ok);
+    amber::app_ctx->showMessage(tr("XML Parsing Error"), tr("Couldn't load '%1'. %2").arg(filename_, error_str), 3);
   } else {
-    QMessageBox::critical(amber::MainWindow, tr("Project Load Error"), tr("Error loading project: %1").arg(error_str),
-                          QMessageBox::Ok);
+    amber::app_ctx->showMessage(tr("Project Load Error"), tr("Error loading project: %1").arg(error_str), 3);
   }
 }
 

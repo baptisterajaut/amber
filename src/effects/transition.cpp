@@ -20,10 +20,10 @@
 
 #include "transition.h"
 
+#include "core/appcontext.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "global/debug.h"
-#include "ui/mainwindow.h"
 
 #include "project/clipboard.h"
 
@@ -34,7 +34,6 @@
 #include "effects/internal/logarithmicfadetransition.h"
 
 #include <QCoreApplication>
-#include <QMessageBox>
 
 Transition::Transition(Clip* c, Clip* s, const EffectMeta* em) : Effect(c, em), secondary_clip(s) {
   EffectRow* length_row = new EffectRow(this, tr("Length"), false, false);
@@ -103,12 +102,13 @@ TransitionPtr Transition::CreateFromMeta(Clip* c, Clip* s, const EffectMeta* em)
     }
   } else {
     qCritical() << "Invalid transition data";
-    QMessageBox::critical(
-        amber::MainWindow, QCoreApplication::translate("transition", "Invalid transition"),
+    amber::app_ctx->showMessage(
+        QCoreApplication::translate("transition", "Invalid transition"),
         QCoreApplication::translate(
             "transition",
             "No candidate for transition '%1'. This transition may be corrupt. Try reinstalling it or Amber.")
-            .arg(em->name));
+            .arg(em->name),
+        3);
   }
   return nullptr;
 }
