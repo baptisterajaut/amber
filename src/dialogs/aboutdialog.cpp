@@ -65,12 +65,15 @@ AboutDialog::AboutDialog(QWidget *parent) :
       new QLabel(QString("<html><head/><body>"
                          "<p><b>%1</b></p>"
                          "<p>%2</p>"
-                         "<p>%3</p>"
+                         "<p><i>%3</i></p>"
                          "<p>%4</p>"
+                         "<p>%5</p>"
                          "</body></html>")
                      .arg(amber::AppName,
                           tr("A fork of Olive 0.1 ported to Qt 6 and modern FFmpeg, "
                              "with many bugs from the original codebase fixed along the way."),
+                          tr("This is a 2.0 preview build — pre-alpha, features incomplete. "
+                             "For production use, prefer Amber 1.x."),
                           tr("Free open-source software released under the GNU GPL. "
                              "Original code by the %1.")
                               .arg(link.arg("https://www.olivevideoeditor.org", tr("Olive Team"))),

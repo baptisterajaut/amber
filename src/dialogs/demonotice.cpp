@@ -20,7 +20,6 @@
 
 #include "demonotice.h"
 
-#include <QCheckBox>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -29,12 +28,10 @@
 #include <QScreen>
 #include <QSvgRenderer>
 
-#include "global/config.h"
-
 DemoNotice::DemoNotice(QWidget *parent) :
   QDialog(parent)
 {
-  setWindowTitle(tr("Welcome to Amber!"));
+  setWindowTitle(tr("Amber 2.0 Preview"));
   setMinimumWidth(520);
   setSizeGripEnabled(true);
 
@@ -64,18 +61,16 @@ DemoNotice::DemoNotice(QWidget *parent) :
 
   QLabel* text = new QLabel("<html><head/><body>"
                             "<p><span style=\" font-size:14pt;\">"
-                            + tr("Welcome to Amber!")
+                            + tr("Amber 2.0 Preview — Early Development Build")
                             + "</span></p><p>"
-                            + tr("Amber is a fork of Olive 0.1 ported to Qt 6 and modern FFmpeg. "
-                                 "The original codebase was considered alpha-quality, but it has proven "
-                                 "to be quite reliable in practice. Many bugs from the original code have "
-                                 "been fixed along the way.")
+                            + tr("This is a pre-alpha build of Amber 2.0. Features are incomplete, "
+                                 "may change without notice, or may not work at all.")
                             + "</p><p>"
-                            + tr("The original struck a rare balance between power and simplicity: "
-                                 "a video editor where every feature you need is right where you expect it. "
-                                 "I never found anything quite like it since, so I brought it back.")
+                            + tr("<b>For production work, use Amber 1.x (stable).</b> "
+                                 "If you are here to test new 2.0 features, expect rough edges and "
+                                 "do not rely on this build for anything important.")
                             + "</p><p>"
-                            + tr("If you run into any issues, please report them on GitHub: %1")
+                            + tr("Bug reports and feedback are welcome on GitHub: %1")
                                 .arg("<a href=\"https://github.com/baptisterajaut/amber\">"
                                      "<span style=\" text-decoration: underline; color:#007af4;\">"
                                      "github.com/baptisterajaut/amber</span></a>")
@@ -85,18 +80,9 @@ DemoNotice::DemoNotice(QWidget *parent) :
 
   vlayout->addLayout(layout);
 
-  dont_show_again_ = new QCheckBox(tr("Don't show this message again"), this);
-  vlayout->addWidget(dont_show_again_);
-
   QDialogButtonBox* buttons = new QDialogButtonBox(QDialogButtonBox::Ok, this);
   buttons->setCenterButtons(true);
   connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
   vlayout->addWidget(buttons);
 }
 
-void DemoNotice::accept() {
-  if (dont_show_again_->isChecked()) {
-    amber::CurrentConfig.show_welcome_dialog = false;
-  }
-  QDialog::accept();
-}

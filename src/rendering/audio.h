@@ -72,7 +72,7 @@ void init_audio();
 void stop_audio();
 qint64 get_buffer_offset_from_frame(double framerate, long frame);
 
-bool start_recording();
+bool start_recording(const QString& project_filename);
 void stop_recording();
 QString get_recorded_audio_filename();
 

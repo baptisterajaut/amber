@@ -33,7 +33,6 @@ extern "C" {
 #include <QPainter>
 #include <QtMath>
 
-#include "global/global.h"
 #include "engine/sequence.h"
 #include "core/appcontext.h"
 #include "rendering/renderthread.h"
@@ -45,10 +44,12 @@ extern "C" {
 #include <malloc.h>
 #endif
 
-ExportThread::ExportThread(const ExportParams &params,
+ExportThread::ExportThread(Sequence* seq,
+                           const ExportParams &params,
                            const VideoCodecParams& vparams,
                            QObject *parent) :
   QThread(parent),
+  seq_(seq),
   params_(params),
   vcodec_params_(vparams),
   interrupt_(false)
@@ -184,14 +185,14 @@ bool ExportThread::SetupVideo() {
   }
 
   // Create raw AVFrame that will contain the RGBA buffer straight from compositing
-  if (amber::ActiveSequence == nullptr) {
+  if (seq_ == nullptr) {
     export_error = tr("no active sequence");
     return false;
   }
   video_frame = av_frame_alloc();
   video_frame->format = AV_PIX_FMT_RGBA;
-  video_frame->width = amber::ActiveSequence->width;
-  video_frame->height = amber::ActiveSequence->height;
+  video_frame->width = seq_->width;
+  video_frame->height = seq_->height;
   ret = av_frame_get_buffer(video_frame, 0);
   if (ret < 0) {
     qCritical() << "Could not allocate video frame buffer." << ret;
@@ -203,8 +204,8 @@ bool ExportThread::SetupVideo() {
 
   // Set up conversion context
   sws_ctx = sws_getContext(
-        amber::ActiveSequence->width,
-        amber::ActiveSequence->height,
+        seq_->width,
+        seq_->height,
         AV_PIX_FMT_RGBA,
         params_.video_width,
         params_.video_height,
@@ -295,7 +296,7 @@ bool ExportThread::SetupAudio() {
   // init audio resampler context
   {
     AVChannelLayout in_ch_layout = {};
-    av_channel_layout_from_mask(&in_ch_layout, amber::ActiveSequence->audio_layout);
+    av_channel_layout_from_mask(&in_ch_layout, seq_->audio_layout);
     swr_alloc_set_opts2(
           &swr_ctx,
           &acodec_ctx->ch_layout,
@@ -432,7 +433,7 @@ void ExportThread::Export()
   connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
   // Loop from now (set to the beginning frame earlier) to the end of the frame
-  while (amber::ActiveSequence->playhead <= params_.end_frame && !interrupt_) {
+  while (seq_->playhead <= params_.end_frame && !interrupt_) {
 
     // Start timing how long this frame will take
     frame_start_time = QDateTime::currentMSecsSinceEpoch();
@@ -441,7 +442,7 @@ void ExportThread::Export()
     if (params_.audio_enabled) {
       waiting_for_audio_ = true;
       SetAudioWakeObject(this);
-      amber::rendering::compose_audio(nullptr, amber::ActiveSequence.get(), 1, true);
+      amber::rendering::compose_audio(seq_, false, 1, true);
     }
 
     // If we're exporting video, trigger a render on the RenderThread
@@ -449,7 +450,7 @@ void ExportThread::Export()
       do {
         // TODO optimize by rendering the next frame while encoding the last
         render_complete_ = false;
-        renderer->start_render(amber::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0);
+        renderer->start_render(seq_, 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0);
 
         // Wait for RenderThread to return (predicate guards against lost wakeup)
         while (!render_complete_ && !interrupt_) {
@@ -474,7 +475,7 @@ void ExportThread::Export()
     }
 
     // Get the current sequence playhead in seconds (used for timestamp calculations later on)
-    double timecode_secs = double(amber::ActiveSequence->playhead - params_.start_frame) / amber::ActiveSequence->frame_rate;
+    double timecode_secs = double(seq_->playhead - params_.start_frame) / seq_->frame_rate;
 
     // If we're exporting video, construct an AVFrame in the destination codec's pixel format to convert the raw RGBA
     // OpenGL buffer to
@@ -563,15 +564,15 @@ void ExportThread::Export()
     // Generating encoding statistics (e.g. the time it took to encode this frame/estimated remaining time)
     frame_time = (QDateTime::currentMSecsSinceEpoch()-frame_start_time);
     total_time += frame_time;
-    remaining_frames = (params_.end_frame - amber::ActiveSequence->playhead);
+    remaining_frames = (params_.end_frame - seq_->playhead);
     avg_time = (total_time/frame_count);
     eta = (remaining_frames*avg_time);
 
     // Emit a signal for the percent of the sequence that's been encoded so far
-    emit ProgressChanged(qRound((double(amber::ActiveSequence->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
+    emit ProgressChanged(qRound((double(seq_->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
 
     // Increment sequence playhead
-    amber::ActiveSequence->playhead++;
+    seq_->playhead++;
 
     // Increment frame count (used for generating encoding statistics above)
     frame_count++;
@@ -587,7 +588,7 @@ cleanup_state:
   // timer) is restored on the main thread in ExportDialog::export_thread_finished
   // — starting a QTimer from this thread triggers "Timers cannot be started
   // from another thread".
-  close_active_clips(amber::ActiveSequence.get());
+  close_active_clips(seq_);
 
   if (interrupt_) {
     return;

@@ -27,7 +27,6 @@
 
 #include "engine/sequence.h"
 #include "effects/effect.h"
-#include "panels/viewer.h"
 
 // Per-clip QRhi FBO resources (ping-pong textures for effect processing).
 // Stored as void* in Clip::fbo_rhi to avoid circular includes.
@@ -39,7 +38,6 @@ struct ClipRhiResources {
 };
 
 struct ComposeSequenceParams {
-  Viewer* viewer;
   QRhi* rhi;
   QRhiCommandBuffer* cb;
   Sequence* seq;
@@ -81,7 +79,7 @@ namespace rendering {
 
 QRhiTexture* compose_sequence(ComposeSequenceParams &params);
 
-void compose_audio(Viewer* viewer, Sequence *seq, int playback_speed, bool wait_for_mutexes);
+void compose_audio(Sequence *seq, bool scrubbing, int playback_speed, bool wait_for_mutexes);
 }
 }
 

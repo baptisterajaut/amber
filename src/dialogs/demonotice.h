@@ -23,19 +23,12 @@
 
 #include <QDialog>
 
-class QCheckBox;
-
 class DemoNotice : public QDialog
 {
   Q_OBJECT
 public:
   explicit DemoNotice(QWidget *parent = nullptr);
 
-protected:
-  void accept() override;
-
-private:
-  QCheckBox* dont_show_again_;
 };
 
 #endif // DEMONOTICE_H

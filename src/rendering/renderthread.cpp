@@ -293,7 +293,6 @@ void RenderThread::paint() {
 
   // Set up compose_sequence() parameters
   ComposeSequenceParams params;
-  params.viewer = nullptr;
   params.rhi = rhi_;
   params.cb = cb;
   params.seq = seq;

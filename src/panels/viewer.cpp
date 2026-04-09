@@ -427,7 +427,7 @@ void Viewer::play(bool in_to_out) {
   }
 
   reset_all_audio();
-  if (is_recording_cued() && !start_recording()) {
+  if (is_recording_cued() && !start_recording(amber::ActiveProjectFilename)) {
     qCritical() << "Failed to record audio";
     return;
   }

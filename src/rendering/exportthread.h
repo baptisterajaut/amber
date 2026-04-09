@@ -35,6 +35,7 @@ struct AVStream;
 struct AVCodec;
 struct SwsContext;
 struct SwrContext;
+class Sequence;
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -73,7 +74,7 @@ struct VideoCodecParams {
 class ExportThread : public QThread {
   Q_OBJECT
 public:
-  ExportThread(const ExportParams& params, const VideoCodecParams& vparams, QObject* parent = nullptr);
+  ExportThread(Sequence* seq, const ExportParams& params, const VideoCodecParams& vparams, QObject* parent = nullptr);
   void run() override;
 
   // Pre-created GL fallback surface (created on GUI thread, passed through to
@@ -98,6 +99,8 @@ private:
   void Cleanup();
 
   std::atomic<bool> interrupt_;
+
+  Sequence* seq_;
 
   // params imported from dialogs
   ExportParams params_;

@@ -356,13 +356,11 @@ void OliveGlobal::finished_initialize() {
     enable_load_project_on_init = false;
 
   } else {
-    // if we are not loading a project on launch and are running a release build, open the demo notice dialog
+    // 2.0 preview: always show the pre-alpha notice on launch (release builds only)
 #ifndef QT_DEBUG
-    if (amber::CurrentConfig.show_welcome_dialog) {
-      DemoNotice* d = new DemoNotice(amber::MainWindow);
-      connect(d, &QDialog::finished, d, &QObject::deleteLater);
-      d->open();
-    }
+    DemoNotice* d = new DemoNotice(amber::MainWindow);
+    connect(d, &QDialog::finished, d, &QObject::deleteLater);
+    d->open();
 #endif
   }
 

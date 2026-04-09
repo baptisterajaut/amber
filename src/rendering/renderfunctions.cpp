@@ -36,15 +36,11 @@ extern "C" {
 #include "project/footage.h"
 #include "project/media.h"
 
-#include "ui/collapsiblewidget.h"
-
 #include "rendering/audio.h"
+#include "rendering/renderthread.h"
 
 #include "core/math.h"
 #include "global/config.h"
-
-#include "panels/timeline.h"
-#include "panels/viewer.h"
 
 // Depth-only correction for intermediate offscreen passes (no Y-flip).
 // Remaps OpenGL depth range [-1,1] to [0,1] for Vulkan/Metal/D3D.
@@ -831,7 +827,7 @@ static void process_audio_clip(Clip* c, long playhead, ComposeSequenceParams& pa
 
     if (got_mutex2) {
       c->cache_lock.unlock();
-      c->Cache(playhead, (params.viewer != nullptr && !params.viewer->playing), params.nests, params.playback_speed);
+      c->Cache(playhead, params.scrubbing, params.nests, params.playback_speed);
     }
   }
 }
@@ -923,13 +919,12 @@ QRhiTexture* amber::rendering::compose_sequence(ComposeSequenceParams& params) {
   return nullptr;
 }
 
-void amber::rendering::compose_audio(Viewer* viewer, Sequence* seq, int playback_speed, bool wait_for_mutexes) {
+void amber::rendering::compose_audio(Sequence* seq, bool scrubbing, int playback_speed, bool wait_for_mutexes) {
   if (!seq) {
     qWarning() << "compose_audio: seq is null";
     return;
   }
   ComposeSequenceParams params;
-  params.viewer = viewer;
   params.rhi = nullptr;
   params.cb = nullptr;
   params.seq = seq;
@@ -937,7 +932,7 @@ void amber::rendering::compose_audio(Viewer* viewer, Sequence* seq, int playback
   params.gizmos = nullptr;
   params.wait_for_mutexes = wait_for_mutexes;
   params.playback_speed = playback_speed;
-  params.scrubbing = (viewer != nullptr && !viewer->playing);
+  params.scrubbing = scrubbing;
   compose_sequence(params);
 }
 

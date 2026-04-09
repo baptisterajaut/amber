@@ -21,8 +21,6 @@
 #include "audio.h"
 
 #include "core/appcontext.h"
-#include "global/global.h"
-
 #include "engine/sequence.h"
 
 #include "global/config.h"
@@ -376,13 +374,8 @@ void write_wave_trailer(QFile& f) {
   f.write(arr, 4);
 }
 
-bool start_recording() {
-  if (amber::ActiveSequence == nullptr) {
-    qCritical() << "No active sequence to record into";
-    return false;
-  }
-
-  QString audio_path = QCoreApplication::translate("Audio", "%1 Audio").arg(amber::ActiveProjectFilename);
+bool start_recording(const QString& project_filename) {
+  QString audio_path = QCoreApplication::translate("Audio", "%1 Audio").arg(project_filename);
   QDir audio_dir(audio_path);
   if (!audio_dir.exists() && !audio_dir.mkpath(".")) {
     qCritical() << "Failed to create audio directory";

@@ -357,7 +357,7 @@ void ViewerWidget::frame_update() {
                              nullptr, nullptr, 0, amber::CurrentConfig.preview_resolution_divider, scrubbing);
     }
 
-    amber::rendering::compose_audio(viewer, viewer->seq.get(), viewer->get_playback_speed(), false);
+    amber::rendering::compose_audio(viewer->seq.get(), !viewer->playing, viewer->get_playback_speed(), false);
   }
 }
 

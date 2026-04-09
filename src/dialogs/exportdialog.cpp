@@ -520,7 +520,7 @@ void ExportDialog::StartExport() {
     }
 
     // Create export thread
-    export_thread_ = new ExportThread(params, vcodec_params, this);
+    export_thread_ = new ExportThread(amber::ActiveSequence.get(), params, vcodec_params, this);
 
     // Pre-create a GL fallback surface on the GUI thread for the export's
     // RenderThread.  Avoids "QWindow outside gui thread" warning on Wayland.
