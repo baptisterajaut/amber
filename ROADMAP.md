@@ -88,6 +88,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Audio FFT input (`iChannel` of type audio)
 
 ### New built-in effects
+- Gradient generator — linear/radial with multi-stop color ramp, applicable to solids and text (#21)
 - Timer / countdown
 - Progress bar
 - Lift / gamma / gain (3-way color correction)
