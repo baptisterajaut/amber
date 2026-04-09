@@ -580,6 +580,9 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
     case LOAD_TYPE_URL:
       root_search = "url";
       break;
+    case LOAD_TYPE_PREVIEW_RES:
+      root_search = "previewresolution";
+      break;
     case MEDIA_TYPE_FOLDER:
       root_search = "folders";
       child_search = "folder";
@@ -616,6 +619,11 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
       } else if (type == LOAD_TYPE_URL) {
         internal_proj_url = stream.readElementText();
         internal_proj_dir = QFileInfo(internal_proj_url).absoluteDir();
+      } else if (type == LOAD_TYPE_PREVIEW_RES) {
+        int div = stream.readElementText().toInt();
+        if (div == 1 || div == 2 || div == 4) {
+          amber::CurrentConfig.preview_resolution_divider = div;
+        }
       } else {
         while (!cancelled_ && !stream.atEnd() && !(stream.name() == root_search && stream.isEndElement())) {
           read_next(stream);
@@ -709,6 +717,11 @@ void LoadThread::run() {
   // find project's internal URL
   if (cont) {
     cont = load_worker(file, stream, LOAD_TYPE_URL);
+  }
+
+  // restore preview resolution (optional — missing element is fine for older projects)
+  if (cont) {
+    load_worker(file, stream, LOAD_TYPE_PREVIEW_RES);
   }
 
   // load folders first

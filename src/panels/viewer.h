@@ -26,6 +26,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QTimer>
+#include <QToolButton>
 
 #include "project/media.h"
 #include "timeline/marker.h"
@@ -66,6 +67,7 @@ class Viewer : public Panel {
   void set_zoom(bool in);
   void set_panel_name(const QString& n);
   void show_videoaudio_buttons(bool s);
+  void update_preview_res_label();
 
   // playback functions
   void seek(long p, bool scrub_audio = true);
@@ -129,6 +131,7 @@ class Viewer : public Panel {
 
   void drag_video_only();
   void drag_audio_only();
+  void set_preview_resolution(QAction* action);
 
  private:
   void update_window_title();
@@ -163,6 +166,7 @@ class Viewer : public Panel {
 
   QPushButton* video_only_button;
   QPushButton* audio_only_button;
+  QToolButton* preview_res_button_;
 
   bool cue_recording_internal{false};
   QTimer recording_flasher;

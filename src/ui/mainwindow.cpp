@@ -1305,6 +1305,8 @@ void MainWindow::viewMenu_About_To_Be_Shown() {
 void MainWindow::set_preview_resolution() {
   QAction* action = static_cast<QAction*>(sender());
   amber::CurrentConfig.preview_resolution_divider = action->data().toInt();
+  panel_sequence_viewer->update_preview_res_label();
+  panel_footage_viewer->update_preview_res_label();
   update_ui(false);
 }
 

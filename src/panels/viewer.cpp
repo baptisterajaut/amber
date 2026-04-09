@@ -25,15 +25,18 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
+#include <QActionGroup>
 #include <QAudioSink>
 #include <QDrag>
 #include <QHBoxLayout>
+#include <QMenu>
 #include <QMimeData>
 #include <QPainter>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QStringList>
 #include <QTimer>
+#include <QToolButton>
 #include <QtMath>
 
 #include "engine/clip.h"
@@ -757,6 +760,33 @@ void Viewer::setup_ui() {
   right_control_layout->setContentsMargins(0, 0, 0, 0);
   right_control_layout->addStretch();
 
+  // Preview resolution toggle
+  preview_res_button_ = new QToolButton();
+  preview_res_button_->setPopupMode(QToolButton::InstantPopup);
+  preview_res_button_->setToolTip(tr("Preview Resolution"));
+  QMenu* preview_res_menu = new QMenu(preview_res_button_);
+  QActionGroup* preview_res_group = new QActionGroup(preview_res_menu);
+  auto add_res_action = [&](const QString& text, int divider) {
+    QAction* a = preview_res_menu->addAction(text);
+    a->setData(divider);
+    a->setCheckable(true);
+    a->setChecked(amber::CurrentConfig.preview_resolution_divider == divider);
+    preview_res_group->addAction(a);
+  };
+  add_res_action(tr("Full"), 1);
+  add_res_action(tr("1/2"), 2);
+  add_res_action(tr("1/4"), 4);
+  connect(preview_res_menu, &QMenu::triggered, this, &Viewer::set_preview_resolution);
+  connect(preview_res_menu, &QMenu::aboutToShow, this, [preview_res_menu]() {
+    int div = amber::CurrentConfig.preview_resolution_divider;
+    for (QAction* a : preview_res_menu->actions()) {
+      a->setChecked(a->data().toInt() == div);
+    }
+  });
+  preview_res_button_->setMenu(preview_res_menu);
+  update_preview_res_label();
+  right_control_layout->addWidget(preview_res_button_);
+
   video_only_button = new QPushButton();
   video_only_button->setToolTip(tr("Drag video only"));
   video_only_button->setIcon(amber::icon::MediaVideo);
@@ -928,6 +958,21 @@ void Viewer::resize_move(double d) { set_zoom_value(headers->get_zoom() * d); }
 void Viewer::drag_video_only() { initiate_drag(amber::timeline::kImportVideoOnly); }
 
 void Viewer::drag_audio_only() { initiate_drag(amber::timeline::kImportAudioOnly); }
+
+void Viewer::set_preview_resolution(QAction* action) {
+  amber::CurrentConfig.preview_resolution_divider = action->data().toInt();
+  update_preview_res_label();
+  panel_sequence_viewer->update_parents();
+}
+
+void Viewer::update_preview_res_label() {
+  int div = amber::CurrentConfig.preview_resolution_divider;
+  switch (div) {
+    case 2: preview_res_button_->setText(tr("1/2")); break;
+    case 4: preview_res_button_->setText(tr("1/4")); break;
+    default: preview_res_button_->setText(tr("Full")); break;
+  }
+}
 
 void Viewer::clean_created_seq() {
   viewer_widget->waveform = false;

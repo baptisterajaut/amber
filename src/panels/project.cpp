@@ -1279,6 +1279,7 @@ void Project::save_project(bool autorecovery) {
   stream.writeTextElement("version", QString::number(amber::kSaveVersion));
 
   stream.writeTextElement("url", amber::ActiveProjectFilename);
+  stream.writeTextElement("previewresolution", QString::number(amber::CurrentConfig.preview_resolution_divider));
   proj_dir = QFileInfo(amber::ActiveProjectFilename).absoluteDir();
 
   save_folder(stream, MEDIA_TYPE_FOLDER, true);

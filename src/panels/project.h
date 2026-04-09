@@ -42,6 +42,7 @@
 
 #define LOAD_TYPE_VERSION 69
 #define LOAD_TYPE_URL 70
+#define LOAD_TYPE_PREVIEW_RES 71
 
 extern QString autorecovery_filename;
 extern QStringList recent_projects;
