@@ -24,16 +24,17 @@
 #include <QLabel>
 #include <QUndoCommand>
 
+#include "core/displaytype.h"
+
 /**
  * @brief The LabelSlider class
  *
  * A UI element that shows a number and can be dragged to increase/decrease its value or clicked to enter a specific
  * one.
  */
-class LabelSlider : public QLabel
-{
+class LabelSlider : public QLabel {
   Q_OBJECT
-public:
+ public:
   LabelSlider(QWidget* parent = nullptr);
 
   /**
@@ -68,12 +69,11 @@ public:
    */
   double value();
 
-  enum DisplayType : uint8_t {
-    Normal,
-    FrameNumber,
-    Percent,
-    Decibel
-  };
+  using DisplayType = amber::DisplayType;
+  static constexpr DisplayType Normal = DisplayType::Normal;
+  static constexpr DisplayType FrameNumber = DisplayType::FrameNumber;
+  static constexpr DisplayType Percent = DisplayType::Percent;
+  static constexpr DisplayType Decibel = DisplayType::Decibel;
 
   /**
    * @brief Sets the way to display the value
@@ -121,7 +121,7 @@ public:
    * Defaults to 1
    */
   void SetDecimalPlaces(int places);
-public slots:
+ public slots:
   /**
    * @brief Set the minimum value
    *
@@ -146,12 +146,12 @@ public slots:
    */
   void SetMaximum(double v);
 
-protected:
-  void mousePressEvent(QMouseEvent *ev) override;
-  void mouseMoveEvent(QMouseEvent *ev) override;
-  void mouseReleaseEvent(QMouseEvent *ev) override;
-private:
+ protected:
+  void mousePressEvent(QMouseEvent* ev) override;
+  void mouseMoveEvent(QMouseEvent* ev) override;
+  void mouseReleaseEvent(QMouseEvent* ev) override;
 
+ private:
   /**
    * @brief Convert the internal value to a displayed string according to `display_type`
    * @return The internal value as a string
@@ -189,7 +189,7 @@ private:
    * @brief Internal function to set the cursor while dragging (usually NoCursor aka invisible)
    */
   void SetActiveCursor();
-private slots:
+ private slots:
   /**
    * @brief Context menu slot to be connected to QWidget::customContextMenuRequested(const QPoint&)
    *
@@ -212,7 +212,7 @@ private slots:
    * display type and converts them back to the internal value type.
    */
   void ShowDialog();
-signals:
+ signals:
   /**
    * @brief valueChanged signal
    *
@@ -228,4 +228,4 @@ signals:
   void clicked();
 };
 
-#endif // LABELSLIDER_H
+#endif  // LABELSLIDER_H

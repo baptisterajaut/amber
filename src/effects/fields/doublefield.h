@@ -2,7 +2,7 @@
 #define DOUBLEFIELD_H
 
 #include "../effectfield.h"
-#include "ui/labelslider.h"
+#include "core/displaytype.h"
 
 /**
  * @brief The DoubleField class
@@ -10,10 +10,9 @@
  * An EffectField derivative the produces number values (integer or floating-point) and uses a LabelSlider as its
  * visual representation.
  */
-class DoubleField : public EffectField
-{
+class DoubleField : public EffectField {
   Q_OBJECT
-public:
+ public:
   /**
    * @brief Reimplementation of EffectField::EffectField().
    */
@@ -50,9 +49,9 @@ public:
   void SetDefault(double d);
 
   /**
-   * @brief Sets the UI display type to a member of LabelSlider::DisplayType.
+   * @brief Sets the UI display type to a member of amber::DisplayType.
    */
-  void SetDisplayType(LabelSlider::DisplayType type);
+  void SetDisplayType(amber::DisplayType type);
 
   /**
    * @brief For a timecode-based display type, sets the frame rate to be used for the displayed timecode
@@ -77,7 +76,7 @@ public:
    */
   QString ConvertValueToString(const QVariant& v) override;
 
-signals:
+ signals:
   /**
    * @brief Signal emitted when the field's maximum value has changed
    *
@@ -111,7 +110,8 @@ signals:
    * The new minimum value.
    */
   void MinimumChanged(double minimum);
-private:
+
+ private:
   /**
    * @brief Internal minimum value
    *
@@ -138,7 +138,7 @@ private:
    *
    * \see SetDisplayType().
    */
-  LabelSlider::DisplayType display_type_{LabelSlider::Normal};
+  amber::DisplayType display_type_{amber::DisplayType::Normal};
 
   /**
    * @brief Internal frame rate value
@@ -154,13 +154,12 @@ private:
    */
   bool value_set_{false};
 
-private slots:
+ private slots:
   /**
    * @brief Connected to EffectField::Changed() to ensure value_set_ gets set to TRUE whenever a value is set on this
    * field.
    */
   void ValueHasBeenSet();
-
 };
 
-#endif // DOUBLEFIELD_H
+#endif  // DOUBLEFIELD_H

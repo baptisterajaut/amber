@@ -1,14 +1,13 @@
 #include "doublefieldwidget.h"
 
-#include "effects/fields/doublefield.h"
 #include "effects/effectrow.h"
+#include "effects/fields/doublefield.h"
 #include "effects/keyframe.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
 #include "ui/labelslider.h"
 
-DoubleFieldWidget::DoubleFieldWidget(EffectField* field, QObject* parent)
-    : EffectFieldWidget(field, parent) {}
+DoubleFieldWidget::DoubleFieldWidget(EffectField* field, QObject* parent) : EffectFieldWidget(field, parent) {}
 
 QWidget* DoubleFieldWidget::CreateWidget(QWidget* existing) {
   DoubleField* df = static_cast<DoubleField*>(field_);
@@ -24,7 +23,7 @@ QWidget* DoubleFieldWidget::CreateWidget(QWidget* existing) {
     if (!qIsNaN(df->GetMaximum())) {
       ls->SetMaximum(df->GetMaximum());
     }
-    ls->SetDisplayType(static_cast<LabelSlider::DisplayType>(df->GetDisplayType()));
+    ls->SetDisplayType(static_cast<amber::DisplayType>(df->GetDisplayType()));
     ls->SetFrameRate(df->GetFrameRate());
 
     ls->setEnabled(df->IsEnabled());

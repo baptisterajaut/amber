@@ -20,55 +20,44 @@
 
 #include "transition.h"
 
-#include "ui/mainwindow.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "global/debug.h"
+#include "ui/mainwindow.h"
 
 #include "project/clipboard.h"
 
 #include "effects/internal/crossdissolvetransition.h"
-#include "effects/internal/linearfadetransition.h"
-#include "effects/internal/exponentialfadetransition.h"
-#include "effects/internal/logarithmicfadetransition.h"
 #include "effects/internal/cubetransition.h"
+#include "effects/internal/exponentialfadetransition.h"
+#include "effects/internal/linearfadetransition.h"
+#include "effects/internal/logarithmicfadetransition.h"
 
-#include "ui/labelslider.h"
-
-#include <QMessageBox>
 #include <QCoreApplication>
+#include <QMessageBox>
 
-Transition::Transition(Clip *c, Clip *s, const EffectMeta* em) :
-  Effect(c, em),
-  secondary_clip(s)
-{
+Transition::Transition(Clip* c, Clip* s, const EffectMeta* em) : Effect(c, em), secondary_clip(s) {
   EffectRow* length_row = new EffectRow(this, tr("Length"), false, false);
   length_field = new DoubleField(length_row, "length");
   length_field->SetDefault(30);
   length_field->SetMinimum(1);
-  length_field->SetDisplayType(LabelSlider::FrameNumber);
-  length_field->SetFrameRate(parent_clip->sequence == nullptr ?
-                               parent_clip->cached_frame_rate() : parent_clip->sequence->frame_rate);
+  length_field->SetDisplayType(amber::DisplayType::FrameNumber);
+  length_field->SetFrameRate(parent_clip->sequence == nullptr ? parent_clip->cached_frame_rate()
+                                                              : parent_clip->sequence->frame_rate);
 
   connect(length_field, &DoubleField::Changed, this, &Transition::UpdateMaximumLength);
 }
 
-TransitionPtr Transition::copy(Clip *c, Clip *s) {
-  return Transition::Create(c, s, meta, get_true_length());
-}
+TransitionPtr Transition::copy(Clip* c, Clip* s) { return Transition::Create(c, s, meta, get_true_length()); }
 
-void Transition::save(QXmlStreamWriter &stream) {
+void Transition::save(QXmlStreamWriter& stream) {
   stream.writeAttribute("length", QString::number(get_true_length()));
   Effect::save(stream);
 }
 
-void Transition::set_length(int l) {
-  length_field->SetValueAt(0, l);
-}
+void Transition::set_length(int l) { length_field->SetValueAt(0, l); }
 
-int Transition::get_true_length() {
-  return length_field->GetValueAt(0).toInt();
-}
+int Transition::get_true_length() { return length_field->GetValueAt(0).toInt(); }
 
 int Transition::get_length() {
   if (secondary_clip != nullptr) {
@@ -102,24 +91,29 @@ TransitionPtr Transition::CreateFromMeta(Clip* c, Clip* s, const EffectMeta* em)
   } else if (em->internal >= 0 && em->internal < TRANSITION_INTERNAL_COUNT) {
     // must be an internal effect
     switch (em->internal) {
-    case TRANSITION_INTERNAL_CROSSDISSOLVE: return TransitionPtr(new CrossDissolveTransition(c, s, em));
-    case TRANSITION_INTERNAL_LINEARFADE: return TransitionPtr(new LinearFadeTransition(c, s, em));
-    case TRANSITION_INTERNAL_EXPONENTIALFADE: return TransitionPtr(new ExponentialFadeTransition(c, s, em));
-    case TRANSITION_INTERNAL_LOGARITHMICFADE: return TransitionPtr(new LogarithmicFadeTransition(c, s, em));
-    //case TRANSITION_INTERNAL_CUBE: return TransitionPtr(new CubeTransition(c, s, em));
+      case TRANSITION_INTERNAL_CROSSDISSOLVE:
+        return TransitionPtr(new CrossDissolveTransition(c, s, em));
+      case TRANSITION_INTERNAL_LINEARFADE:
+        return TransitionPtr(new LinearFadeTransition(c, s, em));
+      case TRANSITION_INTERNAL_EXPONENTIALFADE:
+        return TransitionPtr(new ExponentialFadeTransition(c, s, em));
+      case TRANSITION_INTERNAL_LOGARITHMICFADE:
+        return TransitionPtr(new LogarithmicFadeTransition(c, s, em));
+        // case TRANSITION_INTERNAL_CUBE: return TransitionPtr(new CubeTransition(c, s, em));
     }
   } else {
     qCritical() << "Invalid transition data";
-    QMessageBox::critical(amber::MainWindow,
-                          QCoreApplication::translate("transition", "Invalid transition"),
-                          QCoreApplication::translate("transition", "No candidate for transition '%1'. This transition may be corrupt. Try reinstalling it or Amber.").arg(em->name)
-                          );
+    QMessageBox::critical(
+        amber::MainWindow, QCoreApplication::translate("transition", "Invalid transition"),
+        QCoreApplication::translate(
+            "transition",
+            "No candidate for transition '%1'. This transition may be corrupt. Try reinstalling it or Amber.")
+            .arg(em->name));
   }
   return nullptr;
 }
 
-void Transition::UpdateMaximumLength()
-{
+void Transition::UpdateMaximumLength() {
   // Get the maximum area this transition can occupy on the clip
   long maximum_length = GetMaximumEmptySpaceOnClip(parent_clip);
 
@@ -133,8 +127,7 @@ void Transition::UpdateMaximumLength()
   length_field->SetMaximum(maximum_length);
 }
 
-long Transition::GetMaximumEmptySpaceOnClip(Clip *c)
-{
+long Transition::GetMaximumEmptySpaceOnClip(Clip* c) {
   long maximum_transition_length = c->length();
 
   Transition* opposite_transition;
