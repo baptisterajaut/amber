@@ -11,7 +11,10 @@ class Sequence {
 SequencePtr amber::ActiveSequence;
 
 #include "core/appcontext.h"
+#include "core/audio.h"
 #include "global/projectio.h"
+
+Q_DECLARE_METATYPE(SequencePtr)
 
 class StubAppContext : public AppContext {
  public:
@@ -107,6 +110,141 @@ class TestProjectIO : public QObject {
     QCOMPARE(pio.canCloseProject(), ProjectIO::Clean);
     pio.setModified(true);
     QCOMPARE(pio.canCloseProject(), ProjectIO::NeedsSave);
+    // Clearing modified restores Clean state
+    pio.setModified(false);
+    QCOMPARE(pio.canCloseProject(), ProjectIO::Clean);
+  }
+
+  // --- Signal tests ---
+
+  void modifiedSignal() {
+    ProjectIO pio;
+    QSignalSpy spy(&pio, &ProjectIO::modifiedChanged);
+    pio.setModified(true);
+    pio.setModified(false);
+    QCOMPARE(spy.count(), 2);
+    QCOMPARE(spy.at(0).at(0).toBool(), true);
+    QCOMPARE(spy.at(1).at(0).toBool(), false);
+  }
+
+  void sequenceChangedSignal() {
+    ProjectIO pio;
+    amber::ActiveSequence = nullptr;
+    QSignalSpy spy(&pio, &ProjectIO::sequenceChanged);
+    auto seq1 = std::make_shared<Sequence>();
+    pio.setSequence(seq1);
+    QCOMPARE(spy.count(), 1);
+    // The emitted pointer must match
+    SequencePtr emitted = spy.at(0).at(0).value<SequencePtr>();
+    QCOMPARE(emitted, seq1);
+    pio.setSequence(nullptr);
+  }
+
+  // --- Autorecovery ---
+
+  void autorecoverySaveRequested() {
+    ProjectIO pio;
+    QSignalSpy spy(&pio, &ProjectIO::autorecoverySaveRequested);
+
+    // Not modified — saveAutorecoveryFile should NOT emit
+    pio.saveAutorecoveryFile();
+    QCOMPARE(spy.count(), 0);
+
+    // Mark modified, then save — signal emitted once
+    pio.setModified(true);
+    pio.saveAutorecoveryFile();
+    QCOMPARE(spy.count(), 1);
+
+    // Second save without re-modifying — changed_since_last_autorecovery_ was cleared
+    pio.saveAutorecoveryFile();
+    QCOMPARE(spy.count(), 1);
+  }
+
+  void renderingStatePausesAutorecovery() {
+    ProjectIO pio;
+    // Initial state: audio_rendering default is false
+    audio_rendering = false;
+
+    pio.setRenderingState(true);
+    QCOMPARE(audio_rendering.load(), true);
+
+    pio.setRenderingState(false);
+    QCOMPARE(audio_rendering.load(), false);
+
+    // Restore
+    audio_rendering = false;
+  }
+
+  // --- Recent projects edge cases ---
+
+  void recentProjectsCap() {
+    ProjectIO pio;
+    for (int i = 0; i < 12; ++i) {
+      pio.addRecentProject(QString("/tmp/project_%1.ove").arg(i));
+    }
+    QCOMPARE(pio.recentProjects().size(), 10);
+    // Most recent is the last added
+    QCOMPARE(pio.recentProjects().first(), "/tmp/project_11.ove");
+    // Oldest entries were dropped
+    QVERIFY(!pio.recentProjects().contains("/tmp/project_0.ove"));
+    QVERIFY(!pio.recentProjects().contains("/tmp/project_1.ove"));
+  }
+
+  void recentProjectsNoDuplicateAtFront() {
+    ProjectIO pio;
+    pio.addRecentProject("/tmp/a.ove");
+    QCOMPARE(pio.recentProjects().size(), 1);
+    // Adding the same path again must not grow the list
+    pio.addRecentProject("/tmp/a.ove");
+    QCOMPARE(pio.recentProjects().size(), 1);
+    QCOMPARE(pio.recentProjects().first(), "/tmp/a.ove");
+  }
+
+  void recentProjectsFileFilter() {
+    ProjectIO pio;
+    QVERIFY(pio.projectFileFilter().contains("(*.ove)"));
+  }
+
+  // --- Sequence edge cases ---
+
+  void clearSequenceHistoryTest() {
+    ProjectIO pio;
+    amber::ActiveSequence = nullptr;
+    auto seq1 = std::make_shared<Sequence>();
+    auto seq2 = std::make_shared<Sequence>();
+    pio.setSequence(seq1);
+    pio.setSequence(seq2, true);
+    QVERIFY(pio.canGoBack());
+    pio.clearSequenceHistory();
+    QVERIFY(!pio.canGoBack());
+    pio.setSequence(nullptr);
+  }
+
+  void setSequenceNullClearsHistory() {
+    ProjectIO pio;
+    amber::ActiveSequence = nullptr;
+    auto seq1 = std::make_shared<Sequence>();
+    auto seq2 = std::make_shared<Sequence>();
+    pio.setSequence(seq1);
+    pio.setSequence(seq2, true);
+    QVERIFY(pio.canGoBack());
+    // setSequence(nullptr) must clear history
+    pio.setSequence(nullptr);
+    QVERIFY(!pio.canGoBack());
+    QCOMPARE(amber::ActiveSequence, nullptr);
+  }
+
+  void goBackOnEmptyDoesNothing() {
+    ProjectIO pio;
+    amber::ActiveSequence = nullptr;
+    auto seq = std::make_shared<Sequence>();
+    pio.setSequence(seq);
+    QVERIFY(!pio.canGoBack());
+    // Must not crash
+    pio.goBackSequence();
+    // ActiveSequence unchanged — goBack on empty history is a no-op
+    QCOMPARE(amber::ActiveSequence, seq);
+    pio.setSequence(nullptr);
   }
 
  private:
