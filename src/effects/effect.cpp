@@ -20,40 +20,31 @@
 
 #include "effect.h"
 
+#include <rhi/qshaderbaker.h>
 #include <QApplication>
 #include <QCheckBox>
 #include <QCryptographicHash>
 #include <QDir>
-#include <QFileDialog>
 #include <QGridLayout>
 #include <QMenu>
-#include <QMessageBox>
 #include <QPainter>
 #include <QStandardPaths>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QtMath>
-#include <rhi/qshaderbaker.h>
 
-#include "global/config.h"
-#include "global/debug.h"
+#include "core/appcontext.h"
 #include "core/math.h"
 #include "core/path.h"
-#include "panels/effectcontrols.h"
-#include "panels/grapheditor.h"
-#include "panels/panels.h"
-#include "panels/project.h"
-#include "panels/timeline.h"
-#include "panels/viewer.h"
-#include "project/clipboard.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
-#include "transition.h"
-#include "ui/mainwindow.h"
-#include "ui/viewerwidget.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
+#include "global/config.h"
+#include "global/debug.h"
+#include "project/clipboard.h"
 #include "rendering/renderthread.h"
+#include "transition.h"
 
 #include "effects/internal/audionoiseeffect.h"
 #include "effects/internal/cornerpineffect.h"
@@ -137,11 +128,12 @@ EffectPtr Effect::Create(Clip* c, const EffectMeta* em) {
     return std::make_shared<Effect>(c, em);
   } else {
     qCritical() << "Invalid effect data";
-    QMessageBox::critical(
-        amber::MainWindow, QCoreApplication::translate("Effect", "Invalid effect"),
+    amber::app_ctx->showMessage(
+        QCoreApplication::translate("Effect", "Invalid effect"),
         QCoreApplication::translate(
             "Effect", "No candidate for effect '%1'. This effect may be corrupt. Try reinstalling it or Amber.")
-            .arg(em->name));
+            .arg(em->name),
+        3);
   }
   return nullptr;
 }
@@ -345,13 +337,8 @@ Effect::~Effect() {
   }
 
   // Clear graph editor if it's using one of these rows
-  if (panel_graph_editor != nullptr) {
-    for (int i = 0; i < row_count(); i++) {
-      if (row(i) == panel_graph_editor->get_row()) {
-        panel_graph_editor->set_row(nullptr);
-        break;
-      }
-    }
+  for (int i = 0; i < row_count(); i++) {
+    amber::app_ctx->clearGraphEditorIfRow(row(i));
   }
 
   for (auto gizmo_dragging_action : gizmo_dragging_actions_) {
@@ -403,13 +390,13 @@ int Effect::gizmo_count() { return gizmos.size(); }
 
 void Effect::refresh() {}
 
-void Effect::FieldChanged() { update_ui(false); }
+void Effect::FieldChanged() { amber::app_ctx->updateUi(false); }
 
 void Effect::delete_self() {
   auto* cmd = new EffectDeleteCommand(this);
   cmd->setText(tr("Delete Effect"));
   amber::UndoStack.push(cmd);
-  update_ui(true);
+  amber::app_ctx->updateUi(true);
 }
 
 void Effect::move_up() {
@@ -424,8 +411,8 @@ void Effect::move_up() {
   command->from = index_of_effect;
   command->to = command->from - 1;
   amber::UndoStack.push(command);
-  panel_effect_controls->Reload();
-  panel_sequence_viewer->viewer_widget->frame_update();
+  amber::app_ctx->refreshEffectControls();
+  amber::app_ctx->refreshViewer();
 }
 
 void Effect::move_down() {
@@ -440,14 +427,14 @@ void Effect::move_down() {
   command->from = index_of_effect;
   command->to = command->from + 1;
   amber::UndoStack.push(command);
-  panel_effect_controls->Reload();
-  panel_sequence_viewer->viewer_widget->frame_update();
+  amber::app_ctx->refreshEffectControls();
+  amber::app_ctx->refreshViewer();
 }
 
 void Effect::save_to_file() {
   // save effect settings to file
-  QString file = QFileDialog::getSaveFileName(amber::MainWindow, tr("Save Effect Settings"), QString(),
-                                              tr("Effect XML Settings %1").arg("(*.xml)"));
+  QString file =
+      amber::app_ctx->showSaveFileDialog(tr("Save Effect Settings"), tr("Effect XML Settings %1").arg("(*.xml)"));
 
   // if the user picked a file
   if (!file.isEmpty()) {
@@ -462,16 +449,15 @@ void Effect::save_to_file() {
 
       file_handle.close();
     } else {
-      QMessageBox::critical(amber::MainWindow, tr("Save Settings Failed"),
-                            tr("Failed to open \"%1\" for writing.").arg(file), QMessageBox::Ok);
+      amber::app_ctx->showMessage(tr("Save Settings Failed"), tr("Failed to open \"%1\" for writing.").arg(file), 3);
     }
   }
 }
 
 void Effect::load_from_file() {
   // load effect settings from file
-  QString file = QFileDialog::getOpenFileName(amber::MainWindow, tr("Load Effect Settings"), QString(),
-                                              tr("Effect XML Settings %1").arg("(*.xml)"));
+  QString file =
+      amber::app_ctx->showOpenFileDialog(tr("Load Effect Settings"), tr("Effect XML Settings %1").arg("(*.xml)"));
 
   // if the user picked a file
   if (!file.isEmpty()) {
@@ -483,10 +469,9 @@ void Effect::load_from_file() {
 
       file_handle.close();
 
-      update_ui(false);
+      amber::app_ctx->updateUi(false);
     } else {
-      QMessageBox::critical(amber::MainWindow, tr("Load Settings Failed"),
-                            tr("Failed to open \"%1\" for reading.").arg(file), QMessageBox::Ok);
+      amber::app_ctx->showMessage(tr("Load Settings Failed"), tr("Failed to open \"%1\" for reading.").arg(file), 3);
     }
   }
 }
@@ -656,8 +641,8 @@ void Effect::load_from_string(const QByteArray& s) {
             // pass off to standard loading function
             load(stream);
           } else {
-            QMessageBox::critical(amber::MainWindow, tr("Load Settings Failed"),
-                                  tr("This settings file doesn't match this effect."), QMessageBox::Ok);
+            amber::app_ctx->showMessage(tr("Load Settings Failed"), tr("This settings file doesn't match this effect."),
+                                        3);
           }
           break;
         }
@@ -839,8 +824,7 @@ EffectPtr Effect::copy(Clip* c) {
   return copy;
 }
 
-void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData,
-                            QSize renderSize) {
+void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData, QSize renderSize) {
   if (uboData.size() < fragUboSize_) uboData.resize(fragUboSize_);
 
   // Use actual FBO/render size for resolution uniforms (shaders that use gl_FragCoord need this
