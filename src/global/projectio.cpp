@@ -11,6 +11,8 @@
 
 ProjectIO* amber::project_io = nullptr;
 
+ProjectIO::~ProjectIO() = default;
+
 ProjectIO::ProjectIO(QObject* parent) : QObject(parent) {
   project_file_filter_ = tr("Amber Project %1").arg("(*.ove)");
 }

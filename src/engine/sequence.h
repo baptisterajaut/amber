@@ -22,7 +22,8 @@
 #define SEQUENCE_H
 
 #include <QVector>
-#include <memory>
+
+#include "sequence_fwd.h"
 
 #include "clip.h"
 #include "core/guide.h"
@@ -68,12 +69,5 @@ class Sequence {
   QVector<Guide> guides;
   QVector<ClipPtr> clips;
 };
-
-using SequencePtr = std::shared_ptr<Sequence>;
-
-// static variable for the currently active sequence
-namespace amber {
-extern SequencePtr ActiveSequence;
-}
 
 #endif  // SEQUENCE_H

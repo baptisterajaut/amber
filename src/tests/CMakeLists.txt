@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Test Core)
+find_package(Qt6 REQUIRED COMPONENTS Test Core Gui)
 
 set(AMBER_CORE_SOURCES
   ${CMAKE_SOURCE_DIR}/core/audio.cpp
@@ -69,3 +69,31 @@ add_executable(amber-test-srt
 target_include_directories(amber-test-srt PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-srt PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-srt COMMAND amber-test-srt)
+
+add_executable(amber-test-effects
+  test_effects.cpp
+  ${AMBER_CORE_SOURCES}
+)
+target_include_directories(amber-test-effects PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-effects PRIVATE Qt6::Test Qt6::Core Qt6::Gui)
+add_test(NAME amber-test-effects COMMAND amber-test-effects)
+
+add_executable(amber-test-projectio
+  test_projectio.cpp
+  ${AMBER_CORE_SOURCES}
+  ${CMAKE_SOURCE_DIR}/global/projectio.cpp
+  ${CMAKE_SOURCE_DIR}/global/config.cpp
+)
+target_include_directories(amber-test-projectio PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-projectio PRIVATE Qt6::Test Qt6::Core Qt6::Gui)
+add_test(NAME amber-test-projectio COMMAND amber-test-projectio)
+
+# Rendering integration test — skeleton, may not compile until dependency chain is resolved
+# add_executable(amber-test-rendering
+#   test_rendering.cpp
+# )
+# target_include_directories(amber-test-rendering PRIVATE ${CMAKE_SOURCE_DIR})
+# target_link_libraries(amber-test-rendering PRIVATE
+#   Qt6::Test Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::ShaderTools
+# )
+# add_test(NAME amber-test-rendering COMMAND amber-test-rendering)

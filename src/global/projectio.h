@@ -5,12 +5,13 @@
 #include <QStringList>
 #include <QTimer>
 
-#include "engine/sequence.h"
+#include "engine/sequence_fwd.h"
 
 class ProjectIO : public QObject {
   Q_OBJECT
  public:
   explicit ProjectIO(QObject* parent = nullptr);
+  ~ProjectIO();
 
   const QString& projectFilename() const;
   void setProjectFilename(const QString& path);
