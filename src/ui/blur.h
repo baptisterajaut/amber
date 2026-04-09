@@ -1,32 +1,14 @@
 #ifndef BLUR_H
 #define BLUR_H
 
-#include <QImage>
-#include <QRect>
+// Redirects to core/blur.h. The blur function moved from amber::ui to amber namespace.
+#include "core/blur.h"
 
+// Backward-compat alias for existing callers using amber::ui::blur()
 namespace amber {
-  namespace ui {
-    /**
-     * @brief Convenience function for blurring a QImage
-     *
-     * @param result
-     *
-     * QImage to blur
-     *
-     * @param rect
-     *
-     * The rectangle of the QImage to blur. Use QImage::rect() to blur the entire image.
-     *
-     * @param radius
-     *
-     * The blur radius - how much to blur the image.
-     *
-     * @param alphaOnly
-     *
-     * True if only the alpha channel should be blurred rather than the entire RGBA space.
-     */
-    void blur(QImage& result, const QRect& rect, int radius, bool alphaOnly);
-  }
+namespace ui {
+using ::amber::blur;
 }
+}  // namespace amber
 
-#endif // BLUR_H
+#endif  // BLUR_H
