@@ -25,7 +25,7 @@
 #include <QVariant>
 #include <QIcon>
 
-#include "timeline/marker.h"
+#include "core/marker.h"
 #include "project/footage.h"
 
 enum MediaType : uint8_t {

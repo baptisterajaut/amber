@@ -1,5 +1,6 @@
 #include "richtexteffect.h"
 
+#include <QPainter>
 #include <QTextDocument>
 #include <QtMath>
 

@@ -20,6 +20,7 @@
 
 #include "sourceiconview.h"
 
+#include <QPainter>
 #include <QMimeData>
 #include <QImage>
 
