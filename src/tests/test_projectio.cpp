@@ -38,6 +38,11 @@ class StubAppContext : public AppContext {
   void updateUi(bool) override {}
   int showMessage(const QString&, const QString&, int) override { return 0; }
   bool showQuestion(const QString&, const QString&) override { return true; }
+  QString showSaveFileDialog(const QString&, const QString&) override { return {}; }
+  QString showOpenFileDialog(const QString&, const QString&) override { return {}; }
+  void clearViewerMedia() override {}
+  QWidget* getMainWindow() override { return nullptr; }
+  void clearGraphEditorIfRow(EffectRow*) override {}
 };
 
 class TestProjectIO : public QObject {

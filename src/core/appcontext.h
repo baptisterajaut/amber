@@ -9,6 +9,7 @@
 class EffectRow;
 class Effect;
 class Media;
+class QWidget;
 using MediaPtr = std::shared_ptr<Media>;
 
 // Abstract interface decoupling engine from UI panels.
@@ -38,6 +39,11 @@ class AppContext {
   virtual void updateUi(bool modified) = 0;
   virtual int showMessage(const QString& title, const QString& text, int type) = 0;
   virtual bool showQuestion(const QString& title, const QString& text) = 0;
+  virtual QString showSaveFileDialog(const QString& title, const QString& filter) = 0;
+  virtual QString showOpenFileDialog(const QString& title, const QString& filter) = 0;
+  virtual void clearViewerMedia() = 0;
+  virtual QWidget* getMainWindow() = 0;
+  virtual void clearGraphEditorIfRow(EffectRow* row) = 0;
 };
 
 // Global app context -- set by UI layer at startup, used by engine code.

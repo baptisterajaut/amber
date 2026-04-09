@@ -10,7 +10,9 @@
 #include "ui/audiomonitor.h"
 #include "ui/viewerwidget.h"
 
+#include <QFileDialog>
 #include <QMessageBox>
+#include "ui/mainwindow.h"
 
 void AppContextImpl::refreshViewer() {
   if (panel_sequence_viewer != nullptr) {
@@ -104,17 +106,11 @@ bool AppContextImpl::isToolbarVisible() {
   return false;
 }
 
-bool AppContextImpl::isModified() {
-  return amber::Global->is_modified();
-}
+bool AppContextImpl::isModified() { return amber::Global->is_modified(); }
 
-void AppContextImpl::setModified(bool modified) {
-  amber::Global->set_modified(modified);
-}
+void AppContextImpl::setModified(bool modified) { amber::Global->set_modified(modified); }
 
-void AppContextImpl::updateUi(bool modified) {
-  update_ui(modified);
-}
+void AppContextImpl::updateUi(bool modified) { update_ui(modified); }
 
 int AppContextImpl::showMessage(const QString& title, const QString& text, int type) {
   QMessageBox box;
@@ -127,4 +123,29 @@ int AppContextImpl::showMessage(const QString& title, const QString& text, int t
 
 bool AppContextImpl::showQuestion(const QString& title, const QString& text) {
   return QMessageBox::question(nullptr, title, text, QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes;
+}
+
+QString AppContextImpl::showSaveFileDialog(const QString& title, const QString& filter) {
+  return QFileDialog::getSaveFileName(amber::MainWindow, title, QString(), filter);
+}
+
+QString AppContextImpl::showOpenFileDialog(const QString& title, const QString& filter) {
+  return QFileDialog::getOpenFileName(amber::MainWindow, title, QString(), filter);
+}
+
+void AppContextImpl::clearViewerMedia() {
+  if (panel_sequence_viewer != nullptr) {
+    panel_sequence_viewer->set_media(nullptr);
+  }
+  if (panel_footage_viewer != nullptr) {
+    panel_footage_viewer->set_media(nullptr);
+  }
+}
+
+QWidget* AppContextImpl::getMainWindow() { return amber::MainWindow; }
+
+void AppContextImpl::clearGraphEditorIfRow(EffectRow* row) {
+  if (panel_graph_editor != nullptr && panel_graph_editor->get_row() == row) {
+    panel_graph_editor->set_row(nullptr);
+  }
 }

@@ -25,6 +25,11 @@ class AppContextImpl : public AppContext {
   void updateUi(bool modified) override;
   int showMessage(const QString& title, const QString& text, int type) override;
   bool showQuestion(const QString& title, const QString& text) override;
+  QString showSaveFileDialog(const QString& title, const QString& filter) override;
+  QString showOpenFileDialog(const QString& title, const QString& filter) override;
+  void clearViewerMedia() override;
+  QWidget* getMainWindow() override;
+  void clearGraphEditorIfRow(EffectRow* row) override;
 };
 
 #endif  // UI_APPCONTEXTIMPL_H
