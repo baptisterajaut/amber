@@ -58,71 +58,8 @@ QString DoubleField::ConvertValueToString(const QVariant &v)
   return QString::number(v.toDouble());
 }
 
-QWidget *DoubleField::CreateWidget(QWidget *existing)
-{
-  LabelSlider* ls;
-
-  if (existing == nullptr) {
-
-    ls = new LabelSlider();
-
-    if (!qIsNaN(min_)) {
-      ls->SetMinimum(min_);
-    }
-    ls->SetDefault(default_);
-    if (!qIsNaN(max_)) {
-      ls->SetMaximum(max_);
-    }
-    ls->SetDisplayType(display_type_);
-    ls->SetFrameRate(frame_rate_);
-
-    ls->setEnabled(IsEnabled());
-
-  } else {
-
-    ls = static_cast<LabelSlider*>(existing);
-
-  }
-
-  connect(ls, &LabelSlider::valueChanged, this, &DoubleField::UpdateFromWidget);
-  connect(ls, &LabelSlider::clicked, this, &EffectField::Clicked);
-  connect(this, &EffectField::EnabledChanged, ls, &QWidget::setEnabled);
-  connect(this, &DoubleField::MaximumChanged, ls, &LabelSlider::SetMaximum);
-  connect(this, &DoubleField::MinimumChanged, ls, &LabelSlider::SetMinimum);
-
-  return ls;
-}
-
-void DoubleField::UpdateWidgetValue(QWidget *widget, double timecode)
-{
-  if (qIsNaN(timecode)) {
-    static_cast<LabelSlider*>(widget)->SetValue(qSNaN());
-  } else {
-    static_cast<LabelSlider*>(widget)->SetValue(GetDoubleAt(timecode));
-  }
-}
-
 void DoubleField::ValueHasBeenSet()
 {
   value_set_ = true;
 }
 
-void DoubleField::UpdateFromWidget(double d)
-{
-  LabelSlider* ls = static_cast<LabelSlider*>(sender());
-
-  if (ls->IsDragging() && kdc_ == nullptr) {
-    kdc_ = new KeyframeDataChange(this);
-  }
-
-  SetValueAt(Now(), d);
-
-  if (!ls->IsDragging() && kdc_ != nullptr) {
-    kdc_->SetNewKeyframes();
-    kdc_->setText(QObject::tr("Change Value"));
-
-    amber::UndoStack.push(kdc_);
-
-    kdc_ = nullptr;
-  }
-}

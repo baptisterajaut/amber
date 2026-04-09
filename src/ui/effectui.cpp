@@ -3,6 +3,8 @@
 #include <QPoint>
 #include <QtMath>
 
+#include "effects/ui/effectfieldwidget.h"
+
 #include "engine/clip.h"
 #include "ui/menuhelper.h"
 #include "ui/keyframenavigator.h"
@@ -103,6 +105,7 @@ EffectUI::EffectUI(Effect* e) :
   int maximum_column = 0;
 
   widgets_.resize(e->row_count());
+  field_widgets_.resize(e->row_count());
 
   for (int i=0;i<e->row_count();i++) {
     EffectRow* row = e->row(i);
@@ -115,13 +118,16 @@ EffectUI::EffectUI(Effect* e) :
     layout_->addWidget(row_label, i, 0);
 
     widgets_[i].resize(row->FieldCount());
+    field_widgets_[i].resize(row->FieldCount());
 
     int column = 1;
     for (int j=0;j<row->FieldCount();j++) {
       EffectField* field = row->Field(j);
 
-      QWidget* widget = field->CreateWidget();
+      EffectFieldWidget* fw = EffectFieldWidget::Create(field, this);
+      QWidget* widget = fw->CreateWidget();
 
+      field_widgets_[i][j] = fw;
       widgets_[i][j] = widget;
 
       layout_->addWidget(widget, i, column, 1, field->GetColumnSpan());
@@ -243,7 +249,10 @@ void EffectUI::AddAdditionalEffect(Effect *e)
     for (int j=0;j<row->FieldCount();j++) {
 
       // Attach existing field widget to this effect's field
-      e->row(i)->Field(j)->CreateWidget(Widget(i, j));
+      QWidget* existing_widget = Widget(i, j);
+      if (i < field_widgets_.size() && j < field_widgets_[i].size() && field_widgets_[i][j]) {
+        field_widgets_[i][j]->CreateWidget(existing_widget);
+      }
 
     }
 
@@ -296,9 +305,16 @@ void EffectUI::UpdateFromEffect()
       EffectField* field = row->Field(k);
 
       // Check if this UI object is attached to one effect or many
+      auto update_widget = [&](double timecode) {
+        QWidget* w = Widget(j, k);
+        if (j < field_widgets_.size() && k < field_widgets_[j].size() && field_widgets_[j][k]) {
+          field_widgets_[j][k]->UpdateWidgetValue(w, timecode);
+        }
+      };
+
       if (additional_effects_.isEmpty()) {
 
-        field->UpdateWidgetValue(Widget(j, k), field->Now());
+        update_widget(field->Now());
 
       } else {
 
@@ -315,9 +331,9 @@ void EffectUI::UpdateFromEffect()
         }
 
         if (same_value) {
-          field->UpdateWidgetValue(Widget(j, k), field->Now());
+          update_widget(field->Now());
         } else {
-          field->UpdateWidgetValue(Widget(j, k), qSNaN());
+          update_widget(qSNaN());
         }
 
       }

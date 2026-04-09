@@ -49,17 +49,9 @@ public:
    */
   void AddItem(const QString& text, const QVariant& data);
 
-  /**
-   * @brief Reimplementation of EffectField::CreateWidget()
-   *
-   * Creates and connects to a QComboBox with the set of items added in AddItem().
-   */
-  QWidget *CreateWidget(QWidget *existing = nullptr) override;
-
-  /**
-   * @brief Reimplementation of EffectField::UpdateWidgetValue()
-   */
-  void UpdateWidgetValue(QWidget* widget, double timecode) override;
+  int ItemCount() const { return items_.size(); }
+  const QString& ItemName(int i) const { return items_.at(i).name; }
+  const QVariant& ItemData(int i) const { return items_.at(i).data; }
 
 signals:
   /**
@@ -77,17 +69,6 @@ private:
    */
   QVector<ComboFieldItem> items_;
 
-private slots:
-  /**
-   * @brief Internal function connected to any QWidget made from CreateWidget() to update the value based on user input
-   *
-   * @param b
-   *
-   * The current index of the QWidget (QComboBox in this case). Automatically set when this slot is connected
-   * to the QComboBox::currentIndexChanged() signal. This is the only time ComboFields deal with indices since the
-   * QComboBox's indices will match precisely to the items_ array. Outside of this function, QVariant data is preferred.
-   */
-  void UpdateFromWidget(int index);
 };
 
 #endif // COMBOFIELD_H

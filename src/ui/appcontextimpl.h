@@ -24,6 +24,7 @@ class AppContextImpl : public AppContext {
   void setModified(bool modified) override;
   void updateUi(bool modified) override;
   int showMessage(const QString& title, const QString& text, int type) override;
+  bool showQuestion(const QString& title, const QString& text) override;
 };
 
 #endif  // UI_APPCONTEXTIMPL_H

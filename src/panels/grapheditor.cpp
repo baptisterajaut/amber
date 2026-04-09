@@ -33,6 +33,7 @@
 #include "effects/effect.h"
 #include "effects/effectfields.h"
 #include "effects/effectrow.h"
+#include "effects/ui/effectfieldwidget.h"
 #include "engine/clip.h"
 #include "rendering/renderfunctions.h"
 #include "panels.h"
@@ -150,7 +151,8 @@ void GraphEditor::update_panel() {
       for (int i=0;i<row->FieldCount();i++) {
         EffectField* field = row->Field(i);
         if (field->type() == EffectField::EFFECT_FIELD_DOUBLE) {
-          field->UpdateWidgetValue(field_sliders_.at(slider_index), field->Now());
+          DoubleField* df = static_cast<DoubleField*>(field);
+          field_sliders_.at(slider_index)->SetValue(df->GetDoubleAt(df->Now()));
           slider_index++;
         }
       }
@@ -194,7 +196,8 @@ void GraphEditor::set_row(EffectRow *r) {
         field_enable_buttons.append(slider_button);
         value_layout->addWidget(slider_button);
 
-        LabelSlider* slider = static_cast<LabelSlider*>(field->CreateWidget());
+        EffectFieldWidget* fw = EffectFieldWidget::Create(field, this);
+        LabelSlider* slider = static_cast<LabelSlider*>(fw->CreateWidget());
         slider->SetColor(get_curve_color(i, r->FieldCount()).name());
         field_sliders_.append(slider);
         value_layout->addWidget(slider);

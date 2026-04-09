@@ -219,6 +219,26 @@ set(OLIVE_SOURCES
   effects/keyframe.h
   effects/transition.cpp
   effects/transition.h
+  effects/ui/boolfieldwidget.cpp
+  effects/ui/boolfieldwidget.h
+  effects/ui/buttonfieldwidget.cpp
+  effects/ui/buttonfieldwidget.h
+  effects/ui/colorfieldwidget.cpp
+  effects/ui/colorfieldwidget.h
+  effects/ui/combofieldwidget.cpp
+  effects/ui/combofieldwidget.h
+  effects/ui/doublefieldwidget.cpp
+  effects/ui/doublefieldwidget.h
+  effects/ui/effectfieldwidget.cpp
+  effects/ui/effectfieldwidget.h
+  effects/ui/filefieldwidget.cpp
+  effects/ui/filefieldwidget.h
+  effects/ui/fontfieldwidget.cpp
+  effects/ui/fontfieldwidget.h
+  effects/ui/labelfieldwidget.cpp
+  effects/ui/labelfieldwidget.h
+  effects/ui/stringfieldwidget.cpp
+  effects/ui/stringfieldwidget.h
   global/config.cpp
   global/config.h
   global/debug.cpp

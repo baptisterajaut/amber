@@ -124,3 +124,7 @@ int AppContextImpl::showMessage(const QString& title, const QString& text, int t
   box.addButton(QMessageBox::Ok);
   return box.exec();
 }
+
+bool AppContextImpl::showQuestion(const QString& title, const QString& text) {
+  return QMessageBox::question(nullptr, title, text, QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes;
+}

@@ -100,8 +100,6 @@ QString EffectField::ConvertValueToString(const QVariant &v)
   return v.toString();
 }
 
-void EffectField::UpdateWidgetValue(QWidget *, double) {}
-
 QVariant EffectField::GetValueAt(double timecode)
 {
   if (HasKeyframes()) {

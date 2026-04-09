@@ -19,12 +19,8 @@ public:
    */
   LabelField(EffectRow* parent, const QString& string);
 
-  /**
-   * @brief Reimplementation of EffectField::CreateWidget()
-   *
-   * Creates and connects to a QLabel.
-   */
-  QWidget* CreateWidget(QWidget *existing = nullptr) override;
+  const QString& GetLabelText() const { return label_text_; }
+
 private:
   /**
    * @brief Internal text string

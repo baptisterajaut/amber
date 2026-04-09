@@ -1,9 +1,5 @@
 #include "filefield.h"
 
-#include <QDebug>
-
-#include "ui/embeddedfilechooser.h"
-
 FileField::FileField(EffectRow* parent, const QString &id) :
   EffectField(parent, id, EFFECT_FIELD_FILE)
 {
@@ -14,34 +10,4 @@ FileField::FileField(EffectRow* parent, const QString &id) :
 QString FileField::GetFileAt(double timecode)
 {
   return GetValueAt(timecode).toString();
-}
-
-QWidget *FileField::CreateWidget(QWidget *existing)
-{
-  EmbeddedFileChooser* efc = (existing != nullptr) ? static_cast<EmbeddedFileChooser*>(existing) : new EmbeddedFileChooser();
-
-  connect(efc, &EmbeddedFileChooser::changed, this, &FileField::UpdateFromWidget);
-  connect(this, &EffectField::EnabledChanged, efc, &QWidget::setEnabled);
-
-  return efc;
-}
-
-void FileField::UpdateWidgetValue(QWidget *widget, double timecode)
-{
-  EmbeddedFileChooser* efc = static_cast<EmbeddedFileChooser*>(widget);
-
-  efc->blockSignals(true);
-  efc->setFilename(GetFileAt(timecode));
-  efc->blockSignals(false);
-}
-
-void FileField::UpdateFromWidget(const QString &s)
-{
-  KeyframeDataChange* kdc = new KeyframeDataChange(this);
-
-  SetValueAt(Now(), s);
-
-  kdc->SetNewKeyframes();
-  kdc->setText(QObject::tr("Change Value"));
-  amber::UndoStack.push(kdc);
 }

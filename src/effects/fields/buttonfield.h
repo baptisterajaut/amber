@@ -39,12 +39,8 @@ public:
    */
   void SetCheckable(bool c);
 
-  /**
-   * @brief Reimplementation of EffectField::CreateWidget()
-   *
-   * Creates and connects to a QPushButton.
-   */
-  QWidget* CreateWidget(QWidget *existing = nullptr) override;
+  bool IsCheckable() const { return checkable_; }
+  const QString& GetButtonText() const { return button_text_; }
 
 public slots:
   /**

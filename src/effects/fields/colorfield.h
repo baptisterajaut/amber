@@ -1,8 +1,6 @@
 #ifndef COLORFIELD_H
 #define COLORFIELD_H
 
-#include <QMetaObject>
-
 #include "../effectfield.h"
 
 /**
@@ -35,18 +33,6 @@ public:
   QColor GetColorAt(double timecode);
 
   /**
-   * @brief CreateWidget
-   *
-   * Creates and connects to a ColorButton.
-   */
-  QWidget* CreateWidget(QWidget *existing = nullptr) override;
-
-  /**
-   * @brief Reimplementation of EffectField::UpdateWidgetValue()
-   */
-  void UpdateWidgetValue(QWidget* widget, double timecode) override;
-
-  /**
    * @brief Reimplementation of EffectField::ConvertStringToValue()
    */
   QVariant ConvertStringToValue(const QString& s) override;
@@ -55,21 +41,6 @@ public:
    * @brief Reimplementation of EffectField::ConvertValueToString()
    */
   QString ConvertValueToString(const QVariant& v) override;
-private slots:
-  /**
-   * @brief Internal function connected to any QWidget made from CreateWidget() to update the value based on user input
-   *
-   * @param b
-   *
-   * The current color selected by the QWidget (ColorButton in this case). Automatically triggered when this slot is
-   * connected to the ColorButton::color_changed() signal.
-   */
-  void UpdateFromWidget(const QColor &c);
-
-private:
-  QMetaObject::Connection pick_connection_;
-  QMetaObject::Connection cancel_connection_;
-  void disconnectPick();
 };
 
 #endif // COLORFIELD_H

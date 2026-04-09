@@ -1,9 +1,6 @@
 #include "fontfield.h"
 
 #include <QFontDatabase>
-#include <QDebug>
-
-#include "ui/comboboxex.h"
 
 // NOTE/TODO: This shares a lot of similarity with ComboField, and could probably be a derived class of it
 
@@ -20,55 +17,3 @@ QString FontField::GetFontAt(double timecode)
   return GetValueAt(timecode).toString();
 }
 
-QWidget *FontField::CreateWidget(QWidget *existing)
-{
-  ComboBoxEx* fcb = new ComboBoxEx();
-
-  if (existing == nullptr) {
-
-    fcb = new ComboBoxEx();
-
-    fcb->setScrollingEnabled(false);
-
-    fcb->addItems(font_list);
-
-  } else {
-
-    fcb = static_cast<ComboBoxEx*>(existing);
-
-  }
-
-  connect(fcb, &QComboBox::currentTextChanged, this, &FontField::UpdateFromWidget);
-  connect(this, &EffectField::EnabledChanged, fcb, &QWidget::setEnabled);
-
-  return fcb;
-}
-
-void FontField::UpdateWidgetValue(QWidget *widget, double timecode)
-{
-  QVariant data = GetValueAt(timecode);
-
-  ComboBoxEx* cb = static_cast<ComboBoxEx*>(widget);
-
-  for (int i=0;i<font_list.size();i++) {
-    if (font_list.at(i) == data) {
-      cb->blockSignals(true);
-      cb->setCurrentIndex(i);
-      cb->blockSignals(false);
-      return;
-    }
-  }
-
-  qWarning() << "Failed to set FontField value from data";
-}
-
-void FontField::UpdateFromWidget(const QString& s)
-{
-  KeyframeDataChange* kdc = new KeyframeDataChange(this);
-
-  SetValueAt(Now(), s);
-
-  kdc->SetNewKeyframes();
-  kdc->setText(QObject::tr("Change Font"));
-  amber::UndoStack.push(kdc);
-}

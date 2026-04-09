@@ -33,27 +33,6 @@ public:
    */
   QString GetFileAt(double timecode);
 
-  /**
-   * @brief Reimplementation of EffectField::CreateWidget()
-   *
-   * Creates and connects to a EmbeddedFileChooser.
-   */
-  QWidget* CreateWidget(QWidget *existing = nullptr) override;
-
-  /**
-   * @brief Reimplementation of EffectField::UpdateWidgetValue()
-   */
-  void UpdateWidgetValue(QWidget *widget, double timecode) override;
-private slots:
-  /**
-   * @brief Internal function connected to any QWidget made from CreateWidget() to update the value based on user input
-   *
-   * @param b
-   *
-   * The current string of the QWidget (TextEditEx in this case). Automatically set when this slot
-   * is connected to the TextEditEx::textModified() signal.
-   */
-  void UpdateFromWidget(const QString &s);
 };
 
 #endif // FILEFIELD_H

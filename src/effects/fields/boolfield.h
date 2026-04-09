@@ -33,18 +33,6 @@ public:
   bool GetBoolAt(double timecode);
 
   /**
-   * @brief Reimplementation of EffectField::CreateWidget()
-   *
-   * Creates and connects to a QCheckBox.
-   */
-  QWidget* CreateWidget(QWidget *existing = nullptr) override;
-
-  /**
-   * @brief Reimplementation of EffectField::UpdateWidgetValue()
-   */
-  void UpdateWidgetValue(QWidget* widget, double timecode) override;
-
-  /**
    * @brief Reimplementation of EffectField::ConvertStringToValue()
    */
   QVariant ConvertStringToValue(const QString& s) override;
@@ -56,26 +44,8 @@ public:
 signals:
   /**
    * @brief Emitted whenever the UI widget's boolean value has changed
-   *
-   * For any QCheckBox created through this field's CreateWidget() function, this signal is emitted any time the
-   * checkbox value changes (either through user intervention or keyframing). It is mostly useful for
-   * enabling/disabling/changing other UI elements based on the checked
-   * state of this field's value (e.g. enabling other fields if this field is checked).
-   *
-   * It is NOT a reliable signal that the value has changed at all, as it is only emitted if a widget (created
-   * from CreateWidget() ) is currently active.
    */
   void Toggled(bool);
-private slots:
-  /**
-   * @brief Internal function connected to any QWidget made from CreateWidget() to update the value based on user input
-   *
-   * @param b
-   *
-   * The current checked state of the QWidget (QCheckBox in this case). Automatically set when this slot is connected
-   * to the QCheckBox::toggled() signal.
-   */
-  void UpdateFromWidget(bool b);
 };
 
 #endif // BOOLFIELD_H

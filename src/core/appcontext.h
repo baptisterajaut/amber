@@ -37,6 +37,7 @@ class AppContext {
   virtual void setModified(bool modified) = 0;
   virtual void updateUi(bool modified) = 0;
   virtual int showMessage(const QString& title, const QString& text, int type) = 0;
+  virtual bool showQuestion(const QString& title, const QString& text) = 0;
 };
 
 // Global app context -- set by UI layer at startup, used by engine code.

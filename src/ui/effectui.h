@@ -4,6 +4,8 @@
 #include "collapsiblewidget.h"
 #include "effects/effect.h"
 
+class EffectFieldWidget;
+
 class EffectUI : public CollapsibleWidget {
   Q_OBJECT
 public:
@@ -29,6 +31,7 @@ private:
   QVector<Effect*> additional_effects_;
   QGridLayout* layout_;
   QVector< QVector<QWidget*> > widgets_;
+  QVector< QVector<EffectFieldWidget*> > field_widgets_;
   QVector<QLabel*> labels_;
   QVector<KeyframeNavigator*> keyframe_navigators_;
   QVector<QPushButton*> row_reset_buttons_;

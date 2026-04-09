@@ -61,6 +61,12 @@ public:
    */
   void SetFrameRate(const double& rate);
 
+  int GetDisplayType() const { return static_cast<int>(display_type_); }
+  double GetMinimum() const { return min_; }
+  double GetMaximum() const { return max_; }
+  double GetDefault() const { return default_; }
+  double GetFrameRate() const { return frame_rate_; }
+
   /**
    * @brief Reimplementation of EffectField::ConvertStringToValue()
    */
@@ -71,17 +77,6 @@ public:
    */
   QString ConvertValueToString(const QVariant& v) override;
 
-  /**
-   * @brief Reimplementation of EffectField::CreateWidget()
-   *
-   * Creates and connects to a LabelSlider.
-   */
-  QWidget* CreateWidget(QWidget *existing = nullptr) override;
-
-  /**
-   * @brief Reimplementation of EffectField::UpdateWidgetValue()
-   */
-  void UpdateWidgetValue(QWidget* widget, double timecode) override;
 signals:
   /**
    * @brief Signal emitted when the field's maximum value has changed
@@ -159,14 +154,6 @@ private:
    */
   bool value_set_{false};
 
-  /**
-   * @brief An internal KeyframeDataChange undoable command
-   *
-   * This is stored to allow for the value to be changed by dragging without every single "step" being pushed to
-   * the undo stack. Instead an undo command can be created at the start of a drag, and then pushed at the end
-   * to make it one single undoable action.
-   */
-  KeyframeDataChange* kdc_{nullptr};
 private slots:
   /**
    * @brief Connected to EffectField::Changed() to ensure value_set_ gets set to TRUE whenever a value is set on this
@@ -174,15 +161,6 @@ private slots:
    */
   void ValueHasBeenSet();
 
-  /**
-   * @brief Internal function connected to any QWidget made from CreateWidget() to update the value based on user input
-   *
-   * @param b
-   *
-   * The current number value of the QWidget (LabelSlider in this case). Automatically set when this slot is connected
-   * to the LabelSlider::valueChanged() signal.
-   */
-  void UpdateFromWidget(double d);
 };
 
 #endif // DOUBLEFIELD_H

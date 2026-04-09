@@ -36,27 +36,8 @@ public:
    */
   QString GetStringAt(double timecode);
 
-  /**
-   * @brief Reimplementation of EffectField::CreateWidget()
-   *
-   * Creates and connects to a TextEditEx.
-   */
-  QWidget *CreateWidget(QWidget *existing = nullptr) override;
+  bool IsRichText() const { return rich_text_; }
 
-  /**
-   * @brief Reimplementation of EffectField::UpdateWidgetValue()
-   */
-  void UpdateWidgetValue(QWidget* widget, double timecode) override;
-private slots:
-  /**
-   * @brief Internal function connected to any QWidget made from CreateWidget() to update the value based on user input
-   *
-   * @param b
-   *
-   * The current checked state of the QWidget (EmbeddedFileChooser in this case). Automatically set when this slot
-   * is connected to the EmbeddedFileChooser::changed() signal.
-   */
-  void UpdateFromWidget(const QString& b);
 private:
   /**
    * @brief Internal value for whether this field is in rich text or plain text mode
