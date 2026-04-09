@@ -22,19 +22,17 @@
 
 // adapted from http://teragonaudio.com/article/How-to-make-your-own-VST-host.html
 
-#include <QPushButton>
 #include <QDialog>
-#include <QMessageBox>
 #include <QFile>
-#include <QXmlStreamWriter>
+#include <QPushButton>
 #include <QWindow>
+#include <QXmlStreamWriter>
 
 #include <cstring>
 
-#include "rendering/audio.h"
-#include "ui/mainwindow.h"
-#include "global/global.h"
+#include "core/appcontext.h"
 #include "global/debug.h"
+#include "rendering/audio.h"
 
 // Load libraries for retrieving the native window handle. Used for VST plugins that have a separate window
 // dedicated to controls.
@@ -67,94 +65,93 @@ extern "C" {
 intptr_t hostCallback(AEffect* effect, int32_t opcode, int32_t index, intptr_t value, void* ptr, float opt) {
   Q_UNUSED(value)
 
-  switch(opcode) {
-  case audioMasterAutomate:
-    effect->setParameter(effect, index, opt);
-    break;
-  case audioMasterVersion:
-    return 2400;
-  case audioMasterIdle:
-    effect->dispatcher(effect, effEditIdle, 0, 0, nullptr, 0);
-    break;
-  case audioMasterWantMidi:
-    return 0;
-  case audioMasterGetTime: {
-    static VstTimeInfo timeInfo;
-    memset(&timeInfo, 0, sizeof(timeInfo));
-    timeInfo.samplePos = 0.0;
-    timeInfo.sampleRate = current_audio_freq();
-    timeInfo.tempo = 120.0;
-    timeInfo.timeSigNumerator = 4;
-    timeInfo.timeSigDenominator = 4;
-    timeInfo.flags = 0;
-    return reinterpret_cast<intptr_t>(&timeInfo);
-  }
-  case audioMasterIOChanged:
-    return 1;
-  case audioMasterSizeWindow:
-    // would need a back-pointer from AEffect to VSTHost to resize the dialog
-    return 0;
-  case audioMasterGetSampleRate:
-    return current_audio_freq();
-  case audioMasterGetBlockSize:
-    return BLOCK_SIZE;
-  case audioMasterGetCurrentProcessLevel:
-    return 0;
-  case audioMasterGetVendorString:
-    strncpy(static_cast<char*>(ptr), "Amber Video Editor", 63);
-    static_cast<char*>(ptr)[63] = '\0';
-    return 1;
-  case audioMasterGetProductString:
-    strncpy(static_cast<char*>(ptr), "Amber", 63);
-    static_cast<char*>(ptr)[63] = '\0';
-    return 1;
-  case audioMasterGetVendorVersion:
-    return 1400;
-  case audioMasterCanDo: {
-    const char* str = static_cast<const char*>(ptr);
-    if (strcmp(str, "sendVstTimeInfo") == 0) return 1;
-    if (strcmp(str, "sizeWindow") == 0) return 1;
-    if (strcmp(str, "acceptIOChanges") == 0) return 1;
-    if (strcmp(str, "startStopProcess") == 0) return 1;
-    if (strcmp(str, "sendVstEvents") == 0) return -1;
-    if (strcmp(str, "sendVstMidiEvent") == 0) return -1;
-    if (strcmp(str, "receiveVstEvents") == 0) return -1;
-    if (strcmp(str, "receiveVstMidiEvent") == 0) return -1;
-    if (strcmp(str, "offline") == 0) return -1;
-    if (strcmp(str, "shellCategory") == 0) return -1;
-    if (strcmp(str, "openFileSelector") == 0) return -1;
-    if (strcmp(str, "closeFileSelector") == 0) return -1;
-    return 0;
-  }
-  case audioMasterGetLanguage:
-    return kVstLangEnglish;
-  case audioMasterUpdateDisplay:
-    return 0;
-  case audioMasterBeginEdit:
-    return 0;
-  case audioMasterEndEdit:
-    amber::Global->set_modified(true);
-    return 0;
-  default:
-    qInfo() << "Plugin requested unhandled opcode" << opcode;
+  switch (opcode) {
+    case audioMasterAutomate:
+      effect->setParameter(effect, index, opt);
+      break;
+    case audioMasterVersion:
+      return 2400;
+    case audioMasterIdle:
+      effect->dispatcher(effect, effEditIdle, 0, 0, nullptr, 0);
+      break;
+    case audioMasterWantMidi:
+      return 0;
+    case audioMasterGetTime: {
+      static VstTimeInfo timeInfo;
+      memset(&timeInfo, 0, sizeof(timeInfo));
+      timeInfo.samplePos = 0.0;
+      timeInfo.sampleRate = current_audio_freq();
+      timeInfo.tempo = 120.0;
+      timeInfo.timeSigNumerator = 4;
+      timeInfo.timeSigDenominator = 4;
+      timeInfo.flags = 0;
+      return reinterpret_cast<intptr_t>(&timeInfo);
+    }
+    case audioMasterIOChanged:
+      return 1;
+    case audioMasterSizeWindow:
+      // would need a back-pointer from AEffect to VSTHost to resize the dialog
+      return 0;
+    case audioMasterGetSampleRate:
+      return current_audio_freq();
+    case audioMasterGetBlockSize:
+      return BLOCK_SIZE;
+    case audioMasterGetCurrentProcessLevel:
+      return 0;
+    case audioMasterGetVendorString:
+      strncpy(static_cast<char*>(ptr), "Amber Video Editor", 63);
+      static_cast<char*>(ptr)[63] = '\0';
+      return 1;
+    case audioMasterGetProductString:
+      strncpy(static_cast<char*>(ptr), "Amber", 63);
+      static_cast<char*>(ptr)[63] = '\0';
+      return 1;
+    case audioMasterGetVendorVersion:
+      return 1400;
+    case audioMasterCanDo: {
+      const char* str = static_cast<const char*>(ptr);
+      if (strcmp(str, "sendVstTimeInfo") == 0) return 1;
+      if (strcmp(str, "sizeWindow") == 0) return 1;
+      if (strcmp(str, "acceptIOChanges") == 0) return 1;
+      if (strcmp(str, "startStopProcess") == 0) return 1;
+      if (strcmp(str, "sendVstEvents") == 0) return -1;
+      if (strcmp(str, "sendVstMidiEvent") == 0) return -1;
+      if (strcmp(str, "receiveVstEvents") == 0) return -1;
+      if (strcmp(str, "receiveVstMidiEvent") == 0) return -1;
+      if (strcmp(str, "offline") == 0) return -1;
+      if (strcmp(str, "shellCategory") == 0) return -1;
+      if (strcmp(str, "openFileSelector") == 0) return -1;
+      if (strcmp(str, "closeFileSelector") == 0) return -1;
+      return 0;
+    }
+    case audioMasterGetLanguage:
+      return kVstLangEnglish;
+    case audioMasterUpdateDisplay:
+      return 0;
+    case audioMasterBeginEdit:
+      return 0;
+    case audioMasterEndEdit:
+      amber::app_ctx->setModified(true);
+      return 0;
+    default:
+      qInfo() << "Plugin requested unhandled opcode" << opcode;
   }
   return 0;
 }
 }
 
 // Plugin's entry point
-using vstPluginFuncPtr = AEffect *(*)(audioMasterCallback host);
+using vstPluginFuncPtr = AEffect* (*)(audioMasterCallback host);
 // Plugin's getParameter() method
-using getParameterFuncPtr = float (*)(AEffect *effect, int32_t index);
+using getParameterFuncPtr = float (*)(AEffect* effect, int32_t index);
 // Plugin's setParameter() method
-using setParameterFuncPtr = void (*)(AEffect *effect, int32_t index, float value);
+using setParameterFuncPtr = void (*)(AEffect* effect, int32_t index, float value);
 // Plugin's processEvents() method
-using processEventsFuncPtr = int32_t (*)(VstEvents *events);
+using processEventsFuncPtr = int32_t (*)(VstEvents* events);
 // Plugin's process() method
-using processFuncPtr = void (*)(AEffect *effect, float **inputs, float **outputs, int32_t sampleFrames);
+using processFuncPtr = void (*)(AEffect* effect, float** inputs, float** outputs, int32_t sampleFrames);
 
 void VSTHost::loadPlugin() {
-
   QString dll_fn = file_field->GetFileAt(0);
 
   if (dll_fn.isEmpty()) {
@@ -164,15 +161,12 @@ void VSTHost::loadPlugin() {
   // Try to load the plugin
   modulePtr.setFileName(dll_fn);
   if (!modulePtr.load()) {
-
     // Show an error if the plugin fails to load
 
     qCritical() << "Failed to load VST plugin" << dll_fn << "-" << modulePtr.errorString();
-    QMessageBox::critical(amber::MainWindow,
-                          tr("Error loading VST plugin"),
-                          tr("Failed to load VST plugin \"%1\": %2").arg(dll_fn, modulePtr.errorString()));
+    amber::app_ctx->showMessage(tr("Error loading VST plugin"),
+                                tr("Failed to load VST plugin \"%1\": %2").arg(dll_fn, modulePtr.errorString()), 3);
     return;
-
   }
 
   // Try to find the VST entry point (first using VSTPluginMain() )
@@ -184,16 +178,14 @@ void VSTHost::loadPlugin() {
   }
 
   if (mainEntryPoint == nullptr) {
-    QMessageBox::critical(amber::MainWindow,
-                          tr("Error loading VST plugin"),
-                          tr("Failed to locate entry point for dynamic library."));
+    amber::app_ctx->showMessage(tr("Error loading VST plugin"), tr("Failed to locate entry point for dynamic library."),
+                                3);
     modulePtr.unload();
     return;
   }
 
   // Instantiate the plugin
   plugin = mainEntryPoint(hostCallback);
-
 }
 
 void VSTHost::freePlugin() {
@@ -218,9 +210,9 @@ bool VSTHost::configurePluginCallbacks() {
   // Check plugin's magic number
   // If incorrect, then the file either was not loaded properly, is not a
   // real VST plugin, or is otherwise corrupt.
-  if(plugin->magic != kEffectMagic) {
+  if (plugin->magic != kEffectMagic) {
     qCritical() << "Plugin's magic number is bad";
-    QMessageBox::critical(amber::MainWindow, tr("VST Error"), tr("Plugin's magic number is invalid"));
+    amber::app_ctx->showMessage(tr("VST Error"), tr("Plugin's magic number is invalid"), 3);
     return false;
   }
 
@@ -251,31 +243,26 @@ void VSTHost::stopPlugin() {
   dispatcher(plugin, effClose, 0, 0, nullptr, 0);
 }
 
-void VSTHost::resumePlugin() {
-  dispatcher(plugin, effMainsChanged, 0, 1, nullptr, 0.0f);
-}
+void VSTHost::resumePlugin() { dispatcher(plugin, effMainsChanged, 0, 1, nullptr, 0.0f); }
 
-void VSTHost::suspendPlugin() {
-  dispatcher(plugin, effMainsChanged, 0, 0, nullptr, 0.0f);
-}
+void VSTHost::suspendPlugin() { dispatcher(plugin, effMainsChanged, 0, 0, nullptr, 0.0f); }
 
-bool VSTHost::canPluginDo(char *canDoString) {
+bool VSTHost::canPluginDo(char* canDoString) {
   return (dispatcher(plugin, effCanDo, 0, 0, static_cast<void*>(canDoString), 0.0f) > 0);
 }
 
 void VSTHost::processAudio(long numFrames) {
   // Always reset the output array before processing.
-  for (int i=0;i<CHANNEL_COUNT;i++) {
-    memset(outputs[i], 0, BLOCK_SIZE*sizeof(float));
+  for (int i = 0; i < CHANNEL_COUNT; i++) {
+    memset(outputs[i], 0, BLOCK_SIZE * sizeof(float));
   }
 
   plugin->processReplacing(plugin, inputs, outputs, numFrames);
 }
 
-void VSTHost::CreateDialogIfNull()
-{
+void VSTHost::CreateDialogIfNull() {
   if (dialog == nullptr) {
-    dialog = new QDialog(amber::MainWindow);
+    dialog = new QDialog(amber::app_ctx->getMainWindow());
     dialog->setWindowTitle(tr("VST Plugin"));
     dialog->setAttribute(Qt::WA_NativeWindow, true);
     dialog->setWindowFlags(dialog->windowFlags() | Qt::MSWindowsFixedSizeDialogHint);
@@ -283,20 +270,19 @@ void VSTHost::CreateDialogIfNull()
   }
 }
 
-void VSTHost::send_data_cache_to_plugin()
-{
+void VSTHost::send_data_cache_to_plugin() {
   dispatcher(plugin, effSetChunk, 0, int32_t(data_cache.size()), static_cast<void*>(data_cache.data()), 0);
 }
 
-VSTHost::VSTHost(Clip* c, const EffectMeta *em) :
-  Effect(c, em)
-  
+VSTHost::VSTHost(Clip* c, const EffectMeta* em)
+    : Effect(c, em)
+
 {
   plugin = nullptr;
 
-  inputs = new float* [CHANNEL_COUNT];
-  outputs = new float* [CHANNEL_COUNT];
-  for(int channel = 0; channel < CHANNEL_COUNT; channel++) {
+  inputs = new float*[CHANNEL_COUNT];
+  outputs = new float*[CHANNEL_COUNT];
+  for (int channel = 0; channel < CHANNEL_COUNT; channel++) {
     inputs[channel] = new float[BLOCK_SIZE];
     outputs[channel] = new float[BLOCK_SIZE];
   }
@@ -334,12 +320,12 @@ EffectPtr VSTHost::copy(Clip* c) {
 }
 
 VSTHost::~VSTHost() {
-  for(int channel = 0; channel < CHANNEL_COUNT; channel++) {
-    delete [] inputs[channel];
-    delete [] outputs[channel];
+  for (int channel = 0; channel < CHANNEL_COUNT; channel++) {
+    delete[] inputs[channel];
+    delete[] outputs[channel];
   }
-  delete [] outputs;
-  delete [] inputs;
+  delete[] outputs;
+  delete[] inputs;
 
   freePlugin();
 
@@ -353,41 +339,41 @@ VSTHost::~VSTHost() {
 
 void VSTHost::process_audio(double, double, quint8* samples, int nb_bytes, int) {
   if (plugin != nullptr) {
-    int interval = BLOCK_SIZE*4;
-    for (int i=0;i<nb_bytes;i+=interval) {
+    int interval = BLOCK_SIZE * 4;
+    for (int i = 0; i < nb_bytes; i += interval) {
       int process_size = qMin(interval, nb_bytes - i);
       int lim = i + process_size;
 
       // convert to float
-      for (int j=i;j<lim;j+=4) {
-        qint16 left_sample = qint16(((samples[j+1] & 0xFF) << 8) | (samples[j] & 0xFF));
-        qint16 right_sample = qint16(((samples[j+3] & 0xFF) << 8) | (samples[j+2] & 0xFF));
+      for (int j = i; j < lim; j += 4) {
+        qint16 left_sample = qint16(((samples[j + 1] & 0xFF) << 8) | (samples[j] & 0xFF));
+        qint16 right_sample = qint16(((samples[j + 3] & 0xFF) << 8) | (samples[j + 2] & 0xFF));
 
-        int index = (j-i)>>2;
+        int index = (j - i) >> 2;
         inputs[0][index] = float(left_sample) / float(INT16_MAX);
         inputs[1][index] = float(right_sample) / float(INT16_MAX);
       }
 
       // send to VST
-      processAudio(process_size>>2);
+      processAudio(process_size >> 2);
 
       // convert back to int16
-      for (int j=i;j<lim;j+=4) {
-        int index = (j-i)>>2;
+      for (int j = i; j < lim; j += 4) {
+        int index = (j - i) >> 2;
 
         qint16 left_sample = qint16(qRound(outputs[0][index] * INT16_MAX));
         qint16 right_sample = qint16(qRound(outputs[1][index] * INT16_MAX));
 
-        samples[j+3] = quint8(right_sample >> 8);
-        samples[j+2] = quint8(right_sample);
-        samples[j+1] = quint8(left_sample >> 8);
+        samples[j + 3] = quint8(right_sample >> 8);
+        samples[j + 2] = quint8(right_sample);
+        samples[j + 1] = quint8(left_sample >> 8);
         samples[j] = quint8(left_sample);
       }
     }
   }
 }
 
-void VSTHost::custom_load(QXmlStreamReader &stream) {
+void VSTHost::custom_load(QXmlStreamReader& stream) {
   if (stream.name() == QLatin1String("plugindata")) {
     stream.readNext();
     data_cache = QByteArray::fromBase64(stream.text().toUtf8());
@@ -397,7 +383,7 @@ void VSTHost::custom_load(QXmlStreamReader &stream) {
   }
 }
 
-void VSTHost::save(QXmlStreamWriter &stream) {
+void VSTHost::save(QXmlStreamWriter& stream) {
   Effect::save(stream);
   if (plugin != nullptr) {
     char* p = nullptr;
@@ -418,8 +404,8 @@ void VSTHost::show_interface(bool show) {
     if (!x11_display_) {
       x11_display_ = XOpenDisplay(nullptr);
       if (!x11_display_) {
-        QMessageBox::critical(amber::MainWindow, tr("VST Error"),
-          tr("Cannot open X11 display. VST plugin interfaces require X11."));
+        amber::app_ctx->showMessage(tr("VST Error"), tr("Cannot open X11 display. VST plugin interfaces require X11."),
+                                    3);
         show_interface_btn->SetChecked(false);
         return;
       }
@@ -440,8 +426,7 @@ void VSTHost::show_interface(bool show) {
       char* dpi_str = XGetDefault(dpy, "Xft", "dpi");
       if (dpi_str) {
         int xft_dpi = 0;
-        for (const char* p = dpi_str; *p >= '0' && *p <= '9'; p++)
-          xft_dpi = xft_dpi * 10 + (*p - '0');
+        for (const char* p = dpi_str; *p >= '0' && *p <= '9'; p++) xft_dpi = xft_dpi * 10 + (*p - '0');
         if (xft_dpi > 96) {
           w = w * xft_dpi / 96;
           h = h * xft_dpi / 96;
@@ -463,9 +448,8 @@ void VSTHost::show_interface(bool show) {
       attrs.background_pixel = BlackPixel(dpy, screen);
       attrs.border_pixel = 0;
 
-      x11_window_ = XCreateWindow(dpy, RootWindow(dpy, screen),
-        0, 0, w, h, 0, vinfo.depth, InputOutput, vinfo.visual,
-        CWColormap | CWBackPixel | CWBorderPixel, &attrs);
+      x11_window_ = XCreateWindow(dpy, RootWindow(dpy, screen), 0, 0, w, h, 0, vinfo.depth, InputOutput, vinfo.visual,
+                                  CWColormap | CWBackPixel | CWBorderPixel, &attrs);
 
       XStoreName(dpy, static_cast<Window>(x11_window_), "VST Plugin");
 
@@ -503,8 +487,8 @@ void VSTHost::show_interface(bool show) {
         // Poll for WM close button
         if (x11_display_ && x11_window_) {
           XEvent event;
-          while (XCheckTypedWindowEvent(static_cast<Display*>(x11_display_),
-                   static_cast<Window>(x11_window_), ClientMessage, &event)) {
+          while (XCheckTypedWindowEvent(static_cast<Display*>(x11_display_), static_cast<Window>(x11_window_),
+                                        ClientMessage, &event)) {
             if (static_cast<unsigned long>(event.xclient.data.l[0]) == x11_wm_delete_) {
               show_interface_btn->SetChecked(false);
               return;
@@ -533,9 +517,7 @@ void VSTHost::show_interface(bool show) {
   }
 }
 
-void VSTHost::uncheck_show_button() {
-  show_interface_btn->SetChecked(false);
-}
+void VSTHost::uncheck_show_button() { show_interface_btn->SetChecked(false); }
 
 void VSTHost::change_plugin() {
   freePlugin();
@@ -559,10 +541,8 @@ void VSTHost::change_plugin() {
 #endif
 
     } else {
-
       modulePtr.unload();
       plugin = nullptr;
-
     }
   }
   bool has_editor = (plugin != nullptr) && (plugin->flags & effFlagsHasEditor);
