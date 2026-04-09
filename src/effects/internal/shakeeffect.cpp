@@ -24,11 +24,8 @@
 #include <QLabel>
 #include <QtMath>
 
-#include "ui/labelslider.h"
-#include "ui/collapsiblewidget.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
-#include "panels/timeline.h"
 #include "global/debug.h"
 
 ShakeEffect::ShakeEffect(Clip* c, const EffectMeta *em) : Effect(c, em) {

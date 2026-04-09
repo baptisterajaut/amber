@@ -145,6 +145,10 @@ enum FrameQueueType : uint8_t {
 };
 }  // namespace amber
 
+bool frame_rate_is_droppable(double rate);
+long timecode_to_frame(const QString& s, int view, double frame_rate);
+QString frame_to_timecode(long f, int view, double frame_rate);
+
 /**
  * @brief The Config struct
  *

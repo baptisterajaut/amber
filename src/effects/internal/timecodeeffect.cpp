@@ -33,11 +33,8 @@
 #include <QtMath>
 #include <QDebug>
 
-#include "ui/labelslider.h"
-#include "ui/collapsiblewidget.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
-#include "panels/viewer.h"
 #include "ui/comboboxex.h"
 #include "ui/colorbutton.h"
 #include "ui/fontcombobox.h"

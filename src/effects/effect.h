@@ -42,8 +42,6 @@
 #include "core/audio.h"
 #include "effectgizmo.h"
 #include "effectrow.h"
-#include "ui/collapsiblewidget.h"
-
 class Clip;
 
 class Effect;

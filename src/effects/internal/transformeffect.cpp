@@ -28,19 +28,11 @@
 #include <QComboBox>
 #include <QMouseEvent>
 
-#include "ui/collapsiblewidget.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "project/footage.h"
 #include "core/math.h"
-#include "ui/labelslider.h"
-#include "ui/comboboxex.h"
-#include "panels/project.h"
 #include "global/debug.h"
-
-#include "panels/panels.h"
-#include "panels/viewer.h"
-#include "ui/viewerwidget.h"
 
 TransformEffect::TransformEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   SetFlags(Effect::CoordsFlag);

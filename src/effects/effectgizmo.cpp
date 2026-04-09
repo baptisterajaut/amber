@@ -20,7 +20,6 @@
 
 #include "effectgizmo.h"
 
-#include "ui/labelslider.h"
 #include "effects/fields/doublefield.h"
 #include "effects/effect.h"
 

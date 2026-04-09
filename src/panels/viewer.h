@@ -39,9 +39,7 @@
 #include "ui/timelinewidget.h"
 #include "ui/viewerwidget.h"
 
-bool frame_rate_is_droppable(double rate);
-long timecode_to_frame(const QString& s, int view, double frame_rate);
-QString frame_to_timecode(long f, int view, double frame_rate);
+#include "global/config.h"
 
 class Viewer : public Panel {
   Q_OBJECT

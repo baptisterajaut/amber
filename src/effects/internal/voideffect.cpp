@@ -24,7 +24,6 @@
 #include <QLabel>
 #include <QFile>
 
-#include "ui/collapsiblewidget.h"
 #include "global/debug.h"
 
 VoidEffect::VoidEffect(Clip* c, const QString& n) : Effect(c, nullptr) {

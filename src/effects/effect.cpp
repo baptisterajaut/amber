@@ -49,7 +49,6 @@
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "transition.h"
-#include "ui/collapsiblewidget.h"
 #include "ui/mainwindow.h"
 #include "ui/viewerwidget.h"
 #include "engine/undo/undo.h"

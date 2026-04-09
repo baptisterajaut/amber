@@ -25,9 +25,6 @@
 #include <QtMath>
 #include <cmath>
 
-#include "ui/labelslider.h"
-#include "ui/collapsiblewidget.h"
-
 PanEffect::PanEffect(Clip* c, const EffectMeta *em) : Effect(c, em) {
   EffectRow* pan_row = new EffectRow(this, tr("Pan"));
   pan_val = new DoubleField(pan_row, "pan");

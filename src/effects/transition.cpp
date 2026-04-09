@@ -35,9 +35,6 @@
 
 #include "ui/labelslider.h"
 
-#include "panels/panels.h"
-#include "panels/timeline.h"
-
 #include <QMessageBox>
 #include <QCoreApplication>
 

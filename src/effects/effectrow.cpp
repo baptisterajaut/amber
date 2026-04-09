@@ -29,8 +29,6 @@
 #include "engine/sequence.h"
 #include "core/appcontext.h"
 #include "effect.h"
-#include "ui/keyframenavigator.h"
-#include "ui/clickablelabel.h"
 
 EffectRow::EffectRow(Effect *parent, const QString &n, bool savable, bool keyframable) :
   QObject(parent),
