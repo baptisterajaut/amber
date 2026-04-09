@@ -21,22 +21,22 @@
 #ifndef PROJECT_H
 #define PROJECT_H
 
-#include <QVector>
-#include <QTimer>
 #include <QDir>
-#include <QXmlStreamReader>
-#include <QXmlStreamWriter>
 #include <QFile>
 #include <QPushButton>
+#include <QTimer>
+#include <QVector>
+#include <QXmlStreamReader>
+#include <QXmlStreamWriter>
 
-#include "project/projectmodel.h"
-#include "project/projectfilter.h"
+#include "engine/undo/undo.h"
 #include "project/projectelements.h"
+#include "project/projectfilter.h"
+#include "project/projectmodel.h"
 #include "project/sourcescommon.h"
+#include "timeline/mediaimportdata.h"
 #include "ui/panel.h"
 #include "ui/sourceiconview.h"
-#include "timeline/mediaimportdata.h"
-#include "engine/undo/undo.h"
 
 #include "ui/sourcetable.h"
 
@@ -44,30 +44,28 @@
 #define LOAD_TYPE_URL 70
 #define LOAD_TYPE_PREVIEW_RES 71
 
-extern QString autorecovery_filename;
-extern QStringList recent_projects;
-
-SequencePtr create_sequence_from_media(QVector<amber::timeline::MediaImportData> &media_list);
+SequencePtr create_sequence_from_media(QVector<amber::timeline::MediaImportData>& media_list);
 
 QString get_channel_layout_name(int channels, uint64_t layout);
 QString get_interlacing_name(int interlacing);
 
 class Project : public Panel {
   Q_OBJECT
-public:
-  explicit Project(QWidget *parent = nullptr);
+ public:
+  explicit Project(QWidget* parent = nullptr);
 
   void ConnectFilterToModel();
   void DisconnectFilterToModel();
 
   bool is_focused();
   void clear();
-  MediaPtr create_sequence_internal(ComboAction *ca, SequencePtr s, bool open, Media* parent);
+  MediaPtr create_sequence_internal(ComboAction* ca, SequencePtr s, bool open, Media* parent);
   QString get_next_sequence_name(QString start = nullptr);
-  void process_file_list(QStringList& files, bool recursive = false, MediaPtr replace = nullptr, Media *parent = nullptr);
+  void process_file_list(QStringList& files, bool recursive = false, MediaPtr replace = nullptr,
+                         Media* parent = nullptr);
   void replace_media(MediaPtr item, QString filename);
   Media* get_selected_folder();
-  bool reveal_media(Media *media, QModelIndex parent = QModelIndex());
+  bool reveal_media(Media* media, QModelIndex parent = QModelIndex());
   void add_recent_project(QString url);
 
   void save_project(bool autorecovery);
@@ -75,7 +73,7 @@ public:
   MediaPtr create_folder_internal(QString name);
 
   Media* item_to_media(const QModelIndex& index);
-  MediaPtr item_to_media_ptr(const QModelIndex &index);
+  MediaPtr item_to_media_ptr(const QModelIndex& index);
 
   void save_recent_projects();
 
@@ -85,14 +83,15 @@ public:
 
   QModelIndexList get_current_selected();
 
-  void get_all_media_from_table(QList<Media *> &items, QList<Media *> &list, int type = -1);
+  void get_all_media_from_table(QList<Media*>& items, QList<Media*>& list, int type = -1);
 
   bool IsToolbarVisible();
-  bool IsProjectWidget(QObject *child);
+  bool IsProjectWidget(QObject* child);
 
   void Retranslate() override;
-protected:
-public slots:
+
+ protected:
+ public slots:
   void import_dialog();
   void delete_selected_media();
   void duplicate_selected();
@@ -104,13 +103,14 @@ public slots:
   void new_sequence();
 
   void SetToolbarVisible(bool visible);
-private:
-  void save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only, const QModelIndex &parent = QModelIndex());
+
+ private:
+  void save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only, const QModelIndex& parent = QModelIndex());
   int folder_id;
   int media_id;
   int sequence_id;
-  void list_all_sequences_worker(QVector<Media *> *list, Media* parent);
-  QString get_file_name_from_path(const QString &path);
+  void list_all_sequences_worker(QVector<Media*>* list, Media* parent);
+  QString get_file_name_from_path(const QString& path);
   QDir proj_dir;
   QWidget* icon_view_container;
   QSlider* icon_size_slider;
@@ -123,11 +123,11 @@ private:
 
   ProjectFilter sorter;
   SourcesCommon sources_common;
-private slots:
+ private slots:
   void update_view_type();
   void clear_recent_projects();
 
-public slots:
+ public slots:
   void set_icon_view();
   void set_list_view();
   void set_tree_view();
@@ -137,4 +137,4 @@ public slots:
   void make_new_menu();
 };
 
-#endif // PROJECT_H
+#endif  // PROJECT_H

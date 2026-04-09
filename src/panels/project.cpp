@@ -44,16 +44,19 @@ extern "C" {
 #include "dialogs/mediapropertiesdialog.h"
 #include "dialogs/newsequencedialog.h"
 #include "dialogs/replaceclipmediadialog.h"
+#include "engine/cacher.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/debug.h"
 #include "global/global.h"
+#include "global/projectio.h"
 #include "panels.h"
 #include "panels/effectcontrols.h"
 #include "project/clipboard.h"
 #include "project/previewgenerator.h"
 #include "project/projectfilter.h"
 #include "project/sourcescommon.h"
-#include "engine/cacher.h"
 #include "rendering/renderfunctions.h"
 #include "ui/icons.h"
 #include "ui/mainwindow.h"
@@ -62,13 +65,6 @@ extern "C" {
 #include "ui/menuhelper.h"
 #include "ui/sourceiconview.h"
 #include "ui/sourcetable.h"
-#include "engine/undo/undo.h"
-#include "engine/undo/undostack.h"
-
-constexpr int MAXIMUM_RECENT_PROJECTS = 10;  // FIXME: should be configurable
-
-QString autorecovery_filename;
-QStringList recent_projects;
 
 Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(this, sorter) {
   QWidget* dockWidgetContents = new QWidget(this);
@@ -627,7 +623,7 @@ void Project::delete_selected_media() {
             confirm.setWindowTitle(tr("Delete sequence in use?"));
             confirm.setText(tr("The sequence '%1' is used as a nested sequence in '%2'. "
                                "Deleting it will remove all instances. Are you sure?")
-                               .arg(item->to_sequence()->name, s->name));
+                                .arg(item->to_sequence()->name, s->name));
             confirm.addButton(QMessageBox::Yes);
             QAbstractButton* cancel_button = confirm.addButton(QMessageBox::Cancel);
             confirm.exec();
@@ -1264,7 +1260,7 @@ void Project::save_project(bool autorecovery) {
   media_id = 1;
   sequence_id = 1;
 
-  QFile file(autorecovery ? autorecovery_filename : amber::ActiveProjectFilename);
+  QFile file(autorecovery ? amber::project_io->autorecoveryFilename() : amber::ActiveProjectFilename);
   if (!file.open(QIODevice::WriteOnly)) {
     qCritical() << "Could not open file";
     return;
@@ -1347,26 +1343,11 @@ void Project::set_tree_view() {
   update_view_type();
 }
 
-void Project::save_recent_projects() {
-  // save to file
-  QFile f(amber::Global->get_recent_project_list_file());
-  if (f.open(QFile::WriteOnly | QFile::Truncate | QFile::Text)) {
-    QTextStream out(&f);
-    for (int i = 0; i < recent_projects.size(); i++) {
-      if (i > 0) {
-        out << "\n";
-      }
-      out << recent_projects.at(i);
-    }
-    f.close();
-  } else {
-    qWarning() << "Could not save recent projects";
-  }
-}
+void Project::save_recent_projects() { amber::project_io->saveRecentProjects(); }
 
 void Project::clear_recent_projects() {
-  recent_projects.clear();
-  save_recent_projects();
+  amber::project_io->recentProjects().clear();
+  amber::project_io->saveRecentProjects();
 }
 
 void Project::set_icon_view_size(int s) {
@@ -1391,23 +1372,7 @@ void Project::make_new_menu() {
   new_menu.exec(QCursor::pos());
 }
 
-void Project::add_recent_project(QString url) {
-  bool found = false;
-  for (int i = 0; i < recent_projects.size(); i++) {
-    if (url == recent_projects.at(i)) {
-      found = true;
-      recent_projects.move(i, 0);
-      break;
-    }
-  }
-  if (!found) {
-    recent_projects.insert(0, url);
-    if (recent_projects.size() > MAXIMUM_RECENT_PROJECTS) {
-      recent_projects.removeLast();
-    }
-  }
-  save_recent_projects();
-}
+void Project::add_recent_project(QString url) { amber::project_io->addRecentProject(url); }
 
 void Project::list_all_sequences_worker(QVector<Media*>* list, Media* parent) {
   for (int i = 0; i < amber::project_model.childCount(parent); i++) {

@@ -38,13 +38,17 @@
 #include <QTranslator>
 
 #include "core/appcontext.h"
+#include "core/path.h"
 #include "dialogs/debugdialog.h"
 #include "dialogs/footagerelinkdialog.h"
+#include "effects/internal/srtparser.h"
+#include "effects/internal/subtitleeffect.h"
+#include "engine/clip.h"
+#include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/debug.h"
 #include "global/global.h"
-#include "ui/styling.h"
-#include "core/path.h"
+#include "global/projectio.h"
 #include "panels/panels.h"
 #include "project/projectelements.h"
 #include "project/projectfilter.h"
@@ -52,19 +56,16 @@
 #include "project/proxygenerator.h"
 #include "rendering/audio.h"
 #include "rendering/renderfunctions.h"
-#include "engine/clip.h"
+#include "ui/appcontextimpl.h"
 #include "ui/cursors.h"
 #include "ui/focusfilter.h"
 #include "ui/icons.h"
 #include "ui/menuhelper.h"
 #include "ui/sourceiconview.h"
 #include "ui/sourcetable.h"
+#include "ui/styling.h"
 #include "ui/timelineheader.h"
-#include "ui/appcontextimpl.h"
 #include "ui/viewerwidget.h"
-#include "engine/undo/undostack.h"
-#include "effects/internal/srtparser.h"
-#include "effects/internal/subtitleeffect.h"
 
 MainWindow* amber::MainWindow;
 
@@ -246,7 +247,7 @@ MainWindow::MainWindow(QWidget* parent)
           if (line.isNull()) {
             break;
           } else {
-            recent_projects.append(line);
+            amber::project_io->recentProjects().append(line);
           }
         }
         f.close();
@@ -520,8 +521,7 @@ void MainWindow::setup_menus() {
   import_action =
       MenuHelper::create_menu_action(file_menu, "import", panel_project, SLOT(import_dialog()), QKeySequence("Ctrl+I"));
 
-  import_subtitle_action =
-      MenuHelper::create_menu_action(file_menu, "importsubtitle", this, SLOT(import_subtitle()));
+  import_subtitle_action = MenuHelper::create_menu_action(file_menu, "importsubtitle", this, SLOT(import_subtitle()));
 
   relink_media_action = MenuHelper::create_menu_action(file_menu, "relinkmedia", this, SLOT(relink_media()));
 
@@ -529,8 +529,8 @@ void MainWindow::setup_menus() {
 
   export_action = MenuHelper::create_menu_action(file_menu, "export", amber::Global.get(), SLOT(open_export_dialog()),
                                                  QKeySequence("Ctrl+M"));
-  export_frame_action = MenuHelper::create_menu_action(file_menu, "exportframe",
-      panel_sequence_viewer->viewer_widget, SLOT(save_frame()), QKeySequence("Ctrl+Shift+E"));
+  export_frame_action = MenuHelper::create_menu_action(file_menu, "exportframe", panel_sequence_viewer->viewer_widget,
+                                                       SLOT(save_frame()), QKeySequence("Ctrl+Shift+E"));
 
   file_menu->addSeparator();
 
@@ -574,10 +574,11 @@ void MainWindow::setup_menus() {
   edit_menu->addSeparator();
 
   amber::MenuHelper.make_inout_menu(edit_menu, true);
-  delete_inout_point_ =
-      MenuHelper::create_menu_action(amber::MenuHelper.inout_submenu_, "deleteinout", panel_timeline, SLOT(delete_inout()), QKeySequence(";"));
-  ripple_delete_inout_point_ = MenuHelper::create_menu_action(amber::MenuHelper.inout_submenu_, "rippledeleteinout", panel_timeline,
-                                                              SLOT(ripple_delete_inout()), QKeySequence("'"));
+  delete_inout_point_ = MenuHelper::create_menu_action(amber::MenuHelper.inout_submenu_, "deleteinout", panel_timeline,
+                                                       SLOT(delete_inout()), QKeySequence(";"));
+  ripple_delete_inout_point_ =
+      MenuHelper::create_menu_action(amber::MenuHelper.inout_submenu_, "rippledeleteinout", panel_timeline,
+                                     SLOT(ripple_delete_inout()), QKeySequence("'"));
 
   edit_menu->addSeparator();
 
@@ -650,20 +651,20 @@ void MainWindow::setup_menus() {
   preview_resolution_menu = MenuHelper::create_submenu(view_menu);
   QActionGroup* preview_res_group = new QActionGroup(this);
 
-  preview_res_full_ = MenuHelper::create_menu_action(preview_resolution_menu, "previewfull",
-      this, SLOT(set_preview_resolution()));
+  preview_res_full_ =
+      MenuHelper::create_menu_action(preview_resolution_menu, "previewfull", this, SLOT(set_preview_resolution()));
   preview_res_full_->setData(1);
   preview_res_full_->setCheckable(true);
   preview_res_group->addAction(preview_res_full_);
 
-  preview_res_half_ = MenuHelper::create_menu_action(preview_resolution_menu, "previewhalf",
-      this, SLOT(set_preview_resolution()));
+  preview_res_half_ =
+      MenuHelper::create_menu_action(preview_resolution_menu, "previewhalf", this, SLOT(set_preview_resolution()));
   preview_res_half_->setData(2);
   preview_res_half_->setCheckable(true);
   preview_res_group->addAction(preview_res_half_);
 
-  preview_res_quarter_ = MenuHelper::create_menu_action(preview_resolution_menu, "previewquarter",
-      this, SLOT(set_preview_resolution()));
+  preview_res_quarter_ =
+      MenuHelper::create_menu_action(preview_resolution_menu, "previewquarter", this, SLOT(set_preview_resolution()));
   preview_res_quarter_->setData(4);
   preview_res_quarter_->setCheckable(true);
   preview_res_group->addAction(preview_res_quarter_);
@@ -717,7 +718,7 @@ void MainWindow::setup_menus() {
 
   guides_menu_ = MenuHelper::create_submenu(view_menu);
   lock_guides_ = MenuHelper::create_menu_action(guides_menu_, "lockguides", &amber::MenuHelper,
-                                                 SLOT(toggle_bool_action()), QKeySequence("Ctrl+Alt+;"));
+                                                SLOT(toggle_bool_action()), QKeySequence("Ctrl+Alt+;"));
   lock_guides_->setCheckable(true);
   lock_guides_->setData(reinterpret_cast<quintptr>(&amber::CurrentConfig.lock_guides));
   guides_menu_->addSeparator();
@@ -899,8 +900,7 @@ void MainWindow::setup_menus() {
   snap_toggle->setCheckable(true);
   snap_toggle->setData(reinterpret_cast<quintptr>(panel_timeline->snappingButton));
 
-  color_labels_toggle =
-      MenuHelper::create_menu_action(tools_menu, "colorlabels", this, SLOT(toggle_color_labels()));
+  color_labels_toggle = MenuHelper::create_menu_action(tools_menu, "colorlabels", this, SLOT(toggle_color_labels()));
   color_labels_toggle->setCheckable(true);
 
   tools_menu->addSeparator();
@@ -1119,10 +1119,11 @@ void MainWindow::closeEvent(QCloseEvent* e) {
 
     QString data_dir = get_data_path();
     QString config_path = get_config_path();
-    if (!data_dir.isEmpty() && !autorecovery_filename.isEmpty()) {
-      if (QFile::exists(autorecovery_filename)) {
-        QFile::rename(autorecovery_filename,
-                      autorecovery_filename + "." + QDateTime::currentDateTimeUtc().toString("yyyyMMddHHmmss"));
+    if (!data_dir.isEmpty() && !amber::project_io->autorecoveryFilename().isEmpty()) {
+      if (QFile::exists(amber::project_io->autorecoveryFilename())) {
+        QFile::rename(amber::project_io->autorecoveryFilename(),
+                      amber::project_io->autorecoveryFilename() + "." +
+                          QDateTime::currentDateTimeUtc().toString("yyyyMMddHHmmss"));
       }
     }
     if (!config_path.isEmpty()) {
@@ -1364,30 +1365,26 @@ void MainWindow::relink_media() {
 
 void MainWindow::import_subtitle() {
   if (amber::ActiveSequence == nullptr) {
-    QMessageBox::warning(this, tr("No Sequence"),
-                         tr("Please open a sequence before importing subtitles."));
+    QMessageBox::warning(this, tr("No Sequence"), tr("Please open a sequence before importing subtitles."));
     return;
   }
 
-  QString filepath = QFileDialog::getOpenFileName(
-      this, tr("Import Subtitle"), QString(),
-      tr("SRT Subtitle Files (*.srt);;All Files (*)"));
+  QString filepath = QFileDialog::getOpenFileName(this, tr("Import Subtitle"), QString(),
+                                                  tr("SRT Subtitle Files (*.srt);;All Files (*)"));
 
   if (filepath.isEmpty()) return;
 
   SrtParseResult result = parse_srt(filepath);
 
   if (result.cues.isEmpty()) {
-    QMessageBox::warning(this, tr("Import Failed"),
-                         tr("No valid subtitle cues found in the file."));
+    QMessageBox::warning(this, tr("Import Failed"), tr("No valid subtitle cues found in the file."));
     return;
   }
 
   if (result.skipped > 0) {
-    QMessageBox::information(this, tr("Import Subtitle"),
-                             tr("Imported %1 cues, %2 skipped (malformed).")
-                                 .arg(result.cues.size())
-                                 .arg(result.skipped));
+    QMessageBox::information(
+        this, tr("Import Subtitle"),
+        tr("Imported %1 cues, %2 skipped (malformed).").arg(result.cues.size()).arg(result.skipped));
   }
 
   Sequence* seq = amber::ActiveSequence.get();
@@ -1428,13 +1425,13 @@ void MainWindow::import_subtitle() {
 
   // Add Transform effect (standard for video clips)
   if (amber::CurrentConfig.add_default_effects_to_clips) {
-    clip->effects.append(Effect::Create(
-        clip.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TRANSFORM, EFFECT_TYPE_EFFECT)));
+    clip->effects.append(
+        Effect::Create(clip.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TRANSFORM, EFFECT_TYPE_EFFECT)));
   }
 
   // Add SubtitleEffect with parsed cues
-  EffectPtr sub_effect = Effect::Create(
-      clip.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SUBTITLE, EFFECT_TYPE_EFFECT));
+  EffectPtr sub_effect =
+      Effect::Create(clip.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SUBTITLE, EFFECT_TYPE_EFFECT));
   static_cast<SubtitleEffect*>(sub_effect.get())->SetCues(result.cues);
   clip->effects.append(sub_effect);
 
@@ -1482,11 +1479,11 @@ void MainWindow::set_panels_locked(bool locked) {
 }
 
 void MainWindow::fileMenu_About_To_Be_Shown() {
-  if (recent_projects.size() > 0) {
+  if (amber::project_io->recentProjects().size() > 0) {
     open_recent->clear();
     open_recent->setEnabled(true);
-    for (int i = 0; i < recent_projects.size(); i++) {
-      QAction* action = open_recent->addAction(recent_projects.at(i));
+    for (int i = 0; i < amber::project_io->recentProjects().size(); i++) {
+      QAction* action = open_recent->addAction(amber::project_io->recentProjects().at(i));
       action->setProperty("keyignore", true);
       action->setData(i);
       connect(action, &QAction::triggered, &amber::MenuHelper, &MenuHelper::open_recent_from_menu);

@@ -245,6 +245,8 @@ set(OLIVE_SOURCES
   global/debug.h
   global/global.cpp
   global/global.h
+  global/projectio.cpp
+  global/projectio.h
   include/vestige.h
   panels/effectcontrols.cpp
   panels/effectcontrols.h
