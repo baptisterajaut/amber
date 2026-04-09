@@ -1,19 +1,14 @@
-#ifndef COLORLABEL_H
-#define COLORLABEL_H
+#ifndef UI_COLORLABEL_H
+#define UI_COLORLABEL_H
 
-#include <QColor>
+#include "core/colorlabel.h"
+
 #include <QMenu>
-#include <QString>
 
 namespace amber {
-
-constexpr int kColorLabelCount = 16;
-
-QColor GetColorLabel(int index);
-QString GetColorLabelName(int index);
 
 QMenu* BuildColorLabelMenu(QWidget* parent);
 
 }  // namespace amber
 
-#endif  // COLORLABEL_H
+#endif  // UI_COLORLABEL_H

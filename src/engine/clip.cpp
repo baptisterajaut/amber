@@ -22,19 +22,19 @@
 
 #include <QtMath>
 
+#include "cacher.h"
+#include "core/colorlabel.h"
 #include "effects/effect.h"
 #include "effects/transition.h"
-#include "project/footage.h"
+#include "engine/undo/undo.h"
 #include "global/config.h"
-#include "ui/colorlabel.h"
-#include "cacher.h"
+#include "global/debug.h"
+#include "project/clipboard.h"
+#include "project/footage.h"
+#include "project/media.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
 #include "sequence.h"
-#include "project/media.h"
-#include "project/clipboard.h"
-#include "engine/undo/undo.h"
-#include "global/debug.h"
 
 extern "C" {
 #include <libavutil/pixfmt.h>
@@ -50,8 +50,7 @@ Clip::Clip(Sequence* s)
       opening_transition(nullptr),
       closing_transition(nullptr)
 
-{
-}
+{}
 
 ClipPtr Clip::copy(Sequence* s) {
   ClipPtr copy = std::make_shared<Clip>(s);
@@ -572,8 +571,7 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
           yuv_tex_v->create();
         }
         if (yuv_converted_tex == nullptr) {
-          yuv_converted_tex = rhi->newTexture(QRhiTexture::RGBA8, QSize(w, h),
-                                              1, QRhiTexture::RenderTarget);
+          yuv_converted_tex = rhi->newTexture(QRhiTexture::RGBA8, QSize(w, h), 1, QRhiTexture::RenderTarget);
           yuv_converted_tex->create();
           yuv_rt = rhi->newTextureRenderTarget({yuv_converted_tex});
           yuv_rpd = yuv_rt->newCompatibleRenderPassDescriptor();
@@ -640,14 +638,11 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
           memcpy(fragData.data(), &format_type, 4);
           memcpy(fragData.data() + 4, &color_space_val, 4);
 
-          QRhiBuffer* yuvVbuf =
-              rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+          QRhiBuffer* yuvVbuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
           yuvVbuf->create();
-          QRhiBuffer* yuvVertUbo =
-              rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
+          QRhiBuffer* yuvVertUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
           yuvVertUbo->create();
-          QRhiBuffer* yuvFragUbo =
-              rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
+          QRhiBuffer* yuvFragUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
           yuvFragUbo->create();
 
           QRhiSampler* sampler = params->sampler;
@@ -658,9 +653,9 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
               QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, yuvVertUbo),
               QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, yuvFragUbo),
               QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, yuv_tex_y,
-                                                         sampler),
+                                                        sampler),
               QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage, yuv_tex_u,
-                                                         sampler),
+                                                        sampler),
               QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage, vTex, sampler),
           });
           srb->create();
