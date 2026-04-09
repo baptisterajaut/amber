@@ -387,6 +387,35 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
             &data,
             linesize);
 
+  // Apply rotation from display matrix (e.g. portrait videos from phones)
+  {
+    double rotation = 0;
+    const int32_t* matrix = nullptr;
+
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+    // FFmpeg 7+: stream side data moved to codecpar->coded_side_data
+    const AVPacketSideData* sd = av_packet_side_data_get(
+        fmt_ctx_->streams[stream_index]->codecpar->coded_side_data,
+        fmt_ctx_->streams[stream_index]->codecpar->nb_coded_side_data,
+        AV_PKT_DATA_DISPLAYMATRIX);
+    if (sd) matrix = reinterpret_cast<const int32_t*>(sd->data);
+#else
+    const uint8_t* sd = av_stream_get_side_data(
+        fmt_ctx_->streams[stream_index], AV_PKT_DATA_DISPLAYMATRIX, nullptr);
+    if (sd) matrix = reinterpret_cast<const int32_t*>(sd);
+#endif
+
+    if (matrix) {
+      rotation = av_display_rotation_get(matrix);
+    }
+
+    if (!qIsNaN(rotation) && qAbs(rotation) > 1.0) {
+      QTransform transform;
+      transform.rotate(-rotation);
+      s->video_preview = s->video_preview.transformed(transform, Qt::SmoothTransformation);
+    }
+  }
+
   // is video interlaced?
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
   s->video_auto_interlacing = (temp_frame->flags & AV_FRAME_FLAG_INTERLACED) ? ((temp_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
@@ -717,13 +746,36 @@ void PreviewGenerator::run() {
         sem.acquire();
 
         if (!cancelled_) {
-          generate_waveform();
+          if (contains_still_image_) {
+            // Still images (jpeg_pipe, png_pipe, etc.): pipe demuxers can't seek back
+            // after avformat_find_stream_info(), so the FFmpeg decode loop gets EOF.
+            // Load the thumbnail directly via Qt instead.
+            for (auto & ms : footage_->video_tracks) {
+              if (!ms.preview_done) {
+                QImage img(footage_->url);
+                if (!img.isNull()) {
+                  int dstH = amber::CurrentConfig.thumbnail_resolution;
+                  int dstW = qRound(dstH * (double(img.width()) / double(img.height())));
+                  ms.video_preview = img.scaled(dstW, dstH, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                                        .convertToFormat(QImage::Format_RGBA8888);
+                  ms.preview_done = true;
+                }
+              }
+            }
+            if (retrieve_duration_) {
+              footage_->length = 0;
+              finalize_media();
+            }
+          } else {
+            generate_waveform();
+          }
 
           if (!cancelled_) {
             // save preview to file
             for (auto & ms : footage_->video_tracks) {
-              ms.video_preview.save(get_thumbnail_path(hash, ms), "PNG");
-              //dout << "saved" << ms->file_index << "thumbnail to" << get_thumbnail_path(hash, ms);
+              if (ms.preview_done) {
+                ms.video_preview.save(get_thumbnail_path(hash, ms), "PNG");
+              }
             }
             for (auto & ms : footage_->audio_tracks) {
               QFile f(get_waveform_path(hash, ms));
@@ -731,7 +783,6 @@ void PreviewGenerator::run() {
                 f.write(ms.audio_preview.constData(), ms.audio_preview.size());
                 f.close();
               }
-              //dout << "saved" << ms->file_index << "waveform to" << get_waveform_path(hash, ms);
             }
           }
         }
