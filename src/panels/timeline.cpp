@@ -704,39 +704,40 @@ void Timeline::toggle_enable_on_selected_clips() {
 
 // Compute the ripple point and clamped ripple length from a set of selections and the clip list.
 // Returns true if ripple can proceed.
+static bool clip_overlaps_any_selection(Clip* c, const QVector<Selection>& selections) {
+  for (const auto& s : selections) {
+    if (s.track == c->track() && !(c->timeline_in() < s.in && c->timeline_out() < s.in) &&
+        !(c->timeline_in() > s.out && c->timeline_out() > s.out)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void clamp_ripple_length(Clip* c, const QVector<ClipPtr>& clips, long& ripple_length) {
+  for (auto cc : clips) {
+    if (cc != nullptr && cc->track() == c->track() && cc->timeline_in() > c->timeline_out() &&
+        cc->timeline_in() < c->timeline_out() + ripple_length) {
+      ripple_length = cc->timeline_in() - c->timeline_out();
+    }
+  }
+}
+
 static bool compute_ripple_params(const QVector<Selection>& selections, const QVector<ClipPtr>& clips,
                                   long& ripple_point, long& ripple_length) {
   ripple_point = selections.at(0).in;
   ripple_length = selections.at(0).out - selections.at(0).in;
   for (int i = 1; i < selections.size(); i++) {
-    const Selection& s = selections.at(i);
-    ripple_point = qMin(ripple_point, s.in);
-    ripple_length = qMin(ripple_length, s.out - s.in);
+    ripple_point = qMin(ripple_point, selections.at(i).in);
+    ripple_length = qMin(ripple_length, selections.at(i).out - selections.at(i).in);
   }
-  ripple_point++;  // intuitive offset
+  ripple_point++;
 
   for (int i = 0; i < clips.size(); i++) {
     ClipPtr c = clips.at(i);
     if (c == nullptr || c->timeline_in() >= ripple_point || c->timeline_out() <= ripple_point) continue;
-
-    // Conflict at ripple_point — check if this clip is being deleted
-    bool deleted = false;
-    for (const auto& s : selections) {
-      if (s.track == c->track() && !(c->timeline_in() < s.in && c->timeline_out() < s.in) &&
-          !(c->timeline_in() > s.out && c->timeline_out() > s.out)) {
-        deleted = true;
-        break;
-      }
-    }
-    if (deleted) continue;
-
-    // Not deleted — clamp ripple_length to avoid overlapping this clip
-    for (auto cc : clips) {
-      if (cc != nullptr && cc->track() == c->track() && cc->timeline_in() > c->timeline_out() &&
-          cc->timeline_in() < c->timeline_out() + ripple_length) {
-        ripple_length = cc->timeline_in() - c->timeline_out();
-      }
-    }
+    if (clip_overlaps_any_selection(c.get(), selections)) continue;
+    clamp_ripple_length(c.get(), clips, ripple_length);
   }
   return true;
 }
@@ -981,6 +982,40 @@ static QVector<Selection> build_selections_for_track_range(int track_min, int tr
   return areas;
 }
 
+static void edit_to_point_on_boundary(Timeline* tl, ComboAction* ca, bool in, bool ripple, long playhead,
+                                      const EditPointInfo& info, long& seek, bool& push_undo) {
+  if (!ripple) {
+    push_undo = false;
+    return;
+  }
+  long in_point = playhead;
+  if (!in) {
+    in_point--;
+    seek--;
+  }
+  if (in_point >= 0) {
+    auto areas = build_selections_for_track_range(info.track_min, info.track_max, in_point, in_point + 1);
+    tl->delete_areas_and_relink(ca, areas, true);
+    ripple_clips(ca, amber::ActiveSequence.get(), in_point, -1);
+  } else {
+    push_undo = false;
+  }
+}
+
+static void edit_to_point_off_boundary(Timeline* tl, ComboAction* ca, bool in, bool ripple, long playhead,
+                                       const EditPointInfo& info, long& seek, bool& push_undo) {
+  if (in) seek = info.prev_cut;
+  long sel_in = in ? info.prev_cut : playhead;
+  long sel_out = in ? playhead : info.next_cut;
+  if (sel_in == sel_out) {
+    push_undo = false;
+  } else {
+    auto areas = build_selections_for_track_range(info.track_min, info.track_max, sel_in, sel_out);
+    tl->delete_areas_and_relink(ca, areas, true);
+    if (ripple) ripple_clips(ca, amber::ActiveSequence.get(), sel_in, sel_in - sel_out);
+  }
+}
+
 void Timeline::edit_to_point_internal(bool in, bool ripple) {
   if (amber::ActiveSequence == nullptr) return;
   if (amber::ActiveSequence->clips.isEmpty()) {
@@ -1002,33 +1037,9 @@ void Timeline::edit_to_point_internal(bool in, bool ripple) {
       (!in && (info.playhead_falls_on_in || (info.playhead_falls_on_out && playhead == info.sequence_end)));
 
   if (on_boundary) {
-    if (!ripple) {
-      push_undo = false;
-    } else {
-      long in_point = playhead;
-      if (!in) {
-        in_point--;
-        seek--;
-      }
-      if (in_point >= 0) {
-        areas = build_selections_for_track_range(info.track_min, info.track_max, in_point, in_point + 1);
-        delete_areas_and_relink(ca, areas, true);
-        ripple_clips(ca, amber::ActiveSequence.get(), in_point, -1);
-      } else {
-        push_undo = false;
-      }
-    }
+    edit_to_point_on_boundary(this, ca, in, ripple, playhead, info, seek, push_undo);
   } else {
-    if (in) seek = info.prev_cut;
-    long sel_in = in ? info.prev_cut : playhead;
-    long sel_out = in ? playhead : info.next_cut;
-    if (sel_in == sel_out) {
-      push_undo = false;
-    } else {
-      areas = build_selections_for_track_range(info.track_min, info.track_max, sel_in, sel_out);
-      delete_areas_and_relink(ca, areas, true);
-      if (ripple) ripple_clips(ca, amber::ActiveSequence.get(), sel_in, sel_in - sel_out);
-    }
+    edit_to_point_off_boundary(this, ca, in, ripple, playhead, info, seek, push_undo);
   }
 
   if (push_undo) {
@@ -1117,6 +1128,25 @@ static bool snap_to_clip_points(Timeline* tl, const ClipPtr& c, long* l, bool pr
   return false;
 }
 
+static bool resolve_outgoing_pref() {
+  bool pref = amber::CurrentConfig.snap_to_outgoing_clip;
+  static constexpr Qt::KeyboardModifier kModifiers[] = {Qt::ShiftModifier, Qt::ControlModifier, Qt::AltModifier};
+  int mod_idx = qBound(0, amber::CurrentConfig.snap_outgoing_modifier, 2);
+  if (QGuiApplication::keyboardModifiers() & kModifiers[mod_idx]) {
+    pref = !pref;
+  }
+  return pref;
+}
+
+bool Timeline::toolSupportsInsert() const { return tool == TIMELINE_TOOL_POINTER || importing || creating; }
+
+bool Timeline::snap_to_markers(long* l) {
+  for (const auto& marker : amber::ActiveSequence->markers) {
+    if (snap_to_point(marker.frame, l)) return true;
+  }
+  return false;
+}
+
 bool Timeline::snap_to_timeline(long* l, bool use_playhead, bool use_markers, bool use_workarea, bool for_playhead) {
   snapped = false;
   if (!snapping) return false;
@@ -1125,27 +1155,14 @@ bool Timeline::snap_to_timeline(long* l, bool use_playhead, bool use_markers, bo
     if (snap_to_point(amber::ActiveSequence->playhead, l)) return true;
   }
 
-  if (use_markers) {
-    for (const auto& marker : amber::ActiveSequence->markers) {
-      if (snap_to_point(marker.frame, l)) return true;
-    }
-  }
+  if (use_markers && snap_to_markers(l)) return true;
 
   if (use_workarea && amber::ActiveSequence->using_workarea) {
     if (snap_to_point(amber::ActiveSequence->workarea_in, l)) return true;
     if (snap_to_point(amber::ActiveSequence->workarea_out, l)) return true;
   }
 
-  // Determine whether to snap to timeline_out or timeline_out-1 (shows last frame of clip)
-  bool outgoing_pref = amber::CurrentConfig.snap_to_outgoing_clip;
-  if (for_playhead) {
-    static constexpr Qt::KeyboardModifier kModifiers[] = {Qt::ShiftModifier, Qt::ControlModifier, Qt::AltModifier};
-    int mod_idx = qBound(0, amber::CurrentConfig.snap_outgoing_modifier, 2);
-    if (QGuiApplication::keyboardModifiers() & kModifiers[mod_idx]) {
-      outgoing_pref = !outgoing_pref;
-    }
-  }
-  bool prefer_outgoing = for_playhead && outgoing_pref;
+  bool prefer_outgoing = for_playhead && resolve_outgoing_pref();
 
   for (auto c : amber::ActiveSequence->clips) {
     if (c != nullptr && snap_to_clip_points(this, c, l, prefer_outgoing)) return true;

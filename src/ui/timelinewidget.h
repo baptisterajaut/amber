@@ -95,10 +95,16 @@ class TimelineWidget : public QWidget {
 
   // mouseMoveMovingInit sub-helpers
   void mouseMoveMovingInitBuildGhosts();
+  void mouseMoveMovingInitSlideGhosts();
   void mouseMoveMovingInitRipplePrep();
 
   // mouseMoveHoverTrimDetection sub-helpers
+  void hoverDetectClipTrim(int i, ClipPtr c, const QPoint& pos, int mouse_frame_lower, int mouse_frame_upper,
+                           bool& cursor_contains_clip, int& closeness, bool& found);
   void hoverCheckTrackResize(const QMouseEvent* event, bool cursor_contains_clip, int min_track, int max_track);
+
+  // mouseMoveEvent sub-helpers
+  void mouseMoveHoverDispatch(QMouseEvent* event);
 
   // show_context_menu sub-helpers
   void buildSelectedClipsMenu(Menu& menu, const QVector<Clip*>& selected_clips);

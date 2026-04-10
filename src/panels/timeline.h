@@ -138,6 +138,8 @@ public:
 
   int get_snap_range();
   bool snap_to_point(long point, long* l);
+  bool toolSupportsInsert() const;
+  bool snap_to_markers(long* l);
   bool snap_to_timeline(long* l, bool use_playhead, bool use_markers, bool use_workarea, bool for_playhead = false);
   void set_marker();
 
