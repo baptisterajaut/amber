@@ -383,85 +383,71 @@ void Timeline::add_transition() {
   update_ui(true);
 }
 
-void Timeline::nest() {
-  if (amber::ActiveSequence != nullptr) {
-    // get selected clips
-    QVector<int> selected_clips = amber::ActiveSequence->SelectedClipIndexes();
+// Move each ghost to a free track if it overlaps an existing clip (excluding selected_clips).
+static void resolve_ghost_track_collisions(QVector<Ghost>& ghosts, Sequence* seq,
+                                           const QVector<int>& selected_clips) {
+  for (int j = 0; j < seq->clips.size(); j++) {
+    Clip* c = seq->clips.at(j).get();
+    if (c == nullptr || selected_clips.contains(j)) continue;
 
-    // nest them
-    if (!selected_clips.isEmpty()) {
-      // get earliest point in selected clips
-      long earliest_point = LONG_MAX;
-      for (int selected_clip : selected_clips) {
-        earliest_point = qMin(amber::ActiveSequence->clips.at(selected_clip)->timeline_in(), earliest_point);
+    for (auto& g : ghosts) {
+      bool overlaps = c->track() == g.track && !(c->timeline_out() <= g.in || c->timeline_in() >= g.out);
+      if (overlaps) {
+        g.track += (g.track < 0) ? -1 : 1;
+        j = -1;  // restart scan
+        break;
       }
-
-      ComboAction* ca = new ComboAction(tr("Nest Clip(s)"));
-
-      // create "nest" sequence with the same attributes as the current sequence
-      SequencePtr s = std::make_shared<Sequence>();
-
-      s->name = panel_project->get_next_sequence_name(tr("Nested Sequence"));
-      s->width = amber::ActiveSequence->width;
-      s->height = amber::ActiveSequence->height;
-      s->frame_rate = amber::ActiveSequence->frame_rate;
-      s->audio_frequency = amber::ActiveSequence->audio_frequency;
-      s->audio_layout = amber::ActiveSequence->audio_layout;
-
-      // copy all selected clips to the nest
-      for (int selected_clip : selected_clips) {
-        // delete clip from old sequence
-        ca->append(new DeleteClipAction(amber::ActiveSequence.get(), selected_clip));
-
-        // copy to new
-        ClipPtr copy(amber::ActiveSequence->clips.at(selected_clip)->copy(s.get()));
-        copy->set_timeline_in(copy->timeline_in() - earliest_point);
-        copy->set_timeline_out(copy->timeline_out() - earliest_point);
-        s->clips.append(copy);
-      }
-
-      // relink clips in new nested sequences
-      relink_clips_using_ids(selected_clips, s->clips);
-
-      // add sequence to project
-      MediaPtr m = panel_project->create_sequence_internal(ca, s, false, nullptr);
-
-      // add nested sequence to active sequence
-      QVector<amber::timeline::MediaImportData> media_list;
-      media_list.append(m.get());
-      create_ghosts_from_media(amber::ActiveSequence.get(), earliest_point, media_list);
-
-      // ensure ghosts won't overlap anything
-      for (int j = 0; j < amber::ActiveSequence->clips.size(); j++) {
-        Clip* c = amber::ActiveSequence->clips.at(j).get();
-        if (c != nullptr && !selected_clips.contains(j)) {
-          for (auto& g : ghosts) {
-            if (c->track() == g.track && !((c->timeline_in() < g.in && c->timeline_out() < g.in) ||
-                                           (c->timeline_in() > g.out && c->timeline_out() > g.out))) {
-              // There's a clip occupied by the space taken up by this ghost. Move up/down a track, and seek again
-              if (g.track < 0) {
-                g.track--;
-              } else {
-                g.track++;
-              }
-              j = -1;
-              break;
-            }
-          }
-        }
-      }
-
-      add_clips_from_ghosts(ca, amber::ActiveSequence.get());
-
-      panel_graph_editor->set_row(nullptr);
-      panel_effect_controls->Clear(true);
-      amber::ActiveSequence->selections.clear();
-
-      amber::UndoStack.push(ca);
-
-      update_ui(true);
     }
   }
+}
+
+void Timeline::nest() {
+  if (amber::ActiveSequence == nullptr) return;
+
+  QVector<int> selected_clips = amber::ActiveSequence->SelectedClipIndexes();
+  if (selected_clips.isEmpty()) return;
+
+  long earliest_point = LONG_MAX;
+  for (int selected_clip : selected_clips) {
+    earliest_point = qMin(amber::ActiveSequence->clips.at(selected_clip)->timeline_in(), earliest_point);
+  }
+
+  ComboAction* ca = new ComboAction(tr("Nest Clip(s)"));
+
+  SequencePtr s = std::make_shared<Sequence>();
+  s->name = panel_project->get_next_sequence_name(tr("Nested Sequence"));
+  s->width = amber::ActiveSequence->width;
+  s->height = amber::ActiveSequence->height;
+  s->frame_rate = amber::ActiveSequence->frame_rate;
+  s->audio_frequency = amber::ActiveSequence->audio_frequency;
+  s->audio_layout = amber::ActiveSequence->audio_layout;
+
+  for (int selected_clip : selected_clips) {
+    ca->append(new DeleteClipAction(amber::ActiveSequence.get(), selected_clip));
+    ClipPtr copy(amber::ActiveSequence->clips.at(selected_clip)->copy(s.get()));
+    copy->set_timeline_in(copy->timeline_in() - earliest_point);
+    copy->set_timeline_out(copy->timeline_out() - earliest_point);
+    s->clips.append(copy);
+  }
+
+  relink_clips_using_ids(selected_clips, s->clips);
+
+  MediaPtr m = panel_project->create_sequence_internal(ca, s, false, nullptr);
+
+  QVector<amber::timeline::MediaImportData> media_list;
+  media_list.append(m.get());
+  create_ghosts_from_media(amber::ActiveSequence.get(), earliest_point, media_list);
+
+  resolve_ghost_track_collisions(ghosts, amber::ActiveSequence.get(), selected_clips);
+
+  add_clips_from_ghosts(ca, amber::ActiveSequence.get());
+
+  panel_graph_editor->set_row(nullptr);
+  panel_effect_controls->Clear(true);
+  amber::ActiveSequence->selections.clear();
+
+  amber::UndoStack.push(ca);
+  update_ui(true);
 }
 
 // Expand a single nested sequence clip into individual clips in the parent sequence.

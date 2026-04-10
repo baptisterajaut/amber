@@ -357,6 +357,10 @@ void GraphView::paintEvent(QPaintEvent*) {
   p.drawRect(border);
 }
 
+static bool point_near(const QPoint& pos, double cx, double cy, int radius) {
+  return pos.x() > cx - radius && pos.x() < cx + radius && pos.y() > cy - radius && pos.y() < cy + radius;
+}
+
 // Scan all visible double fields for a keyframe body or bezier handle under pos.
 // Sets sel_key/sel_key_field; updates current_handle + handle state when a handle is hit.
 // Returns true if anything was found.
@@ -370,8 +374,7 @@ bool GraphView::press_find_key(const QPoint& pos, int& sel_key, int& sel_key_fie
       int key_x = get_screen_x(key.time);
       int key_y = get_screen_y(key.data.toDouble());
 
-      if (pos.x() > key_x - KEYFRAME_SIZE && pos.x() < key_x + KEYFRAME_SIZE && pos.y() > key_y - KEYFRAME_SIZE &&
-          pos.y() < key_y + KEYFRAME_SIZE) {
+      if (point_near(pos, key_x, key_y, KEYFRAME_SIZE)) {
         sel_key = j;
         sel_key_field = i;
         return true;
@@ -380,13 +383,10 @@ bool GraphView::press_find_key(const QPoint& pos, int& sel_key, int& sel_key_fie
       QPointF pre_point(key_x + key.pre_handle_x * x_zoom, key_y - key.pre_handle_y * y_zoom);
       QPointF post_point(key_x + key.post_handle_x * x_zoom, key_y - key.post_handle_y * y_zoom);
 
-      if (pos.x() > pre_point.x() - kBezierHandleSize && pos.x() < pre_point.x() + kBezierHandleSize &&
-          pos.y() > pre_point.y() - kBezierHandleSize && pos.y() < pre_point.y() + kBezierHandleSize) {
+      if (point_near(pos, pre_point.x(), pre_point.y(), kBezierHandleSize))
         current_handle = kBezierHandlePre;
-      } else if (pos.x() > post_point.x() - kBezierHandleSize && pos.x() < post_point.x() + kBezierHandleSize &&
-                 pos.y() > post_point.y() - kBezierHandleSize && pos.y() < post_point.y() + kBezierHandleSize) {
+      else if (point_near(pos, post_point.x(), post_point.y(), kBezierHandleSize))
         current_handle = kBezierHandlePost;
-      }
 
       if (current_handle != kBezierHandleNone) {
         sel_key = j;

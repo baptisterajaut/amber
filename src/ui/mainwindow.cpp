@@ -155,6 +155,31 @@ void MainWindow::setup_layout(bool reset) {
   layout()->update();
 }
 
+static int purge_old_files(const QDir& dir, const QString& pattern, qint64 cutoff_ms, bool use_last_read = false) {
+  int deleted = 0;
+  for (const auto& entry : dir.entryList(pattern.isEmpty() ? QStringList() : QStringList(pattern), QDir::Files)) {
+    QString path = dir.filePath(entry);
+    qint64 ts = use_last_read ? QFileInfo(path).lastRead().toMSecsSinceEpoch()
+                              : QFileInfo(path).lastModified().toMSecsSinceEpoch();
+    if (ts < cutoff_ms) {
+      if (QFile(path).remove()) deleted++;
+    }
+  }
+  return deleted;
+}
+
+static void load_recent_projects() {
+  QFile f(amber::Global->get_recent_project_list_file());
+  if (!f.exists() || !f.open(QFile::ReadOnly | QFile::Text)) return;
+  QTextStream text_stream(&f);
+  while (true) {
+    QString line = text_stream.readLine();
+    if (line.isNull()) break;
+    amber::project_io->recentProjects().append(line);
+  }
+  f.close();
+}
+
 static void cleanup_data_dir() {
   QString data_dir = get_data_path();
   if (data_dir.isEmpty()) return;
@@ -163,48 +188,22 @@ static void cleanup_data_dir() {
   dir.mkpath(".");
   if (!dir.exists()) return;
 
-  qint64 a_month_ago = QDateTime::currentMSecsSinceEpoch() - 2592000000LL;
   qint64 a_week_ago = QDateTime::currentMSecsSinceEpoch() - 604800000LL;
-
-  // Delete auto-recoveries older than 7 days
-  QStringList old_autorecoveries = dir.entryList(QStringList("autorecovery.ove.*"), QDir::Files);
-  int deleted_ars = 0;
-  for (const auto& entry : old_autorecoveries) {
-    QString file_name = data_dir + "/" + entry;
-    if (QFileInfo(file_name).lastModified().toMSecsSinceEpoch() < a_week_ago) {
-      if (QFile(file_name).remove()) deleted_ars++;
-    }
-  }
-  if (deleted_ars > 0)
-    qInfo() << "Deleted" << deleted_ars << "autorecovery" << ((deleted_ars == 1) ? "file that was" : "files that were")
+  int n = purge_old_files(dir, "autorecovery.ove.*", a_week_ago);
+  if (n > 0)
+    qInfo() << "Deleted" << n << "autorecovery" << ((n == 1) ? "file that was" : "files that were")
             << "older than 7 days";
 
-  // Delete previews older than 30 days
   QDir preview_dir(dir.filePath("previews"));
   if (preview_dir.exists()) {
-    deleted_ars = 0;
-    for (const auto& entry : preview_dir.entryList(QDir::Files)) {
-      QString file_name = preview_dir.filePath(entry);
-      if (QFileInfo(file_name).lastRead().toMSecsSinceEpoch() < a_month_ago) {
-        if (QFile(file_name).remove()) deleted_ars++;
-      }
-    }
-    if (deleted_ars > 0)
-      qInfo() << "Deleted" << deleted_ars << "preview" << ((deleted_ars == 1) ? "file that was" : "files that were")
+    qint64 a_month_ago = QDateTime::currentMSecsSinceEpoch() - 2592000000LL;
+    n = purge_old_files(preview_dir, QString(), a_month_ago, true);
+    if (n > 0)
+      qInfo() << "Deleted" << n << "preview" << ((n == 1) ? "file that was" : "files that were")
               << "last read over 30 days ago";
   }
 
-  // Load recent projects list
-  QFile f(amber::Global->get_recent_project_list_file());
-  if (f.exists() && f.open(QFile::ReadOnly | QFile::Text)) {
-    QTextStream text_stream(&f);
-    while (true) {
-      QString line = text_stream.readLine();
-      if (line.isNull()) break;
-      amber::project_io->recentProjects().append(line);
-    }
-    f.close();
-  }
+  load_recent_projects();
 }
 
 static void load_config_if_exists() {

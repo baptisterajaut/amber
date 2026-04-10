@@ -785,6 +785,45 @@ static bool handle_new_image_sequence(QWidget* parent, const QString& new_filena
   return false;
 }
 
+// Returns true if the file is part of an already-imported image sequence and should be skipped.
+static bool is_image_sequence_duplicate(QWidget* parent, QString& file, const QStringList& image_sequence_formats,
+                                        QVector<QString>& image_sequence_urls,
+                                        QVector<bool>& image_sequence_importassequence, int& start_number) {
+  int lastcharindex = 0;
+  if (!classify_as_image(file, image_sequence_formats, lastcharindex)) return false;
+  if (lastcharindex <= 0 || !file[lastcharindex - 1].isDigit()) return false;
+
+  int digit_test = 0, digit_count = 0, file_number = 0;
+  QString new_filename = build_sequence_pattern(file, lastcharindex, digit_test, digit_count, file_number);
+  if (new_filename.isEmpty()) return false;
+
+  int cached_idx = image_sequence_urls.indexOf(new_filename);
+  if (cached_idx > -1) return image_sequence_importassequence.at(cached_idx);
+
+  handle_new_image_sequence(parent, new_filename, file, digit_test, digit_count, file_number, lastcharindex,
+                            image_sequence_urls, image_sequence_importassequence, start_number);
+  return false;
+}
+
+static void append_to_project(MediaPtr item, Media* parent, ComboAction* ca) {
+  if (ca)
+    ca->append(new AddMediaCommand(item, parent));
+  else
+    amber::project_model.appendChild(parent, item);
+}
+
+static void finalize_import(ComboAction* ca, bool imported, const QVector<Media*>& last_imported_media) {
+  if (!ca) return;
+  if (!imported) {
+    delete ca;
+    return;
+  }
+  amber::UndoStack.push(ca);
+  for (auto m : last_imported_media) {
+    PreviewGenerator::AnalyzeMedia(m);
+  }
+}
+
 void Project::process_file_list(QStringList& files, bool recursive, MediaPtr replace, Media* parent) {
   bool imported = false;
 
@@ -794,115 +833,57 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
 
   if (!recursive) last_imported_media.clear();
 
-  bool create_undo_action = (!recursive && replace == nullptr);
-  ComboAction* ca = nullptr;
-  if (create_undo_action) ca = new ComboAction(tr("Import Media"));
+  ComboAction* ca = (!recursive && replace == nullptr) ? new ComboAction(tr("Import Media")) : nullptr;
 
   for (const auto& i : files) {
     if (QFileInfo(i).isDir()) {
-      QString folder_name = get_file_name_from_path(i);
-      MediaPtr folder = create_folder_internal(folder_name);
-
+      MediaPtr folder = create_folder_internal(get_file_name_from_path(i));
       QDir directory(i);
       directory.setFilter(QDir::NoDotAndDotDot | QDir::AllEntries);
-      QFileInfoList subdir_files = directory.entryInfoList();
       QStringList subdir_filenames;
-      for (const auto& subdir_file : subdir_files) {
+      for (const auto& subdir_file : directory.entryInfoList()) {
         subdir_filenames.append(subdir_file.filePath());
       }
-
-      if (create_undo_action) {
-        ca->append(new AddMediaCommand(folder, parent));
-      } else {
-        amber::project_model.appendChild(parent, folder);
-      }
-
+      append_to_project(folder, parent, ca);
       process_file_list(subdir_filenames, true, nullptr, folder.get());
       imported = true;
-
-    } else if (!i.isEmpty()) {
-      QString file = i;
-
-      if (file.endsWith(".ove", Qt::CaseInsensitive)) {
-        if (QMessageBox::question(this, tr("Import a Project"),
-                                  tr("\"%1\" is an Olive project file. It will merge with this project. "
-                                     "Do you wish to continue?")
-                                      .arg(file),
-                                  QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
-          amber::Global->ImportProject(file);
-        }
-
-      } else {
-        bool skip = false;
-        int start_number = 0;
-
-        int lastcharindex = 0;
-        bool file_is_an_image = classify_as_image(file, image_sequence_formats, lastcharindex);
-
-        if (file_is_an_image && lastcharindex > 0 && file[lastcharindex - 1].isDigit()) {
-          int digit_test = 0;
-          int digit_count = 0;
-          int file_number = 0;
-          QString new_filename = build_sequence_pattern(file, lastcharindex, digit_test, digit_count, file_number);
-
-          if (!new_filename.isEmpty()) {
-            int cached_idx = image_sequence_urls.indexOf(new_filename);
-            if (cached_idx > -1) {
-              if (image_sequence_importassequence.at(cached_idx)) skip = true;
-            } else {
-              handle_new_image_sequence(this, new_filename, file, digit_test, digit_count, file_number, lastcharindex,
-                                        image_sequence_urls, image_sequence_importassequence, start_number);
-            }
-          }
-        }
-
-        // If we're not skipping this file, let's import it
-        if (!skip) {
-          MediaPtr item;
-          FootagePtr m;
-
-          if (replace != nullptr) {
-            item = replace;
-          } else {
-            item = std::make_shared<Media>();
-          }
-
-          m = std::make_shared<Footage>();
-
-          m->using_inout = false;
-          m->url = file;
-          m->name = get_file_name_from_path(i);
-          m->start_number = start_number;
-
-          item->set_footage(m);
-
-          last_imported_media.append(item.get());
-
-          if (replace == nullptr) {
-            if (create_undo_action) {
-              ca->append(new AddMediaCommand(item, parent));
-            } else {
-              amber::project_model.appendChild(parent, item);
-            }
-          }
-
-          imported = true;
-        }
-      }
+      continue;
     }
-  }
-  if (create_undo_action) {
-    if (imported) {
-      amber::UndoStack.push(ca);
 
-      for (auto i : last_imported_media) {
-        // generate waveform/thumbnail in another thread
-        PreviewGenerator::AnalyzeMedia(i);
+    if (i.isEmpty()) continue;
+    QString file = i;
+
+    if (file.endsWith(".ove", Qt::CaseInsensitive)) {
+      if (QMessageBox::question(this, tr("Import a Project"),
+                                tr("\"%1\" is an Olive project file. It will merge with this project. "
+                                   "Do you wish to continue?")
+                                    .arg(file),
+                                QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+        amber::Global->ImportProject(file);
       }
-    } else {
-      delete ca;
+      continue;
     }
+
+    int start_number = 0;
+    if (is_image_sequence_duplicate(this, file, image_sequence_formats, image_sequence_urls,
+                                    image_sequence_importassequence, start_number)) {
+      continue;
+    }
+
+    MediaPtr item = replace ? replace : std::make_shared<Media>();
+    auto m = std::make_shared<Footage>();
+    m->using_inout = false;
+    m->url = file;
+    m->name = get_file_name_from_path(i);
+    m->start_number = start_number;
+    item->set_footage(m);
+    last_imported_media.append(item.get());
+
+    if (replace == nullptr) append_to_project(item, parent, ca);
+    imported = true;
   }
+
+  finalize_import(ca, imported, last_imported_media);
 }
 
 Media* Project::get_selected_folder() {

@@ -111,53 +111,61 @@ void Media::set_icon(const QIcon& ico) { icon = ico; }
 
 void Media::set_parent(Media* p) { parent = p; }
 
+static void append_video_tooltip(QString& t, Footage* f) {
+  if (f->video_tracks.isEmpty()) return;
+
+  t += QCoreApplication::translate("Media", "Video Dimensions:") + " ";
+  for (int i = 0; i < f->video_tracks.size(); i++) {
+    if (i > 0) t += ", ";
+    const auto& vt = f->video_tracks.at(i);
+    t += QString::number(vt.video_width) + "x" + QString::number(vt.video_height);
+  }
+  t += "\n";
+
+  if (!f->video_tracks.at(0).infinite_length) {
+    t += QCoreApplication::translate("Media", "Frame Rate:") + " ";
+    for (int i = 0; i < f->video_tracks.size(); i++) {
+      if (i > 0) t += ", ";
+      const auto& vt = f->video_tracks.at(i);
+      double adjusted_rate = vt.video_frame_rate * f->speed;
+      if (vt.video_interlacing == VIDEO_PROGRESSIVE) {
+        t += QString::number(adjusted_rate);
+      } else {
+        t += QCoreApplication::translate("Media", "%1 field(s) (%2 frame(s))")
+                 .arg(QString::number(adjusted_rate * 2.0), QString::number(adjusted_rate));
+      }
+    }
+    t += "\n";
+  }
+
+  t += QCoreApplication::translate("Media", "Interlacing:") + " ";
+  for (int i = 0; i < f->video_tracks.size(); i++) {
+    if (i > 0) t += ", ";
+    t += get_interlacing_name(f->video_tracks.at(i).video_interlacing);
+  }
+}
+
+static void append_audio_tooltip(QString& t, Footage* f) {
+  if (f->audio_tracks.isEmpty()) return;
+
+  t += "\n";
+  t += QCoreApplication::translate("Media", "Audio Frequency:") + " ";
+  for (int i = 0; i < f->audio_tracks.size(); i++) {
+    if (i > 0) t += ", ";
+    t += QString::number(f->audio_tracks.at(i).audio_frequency * f->speed);
+  }
+  t += "\n";
+  t += QCoreApplication::translate("Media", "Audio Channels:") + " ";
+  for (int i = 0; i < f->audio_tracks.size(); i++) {
+    if (i > 0) t += ", ";
+    t += get_channel_layout_name(f->audio_tracks.at(i).audio_channels, f->audio_tracks.at(i).audio_layout);
+  }
+}
+
 QString Media::footage_tooltip_body(Footage* f) {
   QString t;
-  if (f->video_tracks.size() > 0) {
-    t += QCoreApplication::translate("Media", "Video Dimensions:") + " ";
-    for (int i = 0; i < f->video_tracks.size(); i++) {
-      if (i > 0) t += ", ";
-      t += QString::number(f->video_tracks.at(i).video_width) + "x" +
-           QString::number(f->video_tracks.at(i).video_height);
-    }
-    t += "\n";
-
-    if (!f->video_tracks.at(0).infinite_length) {
-      t += QCoreApplication::translate("Media", "Frame Rate:") + " ";
-      for (int i = 0; i < f->video_tracks.size(); i++) {
-        if (i > 0) t += ", ";
-        if (f->video_tracks.at(i).video_interlacing == VIDEO_PROGRESSIVE) {
-          t += QString::number(f->video_tracks.at(i).video_frame_rate * f->speed);
-        } else {
-          double adjusted_rate = f->video_tracks.at(i).video_frame_rate * f->speed;
-          t += QCoreApplication::translate("Media", "%1 field(s) (%2 frame(s))")
-                   .arg(QString::number(adjusted_rate * 2.0), QString::number(adjusted_rate));
-        }
-      }
-      t += "\n";
-    }
-
-    t += QCoreApplication::translate("Media", "Interlacing:") + " ";
-    for (int i = 0; i < f->video_tracks.size(); i++) {
-      if (i > 0) t += ", ";
-      t += get_interlacing_name(f->video_tracks.at(i).video_interlacing);
-    }
-  }
-
-  if (f->audio_tracks.size() > 0) {
-    t += "\n";
-    t += QCoreApplication::translate("Media", "Audio Frequency:") + " ";
-    for (int i = 0; i < f->audio_tracks.size(); i++) {
-      if (i > 0) t += ", ";
-      t += QString::number(f->audio_tracks.at(i).audio_frequency * f->speed);
-    }
-    t += "\n";
-    t += QCoreApplication::translate("Media", "Audio Channels:") + " ";
-    for (int i = 0; i < f->audio_tracks.size(); i++) {
-      if (i > 0) t += ", ";
-      t += get_channel_layout_name(f->audio_tracks.at(i).audio_channels, f->audio_tracks.at(i).audio_layout);
-    }
-  }
+  append_video_tooltip(t, f);
+  append_audio_tooltip(t, f);
   return t;
 }
 

@@ -88,86 +88,80 @@ void validate_transitions(Clip* c, int transition_type, long& frame_diff);
 
 bool same_sign(int a, int b) { return (a < 0) == (b < 0); }
 
-void TimelineWidget::dragEnterEvent(QDragEnterEvent* event) {
-  bool import_init = false;
+static void collect_from_project_panel(QDragEnterEvent* event, QVector<amber::timeline::MediaImportData>& media_list) {
+  if (!panel_project->IsProjectWidget(event->source())) return;
+  QModelIndexList items = panel_project->get_current_selected();
+  media_list.resize(items.size());
+  for (int i = 0; i < items.size(); i++) {
+    media_list[i] = panel_project->item_to_media(items.at(i));
+  }
+}
 
+static void collect_from_footage_viewer(QDragEnterEvent* event, QVector<amber::timeline::MediaImportData>& media_list) {
+  if (event->source() != panel_footage_viewer) return;
+  if (panel_footage_viewer->seq == amber::ActiveSequence) return;  // don't allow nesting the same sequence
+  media_list.append(amber::timeline::MediaImportData(
+      panel_footage_viewer->media,
+      static_cast<amber::timeline::MediaImportType>(event->mimeData()->text().toInt())));
+}
+
+static bool collect_from_external_files(QDragEnterEvent* event,
+                                        QVector<amber::timeline::MediaImportData>& media_list) {
+  if (!amber::CurrentConfig.enable_drag_files_to_timeline || !event->mimeData()->hasUrls()) return false;
+  QList<QUrl> urls = event->mimeData()->urls();
+  if (urls.isEmpty()) return false;
+
+  QStringList file_list;
+  for (const auto& url : urls) {
+    file_list.append(url.toLocalFile());
+  }
+  panel_project->process_file_list(file_list);
+
+  for (auto i : panel_project->last_imported_media) {
+    Footage* f = i->to_footage();
+    // waits for media to have a duration
+    // TODO would be much nicer if this was multithreaded
+    f->ready_lock.lock();
+    f->ready_lock.unlock();
+    if (f->ready) media_list.append(i);
+  }
+
+  if (media_list.isEmpty()) {
+    amber::UndoStack.undo();
+    return false;
+  }
+  return true;
+}
+
+void TimelineWidget::dragEnterEvent(QDragEnterEvent* event) {
   QVector<amber::timeline::MediaImportData> media_list;
   panel_timeline->importing_files = false;
 
-  if (panel_project->IsProjectWidget(event->source())) {
-    QModelIndexList items = panel_project->get_current_selected();
-    media_list.resize(items.size());
-    for (int i = 0; i < items.size(); i++) {
-      media_list[i] = panel_project->item_to_media(items.at(i));
-    }
-    import_init = true;
+  collect_from_project_panel(event, media_list);
+  collect_from_footage_viewer(event, media_list);
+  if (media_list.isEmpty() && collect_from_external_files(event, media_list)) {
+    panel_timeline->importing_files = true;
   }
 
-  if (event->source() == panel_footage_viewer) {
-    if (panel_footage_viewer->seq != amber::ActiveSequence) {  // don't allow nesting the same sequence
+  if (media_list.isEmpty()) return;
 
-      media_list.append(amber::timeline::MediaImportData(
-          panel_footage_viewer->media,
-          static_cast<amber::timeline::MediaImportType>(event->mimeData()->text().toInt())));
-      import_init = true;
-    }
+  event->acceptProposedAction();
+
+  long entry_point;
+  Sequence* seq = amber::ActiveSequence.get();
+
+  if (seq == nullptr) {
+    entry_point = 0;
+    self_created_sequence = create_sequence_from_media(media_list);
+    seq = self_created_sequence.get();
+  } else {
+    entry_point = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
+    panel_timeline->drag_frame_start = entry_point + getFrameFromScreenPoint(panel_timeline->zoom, 50);
+    panel_timeline->drag_track_start = (bottom_align) ? -1 : 0;
   }
 
-  if (amber::CurrentConfig.enable_drag_files_to_timeline && event->mimeData()->hasUrls()) {
-    QList<QUrl> urls = event->mimeData()->urls();
-    if (!urls.isEmpty()) {
-      QStringList file_list;
-
-      for (const auto& url : urls) {
-        file_list.append(url.toLocalFile());
-      }
-
-      panel_project->process_file_list(file_list);
-
-      for (auto i : panel_project->last_imported_media) {
-        Footage* f = i->to_footage();
-
-        // waits for media to have a duration
-        // TODO would be much nicer if this was multithreaded
-        f->ready_lock.lock();
-        f->ready_lock.unlock();
-
-        if (f->ready) {
-          media_list.append(i);
-        }
-      }
-
-      if (media_list.isEmpty()) {
-        amber::UndoStack.undo();
-      } else {
-        import_init = true;
-        panel_timeline->importing_files = true;
-      }
-    }
-  }
-
-  if (import_init) {
-    event->acceptProposedAction();
-
-    long entry_point;
-    Sequence* seq = amber::ActiveSequence.get();
-
-    if (seq == nullptr) {
-      // if no sequence, we're going to create a new one using the clips as a reference
-      entry_point = 0;
-
-      self_created_sequence = create_sequence_from_media(media_list);
-      seq = self_created_sequence.get();
-    } else {
-      entry_point = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
-      panel_timeline->drag_frame_start = entry_point + getFrameFromScreenPoint(panel_timeline->zoom, 50);
-      panel_timeline->drag_track_start = (bottom_align) ? -1 : 0;
-    }
-
-    panel_timeline->create_ghosts_from_media(seq, entry_point, media_list);
-
-    panel_timeline->importing = true;
-  }
+  panel_timeline->create_ghosts_from_media(seq, entry_point, media_list);
+  panel_timeline->importing = true;
 }
 
 void TimelineWidget::dragMoveEvent(QDragMoveEvent* event) {
