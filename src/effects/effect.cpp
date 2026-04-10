@@ -336,9 +336,12 @@ Effect::~Effect() {
     close();
   }
 
-  // Clear graph editor if it's using one of these rows
-  for (int i = 0; i < row_count(); i++) {
-    amber::app_ctx->clearGraphEditorIfRow(row(i));
+  // Clear graph editor if it's using one of these rows.
+  // Guard: during static destruction (exit()), app_ctx may already be null.
+  if (amber::app_ctx) {
+    for (int i = 0; i < row_count(); i++) {
+      amber::app_ctx->clearGraphEditorIfRow(row(i));
+    }
   }
 
   for (auto gizmo_dragging_action : gizmo_dragging_actions_) {
