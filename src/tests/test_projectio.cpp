@@ -1,17 +1,8 @@
 #include <QtTest>
 
-// Minimal Sequence stub — just enough for shared_ptr to work.
-// The real Sequence lives in engine/sequence.h but drags in Clip/Cacher/FFmpeg.
-#include "engine/sequence_fwd.h"
-class Sequence {
- public:
-  Sequence() = default;
-  ~Sequence() = default;
-};
-SequencePtr amber::ActiveSequence;
-
 #include "core/appcontext.h"
 #include "core/audio.h"
+#include "engine/sequence.h"
 #include "global/projectio.h"
 
 Q_DECLARE_METATYPE(SequencePtr)

@@ -37,7 +37,9 @@ void ProjectModel::make_root() {
 }
 
 void ProjectModel::destroy_root() {
-  amber::app_ctx->clearViewerMedia();
+  if (amber::app_ctx) {
+    amber::app_ctx->clearViewerMedia();
+  }
 
   root_item_ = std::make_shared<Media>();
 }

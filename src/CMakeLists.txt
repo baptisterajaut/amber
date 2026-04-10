@@ -175,6 +175,7 @@ target_link_libraries(amber-engine PUBLIC
   Qt6::OpenGL Qt6::OpenGLWidgets Qt6::ShaderToolsPrivate Qt6::Svg
   FFMPEG::avutil FFMPEG::avcodec FFMPEG::avformat FFMPEG::avfilter
   FFMPEG::swscale FFMPEG::swresample
+  $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
 )
 
 set(UI_SOURCES
