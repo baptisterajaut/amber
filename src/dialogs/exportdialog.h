@@ -151,6 +151,16 @@ private:
   void prep_ui_for_render(bool r);
 
   /**
+   * @brief Build ExportParams from current UI state.
+   */
+  ExportParams build_export_params(const QString& filename) const;
+
+  /**
+   * @brief Set up and start the export thread with the given params.
+   */
+  void launch_export_thread(const ExportParams& params);
+
+  /**
    * @brief Retrieves the human-readable name of an AVCodecID and adds it to a QComboBox
    *
    * Also sets that item's data to the AVCodecID so it can be retrieved directly from the QComboBox.

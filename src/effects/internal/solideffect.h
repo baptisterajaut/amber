@@ -27,24 +27,24 @@
 
 class SolidEffect : public Effect {
   Q_OBJECT
-public:
-  enum SolidType {
-    SOLID_TYPE_COLOR,
-    SOLID_TYPE_BARS,
-    SOLID_TYPE_CHECKERBOARD
-  };
+ public:
+  enum SolidType { SOLID_TYPE_COLOR, SOLID_TYPE_BARS, SOLID_TYPE_CHECKERBOARD };
 
-  SolidEffect(Clip* c, const EffectMeta *em);
+  SolidEffect(Clip* c, const EffectMeta* em);
   void redraw(double timecode) override;
 
   void SetType(SolidType type);
-private slots:
-  void ui_update(const QVariant &d);
-private:
+ private slots:
+  void ui_update(const QVariant& d);
+
+ private:
   ComboField* solid_type;
   ColorField* solid_color_field;
   DoubleField* opacity_field;
   DoubleField* checkerboard_size_field;
+
+  void DrawSmpteBars(int alpha);
+  void DrawCheckerboard(double timecode, int alpha);
 };
 
-#endif // SOLIDEFFECT_H
+#endif  // SOLIDEFFECT_H

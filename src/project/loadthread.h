@@ -21,41 +21,45 @@
 #ifndef LOADTHREAD_H
 #define LOADTHREAD_H
 
-#include <QThread>
 #include <QDir>
-#include <QPair>
-#include <QXmlStreamReader>
-#include <QMutex>
-#include <QWaitCondition>
 #include <QMessageBox>
+#include <QMutex>
+#include <QPair>
+#include <QThread>
+#include <QWaitCondition>
+#include <QXmlStreamReader>
 
-#include "project/projectelements.h"
-#include "engine/clip.h"
 #include "core/guide.h"
+#include "engine/clip.h"
+#include "project/projectelements.h"
 
-class LoadThread : public QThread
-{
+class LoadThread : public QThread {
   Q_OBJECT
-public:
+ public:
   LoadThread(const QString& filename, bool autorecovery);
   void run() override;
-public slots:
+ public slots:
   void cancel();
-signals:
-  void start_question(const QString &title, const QString &text, int buttons);
+ signals:
+  void start_question(const QString& title, const QString& text, int buttons);
   void success();
   void error();
   void report_progress(int p);
   void found_invalid_footage(QVector<QPair<Media*, Footage*>> invalid);
-private slots:
-  void question_func(const QString &title, const QString &text, int buttons);
+ private slots:
+  void question_func(const QString& title, const QString& text, int buttons);
   void error_func();
   void success_func();
-private:
+
+ private:
   bool autorecovery_;
   QString filename_;
 
   bool load_worker(QFile& f, QXmlStreamReader& stream, int type);
+  bool handle_scalar_load_type(QXmlStreamReader& stream, int type);
+  bool parse_collection_child(QXmlStreamReader& stream, int type, const QString& child_search);
+  void link_nested_sequence_clips();
+  void finalize_loaded_media();
   void load_effect(QXmlStreamReader& stream, Clip* c);
 
   // Per-element parse helpers (called from load_worker)
@@ -106,4 +110,4 @@ private:
   QMessageBox::StandardButton question_btn;
 };
 
-#endif // LOADTHREAD_H
+#endif  // LOADTHREAD_H

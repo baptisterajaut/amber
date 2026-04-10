@@ -20,28 +20,26 @@
 
 #include "previewgenerator.h"
 
-#include "ui/mediaiconservice.h"
-#include "project/media.h"
-#include "project/footage.h"
-#include "panels/viewer.h"
-#include "panels/project.h"
-#include "global/config.h"
 #include "core/path.h"
+#include "global/config.h"
 #include "global/debug.h"
+#include "panels/project.h"
+#include "panels/viewer.h"
+#include "project/footage.h"
+#include "project/media.h"
+#include "ui/mediaiconservice.h"
 
+#include <QDir>
+#include <QFile>
 #include <QPainter>
 #include <QPixmap>
-#include <QtMath>
-#include <QTreeWidgetItem>
 #include <QSemaphore>
-#include <QFile>
-#include <QDir>
+#include <QTreeWidgetItem>
+#include <QtMath>
 
-QSemaphore sem(5); // only 5 preview generators can run at one time
+QSemaphore sem(5);  // only 5 preview generators can run at one time
 
-PreviewGenerator::PreviewGenerator(Media* i) :
-  QThread(nullptr)
-{
+PreviewGenerator::PreviewGenerator(Media* i) : QThread(nullptr) {
   fmt_ctx_ = (nullptr);
   media_ = (i);
   retrieve_duration_ = (false);
@@ -64,115 +62,103 @@ PreviewGenerator::PreviewGenerator(Media* i) :
   start(QThread::LowPriority);
 }
 
-void PreviewGenerator::parse_media() {
-  // detect video/audio streams in file
-  for (int i=0;i<int(fmt_ctx_->nb_streams);i++) {
-    // Find the decoder for the video stream
-    if (avcodec_find_decoder(fmt_ctx_->streams[i]->codecpar->codec_id) == nullptr) {
-      qCritical() << "Unsupported codec in stream" << i << "of file" << footage_->name;
-    } else {
-      FootageStream ms;
-      ms.preview_done = false;
-      ms.file_index = i;
-      ms.enabled = true;
-      ms.infinite_length = false;
+// Parse a video stream and populate `ms`. Returns true if the stream should be appended.
+bool PreviewGenerator::parse_video_stream(int stream_index, FootageStream& ms) {
+  AVStream* stream = fmt_ctx_->streams[stream_index];
+  if (stream->codecpar->width <= 0 || stream->codecpar->height <= 0) return false;
 
-      bool append = false;
+  bool is_still_image = (stream->avg_frame_rate.den == 0 && stream->codecpar->codec_id != AV_CODEC_ID_DNXHD);
 
-      // Skip embedded cover art / thumbnails (e.g. DJI action cameras embed a JPG in MP4)
-      if (fmt_ctx_->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
-        continue;
-      }
-
-      if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO
-          && fmt_ctx_->streams[i]->codecpar->width > 0
-          && fmt_ctx_->streams[i]->codecpar->height > 0) {
-
-        // heuristic to determine if video is a still image (if it is, we treat it differently in the playback/render process)
-        bool is_still_image = false;
-
-        if (fmt_ctx_->streams[i]->avg_frame_rate.den == 0
-            && fmt_ctx_->streams[i]->codecpar->codec_id != AV_CODEC_ID_DNXHD) {
-          is_still_image = true;
-        }
-
-        // FFmpeg 6+ uses per-codec pipe demuxers (png_pipe, jpeg_pipe, etc.) instead of
-        // the legacy "image2" demuxer. Check both to cover all FFmpeg versions.
-        if (!is_still_image && fmt_ctx_->iformat != nullptr
-            && !footage_->url.contains('%')) {
-          QString fmt_name(fmt_ctx_->iformat->name);
-          if (fmt_name.contains(QLatin1String("image2")) || fmt_name.endsWith(QLatin1String("_pipe"))) {
-            is_still_image = true;
-          }
-        }
-
-        if (is_still_image) {
-          if (footage_->url.contains('%')) {
-            // must be an image sequence
-            ms.video_frame_rate = 25;
-          } else {
-            ms.infinite_length = true;
-            contains_still_image_ = true;
-            ms.video_frame_rate = 0;
-          }
-
-        } else {
-          // using ffmpeg's built-in heuristic
-          ms.video_frame_rate = av_q2d(av_guess_frame_rate(fmt_ctx_, fmt_ctx_->streams[i], nullptr));
-        }
-
-        ms.video_width = fmt_ctx_->streams[i]->codecpar->width;
-        ms.video_height = fmt_ctx_->streams[i]->codecpar->height;
-
-        // default value, we get the true value later in generate_waveform()
-        ms.video_auto_interlacing = VIDEO_PROGRESSIVE;
-        ms.video_interlacing = VIDEO_PROGRESSIVE;
-
-        append = true;
-      } else if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-        ms.audio_channels = fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels;
-        {
-          uint64_t mask = 0;
-          // Try to extract a channel mask; if ch_layout isn't mask-based, fall back to default
-          if (fmt_ctx_->streams[i]->codecpar->ch_layout.order == AV_CHANNEL_ORDER_NATIVE) {
-            mask = fmt_ctx_->streams[i]->codecpar->ch_layout.u.mask;
-          } else {
-            AVChannelLayout temp = {};
-            av_channel_layout_default(&temp, ms.audio_channels);
-            if (temp.order == AV_CHANNEL_ORDER_NATIVE) mask = temp.u.mask;
-            av_channel_layout_uninit(&temp);
-          }
-          ms.audio_layout = int(mask);
-        }
-        ms.audio_frequency = fmt_ctx_->streams[i]->codecpar->sample_rate;
-
-        append = true;
-      }
-
-      // Store per-stream duration (container duration may differ from individual stream durations,
-      // e.g. when a subtitle track is longer than the audio/video)
-      if (append && fmt_ctx_->streams[i]->duration != AV_NOPTS_VALUE) {
-        double tb = av_q2d(fmt_ctx_->streams[i]->time_base);
-        ms.stream_duration = qRound64(fmt_ctx_->streams[i]->duration * tb * AV_TIME_BASE);
-      }
-
-      if (append) {
-        QVector<FootageStream>& stream_list = (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) ?
-              footage_->audio_tracks : footage_->video_tracks;
-
-        for (auto & j : stream_list) {
-          if (j.file_index == i) {
-            j = ms;
-            append = false;
-          }
-        }
-
-        if (append) stream_list.append(ms);
-      }
+  if (!is_still_image && fmt_ctx_->iformat != nullptr && !footage_->url.contains('%')) {
+    QString fmt_name(fmt_ctx_->iformat->name);
+    if (fmt_name.contains(QLatin1String("image2")) || fmt_name.endsWith(QLatin1String("_pipe"))) {
+      is_still_image = true;
     }
   }
-  footage_->length = fmt_ctx_->duration;
 
+  if (is_still_image) {
+    if (footage_->url.contains('%')) {
+      ms.video_frame_rate = 25;
+    } else {
+      ms.infinite_length = true;
+      contains_still_image_ = true;
+      ms.video_frame_rate = 0;
+    }
+  } else {
+    ms.video_frame_rate = av_q2d(av_guess_frame_rate(fmt_ctx_, stream, nullptr));
+  }
+
+  ms.video_width = stream->codecpar->width;
+  ms.video_height = stream->codecpar->height;
+  ms.video_auto_interlacing = VIDEO_PROGRESSIVE;
+  ms.video_interlacing = VIDEO_PROGRESSIVE;
+  return true;
+}
+
+// Parse an audio stream and populate `ms`. Returns true always (audio streams are always appended).
+bool PreviewGenerator::parse_audio_stream(int stream_index, FootageStream& ms) {
+  AVStream* stream = fmt_ctx_->streams[stream_index];
+  ms.audio_channels = stream->codecpar->ch_layout.nb_channels;
+  uint64_t mask = 0;
+  if (stream->codecpar->ch_layout.order == AV_CHANNEL_ORDER_NATIVE) {
+    mask = stream->codecpar->ch_layout.u.mask;
+  } else {
+    AVChannelLayout temp = {};
+    av_channel_layout_default(&temp, ms.audio_channels);
+    if (temp.order == AV_CHANNEL_ORDER_NATIVE) mask = temp.u.mask;
+    av_channel_layout_uninit(&temp);
+  }
+  ms.audio_layout = int(mask);
+  ms.audio_frequency = stream->codecpar->sample_rate;
+  return true;
+}
+
+void PreviewGenerator::parse_media() {
+  for (int i = 0; i < int(fmt_ctx_->nb_streams); i++) {
+    if (avcodec_find_decoder(fmt_ctx_->streams[i]->codecpar->codec_id) == nullptr) {
+      qCritical() << "Unsupported codec in stream" << i << "of file" << footage_->name;
+      continue;
+    }
+
+    // Skip embedded cover art / thumbnails (e.g. DJI action cameras embed a JPG in MP4)
+    if (fmt_ctx_->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC) continue;
+
+    FootageStream ms;
+    ms.preview_done = false;
+    ms.file_index = i;
+    ms.enabled = true;
+    ms.infinite_length = false;
+
+    bool is_video = (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
+    bool is_audio = (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO);
+
+    bool append = false;
+    if (is_video) {
+      append = parse_video_stream(i, ms);
+    } else if (is_audio) {
+      append = parse_audio_stream(i, ms);
+    }
+
+    if (!append) continue;
+
+    if (fmt_ctx_->streams[i]->duration != AV_NOPTS_VALUE) {
+      double tb = av_q2d(fmt_ctx_->streams[i]->time_base);
+      ms.stream_duration = qRound64(fmt_ctx_->streams[i]->duration * tb * AV_TIME_BASE);
+    }
+
+    QVector<FootageStream>& stream_list = is_audio ? footage_->audio_tracks : footage_->video_tracks;
+    bool need_append = true;
+    for (auto& j : stream_list) {
+      if (j.file_index == i) {
+        j = ms;
+        need_append = false;
+        break;
+      }
+    }
+    if (need_append) stream_list.append(ms);
+  }
+
+  footage_->length = fmt_ctx_->duration;
   if (fmt_ctx_->duration == INT64_MIN) {
     retrieve_duration_ = true;
   } else {
@@ -183,12 +169,12 @@ void PreviewGenerator::parse_media() {
 bool PreviewGenerator::retrieve_preview(const QString& hash) {
   // returns true if generate_waveform must be run, false if we got all previews from cached files
   if (retrieve_duration_) {
-    //dout << "[NOTE] " << media->name << "needs to retrieve duration";
+    // dout << "[NOTE] " << media->name << "needs to retrieve duration";
     return true;
   }
 
   bool found = true;
-  for (auto & ms : footage_->video_tracks) {
+  for (auto& ms : footage_->video_tracks) {
     QString thumb_path = get_thumbnail_path(hash, ms);
     QFile f(thumb_path);
     if (f.exists() && ms.video_preview.load(thumb_path)) {
@@ -198,15 +184,15 @@ bool PreviewGenerator::retrieve_preview(const QString& hash) {
       break;
     }
   }
-  for (auto & ms : footage_->audio_tracks) {
+  for (auto& ms : footage_->audio_tracks) {
     QString waveform_path = get_waveform_path(hash, ms);
     QFile f(waveform_path);
     if (f.exists()) {
-      //dout << "loaded wave" << ms->file_index << "from" << waveform_path;
+      // dout << "loaded wave" << ms->file_index << "from" << waveform_path;
       if (f.open(QFile::ReadOnly)) {
         QByteArray data = f.readAll();
         ms.audio_preview.resize(data.size());
-        for (int j=0;j<data.size();j++) {
+        for (int j = 0; j < data.size(); j++) {
           // faster way?
           ms.audio_preview[j] = data.at(j);
         }
@@ -219,10 +205,10 @@ bool PreviewGenerator::retrieve_preview(const QString& hash) {
     }
   }
   if (!found) {
-    for (auto & ms : footage_->video_tracks) {
+    for (auto& ms : footage_->video_tracks) {
       ms.preview_done = false;
     }
-    for (auto & ms : footage_->audio_tracks) {
+    for (auto& ms : footage_->audio_tracks) {
       ms.audio_preview.clear();
       ms.preview_done = false;
     }
@@ -261,8 +247,7 @@ void PreviewGenerator::finalize_media() {
   }
 }
 
-void PreviewGenerator::invalidate_media(const QString &error_msg)
-{
+void PreviewGenerator::invalidate_media(const QString& error_msg) {
   media_->update_tooltip(error_msg);
   amber::media_icon_service->SetMediaIcon(media_, ICON_TYPE_ERROR);
   footage_->invalid = true;
@@ -280,19 +265,19 @@ bool PreviewGenerator::setup_stream_codecs(AVCodecContext** codec_ctx, qint16***
   }
   bool create_previews = false;
 
-  for (unsigned int i=0;i<fmt_ctx_->nb_streams;i++) {
-
+  for (unsigned int i = 0; i < fmt_ctx_->nb_streams; i++) {
     // default to nullptr values for easier memory management later
     codec_ctx[i] = nullptr;
     waveform_cache_data[i] = nullptr;
 
     // we only generate previews for video and audio
     // and only if the thumbnail and waveform sizes are > 0
-    if ((fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO && amber::CurrentConfig.thumbnail_resolution > 0)
-        || (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO && amber::CurrentConfig.waveform_resolution > 0)) {
+    if ((fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO &&
+         amber::CurrentConfig.thumbnail_resolution > 0) ||
+        (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO &&
+         amber::CurrentConfig.waveform_resolution > 0)) {
       const AVCodec* codec = avcodec_find_decoder(fmt_ctx_->streams[i]->codecpar->codec_id);
       if (codec != nullptr) {
-
         // alloc the context and load the params into it
         codec_ctx[i] = avcodec_alloc_context3(codec);
         if (codec_ctx[i] == nullptr) {
@@ -316,12 +301,11 @@ bool PreviewGenerator::setup_stream_codecs(AVCodecContext** codec_ctx, qint16***
 
         // audio specific functions
         if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-
           // allocate sample cache for this stream
-          waveform_cache_data[i] = new qint16* [fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels];
+          waveform_cache_data[i] = new qint16*[fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels];
 
           // each channel gets a min and a max value so we allocate two ints for each one
-          for (int j=0;j<fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels;j++) {
+          for (int j = 0; j < fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels; j++) {
             waveform_cache_data[i][j] = new qint16[2];
           }
 
@@ -329,7 +313,6 @@ bool PreviewGenerator::setup_stream_codecs(AVCodecContext** codec_ctx, qint16***
           if (codec_ctx[i]->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC) {
             av_channel_layout_default(&codec_ctx[i]->ch_layout, fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels);
           }
-
         }
 
         // enable next step of process
@@ -341,8 +324,30 @@ bool PreviewGenerator::setup_stream_codecs(AVCodecContext** codec_ctx, qint16***
   return create_previews;
 }
 
-void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s,
-                                           AVCodecContext** codec_ctx, int stream_index) {
+void PreviewGenerator::apply_rotation_to_preview(FootageStream* s, int stream_index) {
+  const int32_t* matrix = nullptr;
+
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+  const AVPacketSideData* sd =
+      av_packet_side_data_get(fmt_ctx_->streams[stream_index]->codecpar->coded_side_data,
+                              fmt_ctx_->streams[stream_index]->codecpar->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX);
+  if (sd) matrix = reinterpret_cast<const int32_t*>(sd->data);
+#else
+  const uint8_t* sd = av_stream_get_side_data(fmt_ctx_->streams[stream_index], AV_PKT_DATA_DISPLAYMATRIX, nullptr);
+  if (sd) matrix = reinterpret_cast<const int32_t*>(sd);
+#endif
+
+  if (!matrix) return;
+  double rotation = av_display_rotation_get(matrix);
+  if (!qIsNaN(rotation) && qAbs(rotation) > 1.0) {
+    QTransform transform;
+    transform.rotate(-rotation);
+    s->video_preview = s->video_preview.transformed(transform, Qt::SmoothTransformation);
+  }
+}
+
+void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s, AVCodecContext** codec_ctx,
+                                           int stream_index) {
   if (!temp_frame) {
     qWarning() << "process_video_frame: temp_frame is null";
     return;
@@ -358,69 +363,33 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
   if (s->preview_done) return;
 
   int dstH = amber::CurrentConfig.thumbnail_resolution;
-  int dstW = qRound(dstH * (float(temp_frame->width)/float(temp_frame->height)));
+  int dstW = qRound(dstH * (float(temp_frame->width) / float(temp_frame->height)));
 
-  SwsContext* sws_ctx = sws_getContext(
-        temp_frame->width,
-        temp_frame->height,
-        static_cast<AVPixelFormat>(temp_frame->format),
-        dstW,
-        dstH,
-        static_cast<AVPixelFormat>(AV_PIX_FMT_RGBA),
-        SWS_FAST_BILINEAR,
-        nullptr,
-        nullptr,
-        nullptr
-        );
+  SwsContext* sws_ctx =
+      sws_getContext(temp_frame->width, temp_frame->height, static_cast<AVPixelFormat>(temp_frame->format), dstW, dstH,
+                     static_cast<AVPixelFormat>(AV_PIX_FMT_RGBA), SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
 
   int linesize[AV_NUM_DATA_POINTERS];
-  linesize[0] = dstW*4;
+  linesize[0] = dstW * 4;
 
   s->video_preview = QImage(dstW, dstH, QImage::Format_RGBA8888);
   uint8_t* data = s->video_preview.bits();
 
-  sws_scale(sws_ctx,
-            temp_frame->data,
-            temp_frame->linesize,
-            0,
-            temp_frame->height,
-            &data,
-            linesize);
+  sws_scale(sws_ctx, temp_frame->data, temp_frame->linesize, 0, temp_frame->height, &data, linesize);
 
   // Apply rotation from display matrix (e.g. portrait videos from phones)
-  {
-    double rotation = 0;
-    const int32_t* matrix = nullptr;
-
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
-    // FFmpeg 7+: stream side data moved to codecpar->coded_side_data
-    const AVPacketSideData* sd = av_packet_side_data_get(
-        fmt_ctx_->streams[stream_index]->codecpar->coded_side_data,
-        fmt_ctx_->streams[stream_index]->codecpar->nb_coded_side_data,
-        AV_PKT_DATA_DISPLAYMATRIX);
-    if (sd) matrix = reinterpret_cast<const int32_t*>(sd->data);
-#else
-    const uint8_t* sd = av_stream_get_side_data(
-        fmt_ctx_->streams[stream_index], AV_PKT_DATA_DISPLAYMATRIX, nullptr);
-    if (sd) matrix = reinterpret_cast<const int32_t*>(sd);
-#endif
-
-    if (matrix) {
-      rotation = av_display_rotation_get(matrix);
-    }
-
-    if (!qIsNaN(rotation) && qAbs(rotation) > 1.0) {
-      QTransform transform;
-      transform.rotate(-rotation);
-      s->video_preview = s->video_preview.transformed(transform, Qt::SmoothTransformation);
-    }
-  }
+  apply_rotation_to_preview(s, stream_index);
 
   // is video interlaced?
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
-  s->video_auto_interlacing = (temp_frame->flags & AV_FRAME_FLAG_INTERLACED) ? ((temp_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
+  s->video_auto_interlacing =
+      (temp_frame->flags & AV_FRAME_FLAG_INTERLACED)
+          ? ((temp_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST)
+          : VIDEO_PROGRESSIVE;
 #else
-  s->video_auto_interlacing = temp_frame->interlaced_frame ? (temp_frame->top_field_first ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
+  s->video_auto_interlacing = temp_frame->interlaced_frame
+                                  ? (temp_frame->top_field_first ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST)
+                                  : VIDEO_PROGRESSIVE;
 #endif
   s->video_interlacing = s->video_auto_interlacing;
 
@@ -435,8 +404,7 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
 }
 
 void PreviewGenerator::process_audio_frame(AVFrame* temp_frame, FootageStream* s, int stream_index,
-                                           qint16*** waveform_cache_data, int& waveform_cache_count,
-                                           AVPacket* packet) {
+                                           qint16*** waveform_cache_data, int& waveform_cache_count, AVPacket* packet) {
   if (!temp_frame) {
     qWarning() << "process_audio_frame: temp_frame is null";
     return;
@@ -455,17 +423,9 @@ void PreviewGenerator::process_audio_frame(AVFrame* temp_frame, FootageStream* s
   swr_frame->format = AV_SAMPLE_FMT_S16P;
 
   SwrContext* swr_ctx = nullptr;
-  swr_alloc_set_opts2(
-        &swr_ctx,
-        &temp_frame->ch_layout,
-        static_cast<AVSampleFormat>(swr_frame->format),
-        temp_frame->sample_rate,
-        &temp_frame->ch_layout,
-        static_cast<AVSampleFormat>(temp_frame->format),
-        temp_frame->sample_rate,
-        0,
-        nullptr
-        );
+  swr_alloc_set_opts2(&swr_ctx, &temp_frame->ch_layout, static_cast<AVSampleFormat>(swr_frame->format),
+                      temp_frame->sample_rate, &temp_frame->ch_layout, static_cast<AVSampleFormat>(temp_frame->format),
+                      temp_frame->sample_rate, 0, nullptr);
 
   swr_init(swr_ctx);
 
@@ -488,14 +448,12 @@ void PreviewGenerator::process_audio_frame(AVFrame* temp_frame, FootageStream* s
   int nb_bytes = swr_frame->nb_samples * sample_size;
 
   // loop through entire frame
-  for (int i=0;i<nb_bytes;i+=sample_size) {
-
+  for (int i = 0; i < nb_bytes; i += sample_size) {
     // check if we've hit sample threshold
     if (waveform_cache_count == interval) {
-
       // if so, we dump our cached values into the preview and reset them
       // for the next interval
-      for (int j=0;j<swr_frame->ch_layout.nb_channels;j++) {
+      for (int j = 0; j < swr_frame->ch_layout.nb_channels; j++) {
         qint16& min = waveform_cache_data[stream_index][j][0];
         qint16& max = waveform_cache_data[stream_index][j][1];
 
@@ -507,7 +465,7 @@ void PreviewGenerator::process_audio_frame(AVFrame* temp_frame, FootageStream* s
     }
 
     // standard processing for each channel of information
-    for (int j=0;j<swr_frame->ch_layout.nb_channels;j++) {
+    for (int j = 0; j < swr_frame->ch_layout.nb_channels; j++) {
       qint16& min = waveform_cache_data[stream_index][j][0];
       qint16& max = waveform_cache_data[stream_index][j][1];
 
@@ -518,7 +476,7 @@ void PreviewGenerator::process_audio_frame(AVFrame* temp_frame, FootageStream* s
       }
 
       // store most minimum and most maximum samples of this interval
-      qint16 sample = qint16((swr_frame->data[j][i+1] << 8) | swr_frame->data[j][i]);
+      qint16 sample = qint16((swr_frame->data[j][i + 1] << 8) | swr_frame->data[j][i]);
       min = qMin(min, sample);
       max = qMax(max, sample);
     }
@@ -541,7 +499,7 @@ void PreviewGenerator::retrieve_media_duration(int64_t* media_lengths) {
   }
   footage_->length = 0;
   unsigned int maximum_stream = 0;
-  for (unsigned int i=0;i<fmt_ctx_->nb_streams;i++) {
+  for (unsigned int i = 0; i < fmt_ctx_->nb_streams; i++) {
     if (media_lengths[i] > media_lengths[maximum_stream]) {
       maximum_stream = i;
     }
@@ -568,118 +526,136 @@ void PreviewGenerator::retrieve_media_duration(int64_t* media_lengths) {
   finalize_media();
 }
 
+// Read the next decodable packet from fmt_ctx_ into packet, updating end_of_file.
+bool PreviewGenerator::read_next_decodable_packet(AVPacket* packet, AVCodecContext** codec_ctx, bool& end_of_file) {
+  while (codec_ctx[packet->stream_index] == nullptr ||
+         avcodec_receive_frame(codec_ctx[packet->stream_index], nullptr) != AVERROR(EAGAIN)) {
+    // This loop is only used to feed the decoder; actual frame receive is done outside.
+    break;
+  }
+  av_packet_unref(packet);
+  int read_ret = av_read_frame(fmt_ctx_, packet);
+  if (read_ret < 0) {
+    end_of_file = true;
+    if (read_ret != AVERROR_EOF) qCritical() << "Failed to read packet for preview generation" << read_ret;
+    return false;
+  }
+  if (codec_ctx[packet->stream_index] != nullptr) {
+    int send_ret = avcodec_send_packet(codec_ctx[packet->stream_index], packet);
+    if (send_ret < 0 && send_ret != AVERROR(EAGAIN)) {
+      qCritical() << "Failed to send packet for preview generation - aborting" << send_ret;
+      end_of_file = true;
+      return false;
+    }
+  }
+  return true;
+}
+
+// Advance the decode loop until a frame is available or EOF.
+// Returns true if a frame was decoded, false if end-of-file was reached.
+bool PreviewGenerator::advance_until_frame(AVPacket* packet, AVFrame* temp_frame, AVCodecContext** codec_ctx,
+                                           bool& end_of_file) {
+  while (codec_ctx[packet->stream_index] == nullptr ||
+         avcodec_receive_frame(codec_ctx[packet->stream_index], temp_frame) == AVERROR(EAGAIN)) {
+    av_packet_unref(packet);
+    int read_ret = av_read_frame(fmt_ctx_, packet);
+    if (read_ret < 0) {
+      end_of_file = true;
+      if (read_ret != AVERROR_EOF) qCritical() << "Failed to read packet for preview generation" << read_ret;
+      return false;
+    }
+    if (codec_ctx[packet->stream_index] != nullptr) {
+      int send_ret = avcodec_send_packet(codec_ctx[packet->stream_index], packet);
+      if (send_ret < 0 && send_ret != AVERROR(EAGAIN)) {
+        qCritical() << "Failed to send packet for preview generation - aborting" << send_ret;
+        end_of_file = true;
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// Decode and process all frames in fmt_ctx_, collecting video thumbnails and audio waveforms.
+void PreviewGenerator::run_decode_loop(AVFrame* temp_frame, AVCodecContext** codec_ctx, int64_t* media_lengths,
+                                       qint16*** waveform_cache_data, int* waveform_cache_count) {
+  avformat_seek_file(fmt_ctx_, -1, INT64_MIN, 0, 0, 0);
+
+  AVPacket* packet = av_packet_alloc();
+  bool end_of_file = false;
+
+  // Prime: skip to the first packet with a valid decoder
+  int initial_ret;
+  do {
+    initial_ret = av_read_frame(fmt_ctx_, packet);
+    if (initial_ret < 0) break;
+  } while (codec_ctx[packet->stream_index] == nullptr);
+
+  if (initial_ret < 0) {
+    end_of_file = true;
+  } else {
+    avcodec_send_packet(codec_ctx[packet->stream_index], packet);
+  }
+
+  while (!end_of_file) {
+    if (!advance_until_frame(packet, temp_frame, codec_ctx, end_of_file)) break;
+
+    int sidx = packet->stream_index;
+    bool is_video = (fmt_ctx_->streams[sidx]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO);
+    FootageStream* s = footage_->get_stream_from_file_index(is_video, sidx);
+    if (s != nullptr) {
+      if (is_video) {
+        process_video_frame(temp_frame, s, codec_ctx, sidx);
+        media_lengths[sidx]++;
+      } else if (fmt_ctx_->streams[sidx]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+        process_audio_frame(temp_frame, s, sidx, waveform_cache_data, waveform_cache_count[sidx], packet);
+        if (cancelled_) break;
+      }
+    }
+
+    // Check if all needed previews are done
+    if (!retrieve_duration_ && footage_->audio_tracks.size() == 0) {
+      bool done = true;
+      for (const auto& video_track : footage_->video_tracks) {
+        if (!video_track.preview_done) {
+          done = false;
+          break;
+        }
+      }
+      if (done) break;
+    }
+    av_packet_unref(packet);
+  }
+
+  av_packet_free(&packet);
+}
+
 void PreviewGenerator::generate_waveform() {
   AVFrame* temp_frame = av_frame_alloc();
-
-  // stores codec contexts for format's streams
-  AVCodecContext** codec_ctx = new AVCodecContext* [fmt_ctx_->nb_streams];
-
-  // stores media lengths while scanning in case the format has no duration metadata
+  AVCodecContext** codec_ctx = new AVCodecContext*[fmt_ctx_->nb_streams];
   int64_t* media_lengths = new int64_t[fmt_ctx_->nb_streams]{0};
-
-  // stores samples while scanning before they get sent to preview file
-  qint16*** waveform_cache_data = new qint16** [fmt_ctx_->nb_streams];
+  qint16*** waveform_cache_data = new qint16**[fmt_ctx_->nb_streams];
   int* waveform_cache_count = new int[fmt_ctx_->nb_streams]{0};
 
   bool create_previews = setup_stream_codecs(codec_ctx, waveform_cache_data);
 
   if (create_previews) {
-    // Seek back to the beginning — avformat_find_stream_info() may have consumed
-    // initial packets, leaving the read position past the start of the file.
-    avformat_seek_file(fmt_ctx_, -1, INT64_MIN, 0, 0, 0);
+    run_decode_loop(temp_frame, codec_ctx, media_lengths, waveform_cache_data, waveform_cache_count);
 
-    AVPacket* packet = av_packet_alloc();
-
-    bool done = true;
-
-    bool end_of_file = false;
-
-    // get the ball rolling
-    int initial_ret;
-    do {
-      initial_ret = av_read_frame(fmt_ctx_, packet);
-      if (initial_ret < 0) break;
-    } while (codec_ctx[packet->stream_index] == nullptr);
-    if (initial_ret < 0) {
-      end_of_file = true;
-    } else {
-      avcodec_send_packet(codec_ctx[packet->stream_index], packet);
-    }
-
-    while (!end_of_file) {
-      while (codec_ctx[packet->stream_index] == nullptr || avcodec_receive_frame(codec_ctx[packet->stream_index], temp_frame) == AVERROR(EAGAIN)) {
-        av_packet_unref(packet);
-        int read_ret = av_read_frame(fmt_ctx_, packet);
-
-        if (read_ret < 0) {
-          end_of_file = true;
-          if (read_ret != AVERROR_EOF) qCritical() << "Failed to read packet for preview generation" << read_ret;
-          break;
-        }
-        if (codec_ctx[packet->stream_index] != nullptr) {
-          int send_ret = avcodec_send_packet(codec_ctx[packet->stream_index], packet);
-          if (send_ret < 0 && send_ret != AVERROR(EAGAIN)) {
-            qCritical() << "Failed to send packet for preview generation - aborting" << send_ret;
-            end_of_file = true;
-            break;
-          }
-        }
-      }
-      if (!end_of_file) {
-        FootageStream* s = footage_->get_stream_from_file_index(fmt_ctx_->streams[packet->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO, packet->stream_index);
-        if (s != nullptr) {
-          if (fmt_ctx_->streams[packet->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-            process_video_frame(temp_frame, s, codec_ctx, packet->stream_index);
-            media_lengths[packet->stream_index]++;
-          } else if (fmt_ctx_->streams[packet->stream_index]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-            process_audio_frame(temp_frame, s, packet->stream_index,
-                                waveform_cache_data, waveform_cache_count[packet->stream_index], packet);
-
-            if (cancelled_) {
-              end_of_file = true;
-              break;
-            }
-          }
-        }
-
-        // check if we've got all our previews
-        if (retrieve_duration_) {
-          done = false;
-        } else if (footage_->audio_tracks.size() == 0) {
-          done = true;
-          for (const auto & video_track : footage_->video_tracks) {
-            if (!video_track.preview_done) {
-              done = false;
-              break;
-            }
-          }
-          if (done) {
-            end_of_file = true;
-            break;
-          }
-        }
-        av_packet_unref(packet);
-      }
-    }
-
-    av_packet_free(&packet);
-
-    for (unsigned int i=0;i<fmt_ctx_->nb_streams;i++) {
+    for (unsigned int i = 0; i < fmt_ctx_->nb_streams; i++) {
       if (waveform_cache_data[i] != nullptr) {
         int nb_channels = fmt_ctx_->streams[i]->codecpar->ch_layout.nb_channels;
-        for (int j=0;j<nb_channels;j++) {
-          delete [] waveform_cache_data[i][j];
+        for (int j = 0; j < nb_channels; j++) {
+          delete[] waveform_cache_data[i][j];
         }
-        delete [] waveform_cache_data[i];
+        delete[] waveform_cache_data[i];
       }
-
       if (codec_ctx[i] != nullptr) {
         avcodec_free_context(&codec_ctx[i]);
       }
     }
 
-    // by this point, we'll have made all audio waveform previews
-    for (auto & audio_track : footage_->audio_tracks) {
+    for (auto& audio_track : footage_->audio_tracks) {
       audio_track.preview_done = true;
     }
   }
@@ -690,10 +666,10 @@ void PreviewGenerator::generate_waveform() {
     retrieve_media_duration(media_lengths);
   }
 
-  delete [] waveform_cache_data;
-  delete [] waveform_cache_count;
-  delete [] media_lengths;
-  delete [] codec_ctx;
+  delete[] waveform_cache_data;
+  delete[] waveform_cache_count;
+  delete[] media_lengths;
+  delete[] codec_ctx;
 }
 
 QString PreviewGenerator::get_thumbnail_path(const QString& hash, const FootageStream& ms) {
@@ -702,6 +678,40 @@ QString PreviewGenerator::get_thumbnail_path(const QString& hash, const FootageS
 
 QString PreviewGenerator::get_waveform_path(const QString& hash, const FootageStream& ms) {
   return data_dir_.filePath(QString("%1w%2").arg(hash, QString::number(ms.file_index)));
+}
+
+void PreviewGenerator::generate_still_image_previews() {
+  for (auto& ms : footage_->video_tracks) {
+    if (!ms.preview_done) {
+      QImage img(footage_->url);
+      if (!img.isNull()) {
+        int dstH = amber::CurrentConfig.thumbnail_resolution;
+        int dstW = qRound(dstH * (double(img.width()) / double(img.height())));
+        ms.video_preview = img.scaled(dstW, dstH, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
+                               .convertToFormat(QImage::Format_RGBA8888);
+        ms.preview_done = true;
+      }
+    }
+  }
+  if (retrieve_duration_) {
+    footage_->length = 0;
+    finalize_media();
+  }
+}
+
+void PreviewGenerator::save_previews_to_disk(const QString& hash) {
+  for (auto& ms : footage_->video_tracks) {
+    if (ms.preview_done) {
+      ms.video_preview.save(get_thumbnail_path(hash, ms), "PNG");
+    }
+  }
+  for (auto& ms : footage_->audio_tracks) {
+    QFile f(get_waveform_path(hash, ms));
+    if (f.open(QFile::WriteOnly)) {
+      f.write(ms.audio_preview.constData(), ms.audio_preview.size());
+      f.close();
+    }
+  }
 }
 
 void PreviewGenerator::run() {
@@ -716,14 +726,12 @@ void PreviewGenerator::run() {
   bool error = false;
 
   AVDictionary* format_opts = nullptr;
-
-  // for image sequences that don't start at 0, set the index where it does start
   if (footage_->start_number > 0) {
     av_dict_set(&format_opts, "start_number", QString::number(footage_->start_number).toUtf8(), 0);
   }
 
   int errCode = avformat_open_input(&fmt_ctx_, filename, nullptr, &format_opts);
-  if(errCode != 0) {
+  if (errCode != 0) {
     char err[1024];
     av_strerror(errCode, err, 1024);
     errorStr = tr("Could not open file - %1").arg(err);
@@ -739,51 +747,19 @@ void PreviewGenerator::run() {
       av_dump_format(fmt_ctx_, 0, filename, 0);
       parse_media();
 
-      // see if we already have data for this
       QString hash = get_file_hash(footage_->url);
-
       if (retrieve_preview(hash)) {
         sem.acquire();
 
         if (!cancelled_) {
           if (contains_still_image_) {
-            // Still images (jpeg_pipe, png_pipe, etc.): pipe demuxers can't seek back
-            // after avformat_find_stream_info(), so the FFmpeg decode loop gets EOF.
-            // Load the thumbnail directly via Qt instead.
-            for (auto & ms : footage_->video_tracks) {
-              if (!ms.preview_done) {
-                QImage img(footage_->url);
-                if (!img.isNull()) {
-                  int dstH = amber::CurrentConfig.thumbnail_resolution;
-                  int dstW = qRound(dstH * (double(img.width()) / double(img.height())));
-                  ms.video_preview = img.scaled(dstW, dstH, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
-                                        .convertToFormat(QImage::Format_RGBA8888);
-                  ms.preview_done = true;
-                }
-              }
-            }
-            if (retrieve_duration_) {
-              footage_->length = 0;
-              finalize_media();
-            }
+            generate_still_image_previews();
           } else {
             generate_waveform();
           }
 
           if (!cancelled_) {
-            // save preview to file
-            for (auto & ms : footage_->video_tracks) {
-              if (ms.preview_done) {
-                ms.video_preview.save(get_thumbnail_path(hash, ms), "PNG");
-              }
-            }
-            for (auto & ms : footage_->audio_tracks) {
-              QFile f(get_waveform_path(hash, ms));
-              if (f.open(QFile::WriteOnly)) {
-                f.write(ms.audio_preview.constData(), ms.audio_preview.size());
-                f.close();
-              }
-            }
+            save_previews_to_disk(hash);
           }
         }
 
@@ -793,13 +769,11 @@ void PreviewGenerator::run() {
     avformat_close_input(&fmt_ctx_);
   }
 
-  if (!cancelled_) {
-    if (error) {
-      invalidate_media(errorStr);
-    }
+  if (!cancelled_ && error) {
+    invalidate_media(errorStr);
   }
 
-  delete [] filename;
+  delete[] filename;
   footage_->preview_gen = nullptr;
 }
 
@@ -808,8 +782,7 @@ void PreviewGenerator::cancel() {
   wait();
 }
 
-void PreviewGenerator::AnalyzeMedia(Media *m)
-{
+void PreviewGenerator::AnalyzeMedia(Media* m) {
   // PreviewGenerator's constructor starts the thread, sets a reference of itself as the media's generator,
   // and connects its thread completion to its own deletion, therefore handling its own memory. Nothing else needs to
   // be done.

@@ -111,81 +111,70 @@ void Media::set_icon(const QIcon& ico) { icon = ico; }
 
 void Media::set_parent(Media* p) { parent = p; }
 
+QString Media::footage_tooltip_body(Footage* f) {
+  QString t;
+  if (f->video_tracks.size() > 0) {
+    t += QCoreApplication::translate("Media", "Video Dimensions:") + " ";
+    for (int i = 0; i < f->video_tracks.size(); i++) {
+      if (i > 0) t += ", ";
+      t += QString::number(f->video_tracks.at(i).video_width) + "x" +
+           QString::number(f->video_tracks.at(i).video_height);
+    }
+    t += "\n";
+
+    if (!f->video_tracks.at(0).infinite_length) {
+      t += QCoreApplication::translate("Media", "Frame Rate:") + " ";
+      for (int i = 0; i < f->video_tracks.size(); i++) {
+        if (i > 0) t += ", ";
+        if (f->video_tracks.at(i).video_interlacing == VIDEO_PROGRESSIVE) {
+          t += QString::number(f->video_tracks.at(i).video_frame_rate * f->speed);
+        } else {
+          double adjusted_rate = f->video_tracks.at(i).video_frame_rate * f->speed;
+          t += QCoreApplication::translate("Media", "%1 field(s) (%2 frame(s))")
+                   .arg(QString::number(adjusted_rate * 2.0), QString::number(adjusted_rate));
+        }
+      }
+      t += "\n";
+    }
+
+    t += QCoreApplication::translate("Media", "Interlacing:") + " ";
+    for (int i = 0; i < f->video_tracks.size(); i++) {
+      if (i > 0) t += ", ";
+      t += get_interlacing_name(f->video_tracks.at(i).video_interlacing);
+    }
+  }
+
+  if (f->audio_tracks.size() > 0) {
+    t += "\n";
+    t += QCoreApplication::translate("Media", "Audio Frequency:") + " ";
+    for (int i = 0; i < f->audio_tracks.size(); i++) {
+      if (i > 0) t += ", ";
+      t += QString::number(f->audio_tracks.at(i).audio_frequency * f->speed);
+    }
+    t += "\n";
+    t += QCoreApplication::translate("Media", "Audio Channels:") + " ";
+    for (int i = 0; i < f->audio_tracks.size(); i++) {
+      if (i > 0) t += ", ";
+      t += get_channel_layout_name(f->audio_tracks.at(i).audio_channels, f->audio_tracks.at(i).audio_layout);
+    }
+  }
+  return t;
+}
+
 void Media::update_tooltip(const QString& error) {
   switch (type) {
     case MEDIA_TYPE_FOOTAGE: {
       Footage* f = to_footage();
       tooltip = QCoreApplication::translate("Media", "Name:") + " " + f->name + "\n" +
                 QCoreApplication::translate("Media", "Filename:") + " " + f->url + "\n";
-
       if (error.isEmpty()) {
-        if (f->video_tracks.size() > 0) {
-          tooltip += QCoreApplication::translate("Media", "Video Dimensions:") + " ";
-          for (int i = 0; i < f->video_tracks.size(); i++) {
-            if (i > 0) {
-              tooltip += ", ";
-            }
-            tooltip += QString::number(f->video_tracks.at(i).video_width) + "x" +
-                       QString::number(f->video_tracks.at(i).video_height);
-          }
-          tooltip += "\n";
-
-          if (!f->video_tracks.at(0).infinite_length) {
-            tooltip += QCoreApplication::translate("Media", "Frame Rate:") + " ";
-            for (int i = 0; i < f->video_tracks.size(); i++) {
-              if (i > 0) {
-                tooltip += ", ";
-              }
-              if (f->video_tracks.at(i).video_interlacing == VIDEO_PROGRESSIVE) {
-                tooltip += QString::number(f->video_tracks.at(i).video_frame_rate * f->speed);
-              } else {
-                double adjusted_rate = f->video_tracks.at(i).video_frame_rate * f->speed;
-
-                tooltip += QCoreApplication::translate("Media", "%1 field(s) (%2 frame(s))")
-                               .arg(QString::number(adjusted_rate * 2.0), QString::number(adjusted_rate));
-              }
-            }
-            tooltip += "\n";
-          }
-
-          tooltip += QCoreApplication::translate("Media", "Interlacing:") + " ";
-          for (int i = 0; i < f->video_tracks.size(); i++) {
-            if (i > 0) {
-              tooltip += ", ";
-            }
-            tooltip += get_interlacing_name(f->video_tracks.at(i).video_interlacing);
-          }
-        }
-
-        if (f->audio_tracks.size() > 0) {
-          tooltip += "\n";
-
-          tooltip += QCoreApplication::translate("Media", "Audio Frequency:") + " ";
-          for (int i = 0; i < f->audio_tracks.size(); i++) {
-            if (i > 0) {
-              tooltip += ", ";
-            }
-            tooltip += QString::number(f->audio_tracks.at(i).audio_frequency * f->speed);
-          }
-          tooltip += "\n";
-
-          tooltip += QCoreApplication::translate("Media", "Audio Channels:") + " ";
-          for (int i = 0; i < f->audio_tracks.size(); i++) {
-            if (i > 0) {
-              tooltip += ", ";
-            }
-            tooltip +=
-                get_channel_layout_name(f->audio_tracks.at(i).audio_channels, f->audio_tracks.at(i).audio_layout);
-          }
-          // tooltip += "\n";
-        }
+        tooltip += footage_tooltip_body(f);
       } else {
         tooltip += error;
       }
     } break;
     case MEDIA_TYPE_SEQUENCE: {
       Sequence* s = to_sequence().get();
-
       tooltip = QCoreApplication::translate("Media",
                                             "Name: %1"
                                             "\nVideo Dimensions: %2x%3"
@@ -307,6 +296,21 @@ QString Media::GetStringDuration() {
   return QString();
 }
 
+QVariant Media::GetRateDisplay() {
+  if (get_type() == MEDIA_TYPE_SEQUENCE) return QString::number(get_frame_rate()) + " FPS";
+  if (get_type() == MEDIA_TYPE_FOOTAGE) {
+    Footage* f = to_footage();
+    double r;
+    if (f->video_tracks.size() > 0 && !qIsNull(r = get_frame_rate())) {
+      return QString::number(get_frame_rate()) + " FPS";
+    }
+    if (f->audio_tracks.size() > 0) {
+      return QString::number(get_sampling_rate()) + " Hz";
+    }
+  }
+  return QVariant();
+}
+
 QVariant Media::data(int column, int role) {
   switch (role) {
     case Qt::DecorationRole:
@@ -317,38 +321,24 @@ QVariant Media::data(int column, int role) {
             return QIcon(QPixmap::fromImage(f->video_tracks.at(0).video_preview));
           }
         }
-
         return icon;
       }
       break;
     case Qt::DisplayRole:
       switch (column) {
         case 0:
-          return (root) ? QCoreApplication::translate("Media", "Name") : get_name();
+          return root ? QCoreApplication::translate("Media", "Name") : get_name();
         case 1:
           if (root) return QCoreApplication::translate("Media", "Duration");
           return GetStringDuration();
-          break;
         case 2:
           if (root) return QCoreApplication::translate("Media", "Rate");
-          if (get_type() == MEDIA_TYPE_SEQUENCE) return QString::number(get_frame_rate()) + " FPS";
-          if (get_type() == MEDIA_TYPE_FOOTAGE) {
-            Footage* f = to_footage();
-            double r;
-            if (f->video_tracks.size() > 0 && !qIsNull(r = get_frame_rate())) {
-              return QString::number(get_frame_rate()) + " FPS";
-            } else if (f->audio_tracks.size() > 0) {
-              return QString::number(get_sampling_rate()) + " Hz";
-            }
-          }
-          break;
+          return GetRateDisplay();
       }
       break;
     case Qt::ToolTipRole:
       return tooltip;
-
     case Qt::UserRole:
-      // User role returns the duration
       return GetStringDuration();
   }
   return QVariant();

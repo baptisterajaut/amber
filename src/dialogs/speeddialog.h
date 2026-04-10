@@ -21,9 +21,9 @@
 #ifndef SPEEDDIALOG_H
 #define SPEEDDIALOG_H
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
-#include <QCheckBox>
 
 #include "engine/clip.h"
 #include "ui/labelslider.h"
@@ -36,10 +36,9 @@
  *
  * It's preferable to
  */
-class SpeedDialog : public QDialog
-{
+class SpeedDialog : public QDialog {
   Q_OBJECT
-public:
+ public:
   /**
    * @brief SpeedDialog Constructor
    *
@@ -52,7 +51,7 @@ public:
    * A valid array of Clips to change the speed of.
    */
   SpeedDialog(QWidget* parent, QVector<Clip*> clips);
-public slots:
+ public slots:
   /**
    * @brief Override of exec() to set up current Clip speed data just before opening
    *
@@ -61,7 +60,7 @@ public slots:
    * The result of QDialog::exec(), a DialogCode result.
    */
   int exec() override;
-private slots:
+ private slots:
   /**
    * @brief Override of accept() to perform the selected changes on the Clips
    */
@@ -93,7 +92,23 @@ private slots:
    * same speed multipler.
    */
   void frame_rate_update();
-private:
+
+ private:
+  /**
+   * @brief Process an audio clip for maintain_pitch checkbox state during exec() init.
+   */
+  void init_exec_audio_clip(Clip* c, bool& multiple_audio);
+
+  /**
+   * @brief Populate the loop mode combo from clips_.
+   */
+  void init_exec_loop_combo();
+
+  /**
+   * @brief Apply speed change from percent/frame_rate/duration field to all clips.
+   */
+  void apply_speed_change(ComboAction* ca, long& earliest_point, long& longest_ripple);
+
   /**
    * @brief Internal array of Clip objects
    */
@@ -135,4 +150,4 @@ private:
   QComboBox* loop_combo_;
 };
 
-#endif // SPEEDDIALOG_H
+#endif  // SPEEDDIALOG_H

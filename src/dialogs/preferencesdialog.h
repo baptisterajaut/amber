@@ -21,18 +21,18 @@
 #ifndef PREFERENCESDIALOG_H
 #define PREFERENCESDIALOG_H
 
-#include <QDialog>
-#include <QKeySequenceEdit>
-#include <QMenuBar>
-#include <QLineEdit>
+#include <QCheckBox>
 #include <QComboBox>
+#include <QDialog>
+#include <QDoubleSpinBox>
+#include <QKeySequenceEdit>
+#include <QLineEdit>
+#include <QMenu>
+#include <QMenuBar>
 #include <QRadioButton>
+#include <QSpinBox>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
-#include <QMenu>
-#include <QCheckBox>
-#include <QDoubleSpinBox>
-#include <QSpinBox>
 
 #include "engine/sequence.h"
 
@@ -45,11 +45,10 @@ class LabelSlider;
  * A dialog for the global application settings. Mostly an interface for Config. Can be loaded from any part of the
  * application.
  */
-class PreferencesDialog : public QDialog
-{
+class PreferencesDialog : public QDialog {
   Q_OBJECT
 
-public:
+ public:
   /**
    * @brief PreferencesDialog Constructor
    *
@@ -57,9 +56,9 @@ public:
    *
    * QWidget parent. Usually MainWindow.
    */
-  explicit PreferencesDialog(QWidget *parent = nullptr);
+  explicit PreferencesDialog(QWidget* parent = nullptr);
 
-private slots:
+ private slots:
   /**
    * @brief Override of accept to save preferences to Config.
    */
@@ -97,7 +96,7 @@ private slots:
    * If so, TRUE is returned so the parent is shown too (even if it doesn't match the search query). If not, FALSE is
    * returned so the parent is hidden.
    */
-  bool refine_shortcut_list(const QString &s, QTreeWidgetItem* parent = nullptr);
+  bool refine_shortcut_list(const QString& s, QTreeWidgetItem* parent = nullptr);
 
   /**
    * @brief Show a file dialog to load an external shortcut preset from file
@@ -124,7 +123,16 @@ private slots:
    */
   void edit_default_sequence_settings();
 
-private:
+ private:
+  /**
+   * @brief Save all UI widget values to amber::CurrentConfig.
+   */
+  void save_config_from_ui();
+
+  /**
+   * @brief Delete preview cache files if thumbnail/waveform resolution changed.
+   */
+  void handle_preview_resolution_changes();
 
   /**
    * @brief Create and arrange all UI widgets
@@ -360,7 +368,7 @@ private:
  */
 class KeySequenceEditor : public QKeySequenceEdit {
   Q_OBJECT
-public:
+ public:
   /**
    * @brief KeySequenceEditor Constructor
    *
@@ -372,7 +380,7 @@ public:
    *
    * The QAction to link to. This cannot be changed throughout the lifetime of a KeySequenceEditor.
    */
-  KeySequenceEditor(QWidget *parent, QAction* a);
+  KeySequenceEditor(QWidget* parent, QAction* a);
 
   /**
    * @brief Sets the attached QAction's shortcut to the shortcut entered in this field.
@@ -419,11 +427,12 @@ public:
    * because a default shortcut does not need to be saved to a file.
    */
   QString export_shortcut();
-private:
+
+ private:
   /**
    * @brief Internal reference to the linked QAction
    */
   QAction* action;
 };
 
-#endif // PREFERENCESDIALOG_H
+#endif  // PREFERENCESDIALOG_H

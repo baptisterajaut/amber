@@ -168,9 +168,8 @@ QRhiTexture* SubtitleEffect::process_superimpose(QRhi* rhi, QRhiResourceUpdateBa
   // Update main-thread UI with active cue text (capture by value to avoid cross-thread data race)
   if (cue_changed) {
     QString cue_text = new_cue >= 0 ? cues_[new_cue].text.left(80) : QString();
-    QMetaObject::invokeMethod(this, [this, cue_text]() {
-      current_cue_field_->SetValueAt(0, cue_text);
-    }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(
+        this, [this, cue_text]() { current_cue_field_->SetValueAt(0, cue_text); }, Qt::QueuedConnection);
   }
 
   if (valueHasChanged(timecode) || dimensions_changed || cue_changed) {
@@ -192,6 +191,70 @@ QRhiTexture* SubtitleEffect::process_superimpose(QRhi* rhi, QRhiResourceUpdateBa
   }
 
   return superimposeTex_;
+}
+
+void SubtitleEffect::DrawSubtitleShadow(QPainter& p, QTextDocument& td, const QRect& clip_rect, int translate_x,
+                                        int translate_y, double timecode) {
+  double angle = shadow_angle_field_->GetDoubleAt(timecode) * M_PI / 180.0;
+  double distance = qFloor(shadow_distance_field_->GetDoubleAt(timecode));
+  int sx = qRound(qCos(angle) * distance);
+  int sy = qRound(qSin(angle) * distance);
+
+  p.translate(sx, sy);
+  QRect shadow_clip = clip_rect;
+  shadow_clip.translate(-sx, -sy);
+  td.drawContents(&p, shadow_clip);
+
+  int blur_softness = qFloor(shadow_softness_field_->GetDoubleAt(timecode));
+  if (blur_softness > 0) {
+    p.end();
+    amber::ui::blur(img, img.rect(), blur_softness, true);
+    p.begin(&img);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.translate(translate_x + sx, translate_y + sy);
+  }
+
+  p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+  QColor scol = shadow_color_field_->GetColorAt(timecode);
+  scol.setAlphaF(shadow_opacity_field_->GetDoubleAt(timecode) * 0.01);
+  p.fillRect(shadow_clip, scol);
+  p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+  p.translate(-sx, -sy);
+}
+
+void SubtitleEffect::DrawSubtitleOutline(QPainter& p, QTextDocument& td, const QRect& clip_rect, int translate_x,
+                                         int translate_y, double timecode) {
+  int ow = qCeil(outline_width_field_->GetDoubleAt(timecode));
+  if (ow <= 0) return;
+
+  QColor ocol = outline_color_field_->GetColorAt(timecode);
+  QImage outline_img(img.size(), QImage::Format_RGBA8888_Premultiplied);
+  outline_img.fill(Qt::transparent);
+
+  QPainter op(&outline_img);
+  op.setRenderHint(QPainter::Antialiasing);
+  op.translate(translate_x, translate_y);
+
+  int steps = qBound(8, ow * 4, 24);
+  for (int s = 0; s < steps; s++) {
+    double a = 2.0 * M_PI * s / steps;
+    int ox = qRound(qCos(a) * ow);
+    int oy = qRound(qSin(a) * ow);
+    op.save();
+    op.translate(ox, oy);
+    QRect offset_clip = clip_rect;
+    offset_clip.translate(-ox, -oy);
+    td.drawContents(&op, offset_clip);
+    op.restore();
+  }
+
+  // Tint with outline color
+  op.setCompositionMode(QPainter::CompositionMode_SourceIn);
+  op.fillRect(outline_img.rect(), ocol);
+  op.end();
+
+  // Composite outline onto main image (over shadow, under text)
+  p.drawImage(0, 0, outline_img);
 }
 
 void SubtitleEffect::redraw(double timecode) {
@@ -240,9 +303,7 @@ void SubtitleEffect::redraw(double timecode) {
 
   QTextDocument td;
   td.setHtml(html);
-  if (wordwrap_field_->GetBoolAt(timecode)) {
-    td.setTextWidth(width);
-  }
+  if (wordwrap_field_->GetBoolAt(timecode)) td.setTextWidth(width);
 
   int doc_height = qRound(td.size().height());
 
@@ -263,74 +324,11 @@ void SubtitleEffect::redraw(double timecode) {
   p.setRenderHint(QPainter::Antialiasing);
   p.translate(translate_x, translate_y);
 
-  // Draw shadow
-  if (shadow_field_->GetBoolAt(timecode)) {
-    double angle = shadow_angle_field_->GetDoubleAt(timecode) * M_PI / 180.0;
-    double distance = qFloor(shadow_distance_field_->GetDoubleAt(timecode));
-    int sx = qRound(qCos(angle) * distance);
-    int sy = qRound(qSin(angle) * distance);
-
-    p.translate(sx, sy);
-    QRect shadow_clip = clip_rect;
-    shadow_clip.translate(-sx, -sy);
-
-    td.drawContents(&p, shadow_clip);
-
-    int blur_softness = qFloor(shadow_softness_field_->GetDoubleAt(timecode));
-    if (blur_softness > 0) {
-      p.end();
-      amber::ui::blur(img, img.rect(), blur_softness, true);
-      p.begin(&img);
-      p.setRenderHint(QPainter::Antialiasing);
-      p.translate(translate_x + sx, translate_y + sy);
-    }
-
-    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
-    QColor scol = shadow_color_field_->GetColorAt(timecode);
-    scol.setAlphaF(shadow_opacity_field_->GetDoubleAt(timecode) * 0.01);
-    p.fillRect(shadow_clip, scol);
-    p.setCompositionMode(QPainter::CompositionMode_SourceOver);
-
-    p.translate(-sx, -sy);
-  }
+  if (shadow_field_->GetBoolAt(timecode)) DrawSubtitleShadow(p, td, clip_rect, translate_x, translate_y, timecode);
 
   // Draw outline via multi-pass offset on a scratch image to avoid SourceIn
   // tinting the already-composited shadow pixels
-  if (outline_field_->GetBoolAt(timecode)) {
-    int ow = qCeil(outline_width_field_->GetDoubleAt(timecode));
-    if (ow > 0) {
-      QColor ocol = outline_color_field_->GetColorAt(timecode);
-
-      QImage outline_img(img.size(), QImage::Format_RGBA8888_Premultiplied);
-      outline_img.fill(Qt::transparent);
-
-      QPainter op(&outline_img);
-      op.setRenderHint(QPainter::Antialiasing);
-      op.translate(translate_x, translate_y);
-
-      int steps = qBound(8, ow * 4, 24);
-      for (int s = 0; s < steps; s++) {
-        double a = 2.0 * M_PI * s / steps;
-        int ox = qRound(qCos(a) * ow);
-        int oy = qRound(qSin(a) * ow);
-
-        op.save();
-        op.translate(ox, oy);
-        QRect offset_clip = clip_rect;
-        offset_clip.translate(-ox, -oy);
-        td.drawContents(&op, offset_clip);
-        op.restore();
-      }
-
-      // Tint with outline color
-      op.setCompositionMode(QPainter::CompositionMode_SourceIn);
-      op.fillRect(outline_img.rect(), ocol);
-      op.end();
-
-      // Composite outline onto main image (over shadow, under text)
-      p.drawImage(0, 0, outline_img);
-    }
-  }
+  if (outline_field_->GetBoolAt(timecode)) DrawSubtitleOutline(p, td, clip_rect, translate_x, translate_y, timecode);
 
   // Draw main text on top
   td.drawContents(&p, clip_rect);

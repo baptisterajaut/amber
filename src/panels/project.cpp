@@ -493,6 +493,163 @@ bool delete_clips_in_clipboard_with_media(ComboAction* ca, Media* m) {
   return (delete_count > 0);
 }
 
+// Confirm whether a footage item should be deleted when it's in use.
+// Returns: 1 = confirmed delete, 0 = skip, -1 = abort
+static int confirm_footage_delete(QWidget* parent, Media* item, Sequence* s, int items_count) {
+  Footage* media = item->to_footage();
+  QMessageBox confirm(parent);
+  confirm.setWindowTitle(QCoreApplication::translate("Project", "Delete media in use?"));
+  confirm.setText(QCoreApplication::translate("Project",
+                      "The media '%1' is currently used in '%2'. Deleting it will remove all instances in "
+                      "the sequence. Are you sure you want to do this?")
+                      .arg(media->name, s->name));
+  QAbstractButton* yes_button = confirm.addButton(QMessageBox::Yes);
+  QAbstractButton* skip_button = nullptr;
+  if (items_count > 1) skip_button = confirm.addButton(QCoreApplication::translate("Project", "Skip"), QMessageBox::NoRole);
+  QAbstractButton* abort_button = confirm.addButton(QMessageBox::Cancel);
+  confirm.exec();
+  if (confirm.clickedButton() == yes_button) return 1;
+  if (confirm.clickedButton() == skip_button) return 0;
+  if (confirm.clickedButton() == abort_button) return -1;
+  return -1;
+}
+
+// Handle the "skip" action: add item and its ancestor chain to the parents exclusion list,
+// also re-add siblings of each ancestor so they aren't lost.
+static void skip_media_item(Media* item, QList<Media*>& items, QVector<Media*>& parents) {
+  Media* parent = item;
+  while (parent != nullptr) {
+    parents.append(parent);
+    for (int m = 0; m < parent->childCount(); m++) {
+      Media* child = parent->child(m);
+      bool found = false;
+      for (auto existing : items) {
+        if (existing == child) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        items.append(child);
+      }
+    }
+    parent = parent->parentItem();
+  }
+}
+
+// Check all footage items and confirm deletion with the user for those in use.
+// Returns false if the user aborted the whole delete operation.
+static bool check_footage_in_use(QWidget* parent, ComboAction* ca, QList<Media*>& items,
+                                  const QList<Media*>& sequence_items, QVector<Media*>& parents, bool& redraw) {
+  QList<Media*> media_items;
+  // Using a local helper scope — avoid capturing `parent` arg as a raw pointer in lambdas
+  for (const auto& it : items) {
+    if (it->get_type() == MEDIA_TYPE_FOOTAGE) media_items.append(it);
+  }
+
+  for (int i = 0; i < media_items.size(); i++) {
+    Media* item = media_items.at(i);
+    bool confirm_delete = false;
+
+    for (int j = 0; j < sequence_items.size(); j++) {
+      Sequence* s = sequence_items.at(j)->to_sequence().get();
+      for (int k = 0; k < s->clips.size(); k++) {
+        ClipPtr c = s->clips.at(k);
+        if (c == nullptr || c->media() != item) continue;
+
+        if (!confirm_delete) {
+          int choice = confirm_footage_delete(parent, item, s, items.size());
+          if (choice == 1) {
+            confirm_delete = true;
+            redraw = true;
+          } else if (choice == 0) {
+            skip_media_item(item, items, parents);
+            j = sequence_items.size();
+            k = s->clips.size();
+          } else {
+            return false;  // abort
+          }
+        }
+        if (confirm_delete) {
+          ca->append(new DeleteClipAction(s, k));
+        }
+      }
+    }
+    if (confirm_delete) {
+      delete_clips_in_clipboard_with_media(ca, item);
+    }
+  }
+  return true;
+}
+
+// Check nested-sequence references and confirm with the user.
+// Returns false if the user cancelled.
+static bool check_sequence_references(QWidget* parent, ComboAction* ca, const QList<Media*>& items,
+                                       const QList<Media*>& sequence_items, bool& redraw) {
+  for (int i = 0; i < items.size(); i++) {
+    Media* item = items.at(i);
+    if (item->get_type() != MEDIA_TYPE_SEQUENCE) continue;
+
+    for (int j = 0; j < sequence_items.size(); j++) {
+      Media* seq_media = sequence_items.at(j);
+      if (items.contains(seq_media)) continue;
+
+      Sequence* s = seq_media->to_sequence().get();
+      bool found_ref = false;
+      for (int k = 0; k < s->clips.size(); k++) {
+        ClipPtr c = s->clips.at(k);
+        if (c == nullptr || c->media() != item) continue;
+
+        if (!found_ref) {
+          QMessageBox confirm(parent);
+          confirm.setWindowTitle(QCoreApplication::translate("Project", "Delete sequence in use?"));
+          confirm.setText(QCoreApplication::translate("Project",
+                              "The sequence '%1' is used as a nested sequence in '%2'. "
+                              "Deleting it will remove all instances. Are you sure?")
+                              .arg(item->to_sequence()->name, s->name));
+          confirm.addButton(QMessageBox::Yes);
+          QAbstractButton* cancel_button = confirm.addButton(QMessageBox::Cancel);
+          confirm.exec();
+          if (confirm.clickedButton() == cancel_button) return false;
+          redraw = true;
+          found_ref = true;
+        }
+        ca->append(new DeleteClipAction(s, k));
+      }
+      if (found_ref) break;
+    }
+  }
+  return true;
+}
+
+// Add delete commands for each item and handle viewer/sequence cleanup.
+static void append_delete_commands(ComboAction* ca, const QList<Media*>& items, bool& redraw) {
+  for (auto item : items) {
+    ca->append(new DeleteMediaCommand(item->parentItem()->get_shared_ptr(item)));
+
+    if (item->get_type() == MEDIA_TYPE_SEQUENCE) {
+      redraw = true;
+      Sequence* s = item->to_sequence().get();
+      if (s == amber::ActiveSequence.get()) {
+        ca->append(new ChangeSequenceAction(nullptr));
+      }
+      if (s == panel_footage_viewer->seq.get()) {
+        panel_footage_viewer->set_media(nullptr);
+      }
+    } else if (item->get_type() == MEDIA_TYPE_FOOTAGE) {
+      if (panel_footage_viewer->seq != nullptr) {
+        for (int j = 0; j < panel_footage_viewer->seq->clips.size(); j++) {
+          ClipPtr c = panel_footage_viewer->seq->clips.at(j);
+          if (c != nullptr && c->media() == item) {
+            panel_footage_viewer->set_media(nullptr);
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
 void Project::delete_selected_media() {
   ComboAction* ca = new ComboAction(tr("Delete Media"));
   QModelIndexList selected_items = get_current_selected();
@@ -502,194 +659,135 @@ void Project::delete_selected_media() {
     items.append(item_to_media(selected_item));
   }
 
-  bool remove = true;
   bool redraw = false;
-
-  // check if media is in use
   QVector<Media*> parents;
+
   QList<Media*> sequence_items;
   QList<Media*> all_top_level_items;
   for (int i = 0; i < amber::project_model.childCount(); i++) {
     all_top_level_items.append(amber::project_model.child(i));
   }
-  get_all_media_from_table(all_top_level_items, sequence_items, MEDIA_TYPE_SEQUENCE);  // find all sequences in project
-  if (sequence_items.size() > 0) {
-    QList<Media*> media_items;
-    get_all_media_from_table(items, media_items, MEDIA_TYPE_FOOTAGE);
+  get_all_media_from_table(all_top_level_items, sequence_items, MEDIA_TYPE_SEQUENCE);
 
-    for (int i = 0; i < media_items.size(); i++) {
-      Media* item = media_items.at(i);
-      Footage* media = item->to_footage();
-      bool confirm_delete = false;
-      for (int j = 0; j < sequence_items.size(); j++) {
-        Sequence* s = sequence_items.at(j)->to_sequence().get();
-        for (int k = 0; k < s->clips.size(); k++) {
-          ClipPtr c = s->clips.at(k);
-          if (c != nullptr && c->media() == item) {
-            if (!confirm_delete) {
-              // we found a reference, so we know we'll need to ask if the user wants to delete it
-              QMessageBox confirm(this);
-              confirm.setWindowTitle(tr("Delete media in use?"));
-              confirm.setText(tr("The media '%1' is currently used in '%2'. Deleting it will remove all instances in "
-                                 "the sequence. Are you sure you want to do this?")
-                                  .arg(media->name, s->name));
-              QAbstractButton* yes_button = confirm.addButton(QMessageBox::Yes);
-              QAbstractButton* skip_button = nullptr;
-              if (items.size() > 1) skip_button = confirm.addButton(tr("Skip"), QMessageBox::NoRole);
-              QAbstractButton* abort_button = confirm.addButton(QMessageBox::Cancel);
-              confirm.exec();
-              if (confirm.clickedButton() == yes_button) {
-                // remove all clips referencing this media
-                confirm_delete = true;
-                redraw = true;
-              } else if (confirm.clickedButton() == skip_button) {
-                // remove media item and any folders containing it from the remove list
-                Media* parent = item;
-                while (parent != nullptr) {
-                  parents.append(parent);
+  if (!sequence_items.isEmpty()) {
+    if (!check_footage_in_use(this, ca, items, sequence_items, parents, redraw)) {
+      delete ca;
+      return;
+    }
+  }
 
-                  // re-add item's siblings
-                  for (int m = 0; m < parent->childCount(); m++) {
-                    Media* child = parent->child(m);
-                    bool found = false;
-                    for (auto item : items) {
-                      if (item == child) {
-                        found = true;
-                        break;
-                      }
-                    }
-                    if (!found) {
-                      items.append(child);
-                    }
-                  }
+  panel_graph_editor->set_row(nullptr);
+  panel_effect_controls->Clear(true);
 
-                  parent = parent->parentItem();
-                }
+  if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
 
-                j = sequence_items.size();
-                k = s->clips.size();
-              } else if (confirm.clickedButton() == abort_button) {
-                // break out of loop
-                i = media_items.size();
-                j = sequence_items.size();
-                k = s->clips.size();
-
-                remove = false;
-              }
-            }
-            if (confirm_delete) {
-              ca->append(new DeleteClipAction(s, k));
-            }
-          }
-        }
-      }
-      if (confirm_delete) {
-        delete_clips_in_clipboard_with_media(ca, item);
+  // Remove skipped parents from the delete list
+  for (auto parent : parents) {
+    for (int l = 0; l < items.size(); l++) {
+      if (items.at(l) == parent) {
+        items.removeAt(l);
+        l--;
       }
     }
   }
 
-  // remove
-  if (remove) {
-    panel_graph_editor->set_row(nullptr);
-    panel_effect_controls->Clear(true);
-
-    if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
-
-    // remove media and parents
-    for (auto parent : parents) {
-      for (int l = 0; l < items.size(); l++) {
-        if (items.at(l) == parent) {
-          items.removeAt(l);
-          l--;
-        }
-      }
-    }
-
-    // Check if any sequence being deleted is referenced by other sequences
-    for (int i = 0; i < items.size(); i++) {
-      Media* item = items.at(i);
-      if (item->get_type() != MEDIA_TYPE_SEQUENCE) continue;
-
-      for (int j = 0; j < sequence_items.size(); j++) {
-        Media* seq_media = sequence_items.at(j);
-        if (items.contains(seq_media)) continue;  // also being deleted, skip
-
-        Sequence* s = seq_media->to_sequence().get();
-        for (int k = 0; k < s->clips.size(); k++) {
-          ClipPtr c = s->clips.at(k);
-          if (c != nullptr && c->media() == item) {
-            QMessageBox confirm(this);
-            confirm.setWindowTitle(tr("Delete sequence in use?"));
-            confirm.setText(tr("The sequence '%1' is used as a nested sequence in '%2'. "
-                               "Deleting it will remove all instances. Are you sure?")
-                                .arg(item->to_sequence()->name, s->name));
-            confirm.addButton(QMessageBox::Yes);
-            QAbstractButton* cancel_button = confirm.addButton(QMessageBox::Cancel);
-            confirm.exec();
-            if (confirm.clickedButton() == cancel_button) {
-              delete ca;
-              return;
-            }
-            // User confirmed — delete clips referencing this sequence
-            redraw = true;
-            for (int m = 0; m < s->clips.size(); m++) {
-              ClipPtr mc = s->clips.at(m);
-              if (mc != nullptr && mc->media() == item) {
-                ca->append(new DeleteClipAction(s, m));
-              }
-            }
-            break;  // Only ask once per referencing sequence
-          }
-        }
-      }
-    }
-
-    for (auto item : items) {
-      ca->append(new DeleteMediaCommand(item->parentItem()->get_shared_ptr(item)));
-
-      if (item->get_type() == MEDIA_TYPE_SEQUENCE) {
-        redraw = true;
-
-        Sequence* s = item->to_sequence().get();
-
-        if (s == amber::ActiveSequence.get()) {
-          ca->append(new ChangeSequenceAction(nullptr));
-        }
-
-        if (s == panel_footage_viewer->seq.get()) {
-          panel_footage_viewer->set_media(nullptr);
-        }
-      } else if (item->get_type() == MEDIA_TYPE_FOOTAGE) {
-        if (panel_footage_viewer->seq != nullptr) {
-          for (int j = 0; j < panel_footage_viewer->seq->clips.size(); j++) {
-            ClipPtr c = panel_footage_viewer->seq->clips.at(j);
-            if (c != nullptr && c->media() == item) {
-              panel_footage_viewer->set_media(nullptr);
-              break;
-            }
-          }
-        }
-      }
-    }
-    amber::UndoStack.push(ca);
-
-    // redraw clips
-    if (redraw) {
-      update_ui(true);
-    }
-  } else {
+  if (!check_sequence_references(this, ca, items, sequence_items, redraw)) {
     delete ca;
+    return;
   }
+
+  append_delete_commands(ca, items, redraw);
+  amber::UndoStack.push(ca);
+
+  if (redraw) {
+    update_ui(true);
+  }
+}
+
+// Determine whether `file` looks like an image based on its extension.
+// Sets `lastcharindex` to the start of the extension (or file.length() if no ext).
+static bool classify_as_image(const QString& file, const QStringList& image_sequence_formats, int& lastcharindex) {
+  lastcharindex = file.lastIndexOf(".");
+  if (lastcharindex != -1 && lastcharindex > file.lastIndexOf('/')) {
+    QString ext = file.mid(lastcharindex + 1);
+    return image_sequence_formats.contains(ext, Qt::CaseInsensitive);
+  }
+  // No extension — treat as potential image
+  lastcharindex = file.length();
+  return true;
+}
+
+// Given an image file that might be part of a sequence, extract digit info at `lastcharindex - 1`.
+// Returns the FFmpeg-format pattern (e.g. "frame%04d.png"), the digit_test position, the
+// file_number, and digit_count.  Returns empty string if the last char before ext isn't a digit.
+static QString build_sequence_pattern(const QString& file, int lastcharindex, int& digit_test, int& digit_count,
+                                       int& file_number) {
+  if (lastcharindex < 1 || !file[lastcharindex - 1].isDigit()) return QString();
+
+  digit_count = 0;
+  digit_test = lastcharindex - 1;
+  while (digit_test > 0 && file[digit_test].isDigit()) {
+    digit_count++;
+    digit_test--;
+  }
+  if (file[digit_test].isDigit()) {
+    // entire prefix is digits
+    digit_count++;
+  } else {
+    digit_test++;
+  }
+
+  file_number = file.mid(digit_test, digit_count).toInt();
+
+  bool adjacent_exists =
+      QFileInfo::exists(file.left(digit_test) + QString("%1").arg(file_number - 1, digit_count, 10, QChar('0')) +
+                        file.mid(lastcharindex)) ||
+      QFileInfo::exists(file.left(digit_test) + QString("%1").arg(file_number + 1, digit_count, 10, QChar('0')) +
+                        file.mid(lastcharindex));
+
+  if (!adjacent_exists) return QString();
+
+  return file.left(digit_test) + "%" + QString::number(digit_count) + "d" + file.mid(lastcharindex);
+}
+
+// Ask the user if `file` is a new image sequence format (not seen before).
+// Mutates `file` to the FFmpeg pattern if they said yes, and computes `start_number`.
+// Returns true if this file should be skipped (already part of an accepted sequence).
+static bool handle_new_image_sequence(QWidget* parent, const QString& new_filename, QString& file, int digit_test,
+                                       int digit_count, int file_number, int lastcharindex,
+                                       QVector<QString>& image_sequence_urls,
+                                       QVector<bool>& image_sequence_importassequence, int& start_number) {
+  image_sequence_urls.append(new_filename);
+
+  if (QMessageBox::question(parent,
+                             QCoreApplication::translate("Project", "Image sequence detected"),
+                             QCoreApplication::translate("Project",
+                                 "The file '%1' appears to be part of an image sequence. "
+                                 "Would you like to import it as such?")
+                                 .arg(file),
+                             QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) == QMessageBox::Yes) {
+    file = new_filename;
+    image_sequence_importassequence.append(true);
+
+    // Find the actual start frame
+    QString test_filename_format = QString("%1%2%3").arg(file.left(digit_test), "%1", file.mid(lastcharindex));
+    int test_file_number = file_number;
+    do {
+      test_file_number--;
+    } while (QFileInfo::exists(
+        test_filename_format.arg(QString("%1").arg(test_file_number, digit_count, 10, QChar('0')))));
+    start_number = test_file_number + 1;
+    return false;
+  }
+
+  image_sequence_importassequence.append(false);
+  return false;
 }
 
 void Project::process_file_list(QStringList& files, bool recursive, MediaPtr replace, Media* parent) {
   bool imported = false;
 
-  // retrieve the array of image formats from the user's configuration
   QStringList image_sequence_formats = amber::CurrentConfig.img_seq_formats.split("|");
-
-  // a cache of image sequence formatted URLS to assist the user in importing image sequences
   QVector<QString> image_sequence_urls;
   QVector<bool> image_sequence_importassequence;
 
@@ -699,19 +797,15 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
   ComboAction* ca = nullptr;
   if (create_undo_action) ca = new ComboAction(tr("Import Media"));
 
-  // Loop through received files
   for (const auto& i : files) {
-    // If this file is a directory, we'll recursively call this function again to process the directory's contents
     if (QFileInfo(i).isDir()) {
       QString folder_name = get_file_name_from_path(i);
       MediaPtr folder = create_folder_internal(folder_name);
 
       QDir directory(i);
       directory.setFilter(QDir::NoDotAndDotDot | QDir::AllEntries);
-
       QFileInfoList subdir_files = directory.entryInfoList();
       QStringList subdir_filenames;
-
       for (const auto& subdir_file : subdir_files) {
         subdir_filenames.append(subdir_file.filePath());
       }
@@ -723,142 +817,40 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
       }
 
       process_file_list(subdir_filenames, true, nullptr, folder.get());
-
       imported = true;
 
     } else if (!i.isEmpty()) {
       QString file = i;
 
-      // Check if the user is importing an Olive project file
       if (file.endsWith(".ove", Qt::CaseInsensitive)) {
-        // This file is an Olive project file. Ask the user if they really want to import it.
         if (QMessageBox::question(this, tr("Import a Project"),
                                   tr("\"%1\" is an Olive project file. It will merge with this project. "
                                      "Do you wish to continue?")
                                       .arg(file),
                                   QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
-          // load the project without clearing the current one
           amber::Global->ImportProject(file);
         }
 
       } else {
-        // This file is NOT an Olive project file
-
-        // Used later if this file is part of an already processed image sequence
         bool skip = false;
-
-        /* Heuristic to determine whether file is part of an image sequence */
-
-        // Firstly, we run a heuristic on whether this file is an image by checking its file extension
-
-        bool file_is_an_image = false;
-
-        // Get the string position of the extension in the filename
-        int lastcharindex = file.lastIndexOf(".");
-
-        if (lastcharindex != -1 && lastcharindex > file.lastIndexOf('/')) {
-          QString ext = file.mid(lastcharindex + 1);
-
-          // If the file extension is part of a predetermined list (from Config::img_seq_formats), we'll treat it
-          // as an image
-          if (image_sequence_formats.contains(ext, Qt::CaseInsensitive)) {
-            file_is_an_image = true;
-          }
-
-        } else {
-          // If we're here, the file has no extension, but we'll still check if its an image sequence just in case
-          lastcharindex = file.length();
-          file_is_an_image = true;
-        }
-
-        // Some image sequence's don't start at "0", if it is indeed an image sequence, we'll use this variable
-        // later to determine where it does start
         int start_number = 0;
 
-        // Check if we passed the earlier heuristic to check whether this is a file, and whether the last number in
-        // the filename (before the extension) is a number
-        if (file_is_an_image && file[lastcharindex - 1].isDigit()) {
-          // Check how many digits are at the end of this filename
+        int lastcharindex = 0;
+        bool file_is_an_image = classify_as_image(file, image_sequence_formats, lastcharindex);
+
+        if (file_is_an_image && lastcharindex > 0 && file[lastcharindex - 1].isDigit()) {
+          int digit_test = 0;
           int digit_count = 0;
-          int digit_test = lastcharindex - 1;
-          while (file[digit_test].isDigit()) {
-            digit_count++;
-            digit_test--;
-          }
+          int file_number = 0;
+          QString new_filename = build_sequence_pattern(file, lastcharindex, digit_test, digit_count, file_number);
 
-          // Retrieve the integer represented at the end of this filename
-          digit_test++;
-          int file_number = file.mid(digit_test, digit_count).toInt();
-
-          // Check whether a file exists with the same format but one number higher or one number lower
-          if (QFileInfo::exists(QString(file.left(digit_test) +
-                                        QString("%1").arg(file_number - 1, digit_count, 10, QChar('0')) +
-                                        file.mid(lastcharindex))) ||
-              QFileInfo::exists(QString(file.left(digit_test) +
-                                        QString("%1").arg(file_number + 1, digit_count, 10, QChar('0')) +
-                                        file.mid(lastcharindex)))) {
-            //
-            // If so, it certainly looks like it *could* be an image sequence, but we'll ask the user just in case
-            //
-
-            // Firstly we should check if this file is part of a sequence the user has already confirmed as either a
-            // sequence or not a sequence (e.g. if the user happened to select a bunch of images that happen to increase
-            // consecutively). We format the filename with FFmpeg's '%Nd' (N = digits) formatting for reading image
-            // sequences
-            QString new_filename =
-                file.left(digit_test) + "%" + QString::number(digit_count) + "d" + file.mid(lastcharindex);
-
-            int does_url_cache_already_contain_this = image_sequence_urls.indexOf(new_filename);
-
-            if (does_url_cache_already_contain_this > -1) {
-              // We've already processed an image with the same formatting
-
-              // Check if the last time we saw this formatting, the user chose to import as a sequence
-              if (image_sequence_importassequence.at(does_url_cache_already_contain_this)) {
-                // If so, no need to import this file too, so we signal to the rest of the function to skip this file
-                skip = true;
-              }
-
-              // If not, we can fall-through to the next step which is importing normally
-
+          if (!new_filename.isEmpty()) {
+            int cached_idx = image_sequence_urls.indexOf(new_filename);
+            if (cached_idx > -1) {
+              if (image_sequence_importassequence.at(cached_idx)) skip = true;
             } else {
-              // If we're here, we've never seen a file with this formatting before, so we'll ask whether to import
-              // as a sequence or not
-
-              // Add this file formatting file to the URL cache
-              image_sequence_urls.append(new_filename);
-
-              // This does look like an image sequence, let's ask the user if it'll indeed be an image sequence
-              if (QMessageBox::question(this, tr("Image sequence detected"),
-                                        tr("The file '%1' appears to be part of an image sequence. "
-                                           "Would you like to import it as such?")
-                                            .arg(file),
-                                        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) == QMessageBox::Yes) {
-                // Proceed to the next step of this with the formatted filename
-                file = new_filename;
-
-                // Cache the user's answer alongside the image_sequence_urls value - in this case, YES, this will be an
-                // image sequence
-                image_sequence_importassequence.append(true);
-
-                // FFmpeg needs to know what file number to start at in the sequence. In case the image sequence doesn't
-                // start at a zero, we'll loop decreasing the number until it doesn't exist anymore
-                QString test_filename_format =
-                    QString("%1%2%3").arg(file.left(digit_test), "%1", file.mid(lastcharindex));
-                int test_file_number = file_number;
-                do {
-                  test_file_number--;
-                } while (QFileInfo::exists(
-                    test_filename_format.arg(QString("%1").arg(test_file_number, digit_count, 10, QChar('0')))));
-
-                // set the image sequence's start number to the last that existed
-                start_number = test_file_number + 1;
-
-              } else {
-                // Cache the user's response to the image sequence question - i.e. none of the files imported with this
-                // formatting should be imported as an image sequence
-                image_sequence_importassequence.append(false);
-              }
+              handle_new_image_sequence(this, new_filename, file, digit_test, digit_count, file_number, lastcharindex,
+                                        image_sequence_urls, image_sequence_importassequence, start_number);
             }
           }
         }
@@ -1044,6 +1036,173 @@ void save_marker(QXmlStreamWriter& stream, const Marker& m) {
   stream.writeEndElement();
 }
 
+static void save_clip_media_attributes(QXmlStreamWriter& stream, const ClipPtr& c) {
+  if (c->media() == nullptr) return;
+  stream.writeAttribute("type", QString::number(c->media()->get_type()));
+  switch (c->media()->get_type()) {
+    case MEDIA_TYPE_FOOTAGE:
+      stream.writeAttribute("media", QString::number(c->media()->to_footage()->save_id));
+      stream.writeAttribute("stream", QString::number(c->media_stream_index()));
+      break;
+    case MEDIA_TYPE_SEQUENCE:
+      stream.writeAttribute("sequence", QString::number(c->media()->to_sequence()->save_id));
+      break;
+  }
+}
+
+static void save_clip_transitions(QXmlStreamWriter& stream, const ClipPtr& c, int j,
+                                   QVector<TransitionPtr>& transition_save_cache,
+                                   QVector<int>& transition_clip_save_cache) {
+  for (int t = kTransitionOpening; t <= kTransitionClosing; t++) {
+    TransitionPtr transition = (t == kTransitionOpening) ? c->opening_transition : c->closing_transition;
+    if (transition == nullptr) continue;
+
+    stream.writeStartElement((t == kTransitionOpening) ? "opening" : "closing");
+    int transition_cache_index = transition_save_cache.indexOf(transition);
+    if (transition_cache_index > -1) {
+      stream.writeAttribute("shared", QString::number(transition_clip_save_cache.at(transition_cache_index)));
+    } else {
+      transition->save(stream);
+      transition_save_cache.append(transition);
+      transition_clip_save_cache.append(j);
+    }
+    stream.writeEndElement();
+  }
+}
+
+static void save_sequence_clips(QXmlStreamWriter& stream, Sequence* s) {
+  QVector<TransitionPtr> transition_save_cache;
+  QVector<int> transition_clip_save_cache;
+
+  for (int j = 0; j < s->clips.size(); j++) {
+    const ClipPtr& c = s->clips.at(j);
+    if (c == nullptr) continue;
+
+    stream.writeStartElement("clip");
+    stream.writeAttribute("id", QString::number(j));
+    stream.writeAttribute("enabled", QString::number(c->enabled()));
+    stream.writeAttribute("name", c->name());
+    stream.writeAttribute("clipin", QString::number(c->clip_in()));
+    stream.writeAttribute("in", QString::number(c->timeline_in()));
+    stream.writeAttribute("out", QString::number(c->timeline_out()));
+    stream.writeAttribute("track", QString::number(c->track()));
+
+    stream.writeAttribute("r", QString::number(c->color().red()));
+    stream.writeAttribute("g", QString::number(c->color().green()));
+    stream.writeAttribute("b", QString::number(c->color().blue()));
+    if (c->color_label() > 0) stream.writeAttribute("label", QString::number(c->color_label()));
+
+    stream.writeAttribute("autoscale", QString::number(c->autoscaled()));
+    stream.writeAttribute("speed", QString::number(c->speed().value, 'f', 10));
+    stream.writeAttribute("maintainpitch", QString::number(c->speed().maintain_audio_pitch));
+    stream.writeAttribute("reverse", QString::number(c->reversed()));
+    if (c->loop_mode() != kLoopNone) stream.writeAttribute("loop", QString::number(c->loop_mode()));
+
+    save_clip_media_attributes(stream, c);
+
+    if (c->media() == nullptr) {
+      for (const auto& k : c->get_markers()) {
+        save_marker(stream, k);
+      }
+    }
+
+    stream.writeStartElement("linked");
+    for (int k : c->linked) {
+      stream.writeStartElement("link");
+      stream.writeAttribute("id", QString::number(k));
+      stream.writeEndElement();
+    }
+    stream.writeEndElement();
+
+    save_clip_transitions(stream, c, j, transition_save_cache, transition_clip_save_cache);
+
+    for (const auto& effect : c->effects) {
+      stream.writeStartElement("effect");
+      effect->save(stream);
+      stream.writeEndElement();
+    }
+
+    stream.writeEndElement();  // clip
+  }
+}
+
+static void save_footage_item(QXmlStreamWriter& stream, Media* m, int media_id_val, const QDir& proj_dir_ref) {
+  Footage* f = m->to_footage();
+  int folder = m->parentItem()->temp_id;
+
+  stream.writeStartElement("footage");
+  stream.writeAttribute("id", QString::number(media_id_val));
+  stream.writeAttribute("folder", QString::number(folder));
+  stream.writeAttribute("name", f->name);
+  stream.writeAttribute("url", proj_dir_ref.relativeFilePath(QDir::cleanPath(f->url)));
+  stream.writeAttribute("duration", QString::number(f->length));
+  stream.writeAttribute("using_inout", QString::number(f->using_inout));
+  stream.writeAttribute("in", QString::number(f->in));
+  stream.writeAttribute("out", QString::number(f->out));
+  stream.writeAttribute("speed", QString::number(f->speed));
+  stream.writeAttribute("alphapremul", QString::number(f->alpha_is_premultiplied));
+  stream.writeAttribute("startnumber", QString::number(f->start_number));
+  stream.writeAttribute("proxy", QString::number(f->proxy));
+  stream.writeAttribute("proxypath", f->proxy_path);
+
+  for (const auto& ms : f->video_tracks) {
+    stream.writeStartElement("video");
+    stream.writeAttribute("id", QString::number(ms.file_index));
+    stream.writeAttribute("width", QString::number(ms.video_width));
+    stream.writeAttribute("height", QString::number(ms.video_height));
+    stream.writeAttribute("framerate", QString::number(ms.video_frame_rate, 'f', 10));
+    stream.writeAttribute("infinite", QString::number(ms.infinite_length));
+    stream.writeEndElement();
+  }
+
+  for (const auto& ms : f->audio_tracks) {
+    stream.writeStartElement("audio");
+    stream.writeAttribute("id", QString::number(ms.file_index));
+    stream.writeAttribute("channels", QString::number(ms.audio_channels));
+    stream.writeAttribute("layout", QString::number(ms.audio_layout));
+    stream.writeAttribute("frequency", QString::number(ms.audio_frequency));
+    stream.writeEndElement();
+  }
+
+  for (const auto& marker : f->markers) {
+    save_marker(stream, marker);
+  }
+
+  stream.writeEndElement();  // footage
+}
+
+static void save_sequence_item(QXmlStreamWriter& stream, Media* m, int folder) {
+  Sequence* s = m->to_sequence().get();
+  stream.writeStartElement("sequence");
+  stream.writeAttribute("id", QString::number(s->save_id));
+  stream.writeAttribute("folder", QString::number(folder));
+  stream.writeAttribute("name", s->name);
+  stream.writeAttribute("width", QString::number(s->width));
+  stream.writeAttribute("height", QString::number(s->height));
+  stream.writeAttribute("framerate", QString::number(s->frame_rate, 'f', 10));
+  stream.writeAttribute("afreq", QString::number(s->audio_frequency));
+  stream.writeAttribute("alayout", QString::number(s->audio_layout));
+  if (s == amber::ActiveSequence.get()) stream.writeAttribute("open", "1");
+  stream.writeAttribute("workarea", QString::number(s->using_workarea));
+  stream.writeAttribute("workareaIn", QString::number(s->workarea_in));
+  stream.writeAttribute("workareaOut", QString::number(s->workarea_out));
+
+  for (const auto& guide : s->guides) {
+    stream.writeStartElement("guide");
+    stream.writeAttribute("orientation", QString::number(guide.orientation));
+    stream.writeAttribute("position", QString::number(guide.position));
+    if (guide.mirror) stream.writeAttribute("mirror", "1");
+    stream.writeEndElement();
+  }
+
+  save_sequence_clips(stream, s);
+
+  for (const auto& marker : s->markers) {
+    save_marker(stream, marker);
+  }
+  stream.writeEndElement();  // sequence
+}
+
 void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only, const QModelIndex& parent) {
   for (int i = 0; i < amber::project_model.rowCount(parent); i++) {
     const QModelIndex& item = amber::project_model.index(i, 0, parent);
@@ -1052,10 +1211,8 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
     if (type == m->get_type()) {
       if (m->get_type() == MEDIA_TYPE_FOLDER) {
         if (set_ids_only) {
-          m->temp_id = folder_id;  // saves a temporary ID for matching in the project file
-          folder_id++;
+          m->temp_id = folder_id++;
         } else {
-          // if we're saving folders, save the folder
           stream.writeStartElement("folder");
           stream.writeAttribute("name", m->get_name());
           stream.writeAttribute("id", QString::number(m->temp_id));
@@ -1066,184 +1223,18 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
           }
           stream.writeEndElement();
         }
-        // save_folder(stream, item, type, set_ids_only);
       } else {
         int folder = m->parentItem()->temp_id;
         if (type == MEDIA_TYPE_FOOTAGE) {
-          Footage* f = m->to_footage();
-          f->save_id = media_id;
-          stream.writeStartElement("footage");
-          stream.writeAttribute("id", QString::number(media_id));
-          stream.writeAttribute("folder", QString::number(folder));
-          stream.writeAttribute("name", f->name);
-          stream.writeAttribute("url", proj_dir.relativeFilePath(QDir::cleanPath(f->url)));
-          stream.writeAttribute("duration", QString::number(f->length));
-          stream.writeAttribute("using_inout", QString::number(f->using_inout));
-          stream.writeAttribute("in", QString::number(f->in));
-          stream.writeAttribute("out", QString::number(f->out));
-          stream.writeAttribute("speed", QString::number(f->speed));
-          stream.writeAttribute("alphapremul", QString::number(f->alpha_is_premultiplied));
-          stream.writeAttribute("startnumber", QString::number(f->start_number));
-
-          stream.writeAttribute("proxy", QString::number(f->proxy));
-          stream.writeAttribute("proxypath", f->proxy_path);
-
-          // save video stream metadata
-          for (const auto& ms : f->video_tracks) {
-            stream.writeStartElement("video");
-            stream.writeAttribute("id", QString::number(ms.file_index));
-            stream.writeAttribute("width", QString::number(ms.video_width));
-            stream.writeAttribute("height", QString::number(ms.video_height));
-            stream.writeAttribute("framerate", QString::number(ms.video_frame_rate, 'f', 10));
-            stream.writeAttribute("infinite", QString::number(ms.infinite_length));
-            stream.writeEndElement();  // video
-          }
-
-          // save audio stream metadata
-          for (const auto& ms : f->audio_tracks) {
-            stream.writeStartElement("audio");
-            stream.writeAttribute("id", QString::number(ms.file_index));
-            stream.writeAttribute("channels", QString::number(ms.audio_channels));
-            stream.writeAttribute("layout", QString::number(ms.audio_layout));
-            stream.writeAttribute("frequency", QString::number(ms.audio_frequency));
-            stream.writeEndElement();  // audio
-          }
-
-          // save footage markers
-          for (const auto& marker : f->markers) {
-            save_marker(stream, marker);
-          }
-
-          stream.writeEndElement();  // footage
+          m->to_footage()->save_id = media_id;
+          save_footage_item(stream, m, media_id, proj_dir);
           media_id++;
         } else if (type == MEDIA_TYPE_SEQUENCE) {
           Sequence* s = m->to_sequence().get();
           if (set_ids_only) {
-            s->save_id = sequence_id;
-            sequence_id++;
+            s->save_id = sequence_id++;
           } else {
-            stream.writeStartElement("sequence");
-            stream.writeAttribute("id", QString::number(s->save_id));
-            stream.writeAttribute("folder", QString::number(folder));
-            stream.writeAttribute("name", s->name);
-            stream.writeAttribute("width", QString::number(s->width));
-            stream.writeAttribute("height", QString::number(s->height));
-            stream.writeAttribute("framerate", QString::number(s->frame_rate, 'f', 10));
-            stream.writeAttribute("afreq", QString::number(s->audio_frequency));
-            stream.writeAttribute("alayout", QString::number(s->audio_layout));
-            if (s == amber::ActiveSequence.get()) {
-              stream.writeAttribute("open", "1");
-            }
-            stream.writeAttribute("workarea", QString::number(s->using_workarea));
-            stream.writeAttribute("workareaIn", QString::number(s->workarea_in));
-            stream.writeAttribute("workareaOut", QString::number(s->workarea_out));
-
-            for (const auto& guide : s->guides) {
-              stream.writeStartElement("guide");
-              stream.writeAttribute("orientation", QString::number(guide.orientation));
-              stream.writeAttribute("position", QString::number(guide.position));
-              if (guide.mirror) stream.writeAttribute("mirror", "1");
-              stream.writeEndElement();  // guide
-            }
-
-            QVector<TransitionPtr> transition_save_cache;
-            QVector<int> transition_clip_save_cache;
-
-            for (int j = 0; j < s->clips.size(); j++) {
-              const ClipPtr& c = s->clips.at(j);
-              if (c != nullptr) {
-                stream.writeStartElement("clip");  // clip
-                stream.writeAttribute("id", QString::number(j));
-                stream.writeAttribute("enabled", QString::number(c->enabled()));
-                stream.writeAttribute("name", c->name());
-                stream.writeAttribute("clipin", QString::number(c->clip_in()));
-                stream.writeAttribute("in", QString::number(c->timeline_in()));
-                stream.writeAttribute("out", QString::number(c->timeline_out()));
-                stream.writeAttribute("track", QString::number(c->track()));
-
-                stream.writeAttribute("r", QString::number(c->color().red()));
-                stream.writeAttribute("g", QString::number(c->color().green()));
-                stream.writeAttribute("b", QString::number(c->color().blue()));
-                if (c->color_label() > 0) {
-                  stream.writeAttribute("label", QString::number(c->color_label()));
-                }
-
-                stream.writeAttribute("autoscale", QString::number(c->autoscaled()));
-                stream.writeAttribute("speed", QString::number(c->speed().value, 'f', 10));
-                stream.writeAttribute("maintainpitch", QString::number(c->speed().maintain_audio_pitch));
-                stream.writeAttribute("reverse", QString::number(c->reversed()));
-                if (c->loop_mode() != kLoopNone) {
-                  stream.writeAttribute("loop", QString::number(c->loop_mode()));
-                }
-
-                if (c->media() != nullptr) {
-                  stream.writeAttribute("type", QString::number(c->media()->get_type()));
-                  switch (c->media()->get_type()) {
-                    case MEDIA_TYPE_FOOTAGE:
-                      stream.writeAttribute("media", QString::number(c->media()->to_footage()->save_id));
-                      stream.writeAttribute("stream", QString::number(c->media_stream_index()));
-                      break;
-                    case MEDIA_TYPE_SEQUENCE:
-                      stream.writeAttribute("sequence", QString::number(c->media()->to_sequence()->save_id));
-                      break;
-                  }
-                }
-
-                // save markers
-                // only necessary for null media clips, since media has its own markers
-                if (c->media() == nullptr) {
-                  for (const auto& k : c->get_markers()) {
-                    save_marker(stream, k);
-                  }
-                }
-
-                // save clip links
-                stream.writeStartElement("linked");  // linked
-                for (int k : c->linked) {
-                  stream.writeStartElement("link");  // link
-                  stream.writeAttribute("id", QString::number(k));
-                  stream.writeEndElement();  // link
-                }
-                stream.writeEndElement();  // linked
-
-                // save opening and closing transitions
-                for (int t = kTransitionOpening; t <= kTransitionClosing; t++) {
-                  TransitionPtr transition = (t == kTransitionOpening) ? c->opening_transition : c->closing_transition;
-
-                  if (transition != nullptr) {
-                    stream.writeStartElement((t == kTransitionOpening) ? "opening" : "closing");
-
-                    // check if this is a shared transition and the transition has already been saved
-                    int transition_cache_index = transition_save_cache.indexOf(transition);
-
-                    if (transition_cache_index > -1) {
-                      // if so, just save a reference to the other clip
-                      stream.writeAttribute("shared",
-                                            QString::number(transition_clip_save_cache.at(transition_cache_index)));
-                    } else {
-                      // otherwise save the whole transition
-                      transition->save(stream);
-                      transition_save_cache.append(transition);
-                      transition_clip_save_cache.append(j);
-                    }
-
-                    stream.writeEndElement();  // opening
-                  }
-                }
-
-                for (const auto& effect : c->effects) {
-                  stream.writeStartElement("effect");  // effect
-                  effect->save(stream);
-                  stream.writeEndElement();  // effect
-                }
-
-                stream.writeEndElement();  // clip
-              }
-            }
-            for (const auto& marker : s->markers) {
-              save_marker(stream, marker);
-            }
-            stream.writeEndElement();
+            save_sequence_item(stream, m, folder);
           }
         }
       }

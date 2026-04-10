@@ -21,20 +21,20 @@
 #ifndef RENDERTHREAD_H
 #define RENDERTHREAD_H
 
-#include <atomic>
-#include <QThread>
-#include <QMutex>
-#include <QWaitCondition>
-#include <QOffscreenSurface>
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
+#include <QMutex>
+#include <QOffscreenSurface>
+#include <QThread>
+#include <QWaitCondition>
+#include <atomic>
 
-#include "engine/sequence.h"
 #include "effects/effect.h"
+#include "engine/sequence.h"
 
 class RenderThread : public QThread {
   Q_OBJECT
-public:
+ public:
   RenderThread();
   ~RenderThread() override;
   void run() override;
@@ -58,13 +58,8 @@ public:
   // Returns the current front buffer index (snapshot of the atomic switcher).
   int front_buffer_index() const;
 
-  void start_render(Sequence* s,
-                    int playback_speed,
-                    const QString& save = nullptr,
-                    void* pixels = nullptr,
-                    int pixel_linesize = 0,
-                    int idivider = 0,
-                    bool scrubbing = false);
+  void start_render(Sequence* s, int playback_speed, const QString& save = nullptr, void* pixels = nullptr,
+                    int pixel_linesize = 0, int idivider = 0, bool scrubbing = false);
   bool did_texture_fail();
   void cancel();
   void wait_until_paused();
@@ -74,16 +69,21 @@ public:
   static void DeferRhiResourceDeletion(QRhiResource* res);
   static void DeferRhiResourceDeletion(const QVector<QRhiResource*>& resources);
 
-public slots:
+ public slots:
   void delete_ctx();
-signals:
+ signals:
   void ready();
-private:
+
+ private:
   static QMutex deferred_delete_mutex_;
   static QVector<QRhiResource*> deferred_delete_queue_;
   void drainDeferredDeletes();
 
   void delete_buffers();
+
+  // RHI initialization helpers
+  bool try_create_rhi();
+  void ensure_render_buffers();
 
   // RHI resources
   QRhi* rhi_{nullptr};
@@ -138,4 +138,4 @@ private:
   QByteArray cpu_frame_[2];
 };
 
-#endif // RENDERTHREAD_H
+#endif  // RENDERTHREAD_H

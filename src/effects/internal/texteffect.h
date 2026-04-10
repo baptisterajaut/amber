@@ -28,13 +28,14 @@
 
 class TextEffect : public Effect {
   Q_OBJECT
-public:
-  TextEffect(Clip* c, const EffectMeta *em);
+ public:
+  TextEffect(Clip* c, const EffectMeta* em);
   void redraw(double timecode) override;
-private slots:
+ private slots:
   void outline_enable(bool);
   void shadow_enable(bool);
-private:
+
+ private:
   QFont font;
 
   StringField* text_val;
@@ -59,6 +60,12 @@ private:
   DoubleField* shadow_softness;
   DoubleField* shadow_opacity;
 
+  // Helpers for redraw()
+  void ApplyWordWrap(QStringList& lines, const QFontMetrics& fm, int width);
+  int ComputeTextX(const QString& line, int halign, const QFontMetrics& fm, int width);
+  int ComputeTextY(int line_index, int valign, const QFontMetrics& fm, int text_height, int height);
+  void DrawShadow(QPainter& p, const QPainterPath& path, double timecode);
+  void DrawOutline(QPainter& p, const QPainterPath& path, double timecode);
 };
 
-#endif // TEXTEFFECT_H
+#endif  // TEXTEFFECT_H

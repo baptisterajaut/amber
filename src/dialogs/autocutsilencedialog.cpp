@@ -35,10 +35,7 @@
 #include "panels/timeline.h"
 #include "rendering/renderfunctions.h"
 
-AutoCutSilenceDialog::AutoCutSilenceDialog(QWidget *parent, QVector<int> clips) :
-  QDialog(parent),
-  clips_(clips)
-{
+AutoCutSilenceDialog::AutoCutSilenceDialog(QWidget* parent, QVector<int> clips) : QDialog(parent), clips_(clips) {
   setWindowTitle(tr("Cut Silence"));
 
   QVBoxLayout* main_layout = new QVBoxLayout(this);
@@ -85,11 +82,9 @@ AutoCutSilenceDialog::AutoCutSilenceDialog(QWidget *parent, QVector<int> clips) 
   main_layout->addWidget(buttonBox);
   connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
   connect(buttonBox, &QDialogButtonBox::accepted, this, &AutoCutSilenceDialog::accept);
-
 }
 
-int AutoCutSilenceDialog::exec()
-{
+int AutoCutSilenceDialog::exec() {
   default_attack_threshold = 5;
   current_attack_threshold = 5;
   default_attack_time = 2;
@@ -127,7 +122,6 @@ int AutoCutSilenceDialog::exec()
 }
 
 void AutoCutSilenceDialog::accept() {
-
   current_attack_threshold = attack_threshold->value();
   current_attack_time = attack_time->value();
   current_release_threshold = release_threshold->value();
@@ -142,18 +136,15 @@ void AutoCutSilenceDialog::accept() {
   CutResult result = cut_silence();
 
   if (result == NoAudioClips) {
-    QMessageBox::information(this, tr("Cut Silence"),
-                             tr("No audio found in the selected clips."));
+    QMessageBox::information(this, tr("Cut Silence"), tr("No audio found in the selected clips."));
     return;
   }
   if (result == NoAudioDetected) {
-    QMessageBox::information(this, tr("Cut Silence"),
-                             tr("No audio detected above threshold — nothing to cut."));
+    QMessageBox::information(this, tr("Cut Silence"), tr("No audio detected above threshold — nothing to cut."));
     return;
   }
   if (result == NoSilenceDetected) {
-    QMessageBox::information(this, tr("Cut Silence"),
-                             tr("No silence detected below threshold — nothing to cut."));
+    QMessageBox::information(this, tr("Cut Silence"), tr("No silence detected below threshold — nothing to cut."));
     return;
   }
 
@@ -161,145 +152,204 @@ void AutoCutSilenceDialog::accept() {
   QDialog::accept();
 }
 
+namespace {
+
+struct AudioSegment {
+  long in;
+  long out;
+};
+
+struct SilenceSegment {
+  long in;
+  long out;
+  int track;
+};
+
+// Check whether `vols[circular_index]` crosses the attack threshold enough times in the
+// circular buffer to trigger an attack event.  Returns the number of samples over threshold
+// found (overthreshold) and sets cut_idx to how far back to cut.
+static void count_overthreshold_attack(const QVector<qint8>& vols, int circular_index, int sample_size,
+                                       int attack_threshold, int& overthreshold, int& cut_idx) {
+  overthreshold = 0;
+  cut_idx = 0;
+  for (int k = 0; k < sample_size; k++) {
+    int back_idx = (((circular_index - k) % sample_size) + sample_size) % sample_size;
+    if (vols[back_idx] > attack_threshold) {
+      overthreshold++;
+      cut_idx = k + 1;
+    }
+  }
+}
+
+// Count how many samples in the circular buffer are below the release threshold.
+static int count_underthreshold_release(const QVector<qint8>& vols, int circular_index, int sample_size,
+                                        int release_threshold) {
+  int count = 0;
+  for (int k = 0; k < sample_size; k++) {
+    int back_idx = (((circular_index - k) % sample_size) + sample_size) % sample_size;
+    if (vols[back_idx] < release_threshold) count++;
+  }
+  return count;
+}
+
+// Analyse the audio data in `clip` for silence/audio transitions.
+// Appends to `split_positions`, `audio_segments`, and sets `any_attack_triggered`.
+static void analyse_clip_audio(Clip* clip, int attack_threshold, int attack_time, int release_threshold,
+                                int release_time, QVector<long>& split_positions,
+                                QVector<AudioSegment>& audio_segments, bool& any_attack_triggered) {
+  long clip_start = clip->timeline_in();
+  long clip_end = clip->timeline_out();
+  const FootageStream* ms = clip->media_stream();
+
+  long media_length = clip->media_length();
+  int preview_size = ms->audio_preview.length();
+  float chunk_size = (float)preview_size / media_length;
+
+  int sample_size = qMax(attack_time, release_time) + 1;
+
+  bool attack = false;
+  bool release = false;
+  long audio_seg_start = -1;
+
+  QVector<qint8> vols;
+  vols.resize(sample_size);
+  vols.fill(0);
+
+  for (long i = clip_start; i < clip_end; i++) {
+    long start = ((i - clip_start + clip->clip_in()) * chunk_size);
+    int circular_index = i % sample_size;
+
+    qint8 tmp = 0;
+    for (int k = start; k < start + chunk_size; k++) {
+      tmp = qMax(tmp, qint8(qRound(double(ms->audio_preview.at(k)))));
+    }
+    vols[circular_index] = tmp;
+
+    if (vols[circular_index] >= attack_threshold && !attack) {
+      int overthreshold = 0;
+      int cut_idx = 0;
+      count_overthreshold_attack(vols, circular_index, sample_size, attack_threshold, overthreshold, cut_idx);
+      if (overthreshold >= attack_time) {
+        audio_seg_start = qMax(i - cut_idx, clip_start);
+        split_positions.append(audio_seg_start);
+        attack = true;
+        any_attack_triggered = true;
+        release = false;
+      }
+    } else if (vols[circular_index] < release_threshold && !release) {
+      int underthreshold = count_underthreshold_release(vols, circular_index, sample_size, release_threshold);
+      if (underthreshold >= release_time) {
+        if (audio_seg_start >= 0) {
+          audio_segments.append({audio_seg_start, i});
+        }
+        audio_seg_start = -1;
+        attack = false;
+        release = true;
+        split_positions.append(i);
+      }
+    }
+  }
+
+  if (attack && audio_seg_start >= 0) {
+    audio_segments.append({audio_seg_start, clip_end});
+  }
+}
+
+// Build silence segments as the complement of audio segments within [clip_start, clip_end].
+static void collect_silence_segments(const QVector<AudioSegment>& audio_segments, long clip_start, long clip_end,
+                                     int track, QVector<SilenceSegment>& silence_segments) {
+  long cursor = clip_start;
+  for (const auto& seg : audio_segments) {
+    long seg_in = qMax(seg.in, clip_start);
+    if (cursor < seg_in) {
+      silence_segments.append({cursor, seg_in, track});
+    }
+    cursor = seg.out;
+  }
+  if (cursor < clip_end) {
+    silence_segments.append({cursor, clip_end, track});
+  }
+}
+
+// Execute the ripple-delete phase: find and remove silent clip segments, shift clips back.
+static void apply_ripple_delete(const QVector<SilenceSegment>& silence_segments, long gap_size) {
+  QVector<SilenceSegment> sorted = silence_segments;
+  std::sort(sorted.begin(), sorted.end(),
+            [](const SilenceSegment& a, const SilenceSegment& b) { return a.in > b.in; });
+
+  ComboAction* delete_ca = new ComboAction(QCoreApplication::translate("AutoCutSilenceDialog",
+                                                                        "Auto-Cut Silence (Ripple Delete)"));
+
+  for (const auto& seg : sorted) {
+    long silence_length = seg.out - seg.in;
+    long ripple_amount = qMax(0L, silence_length - (long)gap_size);
+
+    for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
+      ClipPtr c = amber::ActiveSequence->clips.at(i);
+      if (c == nullptr || c->track() != seg.track || c->timeline_in() != seg.in || c->timeline_out() != seg.out) {
+        continue;
+      }
+      delete_ca->append(new DeleteClipAction(amber::ActiveSequence.get(), i));
+      for (int link : c->linked) {
+        if (link < 0 || link >= amber::ActiveSequence->clips.size()) continue;
+        ClipPtr linked_clip = amber::ActiveSequence->clips.at(link);
+        if (linked_clip != nullptr && linked_clip->timeline_in() == seg.in && linked_clip->timeline_out() == seg.out) {
+          delete_ca->append(new DeleteClipAction(amber::ActiveSequence.get(), link));
+        }
+      }
+      if (ripple_amount > 0) {
+        ripple_clips(delete_ca, amber::ActiveSequence.get(), seg.in, -ripple_amount);
+      }
+      break;
+    }
+  }
+
+  if (delete_ca->hasActions()) {
+    amber::UndoStack.push(delete_ca);
+  } else {
+    delete delete_ca;
+  }
+}
+
+}  // namespace
+
 AutoCutSilenceDialog::CutResult AutoCutSilenceDialog::cut_silence() {
   if (amber::ActiveSequence == nullptr) return NoAudioClips;
 
   ComboAction* ca = new ComboAction(tr("Auto-Cut Silence"));
 
-  // Silence segments collected across all clips for ripple delete
-  struct SilenceSegment {
-    long in;
-    long out;
-    int track;
-  };
   QVector<SilenceSegment> silence_segments;
   bool any_audio_processed = false;
   bool any_attack_triggered = false;
 
-  // Loop over clips provided to this dialog
   for (int j : clips_) {
-
     Clip* clip = amber::ActiveSequence->clips.at(j).get();
 
-    // Check if this clip is an audio footage clip
-    if (clip->track() >= 0
-        && clip->media() != nullptr
-        && clip->media_stream()->preview_done) { // TODO provide warning for preview not being done
+    if (clip->track() < 0 || clip->media() == nullptr || !clip->media_stream()->preview_done) continue;
 
-      any_audio_processed = true;
+    any_audio_processed = true;
 
-      QVector<long> split_positions;
+    QVector<long> split_positions;
+    QVector<AudioSegment> audio_segments;
 
-      long clip_start = clip->timeline_in();
-      long clip_end = clip->timeline_out();
-      const FootageStream* ms = clip->media_stream();
+    analyse_clip_audio(clip, current_attack_threshold, current_attack_time, current_release_threshold,
+                       current_release_time, split_positions, audio_segments, any_attack_triggered);
 
-      long media_length = clip->media_length();
-      int preview_size = ms->audio_preview.length();
-      float chunk_size = (float)preview_size/media_length;  // how many audio samples to read for each fotogram
+    long clip_start = clip->timeline_in();
+    long clip_end = clip->timeline_out();
 
-      int sample_size = qMax(current_attack_time, current_release_time)+1;
-
-      bool attack = false;    // status flags
-      bool release = false;
-      long audio_seg_start = -1; // track current audio segment start for ripple delete
-
-      // Audio segments collected during detection (for building silence as complement)
-      struct AudioSegment { long in; long out; };
-      QVector<AudioSegment> audio_segments;
-
-      QVector<qint8> vols;
-      vols.resize(sample_size);
-      vols.fill(0);
-
-      // loop through the visible portion of the clip
-      for (long i=clip_start;i<clip_end;i++) {
-        long start = ((i-clip_start+clip->clip_in())*chunk_size);  // offset by clip_in to handle trimmed clips
-        int circular_index = i%sample_size;
-
-        // read the current sample into the circular array
-        qint8 tmp = 0;
-        for (int k=start; k<start+chunk_size; k++){
-          tmp = qMax(tmp, qint8(qRound(double(ms->audio_preview.at(k)))));
-        }
-        vols[circular_index] = tmp;
-
-        int overthreshold = 0;
-        int cut_idx = 0;  //how much to cut (backwards)
-
-        // if current volume value is above threshold
-        if (vols[circular_index] >= current_attack_threshold && !attack){   // if we get one sample over the threshold
-          for(int k=0; k<sample_size; k++){                       // count how many times this happened before within sample_size range (avoid false activations)
-            int back_idx = (((circular_index-k)%sample_size)+sample_size)%sample_size;  // positive modulus
-            if(vols[back_idx] > current_attack_threshold){
-              overthreshold++;
-              cut_idx = k+1;
-            }
-          }
-          // if we reached threshold over the set tolerance
-          if(overthreshold >= current_attack_time){
-            audio_seg_start = qMax(i-cut_idx, clip_start);
-            split_positions.append(audio_seg_start);
-            attack = true;
-            any_attack_triggered = true;
-            release = false;
-          }
-          overthreshold = 0;
-          cut_idx = 0;
-        }else if (vols[circular_index] < current_release_threshold && !release){   // if we get one sample under the threshold
-          for(int k=0; k<sample_size; k++){                               // count how many times this happened before within sample_size range
-            int back_idx = (((circular_index-k)%sample_size)+sample_size)%sample_size;  // positive modulus
-            if(vols[back_idx] < current_release_threshold)
-              overthreshold++;
-          }
-          // if we reached threshold over the set tolerance
-          if(overthreshold >= current_release_time){        // must be <= sample_size
-            if (audio_seg_start >= 0) {
-              audio_segments.append({audio_seg_start, i});
-            }
-            audio_seg_start = -1;
-            attack = false;
-            release = true;
-            split_positions.append(i);
-          }
-          overthreshold = 0;
-        }
-      }
-
-      // If audio was still playing at end of clip, close the segment
-      if (attack && audio_seg_start >= 0) {
-        audio_segments.append({audio_seg_start, clip_end});
-      }
-
-      // Build silence segments as the complement of audio segments within [clip_start, clip_end].
-      // This is independent of the split_positions alternation pattern (which depends on
-      // whether the clip starts with silence or audio).
-      if (ripple_delete_enabled && !audio_segments.isEmpty()) {
-        int track = clip->track();
-        long cursor = clip_start;
-        for (const auto& seg : audio_segments) {
-          long seg_in = qMax(seg.in, clip_start);
-          if (cursor < seg_in) {
-            silence_segments.append({cursor, seg_in, track});
-          }
-          cursor = seg.out;
-        }
-        if (cursor < clip_end) {
-          silence_segments.append({cursor, clip_end, track});
-        }
-      }
-
-      // Filter out positions at clip boundaries (no-op splits)
-      split_positions.erase(
-        std::remove_if(split_positions.begin(), split_positions.end(),
-          [clip_start, clip_end](long pos) { return pos <= clip_start || pos >= clip_end; }),
-        split_positions.end());
-
-      if (!split_positions.isEmpty()) {
-        panel_timeline->split_clip_at_positions(ca, j, split_positions);
-      }
+    if (ripple_delete_enabled && !audio_segments.isEmpty()) {
+      collect_silence_segments(audio_segments, clip_start, clip_end, clip->track(), silence_segments);
     }
 
+    split_positions.erase(
+        std::remove_if(split_positions.begin(), split_positions.end(),
+                       [clip_start, clip_end](long pos) { return pos <= clip_start || pos >= clip_end; }),
+        split_positions.end());
+
+    if (!split_positions.isEmpty()) {
+      panel_timeline->split_clip_at_positions(ca, j, split_positions);
+    }
   }
 
   if (!any_audio_processed) {
@@ -315,53 +365,9 @@ AutoCutSilenceDialog::CutResult AutoCutSilenceDialog::cut_silence() {
     amber::UndoStack.push(ca);
   }
 
-  // Ripple delete: find and remove silence clips, shift everything back
   if (!ripple_delete_enabled || silence_segments.isEmpty()) return CutsApplied;
 
-  // Sort back-to-front so ripples don't invalidate earlier positions
-  std::sort(silence_segments.begin(), silence_segments.end(),
-            [](const SilenceSegment& a, const SilenceSegment& b) {
-              return a.in > b.in;
-            });
-
-  ComboAction* delete_ca = new ComboAction(tr("Auto-Cut Silence (Ripple Delete)"));
-
-  for (const auto& seg : silence_segments) {
-    long silence_length = seg.out - seg.in;
-    long ripple_amount = qMax(0L, silence_length - (long)current_gap_size);
-
-    // Find the clip matching this silence segment
-    for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
-      ClipPtr c = amber::ActiveSequence->clips.at(i);
-      if (c != nullptr && c->track() == seg.track
-          && c->timeline_in() == seg.in && c->timeline_out() == seg.out) {
-
-        // Delete this clip and all its linked clips (e.g. corresponding video track)
-        delete_ca->append(new DeleteClipAction(amber::ActiveSequence.get(), i));
-        for (int link : c->linked) {
-          if (link >= 0 && link < amber::ActiveSequence->clips.size()) {
-            ClipPtr linked_clip = amber::ActiveSequence->clips.at(link);
-            if (linked_clip != nullptr
-                && linked_clip->timeline_in() == seg.in
-                && linked_clip->timeline_out() == seg.out) {
-              delete_ca->append(new DeleteClipAction(amber::ActiveSequence.get(), link));
-            }
-          }
-        }
-
-        if (ripple_amount > 0) {
-          ripple_clips(delete_ca, amber::ActiveSequence.get(), seg.in, -ripple_amount);
-        }
-        break;
-      }
-    }
-  }
-
-  if (delete_ca->hasActions()) {
-    amber::UndoStack.push(delete_ca);
-  } else {
-    delete delete_ca;
-  }
+  apply_ripple_delete(silence_segments, current_gap_size);
 
   return CutsApplied;
 }

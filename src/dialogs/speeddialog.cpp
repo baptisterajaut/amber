@@ -20,23 +20,23 @@
 
 #include "speeddialog.h"
 
-#include <QHBoxLayout>
+#include <QDialogButtonBox>
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QDialogButtonBox>
 
+#include "effects/effect.h"
 #include "engine/sequence.h"
-#include "project/footage.h"
-#include "rendering/renderfunctions.h"
-#include "panels/panels.h"
-#include "panels/timeline.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
-#include "effects/effect.h"
+#include "panels/panels.h"
+#include "panels/timeline.h"
+#include "project/footage.h"
 #include "project/media.h"
+#include "rendering/renderfunctions.h"
 
-SpeedDialog::SpeedDialog(QWidget *parent, QVector<Clip*> clips) : QDialog(parent) {
+SpeedDialog::SpeedDialog(QWidget* parent, QVector<Clip*> clips) : QDialog(parent) {
   setWindowTitle(tr("Speed/Duration"));
 
   clips_ = clips;
@@ -94,6 +94,54 @@ SpeedDialog::SpeedDialog(QWidget *parent, QVector<Clip*> clips) : QDialog(parent
   connect(duration, &LabelSlider::valueChanged, this, &SpeedDialog::duration_update);
 }
 
+// Process a video clip during exec() initialisation.
+// Updates frame-rate accumulators in-place.
+static void init_exec_video_clip(Clip* c, bool& enable_frame_rate, double& default_frame_rate,
+                                 double& current_frame_rate) {
+  if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
+    FootageStream* ms = c->media_stream();
+    if (ms != nullptr && ms->infinite_length) return;
+  }
+
+  double media_frame_rate = c->media_frame_rate();
+  if (enable_frame_rate) {
+    if (!qIsNaN(default_frame_rate) && !qFuzzyCompare(media_frame_rate, default_frame_rate)) {
+      default_frame_rate = qSNaN();
+    }
+    if (!qIsNaN(current_frame_rate) && !qFuzzyCompare(media_frame_rate * c->speed().value, current_frame_rate)) {
+      current_frame_rate = qSNaN();
+    }
+  } else {
+    default_frame_rate = media_frame_rate;
+    current_frame_rate = media_frame_rate * c->speed().value;
+    enable_frame_rate = true;
+  }
+}
+
+// Process an audio clip during exec() initialisation.
+// Updates maintain_pitch checkbox state.
+void SpeedDialog::init_exec_audio_clip(Clip* c, bool& multiple_audio) {
+  maintain_pitch->setEnabled(true);
+  if (!multiple_audio) {
+    maintain_pitch->setChecked(c->speed().maintain_audio_pitch);
+    multiple_audio = true;
+  } else if (!maintain_pitch->isTristate() && maintain_pitch->isChecked() != c->speed().maintain_audio_pitch) {
+    maintain_pitch->setCheckState(Qt::PartiallyChecked);
+    maintain_pitch->setTristate(true);
+  }
+}
+
+void SpeedDialog::init_exec_loop_combo() {
+  int first_loop = clips_.first()->loop_mode();
+  for (int i = 1; i < clips_.size(); i++) {
+    if (clips_.at(i)->loop_mode() != first_loop) {
+      loop_combo_->setCurrentIndex(-1);  // mixed
+      return;
+    }
+  }
+  loop_combo_->setCurrentIndex(first_loop);
+}
+
 int SpeedDialog::exec() {
   bool enable_frame_rate = false;
   bool multiple_audio = false;
@@ -105,51 +153,14 @@ int SpeedDialog::exec() {
   long default_length = -1;
   long current_length = -1;
 
-  for (int i=0;i<clips_.size();i++) {
+  for (int i = 0; i < clips_.size(); i++) {
     Clip* c = clips_.at(i);
+    double clip_percent = c->speed().value;
 
-    double clip_percent;
-
-    // get default frame rate/percentage
-    clip_percent = c->speed().value;
     if (c->track() < 0) {
-      bool process_video = true;
-      if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
-        FootageStream* ms = c->media_stream();
-        if (ms != nullptr && ms->infinite_length) {
-          process_video = false;
-        }
-      }
-
-      if (process_video) {
-        double media_frame_rate = c->media_frame_rate();
-
-        // get "default" frame rate"
-        if (enable_frame_rate) {
-          // check if frame rate is equal to default
-          if (!qIsNaN(default_frame_rate) && !qFuzzyCompare(media_frame_rate, default_frame_rate)) {
-            default_frame_rate = qSNaN();
-          }
-          if (!qIsNaN(current_frame_rate) && !qFuzzyCompare(media_frame_rate*c->speed().value, current_frame_rate)) {
-            current_frame_rate = qSNaN();
-          }
-        } else {
-          default_frame_rate = media_frame_rate;
-          current_frame_rate = media_frame_rate*c->speed().value;
-        }
-
-        enable_frame_rate = true;
-      }
+      init_exec_video_clip(c, enable_frame_rate, default_frame_rate, current_frame_rate);
     } else {
-      maintain_pitch->setEnabled(true);
-
-      if (!multiple_audio) {
-        maintain_pitch->setChecked(c->speed().maintain_audio_pitch);
-        multiple_audio = true;
-      } else if (!maintain_pitch->isTristate() && maintain_pitch->isChecked() != c->speed().maintain_audio_pitch) {
-        maintain_pitch->setCheckState(Qt::PartiallyChecked);
-        maintain_pitch->setTristate(true);
-      }
+      init_exec_audio_clip(c, multiple_audio);
     }
 
     if (i == 0) {
@@ -159,41 +170,19 @@ int SpeedDialog::exec() {
       reverse->setCheckState(Qt::PartiallyChecked);
     }
 
-    // get default length
     long clip_default_length = qRound(c->length() * clip_percent);
     if (i == 0) {
       current_length = c->length();
       default_length = clip_default_length;
       current_percent = clip_percent;
     } else {
-      if (current_length != -1 && c->length() != current_length) {
-        current_length = -1;
-      }
-      if (default_length != -1 && clip_default_length != default_length) {
-        default_length = -1;
-      }
-      if (!qIsNaN(current_percent) && !qFuzzyCompare(clip_percent, current_percent)) {
-        current_percent = qSNaN();
-      }
+      if (current_length != -1 && c->length() != current_length) current_length = -1;
+      if (default_length != -1 && clip_default_length != default_length) default_length = -1;
+      if (!qIsNaN(current_percent) && !qFuzzyCompare(clip_percent, current_percent)) current_percent = qSNaN();
     }
   }
 
-  // populate loop mode combo from clips
-  {
-    int first_loop = clips_.first()->loop_mode();
-    bool mixed = false;
-    for (int i = 1; i < clips_.size(); i++) {
-      if (clips_.at(i)->loop_mode() != first_loop) {
-        mixed = true;
-        break;
-      }
-    }
-    if (mixed) {
-      loop_combo_->setCurrentIndex(-1);  // no selection = mixed
-    } else {
-      loop_combo_->setCurrentIndex(first_loop);
-    }
-  }
+  init_exec_loop_combo();
 
   frame_rate->SetMinimum(1);
   percent->SetMinimum(0.0001);
@@ -214,7 +203,7 @@ void SpeedDialog::percent_update() {
   double fr_val = qSNaN();
   long len_val = -1;
 
-  for (int i=0;i<clips_.size();i++) {
+  for (int i = 0; i < clips_.size(); i++) {
     Clip* c = clips_.at(i);
 
     // get frame rate
@@ -249,7 +238,7 @@ void SpeedDialog::duration_update() {
   bool got_fr = false;
   double fr_val = qSNaN();
 
-  for (int i=0;i<clips_.size();i++) {
+  for (int i = 0; i < clips_.size(); i++) {
     Clip* c = clips_.at(i);
 
     // get percent
@@ -279,63 +268,54 @@ void SpeedDialog::duration_update() {
   percent->SetValue(pc_val);
 }
 
-void SpeedDialog::frame_rate_update() {
-  /*double fr = (frame_rate->value());
-  double pc = (fr / default_frame_rate);
-  percent->set_value(pc, false);
-  duration->set_value(default_length / pc, false);*/
+static long frame_rate_update_audio_len(const QVector<Clip*>& clips, double old_pc_val, double pc_val,
+                                        long current_len_val) {
+  long len_val = current_len_val;
+  for (auto c : clips) {
+    if (c->track() < 0) continue;
+    long new_clip_len =
+        (qIsNaN(old_pc_val) || qIsNaN(pc_val)) ? c->length() : qRound((c->length() * c->speed().value) / pc_val);
+    if (len_val > -1 && new_clip_len != len_val) return -1;
+  }
+  return len_val;
+}
 
+void SpeedDialog::frame_rate_update() {
   double old_pc_val = qSNaN();
   bool got_pc_val = false;
   double pc_val = qSNaN();
   bool got_len_val = false;
   long len_val = -1;
 
-  // analyze video clips
-  for (int i=0;i<clips_.size();i++) {
+  for (int i = 0; i < clips_.size(); i++) {
     Clip* c = clips_.at(i);
 
-    // check if all selected clips are currently the same speed
     if (i == 0) {
       old_pc_val = c->speed().value;
     } else if (!qIsNaN(old_pc_val) && !qFuzzyCompare(c->speed().value, old_pc_val)) {
       old_pc_val = qSNaN();
     }
 
-    if (c->track() < 0) {
-      // what would the new speed be based on this frame rate
-      double new_clip_speed = frame_rate->value() / c->media_frame_rate();
-      if (!got_pc_val) {
-        pc_val = new_clip_speed;
-        got_pc_val = true;
-      } else if (!qIsNaN(pc_val) && !qFuzzyCompare(pc_val, new_clip_speed)) {
-        pc_val = qSNaN();
-      }
+    if (c->track() >= 0) continue;
 
-      // what would be the new length based on this speed
-      long new_clip_len = (c->length() * c->speed().value) / new_clip_speed;
-      if (!got_len_val) {
-        len_val = new_clip_len;
-        got_len_val = true;
-      } else if (len_val > -1 && new_clip_len != len_val) {
-        len_val = -1;
-      }
+    double new_clip_speed = frame_rate->value() / c->media_frame_rate();
+    if (!got_pc_val) {
+      pc_val = new_clip_speed;
+      got_pc_val = true;
+    } else if (!qIsNaN(pc_val) && !qFuzzyCompare(pc_val, new_clip_speed)) {
+      pc_val = qSNaN();
+    }
+
+    long new_clip_len = (c->length() * c->speed().value) / new_clip_speed;
+    if (!got_len_val) {
+      len_val = new_clip_len;
+      got_len_val = true;
+    } else if (len_val > -1 && new_clip_len != len_val) {
+      len_val = -1;
     }
   }
 
-  // analyze audio clips
-  for (auto c : clips_) {
-    if (c->track() >= 0) {
-
-      long new_clip_len = (qIsNaN(old_pc_val) || qIsNaN(pc_val)) ?
-            c->length() : qRound((c->length() * c->speed().value) / pc_val);
-
-      if (len_val > -1 && new_clip_len != len_val) {
-        len_val = -1;
-        break;
-      }
-    }
-  }
+  len_val = frame_rate_update_audio_len(clips_, old_pc_val, pc_val, len_val);
 
   percent->SetValue(pc_val);
   duration->SetValue((len_val == -1) ? qSNaN() : len_val);
@@ -349,11 +329,10 @@ void set_speed(ComboAction* ca, Clip* c, double speed, bool ripple, long& ep, lo
   proposed_out = qRound(c->timeline_in() + (c->length() * multiplier));
   ca->append(new SetSpeedAction(c, speed));
   if (!ripple && proposed_out > c->timeline_out()) {
-    for (int i=0;i<c->sequence->clips.size();i++) {
-            ClipPtr compare = c->sequence->clips.at(i);
-      if (compare != nullptr
-          && compare->track() == c->track()
-          && compare->timeline_in() >= c->timeline_out() && compare->timeline_in() < proposed_out) {
+    for (int i = 0; i < c->sequence->clips.size(); i++) {
+      ClipPtr compare = c->sequence->clips.at(i);
+      if (compare != nullptr && compare->track() == c->track() && compare->timeline_in() >= c->timeline_out() &&
+          compare->timeline_in() < proposed_out) {
         proposed_out = compare->timeline_in();
       }
     }
@@ -371,66 +350,22 @@ void set_speed(ComboAction* ca, Clip* c, double speed, bool ripple, long& ep, lo
   amber::ActiveSequence->selections.append(sel);
 }
 
-void SpeedDialog::accept() {
-  ComboAction* ca = new ComboAction(tr("Change Speed"));
-
-  // undoable action for setting "maintain audio pitch"
-  SetClipProperty* audio_pitch_action = new SetClipProperty(kSetClipPropertyMaintainAudioPitch);
-
-  // undoable action for setting "reversed"
-  SetClipProperty* reversed_action = new SetClipProperty(kSetClipPropertyReversed);
-
-  // undoable action for restoring clip selections
-  SetSelectionsCommand* sel_command = new SetSelectionsCommand(amber::ActiveSequence.get());
-  sel_command->old_data = amber::ActiveSequence->selections;
-
-  // variables used to calculate ripples
-  long earliest_point = LONG_MAX;
-  long longest_ripple = LONG_MIN;
-
-  for (auto c : clips_) {
-    // make sure the clip is closed while we're making changes
-    if (c->IsOpen()) {
-      c->Close(true);
-    }
-
-    // set maintain audio pitch if the user made a selection
-    if (c->track() >= 0
-        && maintain_pitch->checkState() != Qt::PartiallyChecked
-        && c->speed().maintain_audio_pitch != maintain_pitch->isChecked()) {
-      audio_pitch_action->AddSetting(c, maintain_pitch->isChecked());
-    }
-
-    // set reverse setting if the user made a selection
-    if (reverse->checkState() != Qt::PartiallyChecked && c->reversed() != reverse->isChecked()) {
-      long new_clip_in = (c->media_length() - (c->length() + c->clip_in()));
-      c->move(ca, c->timeline_in(), c->timeline_out(), new_clip_in, c->track());
-      c->set_clip_in(new_clip_in);
-      reversed_action->AddSetting(c, reverse->isChecked());
-    }
-  }
-
-  // setting the actual speed
+void SpeedDialog::apply_speed_change(ComboAction* ca, long& earliest_point, long& longest_ripple) {
   if (!qIsNaN(percent->value())) {
-
-    // if we have a percentage value, use that on all the clips
     for (auto c : clips_) {
       set_speed(ca, c, percent->value(), ripple->isChecked(), earliest_point, longest_ripple);
     }
+    return;
+  }
 
-  } else if (!qIsNaN(frame_rate->value())) {
-
-    // if the user changed the speed by changing the frame rate,
+  if (!qIsNaN(frame_rate->value())) {
     bool can_change_all = true;
     double cached_speed = clips_.first()->speed().value;
     double cached_fr = qSNaN();
 
-    // see if we can use the frame rate to change all the speeds
-    for (int i=0;i<clips_.size();i++) {
+    for (int i = 0; i < clips_.size(); i++) {
       Clip* c = clips_.at(i);
-      if (i > 0 && !qFuzzyCompare(cached_speed, c->speed().value)) {
-        can_change_all = false;
-      }
+      if (i > 0 && !qFuzzyCompare(cached_speed, c->speed().value)) can_change_all = false;
       if (c->track() < 0) {
         if (qIsNaN(cached_fr)) {
           cached_fr = c->media_frame_rate();
@@ -441,20 +376,52 @@ void SpeedDialog::accept() {
       }
     }
 
-    // make changes
     for (auto c : clips_) {
       if (c->track() < 0) {
-        set_speed(ca, c, frame_rate->value() / c->media_frame_rate(), ripple->isChecked(), earliest_point, longest_ripple);
+        set_speed(ca, c, frame_rate->value() / c->media_frame_rate(), ripple->isChecked(), earliest_point,
+                  longest_ripple);
       } else if (can_change_all) {
         set_speed(ca, c, frame_rate->value() / cached_fr, ripple->isChecked(), earliest_point, longest_ripple);
       }
     }
-  } else if (!qIsNaN(duration->value())) {
-    // simply set duration
+    return;
+  }
+
+  if (!qIsNaN(duration->value())) {
     for (auto c : clips_) {
-      set_speed(ca, c, (c->length() * c->speed().value) / duration->value(), ripple->isChecked(), earliest_point, longest_ripple);
+      set_speed(ca, c, (c->length() * c->speed().value) / duration->value(), ripple->isChecked(), earliest_point,
+                longest_ripple);
     }
   }
+}
+
+void SpeedDialog::accept() {
+  ComboAction* ca = new ComboAction(tr("Change Speed"));
+  SetClipProperty* audio_pitch_action = new SetClipProperty(kSetClipPropertyMaintainAudioPitch);
+  SetClipProperty* reversed_action = new SetClipProperty(kSetClipPropertyReversed);
+  SetSelectionsCommand* sel_command = new SetSelectionsCommand(amber::ActiveSequence.get());
+  sel_command->old_data = amber::ActiveSequence->selections;
+
+  long earliest_point = LONG_MAX;
+  long longest_ripple = LONG_MIN;
+
+  for (auto c : clips_) {
+    if (c->IsOpen()) c->Close(true);
+
+    if (c->track() >= 0 && maintain_pitch->checkState() != Qt::PartiallyChecked &&
+        c->speed().maintain_audio_pitch != maintain_pitch->isChecked()) {
+      audio_pitch_action->AddSetting(c, maintain_pitch->isChecked());
+    }
+
+    if (reverse->checkState() != Qt::PartiallyChecked && c->reversed() != reverse->isChecked()) {
+      long new_clip_in = (c->media_length() - (c->length() + c->clip_in()));
+      c->move(ca, c->timeline_in(), c->timeline_out(), new_clip_in, c->track());
+      c->set_clip_in(new_clip_in);
+      reversed_action->AddSetting(c, reverse->isChecked());
+    }
+  }
+
+  apply_speed_change(ca, earliest_point, longest_ripple);
 
   if (ripple->isChecked()) {
     ripple_clips(ca, clips_.at(0)->sequence, earliest_point, longest_ripple);
@@ -462,11 +429,9 @@ void SpeedDialog::accept() {
 
   sel_command->new_data = amber::ActiveSequence->selections;
   ca->append(sel_command);
-
   ca->append(reversed_action);
   ca->append(audio_pitch_action);
 
-  // apply loop mode if user made a selection (currentIndex >= 0 means not mixed/unselected)
   if (loop_combo_->currentIndex() >= 0) {
     for (auto c : clips_) {
       if (c->loop_mode() != loop_combo_->currentIndex()) {
@@ -476,7 +441,6 @@ void SpeedDialog::accept() {
   }
 
   amber::UndoStack.push(ca);
-
   update_ui(true);
   QDialog::accept();
 }

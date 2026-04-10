@@ -21,10 +21,10 @@
 #include "renderthread.h"
 
 #include <QApplication>
-#include <QImage>
 #include <QDateTime>
 #include <QDebug>
 #include <QFile>
+#include <QImage>
 // Qt may set QT_CONFIG(vulkan) even without a real Vulkan SDK (e.g. macOS
 // Homebrew Qt with MoltenVK headers but no SDK on the build machine).
 // After including <QVulkanInstance>, check for VK_VERSION_1_0 to know if
@@ -36,9 +36,9 @@
 #define AMBER_HAS_VULKAN 1
 #endif
 
+#include "engine/sequence.h"
 #include "global/config.h"
 #include "rendering/renderfunctions.h"
-#include "engine/sequence.h"
 
 static QShader loadQsb(const QString& path) {
   QFile f(path);
@@ -75,15 +75,146 @@ void RenderThread::drainDeferredDeletes() {
   deferred_delete_queue_.clear();
 }
 
-RenderThread::RenderThread()
-    : front_buffer_switcher(false), queued(false) {
-}
+RenderThread::RenderThread() : front_buffer_switcher(false), queued(false) {}
 
 RenderThread::~RenderThread() {}
 
 void RenderThread::setGlFallbackSurface(QOffscreenSurface* surface) {
   fallbackSurface_ = surface;
   owns_fallback_surface_ = false;
+}
+
+// Attempt to create QRhi using the configured backend, with OpenGL and software Vulkan fallbacks.
+// Returns true on success; on failure rhi_ remains null and the caller should skip the frame.
+bool RenderThread::try_create_rhi() {
+  RhiBackend backend = amber::CurrentRuntimeConfig.rhi_backend;
+
+  switch (backend) {
+#if AMBER_HAS_VULKAN
+    case RhiBackend::Vulkan: {
+      auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
+      if (vi && vi->isValid()) {
+        QRhiVulkanInitParams vkParams;
+        vkParams.inst = vi;
+        rhi_ = QRhi::create(QRhi::Vulkan, &vkParams);
+      }
+      if (!rhi_) qWarning() << "Vulkan QRhi creation failed, falling back to OpenGL";
+      break;
+    }
+#endif
+#if defined(Q_OS_MACOS) || defined(Q_OS_IOS)
+    case RhiBackend::Metal: {
+      QRhiMetalInitParams mtlParams;
+      rhi_ = QRhi::create(QRhi::Metal, &mtlParams);
+      if (!rhi_) qWarning() << "Metal QRhi creation failed, falling back to OpenGL";
+      break;
+    }
+#endif
+#if defined(Q_OS_WIN)
+    case RhiBackend::D3D12: {
+      QRhiD3D12InitParams d3d12Params;
+      rhi_ = QRhi::create(QRhi::D3D12, &d3d12Params);
+      if (!rhi_) {
+        qWarning() << "D3D12 QRhi creation failed, trying D3D11";
+        QRhiD3D11InitParams d3d11Params;
+        rhi_ = QRhi::create(QRhi::D3D11, &d3d11Params);
+        if (!rhi_) qWarning() << "D3D11 also failed, falling back to OpenGL";
+      }
+      break;
+    }
+    case RhiBackend::D3D11: {
+      QRhiD3D11InitParams d3d11Params;
+      rhi_ = QRhi::create(QRhi::D3D11, &d3d11Params);
+      if (!rhi_) qWarning() << "D3D11 QRhi creation failed, falling back to OpenGL";
+      break;
+    }
+#endif
+    default:
+      break;
+  }
+
+  // OpenGL fallback
+  if (!rhi_) {
+    if (!fallbackSurface_) {
+      fallbackSurface_ = QRhiGles2InitParams::newFallbackSurface();
+      owns_fallback_surface_ = true;
+    }
+    QRhiGles2InitParams glParams;
+    glParams.fallbackSurface = fallbackSurface_;
+    rhi_ = QRhi::create(QRhi::OpenGLES2, &glParams);
+  }
+
+#if AMBER_HAS_VULKAN
+  // Last resort: software Vulkan (llvmpipe)
+  if (!rhi_ && amber::CurrentRuntimeConfig.vulkan_is_software) {
+    auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
+    if (vi && vi->isValid()) {
+      qWarning() << "OpenGL failed, falling back to software Vulkan (llvmpipe)";
+      QRhiVulkanInitParams vkParams;
+      vkParams.inst = vi;
+      rhi_ = QRhi::create(QRhi::Vulkan, &vkParams);
+    }
+  }
+#endif
+
+  if (!rhi_) {
+    qCritical() << "Failed to create QRhi with any backend";
+    return false;
+  }
+  qInfo() << "QRhi initialized, backend:" << rhi_->backendName() << "driver:" << rhi_->driverInfo().deviceName;
+
+  passthroughVert_ = loadQsb(QStringLiteral(":/shaders/common.vert.qsb"));
+  passthroughFrag_ = loadQsb(QStringLiteral(":/shaders/passthrough.frag.qsb"));
+  blendingFrag_ = loadQsb(QStringLiteral(":/shaders/blending.frag.qsb"));
+  premultiplyFrag_ = loadQsb(QStringLiteral(":/shaders/premultiply.frag.qsb"));
+  yuvFrag_ = loadQsb(QStringLiteral(":/shaders/yuv2rgb.frag.qsb"));
+
+  sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None, QRhiSampler::ClampToEdge,
+                              QRhiSampler::ClampToEdge);
+  sampler_->create();
+  return true;
+}
+
+// Create or recreate front/back render buffers if the target dimensions changed.
+void RenderThread::ensure_render_buffers() {
+  int target_w = seq->width / divider_;
+  int target_h = seq->height / divider_;
+  if (target_w != tex_width || target_h != tex_height) {
+    delete_buffers();
+    tex_width = target_w;
+    tex_height = target_h;
+  }
+
+  if (front_tex_[0] == nullptr) {
+    for (int i = 0; i < 2; i++) {
+      front_tex_[i] = rhi_->newTexture(QRhiTexture::RGBA8, QSize(tex_width, tex_height), 1,
+                                       QRhiTexture::RenderTarget | QRhiTexture::UsedAsTransferSource);
+      front_tex_[i]->create();
+
+      front_rt_[i] = rhi_->newTextureRenderTarget({front_tex_[i]}, QRhiTextureRenderTarget::PreserveColorContents);
+      if (i == 0) {
+        front_rpd_ = front_rt_[i]->newCompatibleRenderPassDescriptor();
+      }
+      front_rt_[i]->setRenderPassDescriptor(front_rpd_);
+      front_rt_[i]->create();
+
+      front_rt_clear_[i] = rhi_->newTextureRenderTarget({front_tex_[i]});
+      if (i == 0) {
+        front_clear_rpd_ = front_rt_clear_[i]->newCompatibleRenderPassDescriptor();
+      }
+      front_rt_clear_[i]->setRenderPassDescriptor(front_clear_rpd_);
+      front_rt_clear_[i]->create();
+    }
+  }
+
+  if (back_tex_ == nullptr) {
+    back_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(tex_width, tex_height), 1, QRhiTexture::RenderTarget);
+    back_tex_->create();
+    back_rt_ = rhi_->newTextureRenderTarget({back_tex_});
+    back_rpd_ = back_rt_->newCompatibleRenderPassDescriptor();
+    back_rt_->setRenderPassDescriptor(back_rpd_);
+    back_rt_->create();
+  }
 }
 
 void RenderThread::run() {
@@ -93,174 +224,27 @@ void RenderThread::run() {
     if (!queued) {
       wait_cond_.wait(&wait_lock_);
     }
-    if (!running) {
-      break;
-    }
+    if (!running) break;
     queued = false;
 
-    // Create QRhi if not yet initialized
     if (rhi_ == nullptr) {
-      RhiBackend backend = amber::CurrentRuntimeConfig.rhi_backend;
-
-      switch (backend) {
-#if AMBER_HAS_VULKAN
-        case RhiBackend::Vulkan: {
-          auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
-          if (vi && vi->isValid()) {
-            QRhiVulkanInitParams vkParams;
-            vkParams.inst = vi;
-            rhi_ = QRhi::create(QRhi::Vulkan, &vkParams);
-          }
-          if (!rhi_) qWarning() << "Vulkan QRhi creation failed, falling back to OpenGL";
-          break;
-        }
-#endif
-#if defined(Q_OS_MACOS) || defined(Q_OS_IOS)
-        case RhiBackend::Metal: {
-          QRhiMetalInitParams mtlParams;
-          rhi_ = QRhi::create(QRhi::Metal, &mtlParams);
-          if (!rhi_) qWarning() << "Metal QRhi creation failed, falling back to OpenGL";
-          break;
-        }
-#endif
-#if defined(Q_OS_WIN)
-        case RhiBackend::D3D12: {
-          QRhiD3D12InitParams d3d12Params;
-          rhi_ = QRhi::create(QRhi::D3D12, &d3d12Params);
-          if (!rhi_) {
-            qWarning() << "D3D12 QRhi creation failed, trying D3D11";
-            QRhiD3D11InitParams d3d11Params;
-            rhi_ = QRhi::create(QRhi::D3D11, &d3d11Params);
-            if (!rhi_) qWarning() << "D3D11 also failed, falling back to OpenGL";
-          }
-          break;
-        }
-        case RhiBackend::D3D11: {
-          QRhiD3D11InitParams d3d11Params;
-          rhi_ = QRhi::create(QRhi::D3D11, &d3d11Params);
-          if (!rhi_) qWarning() << "D3D11 QRhi creation failed, falling back to OpenGL";
-          break;
-        }
-#endif
-        default:
-          break;
-      }
-
-      // OpenGL fallback.  Prefer a surface pre-created on the GUI thread
-      // (via setGlFallbackSurface) to avoid the "QWindow outside gui thread"
-      // warning on Wayland.  Fall back to creating one here if the caller
-      // didn't provide one (produces a warning but still works).
-      if (!rhi_) {
-        if (!fallbackSurface_) {
-          fallbackSurface_ = QRhiGles2InitParams::newFallbackSurface();
-          owns_fallback_surface_ = true;
-        }
-        QRhiGles2InitParams glParams;
-        glParams.fallbackSurface = fallbackSurface_;
-        rhi_ = QRhi::create(QRhi::OpenGLES2, &glParams);
-      }
-
-      // Last resort: software Vulkan (llvmpipe) if OpenGL also failed
-#if AMBER_HAS_VULKAN
-      if (!rhi_ && amber::CurrentRuntimeConfig.vulkan_is_software) {
-        auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
-        if (vi && vi->isValid()) {
-          qWarning() << "OpenGL failed, falling back to software Vulkan (llvmpipe)";
-          QRhiVulkanInitParams vkParams;
-          vkParams.inst = vi;
-          rhi_ = QRhi::create(QRhi::Vulkan, &vkParams);
-        }
-      }
-#endif
-
-      if (!rhi_) {
-        qCritical() << "Failed to create QRhi with any backend";
-        continue;
-      }
-      qInfo() << "QRhi initialized, backend:" << rhi_->backendName()
-              << "driver:" << rhi_->driverInfo().deviceName;
-
-      // Load core shaders from QRC
-      passthroughVert_ = loadQsb(QStringLiteral(":/shaders/common.vert.qsb"));
-      passthroughFrag_ = loadQsb(QStringLiteral(":/shaders/passthrough.frag.qsb"));
-      blendingFrag_ = loadQsb(QStringLiteral(":/shaders/blending.frag.qsb"));
-      premultiplyFrag_ = loadQsb(QStringLiteral(":/shaders/premultiply.frag.qsb"));
-      yuvFrag_ = loadQsb(QStringLiteral(":/shaders/yuv2rgb.frag.qsb"));
-
-      // Sampler
-      sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
-                                   QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
-      sampler_->create();
+      if (!try_create_rhi()) continue;
     }
 
-    if (rhi_ != nullptr) {
-      // Recreate buffers if sequence size or divider changed
-      int target_w = seq->width / divider_;
-      int target_h = seq->height / divider_;
-      if (target_w != tex_width || target_h != tex_height) {
-        delete_buffers();
-        tex_width = target_w;
-        tex_height = target_h;
-      }
+    ensure_render_buffers();
+    paint();
 
-      // Create front buffers (double-buffered compositing targets)
-      if (front_tex_[0] == nullptr) {
-        for (int i = 0; i < 2; i++) {
-          front_tex_[i] = rhi_->newTexture(QRhiTexture::RGBA8, QSize(tex_width, tex_height),
-                                           1, QRhiTexture::RenderTarget | QRhiTexture::UsedAsTransferSource);
-          front_tex_[i]->create();
-
-          // Compositing RT: preserves contents between clips
-          front_rt_[i] = rhi_->newTextureRenderTarget(
-              {front_tex_[i]}, QRhiTextureRenderTarget::PreserveColorContents);
-          if (i == 0) {
-            front_rpd_ = front_rt_[i]->newCompatibleRenderPassDescriptor();
-          }
-          front_rt_[i]->setRenderPassDescriptor(front_rpd_);
-          front_rt_[i]->create();
-
-          // Clear RT: same texture, no PreserveColorContents (beginPass actually clears)
-          front_rt_clear_[i] = rhi_->newTextureRenderTarget({front_tex_[i]});
-          if (i == 0) {
-            front_clear_rpd_ = front_rt_clear_[i]->newCompatibleRenderPassDescriptor();
-          }
-          front_rt_clear_[i]->setRenderPassDescriptor(front_clear_rpd_);
-          front_rt_clear_[i]->create();
-        }
-      }
-
-      // Create back buffer (single — used for clip→main compositing)
-      if (back_tex_ == nullptr) {
-        back_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(tex_width, tex_height),
-                                     1, QRhiTexture::RenderTarget);
-        back_tex_->create();
-        back_rt_ = rhi_->newTextureRenderTarget({back_tex_});
-        back_rpd_ = back_rt_->newCompatibleRenderPassDescriptor();
-        back_rt_->setRenderPassDescriptor(back_rpd_);
-        back_rt_->create();
-      }
-
-      // Draw frame
-      paint();
-
-      front_buffer_switcher = !front_buffer_switcher;
-
-      emit ready();
-    }
+    front_buffer_switcher = !front_buffer_switcher;
+    emit ready();
   }
 
   delete_ctx();
-
   wait_lock_.unlock();
 }
 
-QMutex* RenderThread::get_texture_mutex(int buffer_index) {
-  return buffer_index ? &front_mutex2 : &front_mutex1;
-}
+QMutex* RenderThread::get_texture_mutex(int buffer_index) { return buffer_index ? &front_mutex2 : &front_mutex1; }
 
-int RenderThread::front_buffer_index() const {
-  return front_buffer_switcher.load() ? 1 : 0;
-}
+int RenderThread::front_buffer_index() const { return front_buffer_switcher.load() ? 1 : 0; }
 
 const char* RenderThread::get_frame_data(int buffer_index) const {
   const QByteArray& buf = cpu_frame_[buffer_index];
@@ -361,8 +345,7 @@ void RenderThread::paint() {
     } else {
       QByteArray& data = cpu_frame_[active_idx];
       if (!data.isEmpty()) {
-        QImage img(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height,
-                   QImage::Format_RGBA8888);
+        QImage img(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height, QImage::Format_RGBA8888);
         img.save(save_fn);
       }
       save_fn = "";
@@ -394,13 +377,8 @@ void RenderThread::paint() {
   }
 }
 
-void RenderThread::start_render(Sequence* s,
-                                int playback_speed,
-                                const QString& save,
-                                void* pixels,
-                                int pixel_linesize,
-                                int idivider,
-                                bool scrubbing) {
+void RenderThread::start_render(Sequence* s, int playback_speed, const QString& save, void* pixels, int pixel_linesize,
+                                int idivider, bool scrubbing) {
   // Apply preview resolution divider for playback (not export)
   if (pixels == nullptr) {
     divider_ = qMax(1, idivider);

@@ -28,23 +28,22 @@
 
 #include <cinttypes>
 
-#include <QtMath>
 #include <QAudioSink>
 #include <QDateTime>
 #include <QFileInfo>
+#include <QtMath>
 #include <cmath>
 
+#include "global/config.h"
+#include "global/debug.h"
 #include "project/projectelements.h"
 #include "rendering/audio.h"
 #include "rendering/renderfunctions.h"
-#include "global/config.h"
-#include "global/debug.h"
 
 const AVPixelFormat kDestPixFmt = AV_PIX_FMT_RGBA;
 const AVSampleFormat kDestSampleFmt = AV_SAMPLE_FMT_S16;
 
-void Cacher::SetRetrievedFrame(AVFrame *f)
-{
+void Cacher::SetRetrievedFrame(AVFrame* f) {
   retrieve_lock_.lock();
   if (retrieved_frame == nullptr) {
     retrieved_frame = f;
@@ -53,19 +52,17 @@ void Cacher::SetRetrievedFrame(AVFrame *f)
   retrieve_lock_.unlock();
 }
 
-void Cacher::WakeMainThread()
-{
+void Cacher::WakeMainThread() {
   main_thread_lock_.lock();
   main_thread_woken_ = true;
   main_thread_wait_.wakeAll();
   main_thread_lock_.unlock();
 }
 
-Cacher::Cacher(Clip* c) :
-  clip(c),
+Cacher::Cacher(Clip* c)
+    : clip(c),
 
-  is_valid_state_(false)
-{
+      is_valid_state_(false) {
   if (!c) {
     qWarning() << "Cacher::Cacher: clip is null";
   }
@@ -87,6 +84,33 @@ void Cacher::openWorkerToneClip() {
   audio_reset_ = true;
 }
 
+// ---------------------------------------------------------------------------
+// openWorkerTryHwAccel — attempt hardware-accelerated decode setup
+// ---------------------------------------------------------------------------
+void Cacher::openWorkerTryHwAccel() {
+  static const AVHWDeviceType hw_types[] = {
+#if defined(__linux__)
+      AV_HWDEVICE_TYPE_VAAPI,
+#elif defined(_WIN32)
+      AV_HWDEVICE_TYPE_D3D11VA,
+#elif defined(__APPLE__)
+      AV_HWDEVICE_TYPE_VIDEOTOOLBOX,
+#endif
+      AV_HWDEVICE_TYPE_NONE};
+
+  for (int i = 0; hw_types[i] != AV_HWDEVICE_TYPE_NONE; i++) {
+    if (av_hwdevice_ctx_create(&hw_device_ctx, hw_types[i], nullptr, nullptr, 0) == 0) {
+      codecCtx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
+      qInfo() << "Hardware decoding enabled:" << av_hwdevice_get_type_name(hw_types[i]);
+      return;
+    }
+  }
+  qInfo() << "Hardware decoding unavailable, falling back to software";
+}
+
+// ---------------------------------------------------------------------------
+// openWorkerOpenCodec
+// ---------------------------------------------------------------------------
 bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
   if (!m) {
     qWarning() << "Cacher::openWorkerOpenCodec: Footage is null";
@@ -96,6 +120,7 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
     qWarning() << "Cacher::openWorkerOpenCodec: FootageStream is null";
     return false;
   }
+
   // Resolve file path (proxy or original)
   QByteArray ba;
   if (m->proxy && !m->proxy_path.isEmpty() && QFileInfo::exists(m->proxy_path)) {
@@ -139,6 +164,7 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
     avformat_close_input(&formatCtx);
     return false;
   }
+
   codecCtx = avcodec_alloc_context3(codec);
   if (codecCtx == nullptr) {
     qCritical() << "Could not allocate codec context";
@@ -160,27 +186,7 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
 
   // Try hardware-accelerated decoding if enabled and this is a video stream
   if (amber::CurrentConfig.hardware_decoding && stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-    static const AVHWDeviceType hw_types[] = {
-#if defined(__linux__)
-      AV_HWDEVICE_TYPE_VAAPI,
-#elif defined(_WIN32)
-      AV_HWDEVICE_TYPE_D3D11VA,
-#elif defined(__APPLE__)
-      AV_HWDEVICE_TYPE_VIDEOTOOLBOX,
-#endif
-      AV_HWDEVICE_TYPE_NONE
-    };
-
-    for (int i = 0; hw_types[i] != AV_HWDEVICE_TYPE_NONE; i++) {
-      if (av_hwdevice_ctx_create(&hw_device_ctx, hw_types[i], nullptr, nullptr, 0) == 0) {
-        codecCtx->hw_device_ctx = av_buffer_ref(hw_device_ctx);
-        qInfo() << "Hardware decoding enabled:" << av_hwdevice_get_type_name(hw_types[i]);
-        break;
-      }
-    }
-    if (hw_device_ctx == nullptr) {
-      qInfo() << "Hardware decoding unavailable, falling back to software";
-    }
+    openWorkerTryHwAccel();
   }
 
   // Open codec
@@ -203,22 +209,19 @@ void Cacher::openWorkerVideoFilter(const FootageStream* ms) {
   }
   char filter_args[512];
   snprintf(filter_args, sizeof(filter_args), "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-           stream->codecpar->width,
-           stream->codecpar->height,
-           stream->codecpar->format,
-           stream->time_base.num,
-           stream->time_base.den,
-           stream->codecpar->sample_aspect_ratio.num,
-           stream->codecpar->sample_aspect_ratio.den);
+           stream->codecpar->width, stream->codecpar->height, stream->codecpar->format, stream->time_base.num,
+           stream->time_base.den, stream->codecpar->sample_aspect_ratio.num, stream->codecpar->sample_aspect_ratio.den);
 
   bool ok = true;
 
-  if (avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("buffer"), "in", filter_args, nullptr, filter_graph) < 0) {
+  if (avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("buffer"), "in", filter_args, nullptr,
+                                   filter_graph) < 0) {
     qCritical() << "Could not create video buffer source";
     ok = false;
   }
 
-  if (ok && avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("buffersink"), "out", nullptr, nullptr, filter_graph) < 0) {
+  if (ok && avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("buffersink"), "out", nullptr, nullptr,
+                                         filter_graph) < 0) {
     qCritical() << "Could not create video buffer sink";
     ok = false;
   }
@@ -230,7 +233,8 @@ void Cacher::openWorkerVideoFilter(const FootageStream* ms) {
     AVFilterContext* yadif_filter;
     snprintf(yadif_args, sizeof(yadif_args), "mode=3:parity=%d",
              ((ms->video_interlacing == VIDEO_TOP_FIELD_FIRST) ? 0 : 1));
-    if (avfilter_graph_create_filter(&yadif_filter, avfilter_get_by_name("yadif"), "yadif", yadif_args, nullptr, filter_graph) < 0) {
+    if (avfilter_graph_create_filter(&yadif_filter, avfilter_get_by_name("yadif"), "yadif", yadif_args, nullptr,
+                                     filter_graph) < 0) {
       qCritical() << "Could not create yadif filter";
       ok = false;
     } else {
@@ -248,7 +252,8 @@ void Cacher::openWorkerVideoFilter(const FootageStream* ms) {
     }
 
     AVFilterContext* format_conv;
-    if (avfilter_graph_create_filter(&format_conv, avfilter_get_by_name("format"), "fmt", fmt_args, nullptr, filter_graph) < 0) {
+    if (avfilter_graph_create_filter(&format_conv, avfilter_get_by_name("format"), "fmt", fmt_args, nullptr,
+                                     filter_graph) < 0) {
       qCritical() << "Could not create format filter";
       ok = false;
     } else {
@@ -270,6 +275,47 @@ void Cacher::openWorkerVideoFilter(const FootageStream* ms) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// openWorkerBuildAtempoChain — build pitch-preserving speed filter chain
+// ---------------------------------------------------------------------------
+bool Cacher::openWorkerBuildAtempoChain(double playback_speed, AVFilterContext*& last_filter, bool& ok) {
+  char speed_param[10];
+  double base = (playback_speed > 1.0) ? 2.0 : 0.5;
+  double speedlog = log(playback_speed) / log(base);
+  int whole2 = qFloor(speedlog);
+  speedlog -= whole2;
+
+  if (whole2 > 0) {
+    snprintf(speed_param, sizeof(speed_param), "%f", base);
+    for (int i = 0; i < whole2; i++) {
+      AVFilterContext* tempo_filter = nullptr;
+      if (avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
+                                       filter_graph) < 0) {
+        qCritical() << "Could not create atempo filter in chain";
+        ok = false;
+        return false;
+      }
+      avfilter_link(last_filter, 0, tempo_filter, 0);
+      last_filter = tempo_filter;
+    }
+  }
+
+  snprintf(speed_param, sizeof(speed_param), "%f", qPow(base, speedlog));
+  AVFilterContext* tempo_filter = nullptr;
+  if (avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
+                                   filter_graph) < 0) {
+    qCritical() << "Could not create final atempo filter";
+    ok = false;
+    return false;
+  }
+  avfilter_link(last_filter, 0, tempo_filter, 0);
+  last_filter = tempo_filter;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// openWorkerAudioFilter
+// ---------------------------------------------------------------------------
 void Cacher::openWorkerAudioFilter(Footage* m) {
   if (!m) {
     qWarning() << "Cacher::openWorkerAudioFilter: Footage is null";
@@ -297,16 +343,14 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
     char ch_layout_str[64];
     av_channel_layout_describe(&codecCtx->ch_layout, ch_layout_str, sizeof(ch_layout_str));
     snprintf(filter_args, sizeof(filter_args), "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
-             stream->time_base.num,
-             stream->time_base.den,
-             stream->codecpar->sample_rate,
-             av_get_sample_fmt_name(codecCtx->sample_fmt),
-             ch_layout_str);
+             stream->time_base.num, stream->time_base.den, stream->codecpar->sample_rate,
+             av_get_sample_fmt_name(codecCtx->sample_fmt), ch_layout_str);
   }
 
   bool ok = true;
 
-  if (avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("abuffer"), "in", filter_args, nullptr, filter_graph) < 0) {
+  if (avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("abuffer"), "in", filter_args, nullptr,
+                                   filter_graph) < 0) {
     qCritical() << "Could not create audio buffer source";
     ok = false;
   }
@@ -323,23 +367,21 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
 
   // Create abuffersink (no constraints — aformat filter handles conversion)
   if (ok) {
-    if (avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out",
-                                     nullptr, nullptr, filter_graph) < 0) {
+    if (avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out", nullptr, nullptr,
+                                     filter_graph) < 0) {
       qCritical() << "Could not create audio buffer sink";
       ok = false;
     }
   }
 
   // Explicit aformat filter: converts sample format, channel layout, and sample rate.
-  // This is more robust than relying on abuffersink constraints + FFmpeg auto-conversion,
-  // which can fail silently across FFmpeg versions (especially mono→stereo).
   AVFilterContext* aformat_ctx = nullptr;
   if (ok) {
     char aformat_args[128];
     snprintf(aformat_args, sizeof(aformat_args), "sample_fmts=%s:channel_layouts=stereo:sample_rates=%d",
              av_get_sample_fmt_name(kDestSampleFmt), target_sample_rate);
-    if (avfilter_graph_create_filter(&aformat_ctx, avfilter_get_by_name("aformat"), "aformat",
-                                     aformat_args, nullptr, filter_graph) < 0) {
+    if (avfilter_graph_create_filter(&aformat_ctx, avfilter_get_by_name("aformat"), "aformat", aformat_args, nullptr,
+                                     filter_graph) < 0) {
       qCritical() << "Could not create aformat filter";
       ok = false;
     }
@@ -349,40 +391,10 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
   if (ok) {
     AVFilterContext* last_filter = buffersrc_ctx;
 
-    if (!qFuzzyCompare(playback_speed, 1.0) && !qFuzzyIsNull(playback_speed) && clip->speed().maintain_audio_pitch) {
-      char speed_param[10];
-      double base = (playback_speed > 1.0) ? 2.0 : 0.5;
-      double speedlog = log(playback_speed) / log(base);
-      int whole2 = qFloor(speedlog);
-      speedlog -= whole2;
-
-      if (whole2 > 0) {
-        snprintf(speed_param, sizeof(speed_param), "%f", base);
-        for (int i = 0; i < whole2; i++) {
-          AVFilterContext* tempo_filter = nullptr;
-          if (avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
-                                           filter_graph) < 0) {
-            qCritical() << "Could not create atempo filter in chain";
-            ok = false;
-            break;
-          }
-          avfilter_link(last_filter, 0, tempo_filter, 0);
-          last_filter = tempo_filter;
-        }
-      }
-
-      if (ok) {
-        snprintf(speed_param, sizeof(speed_param), "%f", qPow(base, speedlog));
-        AVFilterContext* tempo_filter = nullptr;
-        if (avfilter_graph_create_filter(&tempo_filter, avfilter_get_by_name("atempo"), "atempo", speed_param, nullptr,
-                                         filter_graph) < 0) {
-          qCritical() << "Could not create final atempo filter";
-          ok = false;
-        } else {
-          avfilter_link(last_filter, 0, tempo_filter, 0);
-          last_filter = tempo_filter;
-        }
-      }
+    bool need_atempo =
+        !qFuzzyCompare(playback_speed, 1.0) && !qFuzzyIsNull(playback_speed) && clip->speed().maintain_audio_pitch;
+    if (need_atempo) {
+      openWorkerBuildAtempoChain(playback_speed, last_filter, ok);
     }
 
     if (ok) {
@@ -539,8 +551,7 @@ void Cacher::run() {
   clip->cache_lock.unlock();
 }
 
-void Cacher::Open()
-{
+void Cacher::Open() {
   wait();
 
   // set variable defaults for caching
@@ -550,15 +561,33 @@ void Cacher::Open()
   start((clip->track() < 0) ? QThread::HighPriority : QThread::TimeCriticalPriority);
 }
 
-void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed)
-{
+// ---------------------------------------------------------------------------
+// cacheFindFrameInQueue — search queue for matching frame
+// ---------------------------------------------------------------------------
+bool Cacher::cacheFindFrameInQueue(int64_t target_pts) {
+  for (int i = 0; i < queue_.size(); i++) {
+    if (queue_.at(i)->pts == target_pts) {
+      retrieved_frame = queue_.at(i);
+      return true;
+    }
+    if (i > 0 && queue_.at(i - 1)->pts < target_pts && queue_.at(i)->pts > target_pts) {
+      // Close timestamp — assume rounding error, use the frame just before
+      retrieved_frame = queue_.at(i - 1);
+      return true;
+    }
+  }
+  return false;
+}
 
+// ---------------------------------------------------------------------------
+// Cache
+// ---------------------------------------------------------------------------
+void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed) {
   if (!is_valid_state_) {
     return;
   }
 
-  if (clip->media_stream() != nullptr
-      && clip->media_stream()->infinite_length) {
+  if (clip->media_stream() != nullptr && clip->media_stream()->infinite_length) {
     queue_.lock();
     if (queue_.size() > 0) {
       retrieved_frame = queue_.at(0);
@@ -583,32 +612,14 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
     queue_.lock();
     retrieved_frame = nullptr;
     int64_t target_pts = seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
-    for (int i=0;i<queue_.size();i++) {
-
-      if (queue_.at(i)->pts == target_pts) {
-
-        // the queue has a frame with the exact timestamp
-
-        retrieved_frame = queue_.at(i);
-        wait_for_cacher_to_respond = false;
-        break;
-      } else if (i > 0 && queue_.at(i-1)->pts < target_pts && queue_.at(i)->pts > target_pts) {
-
-        // the queue has a frame with a close timestamp that we'll assume is different due to a rounding error
-
-        retrieved_frame = queue_.at(i-1);
-        wait_for_cacher_to_respond = false;
-        break;
-      }
+    if (cacheFindFrameInQueue(target_pts)) {
+      wait_for_cacher_to_respond = false;
     }
     queue_.unlock();
     retrieve_lock_.unlock();
   }
 
   // Audio scrub: fire-and-forget — never block the UI thread.
-  // The cacher decodes the grain asynchronously; if the user seeks again
-  // before it's ready, reset_all_audio() cancels the in-flight decode.
-  // Same pattern as start_render() for video.
   bool audio_scrub = (scrubbing && clip->track() >= 0);
 
   if (wait_for_cacher_to_respond && !audio_scrub) {
@@ -632,8 +643,7 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   }
 }
 
-AVFrame *Cacher::Retrieve()
-{
+AVFrame* Cacher::Retrieve() {
   if (!caching_) {
     return nullptr;
   }
@@ -650,16 +660,13 @@ AVFrame *Cacher::Retrieve()
 
   int attempts = 0;
   while (retrieved_frame == nullptr) {
-
     if (clip->cache_lock.tryLock()) {
-
       // If the queue could lock, the cacher isn't running which means no frame is coming. This is an error.
       qCritical() << "Cacher frame was null while the cacher wasn't running on clip" << clip->name();
       clip->cache_lock.unlock();
       break;
 
     } else {
-
       // cacher is running, wait for it to give a frame (with timeout to avoid deadlock
       // when the cacher finishes without producing a frame, e.g. missing/corrupt media)
       if (!retrieve_wait_.wait(&retrieve_lock_, timeout_ms)) {
@@ -672,9 +679,7 @@ AVFrame *Cacher::Retrieve()
           break;
         }
       }
-
     }
-
   }
 
   retrieve_lock_.unlock();
@@ -682,8 +687,7 @@ AVFrame *Cacher::Retrieve()
   return retrieved_frame;
 }
 
-void Cacher::Close(bool wait_for_finish)
-{
+void Cacher::Close(bool wait_for_finish) {
   caching_ = false;
   wait_cond_.wakeAll();
 
@@ -692,8 +696,7 @@ void Cacher::Close(bool wait_for_finish)
   }
 }
 
-void Cacher::ResetAudio()
-{
+void Cacher::ResetAudio() {
   audio_write_lock.lock();
   audio_reset_ = true;
   frame_sample_index_ = -1;
@@ -701,25 +704,19 @@ void Cacher::ResetAudio()
   audio_write_lock.unlock();
 }
 
-int Cacher::media_width()
-{
+int Cacher::media_width() {
   if (stream == nullptr) return 0;
   return stream->codecpar->width;
 }
 
-int Cacher::media_height()
-{
+int Cacher::media_height() {
   if (stream == nullptr) return 0;
   return stream->codecpar->height;
 }
 
-AVRational Cacher::media_time_base()
-{
+AVRational Cacher::media_time_base() {
   if (stream == nullptr) return {0, 1};
   return stream->time_base;
 }
 
-ClipQueue *Cacher::queue()
-{
-  return &queue_;
-}
+ClipQueue* Cacher::queue() { return &queue_; }

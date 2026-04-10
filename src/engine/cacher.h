@@ -720,6 +720,94 @@ class Cacher : public QThread {
    * @brief Internal function using the Cacher's known information to determine whether this media is playing in reverse
    */
   bool IsReversed();
+
+  // ---------------------------------------------------------------------------
+  // Private helpers — video caching
+  // ---------------------------------------------------------------------------
+
+  /**
+   * @brief Seek the decoder to a position before target_pts and return the first decoded frame.
+   *
+   * Loops (up to ts=0) until a frame before target_pts is obtained. Clears the frame queue on entry.
+   * On return, decoded_frame holds an allocated AVFrame (caller is responsible for it).
+   * seeked_to_zero is set to true if the loop bottomed out at timestamp 0.
+   */
+  int cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFrame*& decoded_frame, bool& seeked_to_zero);
+
+  /**
+   * @brief Update retrieved_frame from a newly decoded frame if not already set.
+   *
+   * Checks exact-match, ahead-of-target-with-queue, and seeked-to-zero fallback cases.
+   * seeked_to_zero may be cleared if the seeked-to-zero fallback is used.
+   */
+  void cacheVideoMaybeSetRetrieved(AVFrame* decoded_frame, int64_t target_pts, bool& seeked_to_zero);
+
+  /**
+   * @brief Trim the front of the queue when FRAME_QUEUE_TYPE_FRAMES previous limit is exceeded.
+   */
+  void cacheVideoTrimPreviousFrames(int64_t target_pts, int64_t minimum_ts);
+
+  /**
+   * @brief Handle a decoded frame with AV_NOPTS_VALUE pts (still-image or seek artifact).
+   *
+   * Assigns target_pts to the frame, and if EOF was also signalled, stores the frame and returns true
+   * (caller should break the decode loop).
+   */
+  bool cacheVideoHandleNoPtsFrame(AVFrame* decoded_frame, int64_t target_pts, int retrieve_code);
+
+  /**
+   * @brief Cache a single still-image frame (infinite_length clips).
+   */
+  void cacheVideoStillImage();
+
+  /**
+   * @brief Cache frames for a dynamic (non-still-image) clip.
+   */
+  void cacheVideoDynamicClip();
+
+  /**
+   * @brief Process one decoded frame inside the decode loop.
+   *
+   * Returns true if the caller should break out of the decode loop.
+   *
+   * @param previous_queue_type   FRAME_QUEUE_TYPE_FRAMES or FRAME_QUEUE_TYPE_SECONDS (for previous/behind frames)
+   * @param upcoming_queue_type   FRAME_QUEUE_TYPE_FRAMES or FRAME_QUEUE_TYPE_SECONDS (for upcoming frames)
+   */
+  bool cacheVideoProcessDecodedFrame(AVFrame* decoded_frame, int retrieve_code, int64_t target_pts,
+                                     bool& seeked_to_zero, int previous_queue_type, int upcoming_queue_type,
+                                     int64_t minimum_ts, int64_t maximum_ts, int& frames_greater_than_target);
+
+  // ---------------------------------------------------------------------------
+  // Private helpers — codec open / filter setup
+  // ---------------------------------------------------------------------------
+
+  /**
+   * @brief Attempt to initialise hardware-accelerated decoding on codecCtx.
+   *
+   * Tries the platform-specific HW device type(s) in order and sets hw_device_ctx on success.
+   * Falls back silently to software if none are available.
+   */
+  void openWorkerTryHwAccel();
+
+  /**
+   * @brief Build the atempo filter chain for pitch-preserving speed adjustment.
+   *
+   * Creates one or more atempo filter nodes between last_filter and the next stage.
+   * Returns false and sets ok=false on any filter creation failure.
+   */
+  bool openWorkerBuildAtempoChain(double playback_speed, AVFilterContext*& last_filter, bool& ok);
+
+  // ---------------------------------------------------------------------------
+  // Private helpers — Cache() queue search
+  // ---------------------------------------------------------------------------
+
+  /**
+   * @brief Search the frame queue for a frame matching target_pts.
+   *
+   * Sets retrieved_frame and returns true if an exact or close match is found.
+   * Must be called with retrieve_lock_ and queue_ both locked.
+   */
+  bool cacheFindFrameInQueue(int64_t target_pts);
 };
 
 #endif  // CACHER_H

@@ -21,18 +21,14 @@
 #ifndef MEDIA_H
 #define MEDIA_H
 
+#include <QIcon>
 #include <QList>
 #include <QVariant>
-#include <QIcon>
 
 #include "core/marker.h"
 #include "project/footage.h"
 
-enum MediaType : uint8_t {
-  MEDIA_TYPE_FOOTAGE,
-  MEDIA_TYPE_SEQUENCE,
-  MEDIA_TYPE_FOLDER
-};
+enum MediaType : uint8_t { MEDIA_TYPE_FOOTAGE, MEDIA_TYPE_SEQUENCE, MEDIA_TYPE_FOLDER };
 
 class Sequence;
 using SequencePtr = std::shared_ptr<Sequence>;
@@ -42,15 +38,14 @@ using VoidPtr = std::shared_ptr<void>;
 class Media;
 using MediaPtr = std::shared_ptr<Media>;
 
-class Media
-{
-public:
+class Media {
+ public:
   Media();
 
-  Footage *to_footage();
+  Footage* to_footage();
   SequencePtr to_sequence();
   void set_icon(const QString& str);
-  void set_icon(const QIcon &ico);
+  void set_icon(const QIcon& ico);
   void set_footage(FootagePtr f);
   void set_sequence(SequencePtr s);
   void set_folder();
@@ -66,13 +61,13 @@ public:
 
   // item functions
   void appendChild(MediaPtr child);
-  bool setData(int col, const QVariant &value);
-  Media *child(int row);
+  bool setData(int col, const QVariant& value);
+  Media* child(int row);
   [[nodiscard]] int childCount() const;
   [[nodiscard]] int columnCount() const;
   QVariant data(int column, int role);
   [[nodiscard]] int row() const;
-  Media *parentItem();
+  Media* parentItem();
   void removeChild(int i);
   MediaPtr get_shared_ptr(Media* m);
 
@@ -83,11 +78,13 @@ public:
   int temp_id;
   int temp_id2;
 
-private:
+ private:
   int type{-1};
   VoidPtr object;
 
   QString GetStringDuration();
+  QVariant GetRateDisplay();
+  QString footage_tooltip_body(Footage* f);
 
   // item functions
   QList<MediaPtr> children;
@@ -97,4 +94,4 @@ private:
   QIcon icon;
 };
 
-#endif // MEDIA_H
+#endif  // MEDIA_H

@@ -21,26 +21,26 @@
 #ifndef CLIP_H
 #define CLIP_H
 
-#include <atomic>
-#include <memory>
-#include <QWaitCondition>
+#include <rhi/qrhi.h>
 #include <QMutex>
 #include <QVector>
-#include <rhi/qrhi.h>
+#include <QWaitCondition>
+#include <atomic>
+#include <memory>
 
 #include "cacher.h"
 
 #include "effects/effect.h"
 #include "effects/transition.h"
 #include "engine/undo/comboaction.h"
-#include "project/media.h"
 #include "project/footage.h"
+#include "project/media.h"
 
 #include "core/marker.h"
 
 extern "C" {
-#include <libavformat/avformat.h>
 #include <libavfilter/avfilter.h>
+#include <libavformat/avformat.h>
 }
 
 enum ClipLoopMode { kLoopNone = 0, kLoopLoop = 1, kLoopClamp = 2 };
@@ -57,10 +57,10 @@ struct ComposeSequenceParams;
 class Sequence;
 
 class Clip {
-public:
-  Clip(Sequence *s);
+ public:
+  Clip(Sequence* s);
   ~Clip();
-  ClipPtr copy(Sequence *s);
+  ClipPtr copy(Sequence* s);
 
   bool IsActiveAt(long timecode);
   bool IsSelected(bool containing = true);
@@ -90,12 +90,7 @@ public:
   bool enabled();
   void set_enabled(bool e);
 
-  void move(ComboAction* ca,
-            long iin,
-            long iout,
-            long iclip_in,
-            int itrack,
-            bool verify_transitions = true,
+  void move(ComboAction* ca, long iin, long iout, long iclip_in, int itrack, bool verify_transitions = true,
             bool relative = false);
 
   long clip_in(bool with_transition = false);
@@ -147,7 +142,7 @@ public:
 
   // playback functions
   void Open();
-  void Cache(long playhead, bool scrubbing, QVector<Clip*> &nests, int playback_speed);
+  void Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed);
   bool Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* params);
   void Close(bool wait);
   bool IsOpen();
@@ -183,7 +178,7 @@ public:
 
   long texture_frame{-1};
 
-private:
+ private:
   // timeline variables (should be copied in copy())
   bool enabled_{true};
   long clip_in_{0};
@@ -207,6 +202,38 @@ private:
   int loop_mode_{kLoopNone};
   std::atomic<bool> open_{false};
   bool cacher_uses_rgba_{false};
+
+  // ---------------------------------------------------------------------------
+  // Private helpers for Retrieve()
+  // ---------------------------------------------------------------------------
+
+  /**
+   * @brief Collect RHI resources to delete on Close() into the given vector.
+   *
+   * Includes YUV plane textures, converted texture, render target, render pass
+   * descriptor, and RGBA texture if present.
+   */
+  void collectRhiResourcesToDelete(QVector<QRhiResource*>& to_delete);
+
+  /**
+   * @brief GPU YUV→RGB path: create/upload YUV plane textures and run the conversion shader.
+   *
+   * Allocates plane textures lazily, uploads Y/U/V data from the decoded frame, then
+   * dispatches the yuv2rgb.frag.qsb pass into yuv_converted_tex. Sets cached_rhi_tex.
+   *
+   * @return true on success
+   */
+  bool retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* params, AVFrame* frame);
+
+  /**
+   * @brief CPU RGBA path: apply ImageFlag effects on CPU and upload result to rgba_tex.
+   *
+   * Allocates rgba_tex lazily, runs all enabled ImageFlag effects on the frame data,
+   * then uploads via a dummy render pass. Sets cached_rhi_tex.
+   *
+   * @return true on success
+   */
+  bool retrieveCpuRgbaPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* params, AVFrame* frame);
 };
 
-#endif // CLIP_H
+#endif  // CLIP_H

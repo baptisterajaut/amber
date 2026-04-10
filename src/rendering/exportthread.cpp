@@ -22,8 +22,8 @@
 
 extern "C" {
 #include <libavformat/avformat.h>
-#include <libavutil/opt.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/opt.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
@@ -33,34 +33,24 @@ extern "C" {
 #include <QPainter>
 #include <QtMath>
 
-#include "engine/sequence.h"
 #include "core/appcontext.h"
-#include "rendering/renderthread.h"
-#include "rendering/renderfunctions.h"
-#include "rendering/audio.h"
+#include "engine/sequence.h"
 #include "global/debug.h"
+#include "rendering/audio.h"
+#include "rendering/renderfunctions.h"
+#include "rendering/renderthread.h"
 
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
 
-ExportThread::ExportThread(Sequence* seq,
-                           const ExportParams &params,
-                           const VideoCodecParams& vparams,
-                           QObject *parent) :
-  QThread(parent),
-  seq_(seq),
-  params_(params),
-  vcodec_params_(vparams),
-  interrupt_(false)
-{
-}
+ExportThread::ExportThread(Sequence* seq, const ExportParams& params, const VideoCodecParams& vparams, QObject* parent)
+    : QThread(parent), seq_(seq), params_(params), vcodec_params_(vparams), interrupt_(false) {}
 
-void ExportThread::setGlFallbackSurface(QOffscreenSurface* surface) {
-  gl_fallback_surface_ = surface;
-}
+void ExportThread::setGlFallbackSurface(QOffscreenSurface* surface) { gl_fallback_surface_ = surface; }
 
-bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, AVFrame* frame, AVPacket* packet, AVStream* stream) {
+bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, AVFrame* frame, AVPacket* packet,
+                          AVStream* stream) {
   ret = avcodec_send_frame(codec_ctx, frame);
   if (ret < 0) {
     qCritical() << "Failed to send frame to encoder." << ret;
@@ -144,19 +134,19 @@ bool ExportThread::SetupVideo() {
 
   // Some codecs require special settings so we set that up here
   switch (vcodec_ctx->codec_id) {
-
-  /// H.264 specific settings
-  case AV_CODEC_ID_H264:
-  case AV_CODEC_ID_H265:
-    switch (params_.video_compression_type) {
-    case COMPRESSION_TYPE_CFR:
-      av_opt_set(vcodec_ctx->priv_data, "crf", QString::number(static_cast<int>(params_.video_bitrate)).toUtf8(), AV_OPT_SEARCH_CHILDREN);
+    /// H.264 specific settings
+    case AV_CODEC_ID_H264:
+    case AV_CODEC_ID_H265:
+      switch (params_.video_compression_type) {
+        case COMPRESSION_TYPE_CFR:
+          av_opt_set(vcodec_ctx->priv_data, "crf", QString::number(static_cast<int>(params_.video_bitrate)).toUtf8(),
+                     AV_OPT_SEARCH_CHILDREN);
+          break;
+      }
       break;
-    }
-    break;
 
-  default:
-    break;
+    default:
+      break;
   }
 
   // Set export to be multithreaded
@@ -203,18 +193,8 @@ bool ExportThread::SetupVideo() {
   video_pkt = av_packet_alloc();
 
   // Set up conversion context
-  sws_ctx = sws_getContext(
-        seq_->width,
-        seq_->height,
-        AV_PIX_FMT_RGBA,
-        params_.video_width,
-        params_.video_height,
-        vcodec_ctx->pix_fmt,
-        SWS_BILINEAR,
-        nullptr,
-        nullptr,
-        nullptr
-        );
+  sws_ctx = sws_getContext(seq_->width, seq_->height, AV_PIX_FMT_RGBA, params_.video_width, params_.video_height,
+                           vcodec_ctx->pix_fmt, SWS_BILINEAR, nullptr, nullptr, nullptr);
 
   return true;
 }
@@ -257,12 +237,14 @@ bool ExportThread::SetupAudio() {
   acodec_ctx->codec_id = static_cast<AVCodecID>(params_.audio_codec);
   acodec_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
   acodec_ctx->sample_rate = params_.audio_sampling_rate;
-  av_channel_layout_from_mask(&acodec_ctx->ch_layout, AV_CH_LAYOUT_STEREO);  // change this to support surround/mono sound in the future (this is what the user sets the output audio to)
+  av_channel_layout_from_mask(&acodec_ctx->ch_layout,
+                              AV_CH_LAYOUT_STEREO);  // change this to support surround/mono sound in the future (this
+                                                     // is what the user sets the output audio to)
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
-  const enum AVSampleFormat *sample_fmts = nullptr;
+  const enum AVSampleFormat* sample_fmts = nullptr;
   int num_sample_fmts = 0;
-  avcodec_get_supported_config(nullptr, acodec, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0,
-                               (const void **)&sample_fmts, &num_sample_fmts);
+  avcodec_get_supported_config(nullptr, acodec, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0, (const void**)&sample_fmts,
+                               &num_sample_fmts);
   acodec_ctx->sample_fmt = (sample_fmts && num_sample_fmts > 0) ? sample_fmts[0] : AV_SAMPLE_FMT_S16;
 #else
   acodec_ctx->sample_fmt = acodec->sample_fmts ? acodec->sample_fmts[0] : AV_SAMPLE_FMT_S16;
@@ -297,17 +279,8 @@ bool ExportThread::SetupAudio() {
   {
     AVChannelLayout in_ch_layout = {};
     av_channel_layout_from_mask(&in_ch_layout, seq_->audio_layout);
-    swr_alloc_set_opts2(
-          &swr_ctx,
-          &acodec_ctx->ch_layout,
-          acodec_ctx->sample_fmt,
-          acodec_ctx->sample_rate,
-          &in_ch_layout,
-          AV_SAMPLE_FMT_S16,
-          acodec_ctx->sample_rate,
-          0,
-          nullptr
-          );
+    swr_alloc_set_opts2(&swr_ctx, &acodec_ctx->ch_layout, acodec_ctx->sample_fmt, acodec_ctx->sample_rate,
+                        &in_ch_layout, AV_SAMPLE_FMT_S16, acodec_ctx->sample_rate, 0, nullptr);
     av_channel_layout_uninit(&in_ch_layout);
   }
   ret = swr_init(swr_ctx);
@@ -327,7 +300,8 @@ bool ExportThread::SetupAudio() {
     audio_frame->nb_samples = 256;
   }
 
-  // TODO change this to support surround/mono sound in the future (this is whatever format they're held in the internal buffer)
+  // TODO change this to support surround/mono sound in the future (this is whatever format they're held in the internal
+  // buffer)
   av_channel_layout_from_mask(&audio_frame->ch_layout, AV_CH_LAYOUT_STEREO);
 
   audio_frame->format = AV_SAMPLE_FMT_S16;
@@ -338,7 +312,8 @@ bool ExportThread::SetupAudio() {
     export_error = tr("could not allocate audio buffer (%1)").arg(QString::number(ret));
     return false;
   }
-  aframe_bytes = av_samples_get_buffer_size(nullptr, audio_frame->ch_layout.nb_channels, audio_frame->nb_samples, static_cast<AVSampleFormat>(audio_frame->format), 0);
+  aframe_bytes = av_samples_get_buffer_size(nullptr, audio_frame->ch_layout.nb_channels, audio_frame->nb_samples,
+                                            static_cast<AVSampleFormat>(audio_frame->format), 0);
 
   audio_pkt = av_packet_alloc();
 
@@ -356,12 +331,10 @@ bool ExportThread::SetupAudio() {
 }
 
 bool ExportThread::SetupContainer() {
-
   // Set up output context (using the filename as the format specification)
 
   avformat_alloc_output_context2(&fmt_ctx, nullptr, nullptr, c_filename);
   if (fmt_ctx == nullptr) {
-
     // Failed to create the output format context. Exit the export and throw an error.
 
     qCritical() << "Could not create output context";
@@ -371,7 +344,6 @@ bool ExportThread::SetupContainer() {
 
   ret = avio_open(&fmt_ctx->pb, c_filename, AVIO_FLAG_WRITE);
   if (ret < 0) {
-
     // Failed to get a valid write handle for the exported file. Exit the export and throw an error.
 
     qCritical() << "Could not open output file." << ret;
@@ -382,49 +354,91 @@ bool ExportThread::SetupContainer() {
   return true;
 }
 
-void ExportThread::Export()
-{
-  // Copy filename from QString to const char
+// Render one video frame and encode it. Returns false on unrecoverable error (caller should goto cleanup_renderer).
+bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs) {
+  do {
+    render_complete_ = false;
+    renderer->start_render(seq_, 1, nullptr, video_frame->data[0], video_frame->linesize[0] / 4, 0);
+    while (!render_complete_ && !interrupt_) {
+      waitCond.wait(&mutex);
+    }
+    if (interrupt_) return false;
+  } while (renderer->did_texture_fail());
+
+  if (interrupt_) return false;
+
+  // Alloc/free sws_frame every frame — required to avoid GIF getting stuck on first frame
+  // (see https://stackoverflow.com/a/38997739)
+  sws_frame = av_frame_alloc();
+  sws_frame->format = vcodec_ctx->pix_fmt;
+  sws_frame->width = params_.video_width;
+  sws_frame->height = params_.video_height;
+  av_frame_get_buffer(sws_frame, 0);
+
+  sws_scale(sws_ctx, video_frame->data, video_frame->linesize, 0, video_frame->height, sws_frame->data,
+            sws_frame->linesize);
+  sws_frame->pts = qRound(timecode_secs / av_q2d(vcodec_ctx->time_base));
+
+  bool ok = Encode(fmt_ctx, vcodec_ctx, sws_frame, video_pkt, video_stream);
+  av_frame_free(&sws_frame);
+  sws_frame = nullptr;
+  return ok;
+}
+
+// Drain audio buffer and encode frames up to timecode_secs. Returns false on error (caller should goto
+// cleanup_renderer).
+bool ExportThread::EncodeAudioFrames(long& file_audio_samples, double timecode_secs) {
+  while (waiting_for_audio_ && !interrupt_) {
+    waitCond.wait(&mutex);
+  }
+
+  audio_write_lock.lock();
+  while (!interrupt_ && file_audio_samples <= (timecode_secs * params_.audio_sampling_rate)) {
+    int adjusted_read = audio_ibuffer_read.load() % audio_ibuffer_size;
+    int copylen = qMin(aframe_bytes, audio_ibuffer_size - adjusted_read);
+    memcpy(audio_frame->data[0], audio_ibuffer + adjusted_read, copylen);
+    memset(audio_ibuffer + adjusted_read, 0, copylen);
+    audio_ibuffer_read.fetch_add(copylen);
+
+    if (copylen < aframe_bytes) {
+      int remainder_len = aframe_bytes - copylen;
+      memcpy(audio_frame->data[0] + copylen, audio_ibuffer, remainder_len);
+      memset(audio_ibuffer, 0, remainder_len);
+      audio_ibuffer_read.fetch_add(remainder_len);
+    }
+
+    swr_convert_frame(swr_ctx, swr_frame, audio_frame);
+    swr_frame->pts = file_audio_samples;
+
+    if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) {
+      audio_write_lock.unlock();
+      return false;
+    }
+    file_audio_samples += swr_frame->nb_samples;
+  }
+  audio_write_lock.unlock();
+  return true;
+}
+
+void ExportThread::Export() {
   QByteArray ba = params_.filename.toUtf8();
   c_filename = qstrdup(ba.constData());
 
-  // Set up file container
-  if (!SetupContainer()) {
-    return;
-  }
+  if (!SetupContainer()) return;
+  if (!SetupVideo()) return;
+  if (!SetupAudio()) return;
 
-  // If video is enabled, set it up in the container now
-  if (!SetupVideo()) {
-    return;
-  }
-
-  // If audio is enabled, set it up in the container now
-  if (!SetupAudio()) {
-    return;
-  }
-
-  // Write the container header based on what's been set up above
   ret = avformat_write_header(fmt_ctx, nullptr);
   if (ret < 0) {
-
-    // FFmpeg failed to write the header, so cancel the export and throw an error
-
     qCritical() << "Could not write output file header." << ret;
     export_error = tr("could not write output file header (%1)").arg(QString::number(ret));
-
     return;
   }
 
-  // Count audio samples in file (used for calculating PTS)
   long file_audio_samples = 0;
-
-  // Set up timing variables, used for determining rendering ETA
   qint64 frame_start_time, frame_time, avg_time, eta, total_time = 0;
-
-  // Frame counters - used for generating encoding statistics (e.g. average frame time, ETA, etc.)
   long remaining_frames, frame_count = 1;
 
-  // Create a dedicated render thread for export (viewer composites on main thread now)
   RenderThread* renderer = new RenderThread();
   if (gl_fallback_surface_) {
     renderer->setGlFallbackSurface(gl_fallback_surface_);
@@ -432,149 +446,46 @@ void ExportThread::Export()
   renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
-  // Loop from now (set to the beginning frame earlier) to the end of the frame
   while (seq_->playhead <= params_.end_frame && !interrupt_) {
-
-    // Start timing how long this frame will take
     frame_start_time = QDateTime::currentMSecsSinceEpoch();
 
-    // If we're exporting audio, run compose_audio() which will write mixed audio to the internal audio buffer
     if (params_.audio_enabled) {
       waiting_for_audio_ = true;
       SetAudioWakeObject(this);
       amber::rendering::compose_audio(seq_, false, 1, true);
     }
 
-    // If we're exporting video, trigger a render on the RenderThread
+    double timecode_secs = double(seq_->playhead - params_.start_frame) / seq_->frame_rate;
+
     if (params_.video_enabled) {
-      do {
-        // TODO optimize by rendering the next frame while encoding the last
-        render_complete_ = false;
-        renderer->start_render(seq_, 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0);
-
-        // Wait for RenderThread to return (predicate guards against lost wakeup)
-        while (!render_complete_ && !interrupt_) {
-          waitCond.wait(&mutex);
-        }
-
+      if (!EncodeVideoFrame(renderer, timecode_secs)) {
         if (interrupt_) {
           renderer->cancel();
           delete renderer;
           goto cleanup_state;
         }
-
-        // If the RenderThread failed, do another render
-      } while (renderer->did_texture_fail());
-
-      if (interrupt_) {
-        renderer->cancel();
-        delete renderer;
-        goto cleanup_state;
-      }
-
-    }
-
-    // Get the current sequence playhead in seconds (used for timestamp calculations later on)
-    double timecode_secs = double(seq_->playhead - params_.start_frame) / seq_->frame_rate;
-
-    // If we're exporting video, construct an AVFrame in the destination codec's pixel format to convert the raw RGBA
-    // OpenGL buffer to
-    if (params_.video_enabled) {
-
-      //
-      // - I'm not sure why, but we have to alloc/free sws_frame every frame, or it breaks GIF exporting.
-      // - (i.e. GIFs get stuck on the first frame)
-      // - The same problem/solution can be seen here: https://stackoverflow.com/a/38997739
-      // - Perhaps this is the intended way to use swscale, but it seems inefficient.
-      // - Anyway, here we are.
-      //
-
-      // Construct destination pixel format frame
-      sws_frame = av_frame_alloc();
-      sws_frame->format = vcodec_ctx->pix_fmt;
-      sws_frame->width = params_.video_width;
-      sws_frame->height = params_.video_height;
-      av_frame_get_buffer(sws_frame, 0);
-
-      // Convert raw RGBA buffer to format expected by the encoder
-      sws_scale(sws_ctx, video_frame->data, video_frame->linesize, 0, video_frame->height, sws_frame->data, sws_frame->linesize);
-      sws_frame->pts = qRound(timecode_secs/av_q2d(vcodec_ctx->time_base));
-
-      // Send frame to encoder
-      if (!Encode(fmt_ctx, vcodec_ctx, sws_frame, video_pkt, video_stream)) {
-        av_frame_free(&sws_frame);
-        sws_frame = nullptr;
         goto cleanup_renderer;
       }
-
-      av_frame_free(&sws_frame);
-      sws_frame = nullptr;
     }
 
-    // If we're exporting audio, copy audio from the buffer into an AVFrame for encoding
     if (params_.audio_enabled) {
-
-      while (waiting_for_audio_ && !interrupt_) {
-        waitCond.wait(&mutex);
+      if (!EncodeAudioFrames(file_audio_samples, timecode_secs)) {
+        goto cleanup_renderer;
       }
-
-      // Make sure nothing is writing while we're retrieving
-      audio_write_lock.lock();
-
-      // Check if the count of encoded samples exceeds the current Sequence playhead, in which case we don't need to
-      // encode any audio at this moment
-      while (!interrupt_ && file_audio_samples <= (timecode_secs*params_.audio_sampling_rate)) {
-
-        // Copy samples from audio buffer to AVFrame
-        int adjusted_read = audio_ibuffer_read.load() % audio_ibuffer_size;
-        int copylen = qMin(aframe_bytes, audio_ibuffer_size-adjusted_read);
-        memcpy(audio_frame->data[0], audio_ibuffer+adjusted_read, copylen);
-        memset(audio_ibuffer+adjusted_read, 0, copylen);
-        audio_ibuffer_read.fetch_add(copylen);
-
-        // If we reached the end of the buffer without reaching the end of the frame, do another copy from the start
-        // of the buffer
-        if (copylen < aframe_bytes) {
-          int remainder_len = aframe_bytes-copylen;
-          memcpy(audio_frame->data[0]+copylen, audio_ibuffer, remainder_len);
-          memset(audio_ibuffer, 0, remainder_len);
-          audio_ibuffer_read.fetch_add(remainder_len);
-        }
-
-        // Convert raw audio samples to the destination codec's sample format
-        swr_convert_frame(swr_ctx, swr_frame, audio_frame);
-
-        // The timestamp is set to the current count of audio samples (since the audio stream's timebase is
-        swr_frame->pts = file_audio_samples;
-
-        // Send frame to encoder
-        if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) {
-          audio_write_lock.unlock();
-          goto cleanup_renderer;
-        }
-
-        // Increment by the frame's number of samples
-        file_audio_samples += swr_frame->nb_samples;
-      }
-
-      audio_write_lock.unlock();
-
     }
 
-    // Generating encoding statistics (e.g. the time it took to encode this frame/estimated remaining time)
-    frame_time = (QDateTime::currentMSecsSinceEpoch()-frame_start_time);
+    frame_time = (QDateTime::currentMSecsSinceEpoch() - frame_start_time);
     total_time += frame_time;
     remaining_frames = (params_.end_frame - seq_->playhead);
-    avg_time = (total_time/frame_count);
-    eta = (remaining_frames*avg_time);
+    avg_time = (total_time / frame_count);
+    eta = (remaining_frames * avg_time);
 
-    // Emit a signal for the percent of the sequence that's been encoded so far
-    emit ProgressChanged(qRound((double(seq_->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
+    emit ProgressChanged(
+        qRound((double(seq_->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) *
+               100.0),
+        eta);
 
-    // Increment sequence playhead
     seq_->playhead++;
-
-    // Increment frame count (used for generating encoding statistics above)
     frame_count++;
   }
 
@@ -596,7 +507,6 @@ cleanup_state:
 
   // If audio is enabled, flush the rest of the audio out of swresample
   if (params_.audio_enabled) {
-
     int flush_iter = 0;
     do {
       ret = swr_convert_frame(swr_ctx, swr_frame, nullptr);
@@ -607,7 +517,6 @@ cleanup_state:
       }
       file_audio_samples += swr_frame->nb_samples;
     } while (swr_frame->nb_samples > 0 && ++flush_iter < 1000);
-
   }
 
   if (interrupt_) {
@@ -633,8 +542,7 @@ cleanup_state:
   emit ProgressChanged(100, 0);
 }
 
-void ExportThread::Cleanup()
-{
+void ExportThread::Cleanup() {
   if (fmt_ctx != nullptr) {
     avio_closep(&fmt_ctx->pb);
     avformat_free_context(fmt_ctx);
@@ -680,7 +588,7 @@ void ExportThread::Cleanup()
     av_frame_free(&sws_frame);
   }
 
-  delete [] c_filename;
+  delete[] c_filename;
 }
 
 void ExportThread::run() {
@@ -708,25 +616,18 @@ void ExportThread::run() {
 #endif
 }
 
-const QString &ExportThread::GetError() {
-  return export_error;
-}
+const QString& ExportThread::GetError() { return export_error; }
 
-bool ExportThread::WasInterrupted()
-{
-  return interrupt_;
-}
+bool ExportThread::WasInterrupted() { return interrupt_; }
 
-void ExportThread::Interrupt()
-{
+void ExportThread::Interrupt() {
   mutex.lock();
   interrupt_ = true;
   waitCond.wakeAll();
   mutex.unlock();
 }
 
-void ExportThread::play_wake()
-{
+void ExportThread::play_wake() {
   mutex.lock();
   waiting_for_audio_ = false;
   waitCond.wakeAll();

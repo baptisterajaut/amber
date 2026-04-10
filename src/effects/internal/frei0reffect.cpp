@@ -22,24 +22,22 @@
 
 #ifndef NOFREI0R
 
-#include <QMessageBox>
 #include <QDir>
+#include <QMessageBox>
 
 #include "engine/clip.h"
 
 using f0rConstructFunc = f0r_instance_t (*)(unsigned int width, unsigned int height);
-using f0rInitFunc = int (*) ();
-using f0rDeinitFunc = void (*) ();
-using f0rUpdateFunc = void (*) (f0r_instance_t instance,
-            double time, const uint32_t* inframe, uint32_t* outframe);
+using f0rInitFunc = int (*)();
+using f0rDeinitFunc = void (*)();
+using f0rUpdateFunc = void (*)(f0r_instance_t instance, double time, const uint32_t* inframe, uint32_t* outframe);
 using f0rDestructFunc = void (*)(f0r_instance_t instance);
 using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
-using f0rSetParamValue = void (*) (f0r_instance_t instance,
-        f0r_param_t param, int param_index);
+using f0rSetParamValue = void (*)(f0r_instance_t instance, f0r_param_t param, int param_index);
 
-Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
-  Effect(c, em)
-  
+Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta* em)
+    : Effect(c, em)
+
 {
   SetFlags(ImageFlag);
 
@@ -47,7 +45,6 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
   QString dll_fn = QDir(em->path).filePath(em->filename);
 
   handle.setFileName(dll_fn);
-
 
   if (!handle.load()) {
     QString dll_error = handle.errorString();
@@ -79,39 +76,35 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
   param_count = info.num_params;
 
   get_param_info = reinterpret_cast<f0rGetParamInfo>(handle.resolve("f0r_get_param_info"));
-  for (int i=0;i<param_count;i++) {
+  for (int i = 0; i < param_count; i++) {
     f0r_param_info_t param_info;
     get_param_info(&param_info, i);
 
     if (param_info.type >= 0 && param_info.type <= F0R_PARAM_STRING) {
       EffectRow* row = new EffectRow(this, param_info.name);
       switch (param_info.type) {
-      case F0R_PARAM_BOOL:
-        new BoolField(row, QString::number(i));
-        break;
-      case F0R_PARAM_DOUBLE:
-      {
-        DoubleField* f = new DoubleField(row, QString::number(i));
-        f->SetMinimum(0);
-        f->SetMaximum(100);
-      }
-        break;
-      case F0R_PARAM_COLOR:
-        new ColorField(row, QString::number(i));
-        break;
-      case F0R_PARAM_POSITION:
-      {
-        DoubleField* fx = new DoubleField(row, QString("%1X").arg(QString::number(i)));
-        fx->SetMinimum(0);
-        fx->SetMaximum(100);
-        DoubleField* fy = new DoubleField(row, QString("%1Y").arg(QString::number(i)));
-        fy->SetMinimum(0);
-        fy->SetMaximum(100);
-      }
-        break;
-      case F0R_PARAM_STRING:
-        new StringField(row, QString::number(i), false);
-        break;
+        case F0R_PARAM_BOOL:
+          new BoolField(row, QString::number(i));
+          break;
+        case F0R_PARAM_DOUBLE: {
+          DoubleField* f = new DoubleField(row, QString::number(i));
+          f->SetMinimum(0);
+          f->SetMaximum(100);
+        } break;
+        case F0R_PARAM_COLOR:
+          new ColorField(row, QString::number(i));
+          break;
+        case F0R_PARAM_POSITION: {
+          DoubleField* fx = new DoubleField(row, QString("%1X").arg(QString::number(i)));
+          fx->SetMinimum(0);
+          fx->SetMaximum(100);
+          DoubleField* fy = new DoubleField(row, QString("%1Y").arg(QString::number(i)));
+          fy->SetMinimum(0);
+          fy->SetMaximum(100);
+        } break;
+        case F0R_PARAM_STRING:
+          new StringField(row, QString::number(i), false);
+          break;
       }
     }
   }
@@ -128,7 +121,42 @@ Frei0rEffect::~Frei0rEffect() {
   }
 }
 
-void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *output, int) {
+namespace {
+
+// Apply a single Frei0r parameter to `instance` using `set_param`.
+void ApplyFrei0rParam(f0r_instance_t instance, f0rSetParamValue set_param, EffectRow* param_row, int param_type,
+                      int param_index, double timecode) {
+  switch (param_type) {
+    case F0R_PARAM_BOOL: {
+      double b = param_row->Field(0)->GetValueAt(timecode).toBool() ? 1.0 : 0.0;
+      set_param(instance, &b, param_index);
+    } break;
+    case F0R_PARAM_DOUBLE: {
+      double d = param_row->Field(0)->GetValueAt(timecode).toDouble() * 0.01;
+      set_param(instance, &d, param_index);
+    } break;
+    case F0R_PARAM_COLOR: {
+      QColor qcolor = param_row->Field(0)->GetValueAt(timecode).value<QColor>();
+      f0r_param_color fcolor{float(qcolor.redF()), float(qcolor.greenF()), float(qcolor.blueF())};
+      set_param(instance, &fcolor, param_index);
+    } break;
+    case F0R_PARAM_POSITION: {
+      f0r_param_position pos;
+      pos.x = param_row->Field(0)->GetValueAt(timecode).toDouble();
+      pos.y = param_row->Field(1)->GetValueAt(timecode).toDouble();
+      set_param(instance, &pos, param_index);
+    } break;
+    case F0R_PARAM_STRING: {
+      QByteArray bytes = param_row->Field(0)->GetValueAt(timecode).toString().toUtf8();
+      char* byte_data = bytes.data();
+      set_param(instance, &byte_data, param_index);
+    } break;
+  }
+}
+
+}  // namespace
+
+void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* output, int) {
   // Reconstruct Frei0r instance if clip dimensions changed since construction
   // (e.g., effect was created during project load before media was analyzed)
   int w = parent_clip->media_width();
@@ -145,55 +173,11 @@ void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *outpu
   f0rSetParamValue set_param = reinterpret_cast<f0rSetParamValue>(handle.resolve("f0r_set_param_value"));
   if (set_param == nullptr) return;
 
-  for (int i=0, row_idx=0; i<param_count; i++) {
+  for (int i = 0, row_idx = 0; i < param_count; i++) {
     f0r_param_info_t param_info;
     get_param_info(&param_info, i);
-
     if (param_info.type < 0 || param_info.type > F0R_PARAM_STRING) continue;
-
-    EffectRow* param_row = row(row_idx++);
-
-    switch (param_info.type) {
-    case F0R_PARAM_BOOL:
-    {
-      double b = param_row->Field(0)->GetValueAt(timecode).toBool() ? 1.0 : 0.0;
-      set_param(instance, &b, i);
-    }
-      break;
-    case F0R_PARAM_DOUBLE:
-    {
-      double d = param_row->Field(0)->GetValueAt(timecode).toDouble()*0.01;
-      set_param(instance, &d, i);
-    }
-      break;
-    case F0R_PARAM_COLOR:
-    {
-      QColor qcolor = param_row->Field(0)->GetValueAt(timecode).value<QColor>();
-
-      f0r_param_color fcolor;
-      fcolor.r = float(qcolor.redF());
-      fcolor.g = float(qcolor.greenF());
-      fcolor.b = float(qcolor.blueF());
-
-      set_param(instance, &fcolor, i);
-    }
-      break;
-    case F0R_PARAM_POSITION:
-    {
-      f0r_param_position pos;
-      pos.x = param_row->Field(0)->GetValueAt(timecode).toDouble();
-      pos.y = param_row->Field(1)->GetValueAt(timecode).toDouble();
-      set_param(instance, &pos, i);
-    }
-      break;
-    case F0R_PARAM_STRING:
-    {
-      QByteArray bytes = param_row->Field(0)->GetValueAt(timecode).toString().toUtf8();
-      char* byte_data = bytes.data();
-      set_param(instance, &byte_data, i);
-    }
-      break;
-    }
+    ApplyFrei0rParam(instance, set_param, row(row_idx++), param_info.type, i, timecode);
   }
 
   update_func(instance, timecode, reinterpret_cast<uint32_t*>(input), reinterpret_cast<uint32_t*>(output));

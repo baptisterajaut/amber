@@ -21,24 +21,24 @@
 #ifndef GRAPHVIEW_H
 #define GRAPHVIEW_H
 
-#include <QWidget>
 #include <QVector>
+#include <QWidget>
 
-#include "effects/effectrow.h"
 #include "effects/effectfields.h"
+#include "effects/effectrow.h"
 
 QColor get_curve_color(int index, int length);
 
 class GraphView : public QWidget {
   Q_OBJECT
-public:
+ public:
   GraphView(QWidget* parent = nullptr);
 
-  void paintEvent(QPaintEvent *event) override;
-  void mousePressEvent(QMouseEvent *event) override;
-  void mouseMoveEvent(QMouseEvent *event) override;
-  void mouseReleaseEvent(QMouseEvent *event) override;
-  void wheelEvent(QWheelEvent *event) override;
+  void paintEvent(QPaintEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseMoveEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
+  void wheelEvent(QWheelEvent* event) override;
 
   void set_row(EffectRow* r);
 
@@ -47,12 +47,13 @@ public:
 
   void delete_selected_keys();
   void select_all();
-signals:
+ signals:
   void x_scroll_changed(int);
   void y_scroll_changed(int);
   void zoom_changed(double, double);
   void selection_changed(bool, int);
-private:
+
+ private:
   int x_scroll;
   int y_scroll;
   bool mousedown;
@@ -81,6 +82,8 @@ private:
   void handle_mouse_hover(QMouseEvent* event);
   bool is_hovering_keyframe(const QPoint& pos) const;
   bool test_click_add_on_field(QMouseEvent* event, EffectField* field, int field_index);
+  bool press_find_key(const QPoint& pos, int& sel_key, int& sel_key_field);
+  void press_apply_selection(int sel_key, int sel_key_field, QMouseEvent* event);
 
   QVector<bool> field_visibility;
 
@@ -101,8 +104,8 @@ private:
 
   int current_handle;
 
-  void draw_lines(QPainter &p, bool vert);
-  void draw_line_text(QPainter &p, bool vert, int line_no, int line_pos, int next_line_pos);
+  void draw_lines(QPainter& p, bool vert);
+  void draw_line_text(QPainter& p, bool vert, int line_no, int line_pos, int next_line_pos);
 
   EffectRow* row;
 
@@ -120,7 +123,7 @@ private:
   EffectField* click_add_field;
   int click_add_key;
   int click_add_type;
-private slots:
+ private slots:
   void show_context_menu(const QPoint& pos);
   void reset_view();
   void set_view_to_selection();
@@ -128,4 +131,4 @@ private slots:
   void set_view_to_rect(int x1, double y1, int x2, double y2);
 };
 
-#endif // GRAPHVIEW_H
+#endif  // GRAPHVIEW_H

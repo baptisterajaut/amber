@@ -359,6 +359,56 @@ void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& chil
   loaded_media_items.append(item.get());
 }
 
+// Apply a single clip attribute to the clip, color, speed, and media fields.
+static void apply_clip_attr(const QXmlStreamAttribute& attr, Clip* c, QColor& clip_color, ClipSpeed& speed_info,
+                            int& media_type, int& media_id, int& stream_id, QVector<ClipPtr>& loaded_clips,
+                            ClipPtr c_ptr) {
+  const auto name = attr.name();
+  const auto value = attr.value();
+  if (name == QLatin1String("name")) {
+    c->set_name(value.toString());
+  } else if (name == QLatin1String("enabled")) {
+    c->set_enabled(value == QLatin1String("1"));
+  } else if (name == QLatin1String("id")) {
+    c->load_id = value.toInt();
+  } else if (name == QLatin1String("clipin")) {
+    c->set_clip_in(value.toLong());
+  } else if (name == QLatin1String("in")) {
+    c->set_timeline_in(value.toLong());
+  } else if (name == QLatin1String("out")) {
+    c->set_timeline_out(value.toLong());
+  } else if (name == QLatin1String("track")) {
+    c->set_track(value.toInt());
+  } else if (name == QLatin1String("r")) {
+    clip_color.setRed(value.toInt());
+  } else if (name == QLatin1String("g")) {
+    clip_color.setGreen(value.toInt());
+  } else if (name == QLatin1String("b")) {
+    clip_color.setBlue(value.toInt());
+  } else if (name == QLatin1String("autoscale")) {
+    c->set_autoscaled(value == QLatin1String("1"));
+  } else if (name == QLatin1String("media")) {
+    media_type = MEDIA_TYPE_FOOTAGE;
+    media_id = value.toInt();
+  } else if (name == QLatin1String("stream")) {
+    stream_id = value.toInt();
+  } else if (name == QLatin1String("speed")) {
+    speed_info.value = value.toDouble();
+  } else if (name == QLatin1String("maintainpitch")) {
+    speed_info.maintain_audio_pitch = (value == QLatin1String("1"));
+  } else if (name == QLatin1String("reverse")) {
+    c->set_reversed(value == QLatin1String("1"));
+  } else if (name == QLatin1String("loop")) {
+    c->set_loop_mode(value.toInt());
+  } else if (name == QLatin1String("label")) {
+    c->set_color_label(value.toInt());
+  } else if (name == QLatin1String("sequence")) {
+    media_type = MEDIA_TYPE_SEQUENCE;
+    c->set_media(nullptr, value.toInt());
+    loaded_clips.append(c_ptr);
+  }
+}
+
 void LoadThread::parse_clip_attributes(QXmlStreamReader& stream, ClipPtr c, int& media_type, int& media_id,
                                        int& stream_id) {
   if (!c) {
@@ -369,51 +419,8 @@ void LoadThread::parse_clip_attributes(QXmlStreamReader& stream, ClipPtr c, int&
   ClipSpeed speed_info = c->speed();
 
   for (int j = 0; j < stream.attributes().size(); j++) {
-    const QXmlStreamAttribute& attr = stream.attributes().at(j);
-    if (attr.name() == QLatin1String("name")) {
-      c->set_name(attr.value().toString());
-    } else if (attr.name() == QLatin1String("enabled")) {
-      c->set_enabled(attr.value() == QLatin1String("1"));
-    } else if (attr.name() == QLatin1String("id")) {
-      c->load_id = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("clipin")) {
-      c->set_clip_in(attr.value().toLong());
-    } else if (attr.name() == QLatin1String("in")) {
-      c->set_timeline_in(attr.value().toLong());
-    } else if (attr.name() == QLatin1String("out")) {
-      c->set_timeline_out(attr.value().toLong());
-    } else if (attr.name() == QLatin1String("track")) {
-      c->set_track(attr.value().toInt());
-    } else if (attr.name() == QLatin1String("r")) {
-      clip_color.setRed(attr.value().toInt());
-    } else if (attr.name() == QLatin1String("g")) {
-      clip_color.setGreen(attr.value().toInt());
-    } else if (attr.name() == QLatin1String("b")) {
-      clip_color.setBlue(attr.value().toInt());
-    } else if (attr.name() == QLatin1String("autoscale")) {
-      c->set_autoscaled(attr.value() == QLatin1String("1"));
-    } else if (attr.name() == QLatin1String("media")) {
-      media_type = MEDIA_TYPE_FOOTAGE;
-      media_id = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("stream")) {
-      stream_id = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("speed")) {
-      speed_info.value = attr.value().toDouble();
-    } else if (attr.name() == QLatin1String("maintainpitch")) {
-      speed_info.maintain_audio_pitch = (attr.value() == QLatin1String("1"));
-    } else if (attr.name() == QLatin1String("reverse")) {
-      c->set_reversed(attr.value() == QLatin1String("1"));
-    } else if (attr.name() == QLatin1String("loop")) {
-      c->set_loop_mode(attr.value().toInt());
-    } else if (attr.name() == QLatin1String("label")) {
-      c->set_color_label(attr.value().toInt());
-    } else if (attr.name() == QLatin1String("sequence")) {
-      media_type = MEDIA_TYPE_SEQUENCE;
-
-      // since we haven't finished loading sequences, we defer linking this until later
-      c->set_media(nullptr, attr.value().toInt());
-      loaded_clips.append(c);
-    }
+    apply_clip_attr(stream.attributes().at(j), c.get(), clip_color, speed_info, media_type, media_id, stream_id,
+                    loaded_clips, c);
   }
 
   c->set_color(clip_color);
@@ -469,31 +476,33 @@ bool LoadThread::parse_clip(QXmlStreamReader& stream, SequencePtr s) {
 void LoadThread::parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent) {
   for (int j = 0; j < stream.attributes().size(); j++) {
     const QXmlStreamAttribute& attr = stream.attributes().at(j);
-    if (attr.name() == QLatin1String("name")) {
-      s->name = attr.value().toString();
-    } else if (attr.name() == QLatin1String("folder")) {
-      int folder = attr.value().toInt();
+    const auto name = attr.name();
+    const auto value = attr.value();
+    if (name == QLatin1String("name")) {
+      s->name = value.toString();
+    } else if (name == QLatin1String("folder")) {
+      int folder = value.toInt();
       if (folder > 0) parent = find_loaded_folder_by_id(folder);
-    } else if (attr.name() == QLatin1String("id")) {
-      s->save_id = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("width")) {
-      s->width = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("height")) {
-      s->height = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("framerate")) {
-      s->frame_rate = attr.value().toDouble();
-    } else if (attr.name() == QLatin1String("afreq")) {
-      s->audio_frequency = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("alayout")) {
-      s->audio_layout = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("open")) {
+    } else if (name == QLatin1String("id")) {
+      s->save_id = value.toInt();
+    } else if (name == QLatin1String("width")) {
+      s->width = value.toInt();
+    } else if (name == QLatin1String("height")) {
+      s->height = value.toInt();
+    } else if (name == QLatin1String("framerate")) {
+      s->frame_rate = value.toDouble();
+    } else if (name == QLatin1String("afreq")) {
+      s->audio_frequency = value.toInt();
+    } else if (name == QLatin1String("alayout")) {
+      s->audio_layout = value.toInt();
+    } else if (name == QLatin1String("open")) {
       open_seq = s;
-    } else if (attr.name() == QLatin1String("workarea")) {
-      s->using_workarea = (attr.value() == QLatin1String("1"));
-    } else if (attr.name() == QLatin1String("workareaIn")) {
-      s->workarea_in = attr.value().toLong();
-    } else if (attr.name() == QLatin1String("workareaOut")) {
-      s->workarea_out = attr.value().toLong();
+    } else if (name == QLatin1String("workarea")) {
+      s->using_workarea = (value == QLatin1String("1"));
+    } else if (name == QLatin1String("workareaIn")) {
+      s->workarea_in = value.toLong();
+    } else if (name == QLatin1String("workareaOut")) {
+      s->workarea_out = value.toLong();
     }
   }
 
@@ -566,6 +575,49 @@ bool LoadThread::parse_sequence(QXmlStreamReader& stream, const QStringView& chi
   return true;
 }
 
+// Handle a scalar (non-collection) load type once the root element is found.
+// Returns false if user chose to abort on version mismatch.
+bool LoadThread::handle_scalar_load_type(QXmlStreamReader& stream, int type) {
+  if (type == LOAD_TYPE_VERSION) {
+    int proj_version = stream.readElementText().toInt();
+    if (proj_version < amber::kMinimumSaveVersion || proj_version > amber::kSaveVersion) {
+      show_message(tr("Version Mismatch"),
+                   tr("This project was saved in a different version of Amber and may not be fully compatible with "
+                      "this version. Would you like to attempt loading it anyway?"),
+                   QMessageBox::Yes | QMessageBox::No);
+      if (question_btn == QMessageBox::No) {
+        show_err = false;
+        return false;
+      }
+    }
+  } else if (type == LOAD_TYPE_URL) {
+    internal_proj_url = stream.readElementText();
+    internal_proj_dir = QFileInfo(internal_proj_url).absoluteDir();
+  } else if (type == LOAD_TYPE_PREVIEW_RES) {
+    int div = stream.readElementText().toInt();
+    if (div == 1 || div == 2 || div == 4) {
+      amber::CurrentConfig.preview_resolution_divider = div;
+    }
+  }
+  return true;
+}
+
+// Parse one child element inside a collection root (folders/media/sequences).
+// Returns false if loading should be aborted.
+bool LoadThread::parse_collection_child(QXmlStreamReader& stream, int type, const QString& child_search) {
+  switch (type) {
+    case MEDIA_TYPE_FOLDER:
+      parse_folder(stream);
+      return true;
+    case MEDIA_TYPE_FOOTAGE:
+      parse_footage(stream, child_search);
+      return true;
+    case MEDIA_TYPE_SEQUENCE:
+      return parse_sequence(stream, child_search);
+  }
+  return true;
+}
+
 bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
   f.seek(0);
   stream.setDevice(stream.device());
@@ -599,52 +651,23 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
 
   show_err = true;
 
-  int proj_version = amber::kSaveVersion;
-
   while (!stream.atEnd() && !cancelled_) {
     read_next_start_element(stream);
-    if (stream.name() == root_search) {
-      if (type == LOAD_TYPE_VERSION) {
-        proj_version = stream.readElementText().toInt();
-        if (proj_version < amber::kMinimumSaveVersion || proj_version > amber::kSaveVersion) {
-          show_message(tr("Version Mismatch"),
-                       tr("This project was saved in a different version of Amber and may not be fully compatible with "
-                          "this version. Would you like to attempt loading it anyway?"),
-                       QMessageBox::Yes | QMessageBox::No);
-          if (question_btn == QMessageBox::No) {
-            show_err = false;
-            return false;
-          }
+    if (stream.name() != root_search) continue;
+
+    bool is_collection = (type == MEDIA_TYPE_FOLDER || type == MEDIA_TYPE_FOOTAGE || type == MEDIA_TYPE_SEQUENCE);
+    if (!is_collection) {
+      if (!handle_scalar_load_type(stream, type)) return false;
+    } else {
+      while (!cancelled_ && !stream.atEnd() && !(stream.name() == root_search && stream.isEndElement())) {
+        read_next(stream);
+        if (stream.name() == child_search && stream.isStartElement()) {
+          if (!parse_collection_child(stream, type, child_search)) return false;
         }
-      } else if (type == LOAD_TYPE_URL) {
-        internal_proj_url = stream.readElementText();
-        internal_proj_dir = QFileInfo(internal_proj_url).absoluteDir();
-      } else if (type == LOAD_TYPE_PREVIEW_RES) {
-        int div = stream.readElementText().toInt();
-        if (div == 1 || div == 2 || div == 4) {
-          amber::CurrentConfig.preview_resolution_divider = div;
-        }
-      } else {
-        while (!cancelled_ && !stream.atEnd() && !(stream.name() == root_search && stream.isEndElement())) {
-          read_next(stream);
-          if (stream.name() == child_search && stream.isStartElement()) {
-            switch (type) {
-              case MEDIA_TYPE_FOLDER:
-                parse_folder(stream);
-                break;
-              case MEDIA_TYPE_FOOTAGE:
-                parse_footage(stream, child_search);
-                break;
-              case MEDIA_TYPE_SEQUENCE:
-                if (!parse_sequence(stream, child_search)) return false;
-                break;
-            }
-          }
-        }
-        if (cancelled_) return false;
       }
-      break;
+      if (cancelled_) return false;
     }
+    break;
   }
   return !cancelled_;
 }
@@ -669,6 +692,40 @@ void LoadThread::OrganizeFolders(int folder) {
 
       OrganizeFolders(item->temp_id);
     }
+  }
+}
+
+void LoadThread::link_nested_sequence_clips() {
+  for (const auto& loaded_clip : loaded_clips) {
+    for (auto loaded_sequence : loaded_sequences) {
+      if (loaded_clip->media() == nullptr &&
+          loaded_clip->media_stream_index() == loaded_sequence->to_sequence()->save_id) {
+        loaded_clip->set_media(loaded_sequence, loaded_clip->media_stream_index());
+        loaded_clip->refresh();
+        break;
+      }
+    }
+  }
+}
+
+void LoadThread::finalize_loaded_media() {
+  QVector<QPair<Media*, Footage*>> invalid_footage;
+  for (auto loaded_media_item : loaded_media_items) {
+    Footage* f = loaded_media_item->to_footage();
+    if (!QFileInfo::exists(f->url)) {
+      f->invalid = true;
+      invalid_footage.append(qMakePair(loaded_media_item, f));
+    }
+  }
+
+  emit success();
+
+  if (!invalid_footage.isEmpty()) {
+    emit found_invalid_footage(invalid_footage);
+  }
+
+  for (auto loaded_media_item : loaded_media_items) {
+    PreviewGenerator::AnalyzeMedia(loaded_media_item);
   }
 }
 
@@ -754,45 +811,16 @@ void LoadThread::run() {
       emit error();
       cont = false;
     } else {
-      // attach nested sequence clips to their sequences
-      for (const auto& loaded_clip : loaded_clips) {
-        for (auto loaded_sequence : loaded_sequences) {
-          if (loaded_clip->media() == nullptr &&
-              loaded_clip->media_stream_index() == loaded_sequence->to_sequence()->save_id) {
-            loaded_clip->set_media(loaded_sequence, loaded_clip->media_stream_index());
-            loaded_clip->refresh();
-            break;
-          }
-        }
-      }
+      link_nested_sequence_clips();
     }
   }
 
   if (cont) {
-    // Collect invalid footage (files that couldn't be resolved) before analysis
-    QVector<QPair<Media*, Footage*>> invalid_footage;
-    for (auto loaded_media_item : loaded_media_items) {
-      Footage* f = loaded_media_item->to_footage();
-      if (!QFileInfo::exists(f->url)) {
-        f->invalid = true;
-        invalid_footage.append(qMakePair(loaded_media_item, f));
-      }
-    }
-
-    emit success();  // run in main thread
-
-    if (!invalid_footage.isEmpty()) {
-      emit found_invalid_footage(invalid_footage);
-    }
-
-    for (auto loaded_media_item : loaded_media_items) {
-      PreviewGenerator::AnalyzeMedia(loaded_media_item);
-    }
+    finalize_loaded_media();
   } else {
     if (error_str.isEmpty()) {
       error_str = tr("User aborted loading");
     }
-
     emit error();
   }
 

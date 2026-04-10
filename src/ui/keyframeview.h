@@ -21,8 +21,8 @@
 #ifndef KEYFRAMEVIEW_H
 #define KEYFRAMEVIEW_H
 
-#include <QWidget>
 #include <QPainter>
+#include <QWidget>
 
 #include "ui/effectui.h"
 
@@ -34,7 +34,7 @@ class TimelineHeader;
 
 class KeyframeView : public QWidget {
   Q_OBJECT
-public:
+ public:
   KeyframeView(QWidget* parent = nullptr);
 
   void SetEffects(const QVector<EffectUI*>& open_effects);
@@ -45,13 +45,14 @@ public:
 
   long visible_in{0};
   long visible_out{0};
-signals:
+ signals:
   void wheel_event_signal(QWheelEvent*);
-public slots:
+ public slots:
   void set_x_scroll(int);
   void set_y_scroll(int);
   void resize_move(double d);
-private:
+
+ private:
   QVector<EffectUI*> open_effects_;
 
   QVector<EffectField*> selected_fields;
@@ -61,8 +62,8 @@ private:
   QVector<long> old_key_vals;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
-  void mouseReleaseEvent(QMouseEvent *event) override;
-  void paintEvent(QPaintEvent *event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
+  void paintEvent(QPaintEvent* event) override;
   void wheelEvent(QWheelEvent* e) override;
   bool mousedown{false};
   bool dragging{false};
@@ -70,7 +71,7 @@ private:
   bool select_rect{false};
   bool scroll_drag{false};
 
-  bool keyframeIsSelected(EffectField *field, int keyframe);
+  bool keyframeIsSelected(EffectField* field, int keyframe);
 
   long drag_frame_start;
   long last_frame_diff;
@@ -84,9 +85,17 @@ private:
   int y_scroll{0};
 
   void update_keys();
-private slots:
+  // Returns keyframe index found (-1 if none); sets row_index and field_index.
+  int press_find_key(int mouse_x, int mouse_y, int& row_index, int& field_index);
+  // After hit-test: extend selection to same-time keyframes in the row.
+  void press_extend_same_time_selection(int row_index, int field_index, int keyframe_index);
+  // Rect-select update during drag.
+  void move_rect_select(QMouseEvent* event);
+  // Keyframe move update during drag.
+  void move_keys_drag(QMouseEvent* event);
+ private slots:
   void show_context_menu(const QPoint& pos);
   void menu_set_key_type(QAction*);
 };
 
-#endif // KEYFRAMEVIEW_H
+#endif  // KEYFRAMEVIEW_H

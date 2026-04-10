@@ -20,32 +20,30 @@
 
 #include "texteffect.h"
 
+#include <QColorDialog>
+#include <QComboBox>
+#include <QFontDatabase>
 #include <QGridLayout>
 #include <QLabel>
-#include <QTextEdit>
+#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
-#include <QColorDialog>
-#include <QFontDatabase>
-#include <QComboBox>
+#include <QTextEdit>
 #include <QWidget>
 #include <QtMath>
-#include <QMenu>
 
-#include "ui/labelslider.h"
-#include "ui/collapsiblewidget.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
-#include "ui/comboboxex.h"
-#include "ui/colorbutton.h"
-#include "ui/fontcombobox.h"
-#include "ui/blur.h"
 #include "global/config.h"
+#include "ui/blur.h"
+#include "ui/collapsiblewidget.h"
+#include "ui/colorbutton.h"
+#include "ui/comboboxex.h"
+#include "ui/fontcombobox.h"
+#include "ui/labelslider.h"
 
-TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
-  Effect(c, em)
-{
+TextEffect::TextEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   SetFlags(Effect::SuperimposeFlag);
 
   EffectRow* text_field = new EffectRow(this, tr("Text"));
@@ -155,10 +153,75 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
   fragPath = "dropshadow.frag";
 }
 
-void TextEffect::redraw(double timecode) {
-  if (size_val->GetDoubleAt(timecode) <= 0) {
-    return;
+void TextEffect::ApplyWordWrap(QStringList& lines, const QFontMetrics& fm, int width) {
+  for (int i = 0; i < lines.size(); i++) {
+    const QString& s = lines.at(i);
+    if (fm.horizontalAdvance(s) <= width) continue;
+    int last_space_index = 0;
+    for (int j = 0; j < s.length(); j++) {
+      if (s.at(j) == ' ') {
+        if (fm.horizontalAdvance(s.left(j)) > width) break;
+        last_space_index = j;
+      }
+    }
+    if (last_space_index > 0) {
+      lines.insert(i + 1, s.mid(last_space_index + 1));
+      lines[i] = s.left(last_space_index);
+    }
   }
+}
+
+int TextEffect::ComputeTextX(const QString& line, int halign, const QFontMetrics& fm, int width) {
+  if (halign == Qt::AlignLeft) return 0;
+  if (halign == Qt::AlignRight) return width - fm.horizontalAdvance(line);
+  if (halign == Qt::AlignHCenter) return (width / 2) - (fm.horizontalAdvance(line) / 2);
+
+  // AlignJustify: expand spaces until line fills width
+  // (modifies a local copy; the outer loop must use the return value)
+  return 0;
+}
+
+int TextEffect::ComputeTextY(int i, int valign, const QFontMetrics& fm, int text_height, int height) {
+  if (valign == Qt::AlignTop) return fm.height() * i + fm.ascent();
+  if (valign == Qt::AlignBottom) return (height - text_height - fm.descent()) + fm.height() * (i + 1);
+  // AlignVCenter (default)
+  return ((height / 2) - (text_height / 2) - fm.descent()) + fm.height() * (i + 1);
+}
+
+void TextEffect::DrawShadow(QPainter& p, const QPainterPath& path, double timecode) {
+  p.setPen(Qt::NoPen);
+  double angle = shadow_angle->GetDoubleAt(timecode) * M_PI / 180.0;
+  double distance = qFloor(shadow_distance->GetDoubleAt(timecode));
+  int sx = qRound(qCos(angle) * distance);
+  int sy = qRound(qSin(angle) * distance);
+
+  QPainterPath shadow_path(path);
+  shadow_path.translate(sx, sy);
+
+  QColor col = shadow_color->GetColorAt(timecode);
+  col.setAlpha(0);
+  img.fill(col);
+
+  col.setAlphaF(shadow_opacity->GetDoubleAt(timecode) * 0.01);
+  p.setBrush(col);
+  p.drawPath(shadow_path);
+
+  int blurSoftness = qFloor(shadow_softness->GetDoubleAt(timecode));
+  if (blurSoftness > 0) amber::ui::blur(img, img.rect(), blurSoftness, true);
+}
+
+void TextEffect::DrawOutline(QPainter& p, const QPainterPath& path, double timecode) {
+  int outline_width_val = qCeil(outline_width->GetDoubleAt(timecode));
+  if (outline_width_val <= 0) return;
+  QPen pen(outline_color->GetColorAt(timecode));
+  pen.setWidth(outline_width_val);
+  p.setPen(pen);
+  p.setBrush(Qt::NoBrush);
+  p.drawPath(path);
+}
+
+void TextEffect::redraw(double timecode) {
+  if (size_val->GetDoubleAt(timecode) <= 0) return;
 
   QColor bkg = set_color_button->GetColorAt(timecode);
   bkg.setAlpha(0);
@@ -170,7 +233,6 @@ void TextEffect::redraw(double timecode) {
   int width = img.width() - padding * 2;
   int height = img.height() - padding * 2;
 
-  // set font
   font.setStyleHint(QFont::Helvetica, QFont::PreferAntialias);
   font.setFamily(set_font_combobox->GetFontAt(timecode));
   font.setPointSize(qRound(size_val->GetDoubleAt(timecode)));
@@ -179,120 +241,40 @@ void TextEffect::redraw(double timecode) {
 
   QStringList lines = text_val->GetStringAt(timecode).split('\n');
 
-  // word wrap function
-  if (word_wrap_field->GetBoolAt(timecode)) {
-    for (int i=0;i<lines.size();i++) {
-      QString s(lines.at(i));
-      if (fm.horizontalAdvance(s) > width) {
-        int last_space_index = 0;
-        for (int j=0;j<s.length();j++) {
-          if (s.at(j) == ' ') {
-            if (fm.horizontalAdvance(s.left(j)) > width) {
-              break;
-            } else {
-              last_space_index = j;
-            }
-          }
-        }
-        if (last_space_index > 0) {
-          lines.insert(i+1, s.mid(last_space_index + 1));
-          lines[i] = s.left(last_space_index);
-        }
-      }
-    }
-  }
+  if (word_wrap_field->GetBoolAt(timecode)) ApplyWordWrap(lines, fm, width);
 
   QPainterPath path;
+  int text_height = fm.height() * lines.size();
+  int halign = halign_field->GetValueAt(timecode).toInt();
+  int valign = valign_field->GetValueAt(timecode).toInt();
 
-  int text_height = fm.height()*lines.size();
-
-  for (int i=0;i<lines.size();i++) {
-    int text_x, text_y;
-
-    switch (halign_field->GetValueAt(timecode).toInt()) {
-    case Qt::AlignLeft: text_x = 0; break;
-    case Qt::AlignRight: text_x = width - fm.horizontalAdvance(lines.at(i)); break;
-    case Qt::AlignJustify:
-      // add spaces until the string is too big
-      text_x = 0;
+  for (int i = 0; i < lines.size(); i++) {
+    int text_x = ComputeTextX(lines.at(i), halign, fm, width);
+    // Justify: expand spaces until the line fills the width
+    if (halign == Qt::AlignJustify) {
       while (fm.horizontalAdvance(lines.at(i)) < width) {
         bool space = false;
         QString spaced(lines.at(i));
-        for (int i=0;i<spaced.length();i++) {
-          if (spaced.at(i) == ' ') {
-            // insert a space
-            spaced.insert(i, ' ');
+        for (int j = 0; j < spaced.length(); j++) {
+          if (spaced.at(j) == ' ') {
+            spaced.insert(j, ' ');
             space = true;
-
-            // scan to next non-space
-            while (i < spaced.length() && spaced.at(i) == ' ') i++;
+            while (j < spaced.length() && spaced.at(j) == ' ') j++;
           }
         }
-        if (fm.horizontalAdvance(spaced) > width || !space) {
-          break;
-        } else {
-          lines[i] = spaced;
-        }
+        if (fm.horizontalAdvance(spaced) > width || !space) break;
+        lines[i] = spaced;
       }
-      break;
-    case Qt::AlignHCenter:
-    default:
-      text_x = (width/2) - (fm.horizontalAdvance(lines.at(i))/2);
-      break;
     }
-
-    switch (valign_field->GetValueAt(timecode).toInt()) {
-    case Qt::AlignTop:
-      text_y = (fm.height()*i)+fm.ascent();
-      break;
-    case Qt::AlignBottom:
-      text_y = (height - text_height - fm.descent()) + (fm.height()*(i+1));
-      break;
-    case Qt::AlignVCenter:
-    default:
-      text_y = ((height/2) - (text_height/2) - fm.descent()) + (fm.height()*(i+1));
-      break;
-    }
-
+    int text_y = ComputeTextY(i, valign, fm, text_height, height);
     path.addText(text_x, text_y, font, lines.at(i));
   }
 
   path.translate(position_x->GetDoubleAt(timecode) + padding, position_y->GetDoubleAt(timecode) + padding);
 
-  // draw software shadow
-  if (shadow_bool->GetBoolAt(timecode)) {
-    p.setPen(Qt::NoPen);
+  if (shadow_bool->GetBoolAt(timecode)) DrawShadow(p, path, timecode);
 
-    // calculate offset using distance and angle
-    double angle = shadow_angle->GetDoubleAt(timecode) * M_PI / 180.0;
-    double distance = qFloor(shadow_distance->GetDoubleAt(timecode));
-    int shadow_x_offset = qRound(qCos(angle) * distance);
-    int shadow_y_offset = qRound(qSin(angle) * distance);
-
-    QPainterPath shadow_path(path);
-    shadow_path.translate(shadow_x_offset, shadow_y_offset);
-
-    QColor col = shadow_color->GetColorAt(timecode);
-    col.setAlpha(0);
-    img.fill(col);
-
-    col.setAlphaF(shadow_opacity->GetDoubleAt(timecode)*0.01);
-    p.setBrush(col);
-    p.drawPath(shadow_path);
-
-    int blurSoftness = qFloor(shadow_softness->GetDoubleAt(timecode));
-    if (blurSoftness > 0) amber::ui::blur(img, img.rect(), blurSoftness, true);
-  }
-
-  // draw outline
-  int outline_width_val = qCeil(outline_width->GetDoubleAt(timecode));
-  if (outline_bool->GetBoolAt(timecode) && outline_width_val > 0) {
-    QPen outline(outline_color->GetColorAt(timecode));
-    outline.setWidth(outline_width_val);
-    p.setPen(outline);
-    p.setBrush(Qt::NoBrush);
-    p.drawPath(path);
-  }
+  if (outline_bool->GetBoolAt(timecode)) DrawOutline(p, path, timecode);
 
   // draw "master" text
   p.setPen(Qt::NoPen);

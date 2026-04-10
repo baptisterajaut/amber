@@ -59,6 +59,35 @@ struct VSTRect {
 #define effGetChunk 23
 #define effSetChunk 24
 
+static intptr_t hostCallbackGetTime() {
+  static VstTimeInfo timeInfo;
+  memset(&timeInfo, 0, sizeof(timeInfo));
+  timeInfo.samplePos = 0.0;
+  timeInfo.sampleRate = current_audio_freq();
+  timeInfo.tempo = 120.0;
+  timeInfo.timeSigNumerator = 4;
+  timeInfo.timeSigDenominator = 4;
+  timeInfo.flags = 0;
+  return reinterpret_cast<intptr_t>(&timeInfo);
+}
+
+static intptr_t hostCallbackCanDo(void* ptr) {
+  const char* str = static_cast<const char*>(ptr);
+  if (strcmp(str, "sendVstTimeInfo") == 0) return 1;
+  if (strcmp(str, "sizeWindow") == 0) return 1;
+  if (strcmp(str, "acceptIOChanges") == 0) return 1;
+  if (strcmp(str, "startStopProcess") == 0) return 1;
+  if (strcmp(str, "sendVstEvents") == 0) return -1;
+  if (strcmp(str, "sendVstMidiEvent") == 0) return -1;
+  if (strcmp(str, "receiveVstEvents") == 0) return -1;
+  if (strcmp(str, "receiveVstMidiEvent") == 0) return -1;
+  if (strcmp(str, "offline") == 0) return -1;
+  if (strcmp(str, "shellCategory") == 0) return -1;
+  if (strcmp(str, "openFileSelector") == 0) return -1;
+  if (strcmp(str, "closeFileSelector") == 0) return -1;
+  return 0;
+}
+
 // C callbacks
 extern "C" {
 // Main host callback
@@ -76,17 +105,8 @@ intptr_t hostCallback(AEffect* effect, int32_t opcode, int32_t index, intptr_t v
       break;
     case audioMasterWantMidi:
       return 0;
-    case audioMasterGetTime: {
-      static VstTimeInfo timeInfo;
-      memset(&timeInfo, 0, sizeof(timeInfo));
-      timeInfo.samplePos = 0.0;
-      timeInfo.sampleRate = current_audio_freq();
-      timeInfo.tempo = 120.0;
-      timeInfo.timeSigNumerator = 4;
-      timeInfo.timeSigDenominator = 4;
-      timeInfo.flags = 0;
-      return reinterpret_cast<intptr_t>(&timeInfo);
-    }
+    case audioMasterGetTime:
+      return hostCallbackGetTime();
     case audioMasterIOChanged:
       return 1;
     case audioMasterSizeWindow:
@@ -108,22 +128,8 @@ intptr_t hostCallback(AEffect* effect, int32_t opcode, int32_t index, intptr_t v
       return 1;
     case audioMasterGetVendorVersion:
       return 1400;
-    case audioMasterCanDo: {
-      const char* str = static_cast<const char*>(ptr);
-      if (strcmp(str, "sendVstTimeInfo") == 0) return 1;
-      if (strcmp(str, "sizeWindow") == 0) return 1;
-      if (strcmp(str, "acceptIOChanges") == 0) return 1;
-      if (strcmp(str, "startStopProcess") == 0) return 1;
-      if (strcmp(str, "sendVstEvents") == 0) return -1;
-      if (strcmp(str, "sendVstMidiEvent") == 0) return -1;
-      if (strcmp(str, "receiveVstEvents") == 0) return -1;
-      if (strcmp(str, "receiveVstMidiEvent") == 0) return -1;
-      if (strcmp(str, "offline") == 0) return -1;
-      if (strcmp(str, "shellCategory") == 0) return -1;
-      if (strcmp(str, "openFileSelector") == 0) return -1;
-      if (strcmp(str, "closeFileSelector") == 0) return -1;
-      return 0;
-    }
+    case audioMasterCanDo:
+      return hostCallbackCanDo(ptr);
     case audioMasterGetLanguage:
       return kVstLangEnglish;
     case audioMasterUpdateDisplay:
@@ -395,116 +401,100 @@ void VSTHost::save(QXmlStreamWriter& stream) {
   }
 }
 
-void VSTHost::show_interface(bool show) {
-  if (show) {
 #if defined(Q_OS_LINUX)
-    // Direct X11 window for plugin embedding.
-    // Works on native X11 and Wayland (via XWayland).
-    // 24-bit visual (no alpha) prevents compositor transparency.
+// Ensure the X11 display is open and x11_window_ is created.
+// Returns false and unchecks the button on failure.
+bool VSTHost::EnsureX11Window() {
+  if (!x11_display_) {
+    x11_display_ = XOpenDisplay(nullptr);
     if (!x11_display_) {
-      x11_display_ = XOpenDisplay(nullptr);
-      if (!x11_display_) {
-        amber::app_ctx->showMessage(tr("VST Error"), tr("Cannot open X11 display. VST plugin interfaces require X11."),
-                                    3);
-        show_interface_btn->SetChecked(false);
-        return;
-      }
+      amber::app_ctx->showMessage(tr("VST Error"), tr("Cannot open X11 display. VST plugin interfaces require X11."),
+                                  3);
+      show_interface_btn->SetChecked(false);
+      return false;
     }
+  }
 
-    auto dpy = static_cast<Display*>(x11_display_);
+  if (x11_window_) return true;
 
-    if (!x11_window_) {
-      VSTRect* eRect = nullptr;
-      dispatcher(plugin, effEditGetRect, 0, 0, &eRect, 0);
-      int w = 400, h = 300;
-      if (eRect && eRect->right > eRect->left && eRect->bottom > eRect->top) {
-        w = eRect->right - eRect->left;
-        h = eRect->bottom - eRect->top;
-      }
+  auto dpy = static_cast<Display*>(x11_display_);
 
-      // Scale for HiDPI — Xft.dpi is set by the DE on both X11 and XWayland
-      char* dpi_str = XGetDefault(dpy, "Xft", "dpi");
-      if (dpi_str) {
-        int xft_dpi = 0;
-        for (const char* p = dpi_str; *p >= '0' && *p <= '9'; p++) xft_dpi = xft_dpi * 10 + (*p - '0');
-        if (xft_dpi > 96) {
-          w = w * xft_dpi / 96;
-          h = h * xft_dpi / 96;
-        }
-      }
+  VSTRect* eRect = nullptr;
+  dispatcher(plugin, effEditGetRect, 0, 0, &eRect, 0);
+  int w = 400, h = 300;
+  if (eRect && eRect->right > eRect->left && eRect->bottom > eRect->top) {
+    w = eRect->right - eRect->left;
+    h = eRect->bottom - eRect->top;
+  }
 
-      int screen = DefaultScreen(dpy);
-
-      // 24-bit TrueColor = opaque, no alpha channel for the compositor
-      XVisualInfo vinfo;
-      if (!XMatchVisualInfo(dpy, screen, 24, TrueColor, &vinfo)) {
-        vinfo.visual = DefaultVisual(dpy, screen);
-        vinfo.depth = DefaultDepth(dpy, screen);
-      }
-
-      Colormap cmap = XCreateColormap(dpy, RootWindow(dpy, screen), vinfo.visual, AllocNone);
-      XSetWindowAttributes attrs = {};
-      attrs.colormap = cmap;
-      attrs.background_pixel = BlackPixel(dpy, screen);
-      attrs.border_pixel = 0;
-
-      x11_window_ = XCreateWindow(dpy, RootWindow(dpy, screen), 0, 0, w, h, 0, vinfo.depth, InputOutput, vinfo.visual,
-                                  CWColormap | CWBackPixel | CWBorderPixel, &attrs);
-
-      XStoreName(dpy, static_cast<Window>(x11_window_), "VST Plugin");
-
-      // WM close button support
-      Atom wmDelete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-      x11_wm_delete_ = wmDelete;
-      XSetWMProtocols(dpy, static_cast<Window>(x11_window_), &wmDelete, 1);
+  // Scale for HiDPI — Xft.dpi is set by the DE on both X11 and XWayland
+  char* dpi_str = XGetDefault(dpy, "Xft", "dpi");
+  if (dpi_str) {
+    int xft_dpi = 0;
+    for (const char* p = dpi_str; *p >= '0' && *p <= '9'; p++) xft_dpi = xft_dpi * 10 + (*p - '0');
+    if (xft_dpi > 96) {
+      w = w * xft_dpi / 96;
+      h = h * xft_dpi / 96;
     }
+  }
 
-    XMapRaised(dpy, static_cast<Window>(x11_window_));
-    XSync(dpy, False);
+  int screen = DefaultScreen(dpy);
 
-    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(x11_window_), 0);
+  // 24-bit TrueColor = opaque, no alpha channel for the compositor
+  XVisualInfo vinfo;
+  if (!XMatchVisualInfo(dpy, screen, 24, TrueColor, &vinfo)) {
+    vinfo.visual = DefaultVisual(dpy, screen);
+    vinfo.depth = DefaultDepth(dpy, screen);
+  }
 
-#else  // Windows, macOS, Haiku — use QDialog
-    CreateDialogIfNull();
-    dialog->show();
-    WId nativeWin = dialog->winId();
-#if defined(Q_OS_WIN)
-    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<HWND>(nativeWin), 0);
-#elif defined(Q_OS_MACOS)
-    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<NSWindow*>(nativeWin), 0);
-#else
-    dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(nativeWin), 0);
-#endif
+  Colormap cmap = XCreateColormap(dpy, RootWindow(dpy, screen), vinfo.visual, AllocNone);
+  XSetWindowAttributes attrs = {};
+  attrs.colormap = cmap;
+  attrs.background_pixel = BlackPixel(dpy, screen);
+  attrs.border_pixel = 0;
+
+  x11_window_ = XCreateWindow(dpy, RootWindow(dpy, screen), 0, 0, w, h, 0, vinfo.depth, InputOutput, vinfo.visual,
+                              CWColormap | CWBackPixel | CWBorderPixel, &attrs);
+
+  XStoreName(dpy, static_cast<Window>(x11_window_), "VST Plugin");
+
+  // WM close button support
+  Atom wmDelete = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+  x11_wm_delete_ = wmDelete;
+  XSetWMProtocols(dpy, static_cast<Window>(x11_window_), &wmDelete, 1);
+
+  return true;
+}
 #endif  // Q_OS_LINUX
 
-    // Idle timer: pumps effEditIdle for plugin UI repaints
-    if (!idle_timer) {
-      idle_timer = new QTimer(this);
-      connect(idle_timer, &QTimer::timeout, this, [this]() {
-        if (!plugin) return;
-        dispatcher(plugin, effEditIdle, 0, 0, nullptr, 0);
+void VSTHost::StartIdleTimer() {
+  if (!idle_timer) {
+    idle_timer = new QTimer(this);
+    connect(idle_timer, &QTimer::timeout, this, [this]() {
+      if (!plugin) return;
+      dispatcher(plugin, effEditIdle, 0, 0, nullptr, 0);
 #if defined(Q_OS_LINUX)
-        // Poll for WM close button
-        if (x11_display_ && x11_window_) {
-          XEvent event;
-          while (XCheckTypedWindowEvent(static_cast<Display*>(x11_display_), static_cast<Window>(x11_window_),
-                                        ClientMessage, &event)) {
-            if (static_cast<unsigned long>(event.xclient.data.l[0]) == x11_wm_delete_) {
-              show_interface_btn->SetChecked(false);
-              return;
-            }
+      // Poll for WM close button
+      if (x11_display_ && x11_window_) {
+        XEvent event;
+        while (XCheckTypedWindowEvent(static_cast<Display*>(x11_display_), static_cast<Window>(x11_window_),
+                                      ClientMessage, &event)) {
+          if (static_cast<unsigned long>(event.xclient.data.l[0]) == x11_wm_delete_) {
+            show_interface_btn->SetChecked(false);
+            return;
           }
         }
+      }
 #endif
-      });
-    }
-    idle_timer->start(50);
+    });
+  }
+  idle_timer->start(50);
+}
 
-  } else {
+void VSTHost::show_interface(bool show) {
+  if (!show) {
     if (idle_timer) idle_timer->stop();
-
     dispatcher(plugin, effEditClose, 0, 0, nullptr, 0);
-
 #if defined(Q_OS_LINUX)
     if (x11_display_ && x11_window_) {
       auto dpy = static_cast<Display*>(x11_display_);
@@ -514,7 +504,34 @@ void VSTHost::show_interface(bool show) {
 #else
     if (dialog) dialog->hide();
 #endif
+    return;
   }
+
+#if defined(Q_OS_LINUX)
+  // Direct X11 window for plugin embedding.
+  // Works on native X11 and Wayland (via XWayland).
+  // 24-bit visual (no alpha) prevents compositor transparency.
+  if (!EnsureX11Window()) return;
+
+  auto dpy = static_cast<Display*>(x11_display_);
+  XMapRaised(dpy, static_cast<Window>(x11_window_));
+  XSync(dpy, False);
+  dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(x11_window_), 0);
+
+#else  // Windows, macOS, Haiku — use QDialog
+  CreateDialogIfNull();
+  dialog->show();
+  WId nativeWin = dialog->winId();
+#if defined(Q_OS_WIN)
+  dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<HWND>(nativeWin), 0);
+#elif defined(Q_OS_MACOS)
+  dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<NSWindow*>(nativeWin), 0);
+#else
+  dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(nativeWin), 0);
+#endif
+#endif  // Q_OS_LINUX
+
+  StartIdleTimer();
 }
 
 void VSTHost::uncheck_show_button() { show_interface_btn->SetChecked(false); }

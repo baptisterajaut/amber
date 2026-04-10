@@ -27,28 +27,32 @@ extern "C" {
 #include <QApplication>
 #include <QAudioSink>
 #include <QDrag>
+#include <QFile>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
-#include <QFile>
 #include <QPainter>
 #include <QPolygon>
 #include <QRegularExpression>
 #include <QScreen>
 #include <QtMath>
 
+#include "core/math.h"
+#include "engine/cacher.h"
+#include "engine/undo/comboaction.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undo_guide.h"
+#include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/debug.h"
-#include "core/math.h"
 #include "mainwindow.h"
 #include "panels/panels.h"
 #include "project/media.h"
 #include "project/projectelements.h"
 #include "rendering/audio.h"
-#include "engine/cacher.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
 #include "ui/collapsiblewidget.h"
@@ -56,21 +60,27 @@ extern "C" {
 #include "ui/timelinewidget.h"
 #include "ui/viewercontainer.h"
 #include "ui/viewerwindow.h"
-#include "engine/undo/comboaction.h"
-#include "engine/undo/undo.h"
-#include "engine/undo/undo_guide.h"
-#include "engine/undo/undostack.h"
 
 ViewerWidget::ViewerWidget(QWidget* parent)
     : QRhiWidget(parent)
 
 {
   switch (amber::CurrentRuntimeConfig.rhi_backend) {
-    case RhiBackend::Vulkan: setApi(Api::Vulkan); break;
-    case RhiBackend::Metal: setApi(Api::Metal); break;
-    case RhiBackend::D3D12: setApi(Api::Direct3D12); break;
-    case RhiBackend::D3D11: setApi(Api::Direct3D11); break;
-    default: setApi(Api::OpenGL); break;
+    case RhiBackend::Vulkan:
+      setApi(Api::Vulkan);
+      break;
+    case RhiBackend::Metal:
+      setApi(Api::Metal);
+      break;
+    case RhiBackend::D3D12:
+      setApi(Api::Direct3D12);
+      break;
+    case RhiBackend::D3D11:
+      setApi(Api::Direct3D11);
+      break;
+    default:
+      setApi(Api::OpenGL);
+      break;
   }
   setMinimumSize(1, 1);  // Prevent 0-height from QDockWidget — QRhiWidget never recovers from size 0 on Vulkan
   setMouseTracking(true);
@@ -241,7 +251,7 @@ void ViewerWidget::set_menu_zoom(QAction* action) {
 
 void ViewerWidget::retry() { update(); }
 
-void ViewerWidget::initialize(QRhiCommandBuffer *cb) {
+void ViewerWidget::initialize(QRhiCommandBuffer* cb) {
   if (rhi_ != rhi()) {
     releaseResources();
   }
@@ -272,8 +282,8 @@ void ViewerWidget::initialize(QRhiCommandBuffer *cb) {
     frag_ubuf_ = rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
     frag_ubuf_->create();
 
-    sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None,
-                                 QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge);
+    sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None, QRhiSampler::ClampToEdge,
+                                QRhiSampler::ClampToEdge);
     sampler_->create();
 
     // Placeholder 1x1 texture — replaced by actual frame data in render()
@@ -353,8 +363,8 @@ void ViewerWidget::frame_update() {
       update();
     } else {
       bool scrubbing = !viewer->playing;
-      renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(),
-                             nullptr, nullptr, 0, amber::CurrentConfig.preview_resolution_divider, scrubbing);
+      renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0,
+                             amber::CurrentConfig.preview_resolution_divider, scrubbing);
     }
 
     amber::rendering::compose_audio(viewer->seq.get(), !viewer->playing, viewer->get_playback_speed(), false);
@@ -532,15 +542,62 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   dragging = true;
 }
 
+bool ViewerWidget::move_handle_guide_drag(int video_x, int image_y) {
+  if (dragging_guide_index_ >= 0) {
+    Guide& g = viewer->seq->guides[dragging_guide_index_];
+    int raw_pos = (g.orientation == Guide::Horizontal) ? image_y : video_x;
+    if (dragging_mirror_side_) {
+      int dim = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
+      g.position = dim - raw_pos;
+    } else {
+      g.position = raw_pos;
+    }
+    update();
+    return true;
+  }
+  if (creating_guide_) {
+    creating_guide_pos_ = (creating_guide_orientation_ == Guide::Horizontal) ? image_y : video_x;
+    update();
+    return true;
+  }
+  if (!dragging && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
+    bool hit_mirror = false;
+    int idx = find_guide_at(video_x, image_y, &hit_mirror);
+    if (idx >= 0) {
+      hovered_guide_index_ = idx;
+      hovered_mirror_side_ = hit_mirror;
+      if (!hasFocus()) {
+        QWidget* fw = QApplication::focusWidget();
+        if (fw == nullptr || !fw->inherits("QLineEdit")) setFocus();
+      }
+      const Guide& g = viewer->seq->guides[idx];
+      setCursor(g.orientation == Guide::Horizontal ? Qt::SizeVerCursor : Qt::SizeHorCursor);
+      return true;
+    }
+  }
+  return false;
+}
+
+void ViewerWidget::move_handle_dragging(QMouseEvent* event) {
+  if (waveform) {
+    seek_from_click(qRound(event->position().x()));
+  } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
+    container->dragScrollMove(event->position().toPoint() * container->zoom);
+  } else if (event->buttons() & Qt::LeftButton) {
+    if (gizmos == nullptr) {
+      viewer->initiate_drag(amber::timeline::kImportBoth);
+      dragging = false;
+    } else {
+      move_gizmos(event, false);
+    }
+  }
+}
+
 void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
-  if (color_pick_mode_) {
-    // Keep crosshair cursor, don't process any other mouse move logic
-    return;
-  }
+  if (color_pick_mode_) return;
+
   unsetCursor();
-  if (panel_timeline->tool == TIMELINE_TOOL_HAND) {
-    setCursor(Qt::OpenHandCursor);
-  }
+  if (panel_timeline->tool == TIMELINE_TOOL_HAND) setCursor(Qt::OpenHandCursor);
 
   if (viewer->seq != nullptr && width() > 0) {
     double multiplier_x = double(viewer->seq->width) / double(width());
@@ -548,64 +605,16 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
     int video_x = qRound(event->position().x() * multiplier_x);
     int image_y = qRound(event->position().y() * multiplier_y);
 
-    if (dragging_guide_index_ >= 0) {
-      Guide& g = viewer->seq->guides[dragging_guide_index_];
-      int raw_pos = (g.orientation == Guide::Horizontal) ? image_y : video_x;
-      if (dragging_mirror_side_) {
-        int dim = (g.orientation == Guide::Horizontal) ? viewer->seq->height : viewer->seq->width;
-        g.position = dim - raw_pos;
-      } else {
-        g.position = raw_pos;
-      }
-      update();
-      return;
-    }
-
-    if (creating_guide_) {
-      creating_guide_pos_ = (creating_guide_orientation_ == Guide::Horizontal) ? image_y : video_x;
-      update();
-      return;
-    }
-
-    // Hover cursor for guides
-    if (!dragging && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
-      bool hit_mirror = false;
-      int idx = find_guide_at(video_x, image_y, &hit_mirror);
-      if (idx >= 0) {
-        hovered_guide_index_ = idx;
-        hovered_mirror_side_ = hit_mirror;
-
-        if (!hasFocus()) {
-          QWidget* fw = QApplication::focusWidget();
-          if (fw == nullptr || !fw->inherits("QLineEdit")) setFocus();
-        }
-        const Guide& g = viewer->seq->guides[idx];
-        setCursor(g.orientation == Guide::Horizontal ? Qt::SizeVerCursor : Qt::SizeHorCursor);
-        return;
-      }
-    }
+    if (move_handle_guide_drag(video_x, image_y)) return;
     hovered_guide_index_ = -1;
   }
 
   if (dragging) {
-    if (waveform) {
-      seek_from_click(qRound(event->position().x()));
-    } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
-      container->dragScrollMove(event->position().toPoint() * container->zoom);
-    } else if (event->buttons() & Qt::LeftButton) {
-      if (gizmos == nullptr) {
-        viewer->initiate_drag(amber::timeline::kImportBoth);
-        dragging = false;
-      } else {
-        move_gizmos(event, false);
-      }
-    }
+    move_handle_dragging(event);
   } else {
     EffectGizmo* g = get_gizmo_from_mouse(event->position().toPoint().x(), event->position().toPoint().y());
-    if (g != nullptr) {
-      if (g->get_cursor() > -1) {
-        setCursor(static_cast<enum Qt::CursorShape>(g->get_cursor()));
-      }
+    if (g != nullptr && g->get_cursor() > -1) {
+      setCursor(static_cast<enum Qt::CursorShape>(g->get_cursor()));
     }
   }
 }
@@ -806,8 +815,7 @@ void ViewerWidget::draw_gizmos(QPainter& p) {
       case GIZMO_TYPE_DOT: {
         QPointF center = toWidget(g->screen_pos[0].x(), g->screen_pos[0].y());
         p.setBrush(g->color);
-        p.drawRect(QRectF(center.x() - dot_size_px, center.y() - dot_size_px,
-                          dot_size_px * 2, dot_size_px * 2));
+        p.drawRect(QRectF(center.x() - dot_size_px, center.y() - dot_size_px, dot_size_px * 2, dot_size_px * 2));
         p.setBrush(Qt::NoBrush);
         break;
       }
@@ -816,7 +824,7 @@ void ViewerWidget::draw_gizmos(QPainter& p) {
         for (int k = 0; k < g->get_point_count(); k++) {
           poly << toWidget(g->screen_pos[k].x(), g->screen_pos[k].y());
         }
-        poly << poly.first(); // close
+        poly << poly.first();  // close
         p.drawPolyline(poly);
         break;
       }
@@ -830,7 +838,6 @@ void ViewerWidget::draw_gizmos(QPainter& p) {
       }
     }
   }
-
 }
 
 int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {
@@ -1017,7 +1024,7 @@ QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
                 static_cast<unsigned char>(data[offset + 2]), static_cast<unsigned char>(data[offset + 3]));
 }
 
-void ViewerWidget::render(QRhiCommandBuffer *cb) {
+void ViewerWidget::render(QRhiCommandBuffer* cb) {
   if (waveform) {
     const QColor clearColor(0, 0, 0, 255);
     cb->beginPass(renderTarget(), clearColor, {1.0f, 0});
@@ -1029,7 +1036,7 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
   // Snapshot the front buffer index once to avoid TOCTOU race: the render thread
   // can flip front_buffer_switcher between get_texture_mutex() and get_frame_data().
   int buf_idx = renderer->front_buffer_index();
-  QMutex *frame_lock = renderer->get_texture_mutex(buf_idx);
+  QMutex* frame_lock = renderer->get_texture_mutex(buf_idx);
   frame_lock->lock();
 
   const char* frame_data = renderer->get_frame_data(buf_idx);
@@ -1037,7 +1044,7 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
   int fh = renderer->get_frame_height();
   bool has_frame = (frame_data != nullptr && fw > 0 && fh > 0 && viewer->seq != nullptr);
 
-  QRhiResourceUpdateBatch *u = rhi_->nextResourceUpdateBatch();
+  QRhiResourceUpdateBatch* u = rhi_->nextResourceUpdateBatch();
   if (has_frame) {
     if (fw != cached_tex_w_ || fh != cached_tex_h_) {
       delete frame_tex_;
@@ -1091,10 +1098,8 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
 
   // TriangleStrip: BL, TL, BR, TR — texcoords V=1 at top to pair with clipSpaceCorrMatrix Y-flip
   float vertexData[] = {
-      zoom_left, zoom_bottom, 0.0f, 1.0f,
-      zoom_left, zoom_top, 0.0f, 0.0f,
-      zoom_right, zoom_bottom, 1.0f, 1.0f,
-      zoom_right, zoom_top, 1.0f, 0.0f,
+      zoom_left,  zoom_bottom, 0.0f, 1.0f, zoom_left,  zoom_top, 0.0f, 0.0f,
+      zoom_right, zoom_bottom, 1.0f, 1.0f, zoom_right, zoom_top, 1.0f, 0.0f,
   };
 
   QMatrix4x4 mvp = rhi_->clipSpaceCorrMatrix();
@@ -1123,8 +1128,8 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
 
   // Retry render if texture failed
   if (renderer->did_texture_fail() && !viewer->playing) {
-    renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(),
-                           nullptr, nullptr, 0, amber::CurrentConfig.preview_resolution_divider);
+    renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0,
+                           amber::CurrentConfig.preview_resolution_divider);
   }
 
   // Schedule overlay repaint

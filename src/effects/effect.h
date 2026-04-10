@@ -282,6 +282,18 @@ class Effect : public QObject {
   void parseEffectXml();
 
   /**
+   * @brief Parse a single <row> XML element and create an EffectRow with its fields.
+   * @param reader  XML stream positioned at a <row> start element
+   */
+  void parseRowElement(QXmlStreamReader& reader);
+
+  /**
+   * @brief Parse a single <shader> XML element and set shader paths/flags.
+   * @param reader  XML stream positioned at a <shader> start element
+   */
+  void parseShaderElement(QXmlStreamReader& reader);
+
+  /**
    * @brief Parse a single <field> XML element and create the corresponding EffectField
    *
    * Handles all field types (DOUBLE, BOOL, COLOR, COMBO, FONT, STRING, FILE) including

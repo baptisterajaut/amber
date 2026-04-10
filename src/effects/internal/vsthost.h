@@ -29,23 +29,26 @@
 #include "include/vestige.h"
 
 // Plugin's dispatcher function
-using dispatcherFuncPtr = intptr_t (*)(AEffect *effect, int32_t opCode, int32_t index, int32_t value, void *ptr, float opt);
+using dispatcherFuncPtr = intptr_t (*)(AEffect* effect, int32_t opCode, int32_t index, int32_t value, void* ptr,
+                                       float opt);
 
 class VSTHost : public Effect {
   Q_OBJECT
-public:
+ public:
   VSTHost(Clip* c, const EffectMeta* em);
   ~VSTHost() override;
   EffectPtr copy(Clip* c) override;
-  void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes, int channel_count) override;
+  void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes,
+                     int channel_count) override;
 
   void custom_load(QXmlStreamReader& stream) override;
   void save(QXmlStreamWriter& stream) override;
-private slots:
+ private slots:
   void show_interface(bool show);
   void uncheck_show_button();
   void change_plugin();
-private:
+
+ private:
   FileField* file_field;
   ButtonField* show_interface_btn;
 
@@ -58,7 +61,7 @@ private:
   void stopPlugin();
   void resumePlugin();
   void suspendPlugin();
-  bool canPluginDo(char *canDoString);
+  bool canPluginDo(char* canDoString);
   void processAudio(long numFrames);
   void CreateDialogIfNull();
   float** inputs;
@@ -67,6 +70,7 @@ private:
   QByteArray data_cache;
 
   void send_data_cache_to_plugin();
+  void StartIdleTimer();
 
   QLibrary modulePtr;
   QTimer* idle_timer{nullptr};
@@ -75,7 +79,8 @@ private:
   void* x11_display_{nullptr};
   unsigned long x11_window_{0};
   unsigned long x11_wm_delete_{0};
+  bool EnsureX11Window();
 #endif
 };
 
-#endif // VSTHOSTWIN_H
+#endif  // VSTHOSTWIN_H

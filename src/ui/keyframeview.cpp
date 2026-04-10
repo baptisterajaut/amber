@@ -23,31 +23,31 @@
 #include <QMouseEvent>
 #include <QtMath>
 
+#include "dialogs/keyframepropertiesdialog.h"
 #include "effects/effect.h"
-#include "ui/collapsiblewidget.h"
-#include "panels/panels.h"
+#include "effects/keyframe.h"
 #include "engine/clip.h"
-#include "panels/timeline.h"
-#include "ui/timelineheader.h"
+#include "engine/sequence.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
-#include "panels/viewer.h"
-#include "ui/viewerwidget.h"
-#include "engine/sequence.h"
-#include "panels/grapheditor.h"
-#include "ui/keyframedrawing.h"
-#include "ui/clickablelabel.h"
-#include "ui/resizablescrollbar.h"
-#include "ui/rectangleselect.h"
-#include "effects/keyframe.h"
-#include "ui/graphview.h"
-#include "ui/menu.h"
-#include "dialogs/keyframepropertiesdialog.h"
 #include "global/config.h"
+#include "panels/grapheditor.h"
+#include "panels/panels.h"
+#include "panels/timeline.h"
+#include "panels/viewer.h"
+#include "ui/clickablelabel.h"
+#include "ui/collapsiblewidget.h"
+#include "ui/graphview.h"
+#include "ui/keyframedrawing.h"
+#include "ui/menu.h"
+#include "ui/rectangleselect.h"
+#include "ui/resizablescrollbar.h"
+#include "ui/timelineheader.h"
+#include "ui/viewerwidget.h"
 
-KeyframeView::KeyframeView(QWidget *parent) :
-  QWidget(parent)
-  
+KeyframeView::KeyframeView(QWidget* parent)
+    : QWidget(parent)
+
 {
   setFocusPolicy(Qt::ClickFocus);
   setMouseTracking(true);
@@ -56,10 +56,7 @@ KeyframeView::KeyframeView(QWidget *parent) :
   connect(this, &KeyframeView::customContextMenuRequested, this, &KeyframeView::show_context_menu);
 }
 
-void KeyframeView::SetEffects(const QVector<EffectUI *> &open_effects)
-{
-  open_effects_ = open_effects;
-}
+void KeyframeView::SetEffects(const QVector<EffectUI*>& open_effects) { open_effects_ = open_effects; }
 
 void KeyframeView::show_context_menu(const QPoint& pos) {
   if (selected_fields.size() > 0) {
@@ -79,9 +76,8 @@ void KeyframeView::show_context_menu(const QPoint& pos) {
 
     connect(&menu, &QMenu::triggered, this, &KeyframeView::menu_set_key_type);
     connect(properties, &QAction::triggered, this, [this]() {
-      KeyframePropertiesDialog dlg(
-          this, selected_fields, selected_keyframes,
-          amber::ActiveSequence ? amber::ActiveSequence->frame_rate : 30.0);
+      KeyframePropertiesDialog dlg(this, selected_fields, selected_keyframes,
+                                   amber::ActiveSequence ? amber::ActiveSequence->frame_rate : 30.0);
       dlg.exec();
     });
     menu.exec(mapToGlobal(pos));
@@ -98,7 +94,7 @@ void KeyframeView::menu_set_key_type(QAction* a) {
   } else {
     int new_type = a->data().toInt();
     ComboAction* ca = new ComboAction(tr("Change Keyframe Type"));
-    for (int i=0;i<selected_fields.size();i++) {
+    for (int i = 0; i < selected_fields.size(); i++) {
       EffectField* f = selected_fields.at(i);
       ca->append(new SetInt(&f->keyframes[selected_keyframes.at(i)].type, new_type));
     }
@@ -130,29 +126,28 @@ void KeyframeView::paintEvent(QPaintEvent*) {
     }
 
     for (auto container : open_effects_) {
-
       Effect* e = container->GetEffect();
 
       if (container->IsExpanded()) {
-        for (int j=0;j<e->row_count();j++) {
+        for (int j = 0; j < e->row_count(); j++) {
           EffectRow* row = e->row(j);
 
           int keyframe_y = container->GetRowY(j, this);
 
           QVector<long> key_times;
 
-          for (int l=0;l<row->FieldCount();l++) {
+          for (int l = 0; l < row->FieldCount(); l++) {
             EffectField* f = row->Field(l);
-            for (int k=0;k<f->keyframes.size();k++) {
+            for (int k = 0; k < f->keyframes.size(); k++) {
               if (!key_times.contains(f->keyframes.at(k).time)) {
                 bool keyframe_selected = keyframeIsSelected(f, k);
                 long keyframe_frame = adjust_row_keyframe(row, f->keyframes.at(k).time, visible_in);
 
                 // see if any other keyframes have this time
                 int appearances = 0;
-                for (int m=0;m<row->FieldCount();m++) {
+                for (int m = 0; m < row->FieldCount(); m++) {
                   EffectField* compf = row->Field(m);
-                  for (const auto & keyframe : compf->keyframes) {
+                  for (const auto& keyframe : compf->keyframes) {
                     if (f->keyframes.at(k).time == keyframe.time) {
                       appearances++;
                     }
@@ -161,9 +156,13 @@ void KeyframeView::paintEvent(QPaintEvent*) {
 
                 if (appearances != row->FieldCount()) {
                   QColor cc = get_curve_color(l, row->FieldCount());
-                  draw_keyframe(p, f->keyframes.at(k).type, getScreenPointFromFrame(panel_effect_controls->zoom, keyframe_frame) - x_scroll, keyframe_y, keyframe_selected, cc.red(), cc.green(), cc.blue());
+                  draw_keyframe(p, f->keyframes.at(k).type,
+                                getScreenPointFromFrame(panel_effect_controls->zoom, keyframe_frame) - x_scroll,
+                                keyframe_y, keyframe_selected, cc.red(), cc.green(), cc.blue());
                 } else {
-                  draw_keyframe(p, f->keyframes.at(k).type, getScreenPointFromFrame(panel_effect_controls->zoom, keyframe_frame) - x_scroll, keyframe_y, keyframe_selected);
+                  draw_keyframe(p, f->keyframes.at(k).type,
+                                getScreenPointFromFrame(panel_effect_controls->zoom, keyframe_frame) - x_scroll,
+                                keyframe_y, keyframe_selected);
                 }
 
                 key_times.append(f->keyframes.at(k).time);
@@ -184,7 +183,8 @@ void KeyframeView::paintEvent(QPaintEvent*) {
     panel_effect_controls->horizontalScrollBar->setMaximum(qMax(max_width - width(), 0));
     header->set_visible_in(visible_in);
 
-    int playhead_x = getScreenPointFromFrame(panel_effect_controls->zoom, amber::ActiveSequence->playhead-visible_in) - x_scroll;
+    int playhead_x =
+        getScreenPointFromFrame(panel_effect_controls->zoom, amber::ActiveSequence->playhead - visible_in) - x_scroll;
     if (dragging && panel_timeline->snapped) {
       p.setPen(Qt::white);
     } else {
@@ -198,16 +198,15 @@ void KeyframeView::paintEvent(QPaintEvent*) {
   }
 
   /*if (mouseover && mouseover_row < rowY.size()) {
-    draw_keyframe(p, getScreenPointFromFrame(panel_effect_controls->zoom, mouseover_frame - visible_in), rowY.at(mouseover_row), true);
+    draw_keyframe(p, getScreenPointFromFrame(panel_effect_controls->zoom, mouseover_frame - visible_in),
+    rowY.at(mouseover_row), true);
     }*/
 }
 
-void KeyframeView::wheelEvent(QWheelEvent *e) {
-  emit wheel_event_signal(e);
-}
+void KeyframeView::wheelEvent(QWheelEvent* e) { emit wheel_event_signal(e); }
 
-bool KeyframeView::keyframeIsSelected(EffectField *field, int keyframe) {
-  for (int i=0;i<selected_fields.size();i++) {
+bool KeyframeView::keyframeIsSelected(EffectField* field, int keyframe) {
+  for (int i = 0; i < selected_fields.size(); i++) {
     if (selected_fields.at(i) == field && selected_keyframes.at(i) == keyframe) {
       return true;
     }
@@ -220,9 +219,7 @@ void KeyframeView::update_keys() {
   update();
 }
 
-void KeyframeView::delete_selected_keyframes() {
-  delete_keyframes(selected_fields, selected_keyframes);
-}
+void KeyframeView::delete_selected_keyframes() { delete_keyframes(selected_fields, selected_keyframes); }
 
 void KeyframeView::set_x_scroll(int s) {
   x_scroll = s;
@@ -240,7 +237,53 @@ void KeyframeView::resize_move(double d) {
   update();
 }
 
-void KeyframeView::mousePressEvent(QMouseEvent *event) {
+int KeyframeView::press_find_key(int mouse_x, int mouse_y, int& row_index, int& field_index) {
+  long frame_min = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x - KEYFRAME_SIZE);
+  long frame_max = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x + KEYFRAME_SIZE);
+  long frame_diff = 0;
+  int keyframe_index = -1;
+
+  for (int i = 0; i < rowY.size(); i++) {
+    if (mouse_y <= rowY.at(i) - KEYFRAME_SIZE * 2 || mouse_y >= rowY.at(i) + KEYFRAME_SIZE * 2) continue;
+
+    EffectRow* row = rows.at(i);
+    row->FocusRow();
+
+    for (int k = 0; k < row->FieldCount(); k++) {
+      EffectField* f = row->Field(k);
+      for (int j = 0; j < f->keyframes.size(); j++) {
+        long eval_time = f->keyframes.at(j).time - row->GetParentEffect()->parent_clip->clip_in() +
+                         (row->GetParentEffect()->parent_clip->timeline_in() - visible_in);
+        if (eval_time < frame_min || eval_time > frame_max) continue;
+        long diff = qAbs(eval_time - drag_frame_start);
+        if (keyframe_index == -1 || diff < frame_diff) {
+          row_index = i;
+          field_index = k;
+          keyframe_index = j;
+          frame_diff = diff;
+        }
+      }
+    }
+    break;
+  }
+  return keyframe_index;
+}
+
+void KeyframeView::press_extend_same_time_selection(int row_index, int field_index, int keyframe_index) {
+  long comp_time = rows.at(row_index)->Field(field_index)->keyframes.at(keyframe_index).time;
+  for (int i = 0; i < rows.at(row_index)->FieldCount(); i++) {
+    if (i == field_index) continue;
+    EffectField* f = rows.at(row_index)->Field(i);
+    for (int j = 0; j < f->keyframes.size(); j++) {
+      if (f->keyframes.at(j).time == comp_time) {
+        selected_fields.append(f);
+        selected_keyframes.append(j);
+      }
+    }
+  }
+}
+
+void KeyframeView::mousePressEvent(QMouseEvent* event) {
   rect_select_x = qRound(event->position().x());
   rect_select_y = qRound(event->position().y());
   rect_select_w = 0;
@@ -257,35 +300,10 @@ void KeyframeView::mousePressEvent(QMouseEvent *event) {
   int mouse_y = qRound(event->position().y());
   int row_index = -1;
   int field_index = -1;
-  int keyframe_index = -1;
-  long frame_diff = 0;
-  long frame_min = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x-KEYFRAME_SIZE);
+
   drag_frame_start = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x);
-  long frame_max = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x+KEYFRAME_SIZE);
-  for (int i=0;i<rowY.size();i++) {
-    if (mouse_y > rowY.at(i)-KEYFRAME_SIZE-KEYFRAME_SIZE && mouse_y < rowY.at(i)+KEYFRAME_SIZE+KEYFRAME_SIZE) {
-      EffectRow* row = rows.at(i);
+  int keyframe_index = press_find_key(mouse_x, mouse_y, row_index, field_index);
 
-      row->FocusRow();
-
-      for (int k=0;k<row->FieldCount();k++) {
-        EffectField* f = row->Field(k);
-        for (int j=0;j<f->keyframes.size();j++) {
-          long eval_keyframe_time = f->keyframes.at(j).time-row->GetParentEffect()->parent_clip->clip_in()+(row->GetParentEffect()->parent_clip->timeline_in()-visible_in);
-          if (eval_keyframe_time >= frame_min && eval_keyframe_time <= frame_max) {
-            long eval_frame_diff = qAbs(eval_keyframe_time - drag_frame_start);
-            if (keyframe_index == -1 || eval_frame_diff < frame_diff) {
-              row_index = i;
-              field_index = k;
-              keyframe_index = j;
-              frame_diff = eval_frame_diff;
-            }
-          }
-        }
-      }
-      break;
-    }
-  }
   bool already_selected = false;
   keys_selected = false;
   if (keyframe_index > -1) {
@@ -293,6 +311,7 @@ void KeyframeView::mousePressEvent(QMouseEvent *event) {
   } else {
     select_rect = true;
   }
+
   if (!already_selected) {
     if (!(event->modifiers() & Qt::ShiftModifier)) {
       selected_fields.clear();
@@ -301,37 +320,93 @@ void KeyframeView::mousePressEvent(QMouseEvent *event) {
     if (keyframe_index > -1) {
       selected_fields.append(rows.at(row_index)->Field(field_index));
       selected_keyframes.append(keyframe_index);
-
-      // find other field with keyframes at the same time
-      long comp_time = rows.at(row_index)->Field(field_index)->keyframes.at(keyframe_index).time;
-      for (int i=0;i<rows.at(row_index)->FieldCount();i++) {
-        if (i != field_index) {
-          EffectField* f = rows.at(row_index)->Field(i);
-          for (int j=0;j<f->keyframes.size();j++) {
-            if (f->keyframes.at(j).time == comp_time) {
-              selected_fields.append(f);
-              selected_keyframes.append(j);
-            }
-          }
-        }
-      }
+      press_extend_same_time_selection(row_index, field_index, keyframe_index);
     }
   }
 
-  if (selected_fields.size() > 0) {
-    for (int i=0;i<selected_fields.size();i++) {
+  if (!selected_fields.isEmpty()) {
+    for (int i = 0; i < selected_fields.size(); i++) {
       old_key_vals.append(selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time);
     }
     keys_selected = true;
   }
 
   rect_select_offset = selected_fields.size();
-
   update_keys();
 
-  if (event->button() == Qt::LeftButton) {
-    mousedown = true;
+  if (event->button() == Qt::LeftButton) mousedown = true;
+}
+
+void KeyframeView::move_rect_select(QMouseEvent* event) {
+  selected_fields.resize(rect_select_offset);
+  selected_keyframes.resize(rect_select_offset);
+
+  rect_select_w = qRound(event->position().x()) - rect_select_x;
+  rect_select_h = qRound(event->position().y()) - rect_select_y;
+
+  int min_row = qMin(rect_select_y, qRound(event->position().y())) - KEYFRAME_SIZE;
+  int max_row = qMax(rect_select_y, qRound(event->position().y())) + KEYFRAME_SIZE;
+
+  int mouse_x = qRound(event->position().x()) + x_scroll;
+  long current_frame = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x);
+  long frame_start = getFrameFromScreenPoint(panel_effect_controls->zoom, rect_select_x + x_scroll);
+  long min_frame = qMin(frame_start, current_frame) - KEYFRAME_SIZE;
+  long max_frame = qMax(frame_start, current_frame) + KEYFRAME_SIZE;
+
+  for (int i = 0; i < rowY.size(); i++) {
+    if (rowY.at(i) < min_row || rowY.at(i) > max_row) continue;
+    EffectRow* row = rows.at(i);
+    for (int k = 0; k < row->FieldCount(); k++) {
+      EffectField* field = row->Field(k);
+      for (int j = 0; j < field->keyframes.size(); j++) {
+        long kf = adjust_row_keyframe(row, field->keyframes.at(j).time, visible_in);
+        if (!keyframeIsSelected(field, j) && kf >= min_frame && kf <= max_frame) {
+          selected_fields.append(field);
+          selected_keyframes.append(j);
+        }
+      }
+    }
   }
+  update_keys();
+}
+
+void KeyframeView::move_keys_drag(QMouseEvent* event) {
+  int mouse_x = qRound(event->position().x()) + x_scroll;
+  long current_frame = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x);
+  long frame_diff = current_frame - drag_frame_start;
+
+  panel_timeline->snapped = false;
+  if (panel_timeline->snapping) {
+    for (int i = 0; i < selected_keyframes.size(); i++) {
+      EffectField* field = selected_fields.at(i);
+      Clip* c = field->GetParentRow()->GetParentEffect()->parent_clip;
+      long key_time = old_key_vals.at(i) + frame_diff - c->clip_in() + c->timeline_in();
+      long key_eval = key_time;
+      if (panel_timeline->snap_to_point(amber::ActiveSequence->playhead, &key_eval)) {
+        frame_diff += (key_eval - key_time);
+        break;
+      }
+    }
+  }
+
+  for (int i = 0; i < selected_fields.size(); i++) {
+    EffectField* field = selected_fields.at(i);
+    long eval_key = old_key_vals.at(i);
+    for (int j = 0; j < field->keyframes.size(); j++) {
+      while (!keyframeIsSelected(field, j) && field->keyframes.at(j).time == eval_key + frame_diff) {
+        frame_diff += (last_frame_diff > frame_diff) ? 1 : -1;
+        panel_timeline->snapped = false;
+      }
+    }
+  }
+
+  for (int i = 0; i < selected_keyframes.size(); i++) {
+    selected_fields.at(i)->keyframes[selected_keyframes.at(i)].time = old_key_vals.at(i) + frame_diff;
+  }
+
+  last_frame_diff = frame_diff;
+  dragging = true;
+  update_ui(false);
 }
 
 void KeyframeView::mouseMoveEvent(QMouseEvent* event) {
@@ -340,109 +415,36 @@ void KeyframeView::mouseMoveEvent(QMouseEvent* event) {
   } else {
     unsetCursor();
   }
+
   if (scroll_drag) {
-    panel_effect_controls->horizontalScrollBar->setValue(panel_effect_controls->horizontalScrollBar->value() + rect_select_x - event->position().toPoint().x());
-    panel_effect_controls->verticalScrollBar->setValue(panel_effect_controls->verticalScrollBar->value() + rect_select_y - event->position().toPoint().y());
+    panel_effect_controls->horizontalScrollBar->setValue(panel_effect_controls->horizontalScrollBar->value() +
+                                                         rect_select_x - event->position().toPoint().x());
+    panel_effect_controls->verticalScrollBar->setValue(panel_effect_controls->verticalScrollBar->value() +
+                                                       rect_select_y - event->position().toPoint().y());
     rect_select_x = event->position().toPoint().x();
     rect_select_y = event->position().toPoint().y();
-  } else if (mousedown) {
-    int mouse_x = qRound(event->position().x()) + x_scroll;
+    return;
+  }
 
-    long current_frame = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x);
-    panel_effect_controls->scroll_to_frame(current_frame + visible_in);
+  if (!mousedown) return;
 
-    if (select_rect) {
-      // do a rect select
-      selected_fields.resize(rect_select_offset);
-      selected_keyframes.resize(rect_select_offset);
+  int mouse_x = qRound(event->position().x()) + x_scroll;
+  long current_frame = getFrameFromScreenPoint(panel_effect_controls->zoom, mouse_x);
+  panel_effect_controls->scroll_to_frame(current_frame + visible_in);
 
-      rect_select_w = qRound(event->position().x()) - rect_select_x;
-      rect_select_h = qRound(event->position().y()) - rect_select_y;
-
-      int min_row = qMin(rect_select_y, qRound(event->position().y()))-KEYFRAME_SIZE;
-      int max_row = qMax(rect_select_y, qRound(event->position().y()))+KEYFRAME_SIZE;
-
-      long frame_start = getFrameFromScreenPoint(panel_effect_controls->zoom, rect_select_x+x_scroll);
-      long min_frame = qMin(frame_start, current_frame)-KEYFRAME_SIZE;
-      long max_frame = qMax(frame_start, current_frame)+KEYFRAME_SIZE;
-
-      for (int i=0;i<rowY.size();i++) {
-        if (rowY.at(i) >= min_row && rowY.at(i) <= max_row) {
-          EffectRow* row = rows.at(i);
-          for (int k=0;k<row->FieldCount();k++) {
-            EffectField* field = row->Field(k);
-            for (int j=0;j<field->keyframes.size();j++) {
-              long keyframe_frame = adjust_row_keyframe(row, field->keyframes.at(j).time, visible_in);
-              if (!keyframeIsSelected(field, j) && keyframe_frame >= min_frame && keyframe_frame <= max_frame) {
-                selected_fields.append(field);
-                selected_keyframes.append(j);
-              }
-            }
-          }
-        }
-      }
-
-      update_keys();
-    } else if (keys_selected) {
-      // move keyframes
-      long frame_diff = current_frame - drag_frame_start;
-
-      // snapping to playhead
-      panel_timeline->snapped = false;
-      if (panel_timeline->snapping) {
-        for (int i=0;i<selected_keyframes.size();i++) {
-          EffectField* field = selected_fields.at(i);
-          Clip* c = field->GetParentRow()->GetParentEffect()->parent_clip;
-          long key_time = old_key_vals.at(i) + frame_diff - c->clip_in() + c->timeline_in();
-          long key_eval = key_time;
-          if (panel_timeline->snap_to_point(amber::ActiveSequence->playhead, &key_eval)) {
-            frame_diff += (key_eval - key_time);
-            break;
-          }
-        }
-      }
-
-      // validate frame_diff (make sure no keyframes overlap each other)
-      for (int i=0;i<selected_fields.size();i++) {
-        EffectField* field = selected_fields.at(i);
-        long eval_key = old_key_vals.at(i);
-        for (int j=0;j<field->keyframes.size();j++) {
-          while (!keyframeIsSelected(field, j) && field->keyframes.at(j).time == eval_key + frame_diff) {
-            if (last_frame_diff > frame_diff) {
-              frame_diff++;
-              panel_timeline->snapped = false;
-            } else {
-              frame_diff--;
-              panel_timeline->snapped = false;
-            }
-          }
-        }
-      }
-
-      // apply frame_diffs
-      for (int i=0;i<selected_keyframes.size();i++) {
-        EffectField* field = selected_fields.at(i);
-        field->keyframes[selected_keyframes.at(i)].time = old_key_vals.at(i) + frame_diff;
-      }
-
-      last_frame_diff = frame_diff;
-
-      dragging = true;
-
-      update_ui(false);
-    }
+  if (select_rect) {
+    move_rect_select(event);
+  } else if (keys_selected) {
+    move_keys_drag(event);
   }
 }
 
 void KeyframeView::mouseReleaseEvent(QMouseEvent*) {
   if (dragging) {
     ComboAction* ca = new ComboAction(tr("Move Keyframe(s)"));
-    for (int i=0;i<selected_fields.size();i++) {
-      ca->append(new SetLong(
-                   &selected_fields.at(i)->keyframes[selected_keyframes.at(i)].time,
-                 old_key_vals.at(i),
-                 selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time
-                 ));
+    for (int i = 0; i < selected_fields.size(); i++) {
+      ca->append(new SetLong(&selected_fields.at(i)->keyframes[selected_keyframes.at(i)].time, old_key_vals.at(i),
+                             selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time));
     }
     amber::UndoStack.push(ca);
   }

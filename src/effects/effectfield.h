@@ -50,7 +50,7 @@ class ComboAction;
  */
 class EffectField : public QObject {
   Q_OBJECT
-public:
+ public:
   /**
    * @brief The EffectFieldType enum
    *
@@ -296,7 +296,6 @@ public:
    */
   virtual QVariant ConvertStringToValue(const QString& s);
 
-
   /**
    * @brief Get the correct X position/time value of a bezier keyframe's handles
    *
@@ -360,7 +359,7 @@ public:
    */
   QVector<EffectKeyframe> keyframes;
 
-signals:
+ signals:
   /**
    * @brief Changed signal
    *
@@ -383,7 +382,7 @@ signals:
    */
   void EnabledChanged(bool);
 
-private:
+ private:
   /**
    * @brief Internal type variable set in the constructor. Access with type().
    */
@@ -450,6 +449,11 @@ private:
   void GetKeyframeData(double timecode, int& before, int& after, double& d);
 
   /**
+   * @brief Interpolate a DOUBLE field between two keyframes.
+   */
+  double InterpolateDouble(double timecode, int before_keyframe, int after_keyframe, double progress);
+
+  /**
    * @brief Retrieve the current clip as a frame number
    *
    * Same as Now() but retrieves the value as a frame number (in the appropriate Sequence's frame rate) instead of
@@ -480,7 +484,6 @@ private:
    * @brief Whether default_data_ has been explicitly set
    */
   bool has_default_{false};
-
 };
 
-#endif // EFFECTFIELD_H
+#endif  // EFFECTFIELD_H

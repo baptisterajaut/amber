@@ -4,6 +4,9 @@
 #include "effects/effect.h"
 #include "srtparser.h"
 
+class QPainter;
+class QTextDocument;
+
 class SubtitleEffect : public Effect {
   Q_OBJECT
  public:
@@ -24,6 +27,10 @@ class SubtitleEffect : public Effect {
 
  private:
   int find_active_cue(qint64 time_ms) const;
+  void DrawSubtitleShadow(QPainter& p, QTextDocument& td, const QRect& clip_rect, int translate_x, int translate_y,
+                          double timecode);
+  void DrawSubtitleOutline(QPainter& p, QTextDocument& td, const QRect& clip_rect, int translate_x, int translate_y,
+                           double timecode);
 
   QVector<SubtitleCue> cues_;
   int active_cue_index_{-1};

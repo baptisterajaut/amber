@@ -20,60 +20,53 @@
 
 #include "preferencesdialog.h"
 
-#include <QMenuBar>
 #include <QAction>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QTabWidget>
-#include <QLineEdit>
-#include <QLabel>
-#include <QComboBox>
-#include <QGroupBox>
+#include <QApplication>
+#include <QAudioDevice>
 #include <QCheckBox>
-#include <QRadioButton>
+#include <QComboBox>
+#include <QDebug>
 #include <QDialogButtonBox>
-#include <QTreeWidget>
-#include <QVector>
-#include <QPushButton>
-#include <QTreeWidgetItem>
-#include <QList>
 #include <QDoubleSpinBox>
 #include <QFileDialog>
-#include <QMessageBox>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QList>
 #include <QMediaDevices>
-#include <QAudioDevice>
-#include <QApplication>
+#include <QMenuBar>
+#include <QMessageBox>
 #include <QProcess>
-#include <QDebug>
+#include <QPushButton>
+#include <QRadioButton>
+#include <QTabWidget>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
+#include <QVBoxLayout>
+#include <QVector>
 
-#include "global/global.h"
-#include "global/config.h"
 #include "core/path.h"
-#include "ui/styling.h"
+#include "dialogs/newsequencedialog.h"
+#include "global/config.h"
+#include "global/global.h"
+#include "panels/panels.h"
 #include "rendering/audio.h"
 #include "rendering/audio_ui.h"
-#include "panels/panels.h"
 #include "ui/columnedgridlayout.h"
-#include "ui/mainwindow.h"
 #include "ui/labelslider.h"
-#include "dialogs/newsequencedialog.h"
+#include "ui/mainwindow.h"
+#include "ui/styling.h"
 
-KeySequenceEditor::KeySequenceEditor(QWidget* parent, QAction* a)
-  : QKeySequenceEdit(parent), action(a) {
+KeySequenceEditor::KeySequenceEditor(QWidget* parent, QAction* a) : QKeySequenceEdit(parent), action(a) {
   setKeySequence(action->shortcut());
 }
 
-void KeySequenceEditor::set_action_shortcut() {
-  action->setShortcut(keySequence());
-}
+void KeySequenceEditor::set_action_shortcut() { action->setShortcut(keySequence()); }
 
-void KeySequenceEditor::reset_to_default() {
-  setKeySequence(action->property("default").toString());
-}
+void KeySequenceEditor::reset_to_default() { setKeySequence(action->property("default").toString()); }
 
-QString KeySequenceEditor::action_name() {
-  return action->property("id").toString();
-}
+QString KeySequenceEditor::action_name() { return action->property("id").toString(); }
 
 QString KeySequenceEditor::export_shortcut() {
   QString ks = keySequence().toString();
@@ -83,9 +76,7 @@ QString KeySequenceEditor::export_shortcut() {
   return nullptr;
 }
 
-PreferencesDialog::PreferencesDialog(QWidget *parent) :
-  QDialog(parent)
-{
+PreferencesDialog::PreferencesDialog(QWidget* parent) : QDialog(parent) {
   setWindowTitle(tr("Preferences"));
 
   setup_ui();
@@ -131,15 +122,13 @@ void PreferencesDialog::delete_previews(char type) {
     preview_path.removeRecursively();
   } else {
     QStringList preview_file_list = preview_path.entryList(QDir::Files | QDir::NoDotAndDotDot);
-    for (const auto & preview_file_str : preview_file_list) {
-
+    for (const auto& preview_file_str : preview_file_list) {
       // use filename to determine whether this is a thumbnail or a waveform
-      int identifier_char_index = qMax(0, preview_file_str.size()-2);
+      int identifier_char_index = qMax(0, preview_file_str.size() - 2);
 
       // find identifier char
-      while (identifier_char_index >= 0
-             && preview_file_str.at(identifier_char_index).unicode() >= 48
-             && preview_file_str.at(identifier_char_index).unicode() <= 57) {
+      while (identifier_char_index >= 0 && preview_file_str.at(identifier_char_index).unicode() >= 48 &&
+             preview_file_str.at(identifier_char_index).unicode() <= 57) {
         identifier_char_index--;
       }
 
@@ -152,8 +141,7 @@ void PreferencesDialog::delete_previews(char type) {
   }
 }
 
-void PreferencesDialog::AddBoolPair(QCheckBox *ui, bool *value, bool restart_required)
-{
+void PreferencesDialog::AddBoolPair(QCheckBox* ui, bool* value, bool restart_required) {
   bool_ui.append(ui);
   bool_value.append(value);
   bool_restart_required.append(restart_required);
@@ -175,7 +163,7 @@ void PreferencesDialog::setup_kbd_shortcuts(QMenuBar* menubar) {
     setup_kbd_shortcut_worker(menu, item);
   }
 
-  for (int i=0;i<key_shortcut_items.size();i++) {
+  for (int i = 0; i < key_shortcut_items.size(); i++) {
     if (!key_shortcut_actions.at(i)->property("id").isNull()) {
       KeySequenceEditor* editor = new KeySequenceEditor(keyboard_tree, key_shortcut_actions.at(i));
       keyboard_tree->setItemWidget(key_shortcut_items.at(i), 1, editor);
@@ -184,81 +172,7 @@ void PreferencesDialog::setup_kbd_shortcuts(QMenuBar* menubar) {
   }
 }
 
-void PreferencesDialog::accept() {
-  bool restart_after_saving = false;
-  bool reinit_audio = false;
-  bool reload_language = false;
-  bool reload_effects = false;
-
-  // Validate whether the specified CSS file exists
-  if (!custom_css_fn->text().isEmpty() && !QFileInfo::exists(custom_css_fn->text())) {
-    QMessageBox::critical(
-          this,
-          tr("Invalid CSS File"),
-          tr("CSS file '%1' does not exist.").arg(custom_css_fn->text())
-          );
-    return;
-  }
-
-  // Validate whether the effects panel should refresh itself
-  if (amber::CurrentConfig.effect_textbox_lines != effect_textbox_lines_field->value()) {
-    reload_effects = true;
-  }
-
-  bool bool_requires_restart = false;
-  for (int i=0;i<bool_restart_required.size();i++) {
-    if (bool_restart_required.at(i)
-        && bool_ui.at(i)->isChecked() != *bool_value.at(i)) {
-      bool_requires_restart = true;
-      break;
-    }
-  }
-
-  // Check if any settings will require a restart of Olive
-  if (bool_requires_restart
-      || amber::CurrentConfig.thumbnail_resolution != thumbnail_res_spinbox->value()
-      || amber::CurrentConfig.waveform_resolution != waveform_res_spinbox->value()
-      || amber::CurrentConfig.css_path != custom_css_fn->text()
-      || amber::CurrentConfig.style != static_cast<amber::styling::Style>(ui_style->currentData().toInt())) {
-
-    // any changes to these settings will require a restart - ask the user if we should do one now or later
-
-    int ret = QMessageBox::question(this,
-                                    "Restart Required",
-                                    "Some of the changed settings will require a restart of Olive. Would you like "
-                                    "to restart now?",
-                                    QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-
-    if (ret == QMessageBox::Cancel) {
-      // Return to Preferences dialog without saving any settings
-      return;
-    } else if (ret == QMessageBox::Yes) {
-
-      // Check if we can close the current project. If not, we'll treat it as if the user clicked "Cancel".
-      if (amber::Global->can_close_project()) {
-        restart_after_saving = true;
-      } else {
-        return;
-      }
-    }
-    // Selecting "No" will save the settings and not restart. They will become active next time Olive opens.
-
-  }
-
-  // Audio settings may require the audio device to be re-initiated.
-  if (amber::CurrentConfig.preferred_audio_output != audio_output_devices->currentData().toString()
-      || amber::CurrentConfig.preferred_audio_input != audio_input_devices->currentData().toString()
-      || amber::CurrentConfig.audio_rate != audio_sample_rate->currentData().toInt()) {
-    reinit_audio = true;
-  }
-
-  // see if the language file should be reloaded (not necessary if the app is restarting anyway)
-  if (!restart_after_saving
-      && amber::CurrentConfig.language_file != language_combobox->currentData().toString()) {
-    reload_language = true;
-  }
-
-  // save settings from UI to backend
+void PreferencesDialog::save_config_from_ui() {
   amber::CurrentConfig.css_path = custom_css_fn->text();
   amber::CurrentConfig.recording_mode = recordingComboBox->currentIndex() + 1;
   amber::CurrentConfig.img_seq_formats = imgSeqFormatEdit->text();
@@ -266,11 +180,9 @@ void PreferencesDialog::accept() {
   amber::CurrentConfig.upcoming_queue_type = upcoming_queue_type->currentIndex();
   amber::CurrentConfig.previous_queue_size = previous_queue_spinbox->value();
   amber::CurrentConfig.previous_queue_type = previous_queue_type->currentIndex();
-
   amber::CurrentConfig.preferred_audio_output = audio_output_devices->currentData().toString();
   amber::CurrentConfig.preferred_audio_input = audio_input_devices->currentData().toString();
   amber::CurrentConfig.audio_rate = audio_sample_rate->currentData().toInt();
-
   amber::CurrentConfig.effect_textbox_lines = effect_textbox_lines_field->value();
   amber::CurrentConfig.frame_skip_step = frame_skip_step_field->value();
   amber::CurrentConfig.default_still_length = static_cast<int>(default_still_length_slider->value());
@@ -282,106 +194,117 @@ void PreferencesDialog::accept() {
   amber::CurrentConfig.sticky_keyframe_type = sticky_keyframe_type_check->isChecked();
   amber::CurrentConfig.default_keyframe_type = default_keyframe_type_combo->currentData().toInt();
   amber::CurrentConfig.language_file = language_combobox->currentData().toString();
-
   amber::CurrentConfig.default_sequence_width = default_sequence.width;
   amber::CurrentConfig.default_sequence_height = default_sequence.height;
   amber::CurrentConfig.default_sequence_framerate = default_sequence.frame_rate;
   amber::CurrentConfig.default_sequence_audio_frequency = default_sequence.audio_frequency;
   amber::CurrentConfig.default_sequence_audio_channel_layout = default_sequence.audio_layout;
-
-  for (int i=0;i<bool_ui.size();i++) {
+  for (int i = 0; i < bool_ui.size(); i++) {
     *bool_value[i] = bool_ui.at(i)->isChecked();
   }
-
   amber::CurrentConfig.style = static_cast<amber::styling::Style>(ui_style->currentData().toInt());
+}
 
-  // Check if the thumbnail or waveform icon
-  if (amber::CurrentConfig.thumbnail_resolution != thumbnail_res_spinbox->value()
-      || amber::CurrentConfig.waveform_resolution != waveform_res_spinbox->value()) {
-    // we're changing the size of thumbnails and waveforms, so let's delete them and regenerate them next start
+void PreferencesDialog::handle_preview_resolution_changes() {
+  bool thumb_changed = (amber::CurrentConfig.thumbnail_resolution != thumbnail_res_spinbox->value());
+  bool wave_changed = (amber::CurrentConfig.waveform_resolution != waveform_res_spinbox->value());
 
-    // delete nothing
-    char delete_match = 0;
+  if (!thumb_changed && !wave_changed) return;
 
-    if (amber::CurrentConfig.thumbnail_resolution != thumbnail_res_spinbox->value()) {
-      // delete existing thumbnails
-      amber::CurrentConfig.thumbnail_resolution = thumbnail_res_spinbox->value();
+  char delete_match = 0;
+  if (thumb_changed) {
+    amber::CurrentConfig.thumbnail_resolution = thumbnail_res_spinbox->value();
+    delete_match = 't';
+  }
+  if (wave_changed) {
+    amber::CurrentConfig.waveform_resolution = waveform_res_spinbox->value();
+    delete_match = (delete_match == 't') ? char(1) : 'w';
+  }
+  delete_previews(delete_match);
+}
 
-      // delete only thumbnails
-      delete_match = 't';
-    }
-
-    if (amber::CurrentConfig.waveform_resolution != waveform_res_spinbox->value()) {
-      // delete existing waveforms
-      amber::CurrentConfig.waveform_resolution = waveform_res_spinbox->value();
-
-      // if we're already deleting thumbnails
-      if (delete_match == 't') {
-        // delete all
-        delete_match = 1;
-      } else {
-        // just delete waveforms
-        delete_match = 'w';
-      }
-    }
-
-    delete_previews(delete_match);
+void PreferencesDialog::accept() {
+  // Validate whether the specified CSS file exists
+  if (!custom_css_fn->text().isEmpty() && !QFileInfo::exists(custom_css_fn->text())) {
+    QMessageBox::critical(this, tr("Invalid CSS File"), tr("CSS file '%1' does not exist.").arg(custom_css_fn->text()));
+    return;
   }
 
-  // Save keyboard shortcuts
+  bool reload_effects = (amber::CurrentConfig.effect_textbox_lines != effect_textbox_lines_field->value());
+
+  bool bool_requires_restart = false;
+  for (int i = 0; i < bool_restart_required.size(); i++) {
+    if (bool_restart_required.at(i) && bool_ui.at(i)->isChecked() != *bool_value.at(i)) {
+      bool_requires_restart = true;
+      break;
+    }
+  }
+
+  // Check if any settings will require a restart
+  bool restart_after_saving = false;
+  if (bool_requires_restart || amber::CurrentConfig.thumbnail_resolution != thumbnail_res_spinbox->value() ||
+      amber::CurrentConfig.waveform_resolution != waveform_res_spinbox->value() ||
+      amber::CurrentConfig.css_path != custom_css_fn->text() ||
+      amber::CurrentConfig.style != static_cast<amber::styling::Style>(ui_style->currentData().toInt())) {
+    int ret = QMessageBox::question(this, "Restart Required",
+                                    "Some of the changed settings will require a restart of Olive. Would you like "
+                                    "to restart now?",
+                                    QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+    if (ret == QMessageBox::Cancel) return;
+    if (ret == QMessageBox::Yes) {
+      if (!amber::Global->can_close_project()) return;
+      restart_after_saving = true;
+    }
+  }
+
+  bool reinit_audio = (amber::CurrentConfig.preferred_audio_output != audio_output_devices->currentData().toString() ||
+                       amber::CurrentConfig.preferred_audio_input != audio_input_devices->currentData().toString() ||
+                       amber::CurrentConfig.audio_rate != audio_sample_rate->currentData().toInt());
+
+  bool reload_language =
+      (!restart_after_saving && amber::CurrentConfig.language_file != language_combobox->currentData().toString());
+
+  save_config_from_ui();
+  handle_preview_resolution_changes();
+
   for (auto key_shortcut_field : key_shortcut_fields) {
     key_shortcut_field->set_action_shortcut();
   }
 
-  // Audio settings may require the audio device to be re-initiated.
-  if (reinit_audio) {
-    init_audio();
-  }
-
-  if (reload_effects) {
-    panel_effect_controls->Reload();
-  }
-
-  // reload language file if it changed
-  if (reload_language) {
-    amber::Global->load_translation_from_config();
-  }
+  if (reinit_audio) init_audio();
+  if (reload_effects) panel_effect_controls->Reload();
+  if (reload_language) amber::Global->load_translation_from_config();
 
   QDialog::accept();
 
   if (restart_after_saving) {
-    // since we already ran can_close_project(), bypass checking again by running set_modified(false)
     amber::Global->set_modified(false);
-
     amber::MainWindow->close();
-
-    QProcess::startDetached(QApplication::applicationFilePath(), { amber::ActiveProjectFilename });
+    QProcess::startDetached(QApplication::applicationFilePath(), {amber::ActiveProjectFilename});
   }
 }
 
 void PreferencesDialog::reset_default_shortcut() {
   QList<QTreeWidgetItem*> items = keyboard_tree->selectedItems();
-  for (int i=0;i<items.size();i++) {
+  for (int i = 0; i < items.size(); i++) {
     QTreeWidgetItem* item = keyboard_tree->selectedItems().at(i);
     static_cast<KeySequenceEditor*>(keyboard_tree->itemWidget(item, 1))->reset_to_default();
   }
 }
 
 void PreferencesDialog::reset_all_shortcuts() {
-  if (QMessageBox::question(
-        this,
-        tr("Confirm Reset All Shortcuts"),
-        tr("Are you sure you wish to reset all keyboard shortcuts to their defaults?"),
-        QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+  if (QMessageBox::question(this, tr("Confirm Reset All Shortcuts"),
+                            tr("Are you sure you wish to reset all keyboard shortcuts to their defaults?"),
+                            QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
     for (auto key_shortcut_field : key_shortcut_fields) {
       key_shortcut_field->reset_to_default();
     }
   }
 }
 
-bool PreferencesDialog::refine_shortcut_list(const QString &s, QTreeWidgetItem* parent) {
+bool PreferencesDialog::refine_shortcut_list(const QString& s, QTreeWidgetItem* parent) {
   if (parent == nullptr) {
-    for (int i=0;i<keyboard_tree->topLevelItemCount();i++) {
+    for (int i = 0; i < keyboard_tree->topLevelItemCount(); i++) {
       refine_shortcut_list(s, keyboard_tree->topLevelItem(i));
     }
   } else {
@@ -389,7 +312,7 @@ bool PreferencesDialog::refine_shortcut_list(const QString &s, QTreeWidgetItem* 
 
     bool all_children_are_hidden = !s.isEmpty();
 
-    for (int i=0;i<parent->childCount();i++) {
+    for (int i = 0; i < parent->childCount(); i++) {
       QTreeWidgetItem* item = parent->child(i);
       if (item->childCount() > 0) {
         all_children_are_hidden = refine_shortcut_list(s, item);
@@ -429,7 +352,7 @@ void PreferencesDialog::load_shortcut_file() {
       f.close();
       for (auto key_shortcut_field : key_shortcut_fields) {
         int index = ba.indexOf(key_shortcut_field->action_name().toUtf8());
-        if (index == 0 || (index > 0 && ba.at(index-1) == '\n')) {
+        if (index == 0 || (index > 0 && ba.at(index - 1) == '\n')) {
           while (index < ba.size() && ba.at(index) != '\t') index++;
           QString ks;
           index++;
@@ -443,11 +366,7 @@ void PreferencesDialog::load_shortcut_file() {
         }
       }
     } else {
-      QMessageBox::critical(
-            this,
-            tr("Error saving shortcuts"),
-            tr("Failed to open file for reading")
-            );
+      QMessageBox::critical(this, tr("Error saving shortcuts"), tr("Failed to open file for reading"));
     }
   }
 }
@@ -482,20 +401,17 @@ void PreferencesDialog::browse_css_file() {
 }
 
 void PreferencesDialog::delete_all_previews() {
-  if (QMessageBox::question(this,
-                            tr("Delete All Previews"),
-                            tr("Are you sure you want to delete all previews?"),
+  if (QMessageBox::question(this, tr("Delete All Previews"), tr("Are you sure you want to delete all previews?"),
                             QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
     delete_previews(1);
-    QMessageBox::information(this,
-                             tr("Previews Deleted"),
-                             tr("All previews deleted successfully. You may have to re-open your current project for changes to take effect."),
+    QMessageBox::information(this, tr("Previews Deleted"),
+                             tr("All previews deleted successfully. You may have to re-open your current project for "
+                                "changes to take effect."),
                              QMessageBox::Ok);
   }
 }
 
-void PreferencesDialog::edit_default_sequence_settings()
-{
+void PreferencesDialog::edit_default_sequence_settings() {
   NewSequenceDialog nsd(this, nullptr, &default_sequence);
   nsd.SetNameEditable(false);
   nsd.exec();
@@ -524,18 +440,18 @@ void PreferencesDialog::setup_ui() {
   QList<QString> translation_paths = get_language_paths();
 
   // iterate through all language search paths
-  for (const auto & translation_path : translation_paths) {
+  for (const auto& translation_path : translation_paths) {
     QDir translation_dir(translation_path);
     if (translation_dir.exists()) {
       QStringList translation_files = translation_dir.entryList({"*.qm"}, QDir::Files | QDir::NoDotAndDotDot);
-      for (const auto & translation_file : translation_files) {
+      for (const auto& translation_file : translation_files) {
         // get path of translation relative to the application path
         QString locale_full_path = translation_dir.filePath(translation_file);
         QString locale_relative_path = QDir(get_app_path()).relativeFilePath(locale_full_path);
 
         QFileInfo locale_file(translation_file);
         QString locale_file_basename = locale_file.baseName();
-        QString locale_str = locale_file_basename.mid(locale_file_basename.lastIndexOf('_')+1);
+        QString locale_str = locale_file_basename.mid(locale_file_basename.lastIndexOf('_') + 1);
         language_combobox->addItem(QLocale(locale_str).nativeLanguageName(), locale_relative_path);
 
         if (amber::CurrentConfig.language_file == locale_relative_path) {
@@ -605,7 +521,8 @@ void PreferencesDialog::setup_ui() {
 
   // General -> Hardware Decoding
   QCheckBox* hardware_decoding_checkbox = new QCheckBox(tr("Hardware Decoding (VAAPI/D3D11VA/VideoToolbox)"));
-  hardware_decoding_checkbox->setToolTip(tr("Use GPU-accelerated video decoding when available. Falls back to software if unsupported. Requires restart."));
+  hardware_decoding_checkbox->setToolTip(tr(
+      "Use GPU-accelerated video decoding when available. Falls back to software if unsupported. Requires restart."));
   AddBoolPair(hardware_decoding_checkbox, &amber::CurrentConfig.hardware_decoding, true);
   general_layout->addWidget(hardware_decoding_checkbox, row, 0, 1, 4);
 
@@ -642,10 +559,8 @@ void PreferencesDialog::setup_ui() {
   autorecovery_max_slider->setEnabled(amber::CurrentConfig.autorecovery_enabled);
   ar_grid->addWidget(autorecovery_max_slider, 2, 1);
 
-  connect(autorecovery_enabled_check, &QCheckBox::toggled,
-          autorecovery_interval_slider, &QWidget::setEnabled);
-  connect(autorecovery_enabled_check, &QCheckBox::toggled,
-          autorecovery_max_slider, &QWidget::setEnabled);
+  connect(autorecovery_enabled_check, &QCheckBox::toggled, autorecovery_interval_slider, &QWidget::setEnabled);
+  connect(autorecovery_enabled_check, &QCheckBox::toggled, autorecovery_max_slider, &QWidget::setEnabled);
 
   general_layout->addWidget(autorecovery_group, row, 0, 1, 5);
 
@@ -661,7 +576,8 @@ void PreferencesDialog::setup_ui() {
   AddBoolPair(add_default_effects_to_clips, &amber::CurrentConfig.add_default_effects_to_clips);
   behavior_tab_layout->Add(add_default_effects_to_clips);
 
-  QCheckBox* auto_seek_to_beginning = new QCheckBox(tr("Automatically Seek to the Beginning When Playing at the End of a Sequence"));
+  QCheckBox* auto_seek_to_beginning =
+      new QCheckBox(tr("Automatically Seek to the Beginning When Playing at the End of a Sequence"));
   AddBoolPair(auto_seek_to_beginning, &amber::CurrentConfig.auto_seek_to_beginning);
   behavior_tab_layout->Add(auto_seek_to_beginning);
 
@@ -682,7 +598,9 @@ void PreferencesDialog::setup_ui() {
   behavior_tab_layout->Add(seek_also_selects);
 
   QCheckBox* snap_to_outgoing_clip = new QCheckBox(tr("Snap Playhead to Last Frame of Outgoing Clip"));
-  snap_to_outgoing_clip->setToolTip(tr("When snapping the playhead to a clip boundary, show the last frame of the outgoing clip instead of the first frame of the incoming clip"));
+  snap_to_outgoing_clip->setToolTip(
+      tr("When snapping the playhead to a clip boundary, show the last frame of the outgoing clip instead of the first "
+         "frame of the incoming clip"));
   AddBoolPair(snap_to_outgoing_clip, &amber::CurrentConfig.snap_to_outgoing_clip);
   behavior_tab_layout->Add(snap_to_outgoing_clip);
 
@@ -696,7 +614,8 @@ void PreferencesDialog::setup_ui() {
     snap_outgoing_modifier_combo->addItem(tr("Ctrl"));
     snap_outgoing_modifier_combo->addItem(tr("Alt"));
     snap_outgoing_modifier_combo->setCurrentIndex(qBound(0, amber::CurrentConfig.snap_outgoing_modifier, 2));
-    snap_outgoing_modifier_combo->setToolTip(tr("Hold this key while seeking to invert the snap-to-outgoing-clip behavior"));
+    snap_outgoing_modifier_combo->setToolTip(
+        tr("Hold this key while seeking to invert the snap-to-outgoing-clip behavior"));
     mod_layout->addWidget(snap_outgoing_modifier_combo);
     mod_layout->addStretch();
     behavior_tab_layout->Add(mod_row);
@@ -757,7 +676,8 @@ void PreferencesDialog::setup_ui() {
   kf_layout->setContentsMargins(0, 0, 0, 0);
 
   sticky_keyframe_type_check = new QCheckBox(tr("Use Last Keyframe Type as Default"), behavior_tab);
-  sticky_keyframe_type_check->setToolTip(tr("When enabled, changing a keyframe's type also updates the default type for new keyframes"));
+  sticky_keyframe_type_check->setToolTip(
+      tr("When enabled, changing a keyframe's type also updates the default type for new keyframes"));
   sticky_keyframe_type_check->setChecked(amber::CurrentConfig.sticky_keyframe_type);
   kf_layout->addWidget(sticky_keyframe_type_check);
 
@@ -771,9 +691,8 @@ void PreferencesDialog::setup_ui() {
   kf_layout->addWidget(default_keyframe_type_combo);
   kf_layout->addStretch();
 
-  connect(sticky_keyframe_type_check, &QCheckBox::toggled, this, [this](bool checked) {
-    default_keyframe_type_combo->setEnabled(!checked);
-  });
+  connect(sticky_keyframe_type_check, &QCheckBox::toggled, this,
+          [this](bool checked) { default_keyframe_type_combo->setEnabled(!checked); });
 
   behavior_tab_layout->Add(keyframe_defaults_row);
 
@@ -832,9 +751,11 @@ void PreferencesDialog::setup_ui() {
   row++;
 
   // Appearance -> Effect Panel Shrinkable
-  QCheckBox* effect_panel_shrinkable = new QCheckBox(tr("Allow Effect Properties panel to be smaller than its content"));
-  effect_panel_shrinkable->setToolTip(tr("When enabled, the Effect Properties panel can be resized narrower than its content. "
-                                         "A horizontal scrollbar will appear to access clipped content."));
+  QCheckBox* effect_panel_shrinkable =
+      new QCheckBox(tr("Allow Effect Properties panel to be smaller than its content"));
+  effect_panel_shrinkable->setToolTip(
+      tr("When enabled, the Effect Properties panel can be resized narrower than its content. "
+         "A horizontal scrollbar will appear to access clipped content."));
   AddBoolPair(effect_panel_shrinkable, &amber::CurrentConfig.effect_panel_shrinkable);
   appearance_layout->addWidget(effect_panel_shrinkable, row, 0, 1, 3);
 
@@ -887,11 +808,10 @@ void PreferencesDialog::setup_ui() {
   // list all available audio output devices
   QList<QAudioDevice> devs = QMediaDevices::audioOutputs();
   bool found_preferred_device = false;
-  for (const auto & dev : devs) {
+  for (const auto& dev : devs) {
     audio_output_devices->addItem(dev.description(), dev.description());
-    if (!found_preferred_device
-        && dev.description() == amber::CurrentConfig.preferred_audio_output) {
-      audio_output_devices->setCurrentIndex(audio_output_devices->count()-1);
+    if (!found_preferred_device && dev.description() == amber::CurrentConfig.preferred_audio_output) {
+      audio_output_devices->setCurrentIndex(audio_output_devices->count() - 1);
       found_preferred_device = true;
     }
   }
@@ -910,11 +830,10 @@ void PreferencesDialog::setup_ui() {
   // list all available audio input devices
   devs = QMediaDevices::audioInputs();
   found_preferred_device = false;
-  for (const auto & dev : devs) {
+  for (const auto& dev : devs) {
     audio_input_devices->addItem(dev.description(), dev.description());
-    if (!found_preferred_device
-        && dev.description() == amber::CurrentConfig.preferred_audio_input) {
-      audio_input_devices->setCurrentIndex(audio_input_devices->count()-1);
+    if (!found_preferred_device && dev.description() == amber::CurrentConfig.preferred_audio_input) {
+      audio_input_devices->setCurrentIndex(audio_input_devices->count() - 1);
       found_preferred_device = true;
     }
   }
@@ -929,7 +848,7 @@ void PreferencesDialog::setup_ui() {
 
   audio_sample_rate = new QComboBox();
   combobox_audio_sample_rates(audio_sample_rate);
-  for (int i=0;i<audio_sample_rate->count();i++) {
+  for (int i = 0; i < audio_sample_rate->count(); i++) {
     if (audio_sample_rate->itemData(i).toInt() == amber::CurrentConfig.audio_rate) {
       audio_sample_rate->setCurrentIndex(i);
       break;
@@ -967,7 +886,7 @@ void PreferencesDialog::setup_ui() {
 
   QLineEdit* key_search_line = new QLineEdit(shortcut_tab);
   key_search_line->setPlaceholderText(tr("Search for action or shortcut"));
-  connect(key_search_line, &QLineEdit::textChanged, this, [this](const QString& s){ refine_shortcut_list(s); });
+  connect(key_search_line, &QLineEdit::textChanged, this, [this](const QString& s) { refine_shortcut_list(s); });
 
   shortcut_layout->addWidget(key_search_line);
 
@@ -1005,7 +924,7 @@ void PreferencesDialog::setup_ui() {
 
   QDialogButtonBox* buttonBox = new QDialogButtonBox(this);
   buttonBox->setOrientation(Qt::Horizontal);
-  buttonBox->setStandardButtons(QDialogButtonBox::Cancel|QDialogButtonBox::Ok);
+  buttonBox->setStandardButtons(QDialogButtonBox::Cancel | QDialogButtonBox::Ok);
 
   verticalLayout->addWidget(buttonBox);
 

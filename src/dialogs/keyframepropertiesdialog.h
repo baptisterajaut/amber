@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QVector>
 
+class ComboAction;
 class EffectField;
 class LabelSlider;
 class QComboBox;
@@ -11,9 +12,7 @@ class QComboBox;
 class KeyframePropertiesDialog : public QDialog {
   Q_OBJECT
  public:
-  KeyframePropertiesDialog(QWidget* parent,
-                           const QVector<EffectField*>& fields,
-                           const QVector<int>& keyframe_indices,
+  KeyframePropertiesDialog(QWidget* parent, const QVector<EffectField*>& fields, const QVector<int>& keyframe_indices,
                            double frame_rate);
 
  protected:
@@ -48,6 +47,16 @@ class KeyframePropertiesDialog : public QDialog {
   QVector<OriginalValues> originals_;
 
   void UpdateBezierEnabled();
+
+  /**
+   * @brief Apply all pending keyframe changes for one field/keyframe pair.
+   *
+   * @param ca              ComboAction to append undo commands to
+   * @param i               Index into fields_/keyframe_indices_/originals_
+   * @param new_type_for_sticky  Out: set to the new keyframe type if type changed (first change wins)
+   * @return true if any change was applied
+   */
+  bool apply_keyframe_changes_for_one(ComboAction* ca, int i, int& new_type_for_sticky);
 };
 
 #endif  // KEYFRAMEPROPERTIESDIALOG_H
