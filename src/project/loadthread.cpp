@@ -51,20 +51,38 @@ LoadThread::LoadThread(const QString& filename, bool autorecovery)
   connect(this, &LoadThread::start_question, this, &LoadThread::question_func, Qt::QueuedConnection);
 }
 
-void LoadThread::load_effect(QXmlStreamReader& stream, Clip* c) {
-  if (!c) {
-    qWarning() << "load_effect: c is null";
-    return;
+// Parse the "shared" attribute on a transition element.
+// Returns true if the shared attribute was handled (caller should return immediately).
+static bool load_effect_handle_shared(const QXmlStreamAttribute& attr, const QString& tag, Clip* c) {
+  if (attr.name() != QLatin1String("shared")) return false;
+
+  Clip* sharing_clip = nullptr;
+  int clip_id = attr.value().toInt();
+  for (const auto& clip : c->sequence->clips) {
+    Clip* test_clip = clip.get();
+    if (test_clip->load_id == clip_id) {
+      sharing_clip = test_clip;
+      break;
+    }
   }
-  QString tag = stream.name().toString();
 
-  // variables to store effect metadata in
-  int effect_id = -1;
-  QString effect_name;
-  bool effect_enabled = true;
-  long effect_length = -1;
+  if (sharing_clip == nullptr) {
+    qWarning() << "Failed to link shared transition. Project may be corrupt.";
+  } else if (tag == "opening") {
+    c->opening_transition = sharing_clip->closing_transition;
+    c->opening_transition->secondary_clip = c->opening_transition->parent_clip;
+    c->opening_transition->parent_clip = c;
+    c->opening_transition->refresh();
+  } else if (tag == "closing") {
+    c->closing_transition = sharing_clip->opening_transition;
+    c->closing_transition->secondary_clip = c;
+  }
+  return true;
+}
 
-  // loop through attributes for effect metadata
+// Parse effect metadata attributes (id, enabled, name, length).
+static void load_effect_parse_attrs(QXmlStreamReader& stream, int& effect_id, QString& effect_name,
+                                    bool& effect_enabled, long& effect_length) {
   for (int j = 0; j < stream.attributes().size(); j++) {
     const QXmlStreamAttribute& attr = stream.attributes().at(j);
     if (attr.name() == QLatin1String("id")) {
@@ -75,97 +93,65 @@ void LoadThread::load_effect(QXmlStreamReader& stream, Clip* c) {
       effect_name = attr.value().toString();
     } else if (attr.name() == QLatin1String("length")) {
       effect_length = attr.value().toLong();
-    } else if (attr.name() == QLatin1String("shared")) {
-      // if a transition has this tag, it's sharing a transition with another clip so we don't have to do any processing
-
-      Clip* sharing_clip = nullptr;
-
-      // Find the clip with the ID referenced in the transition
-      int clip_id = attr.value().toInt();
-      for (const auto& clip : c->sequence->clips) {
-        Clip* test_clip = clip.get();
-        if (test_clip->load_id == clip_id) {
-          sharing_clip = test_clip;
-          break;
-        }
-      }
-
-      if (sharing_clip == nullptr) {
-        qWarning() << "Failed to link shared transition. Project may be corrupt.";
-      } else if (tag == "opening") {
-        c->opening_transition = (sharing_clip->closing_transition);
-
-        // since this is the opened clip, switch secondaries and primaries
-        c->opening_transition->secondary_clip = c->opening_transition->parent_clip;
-        c->opening_transition->parent_clip = c;
-        c->opening_transition->refresh();
-      } else if (tag == "closing") {
-        c->closing_transition = (sharing_clip->opening_transition);
-
-        // since this is the closed clip, make this clip the secondary
-        c->closing_transition->secondary_clip = c;
-      }
-      return;
     }
   }
+}
 
-  // Effect loading occurs in another thread, and while it's usually very quick, just for safety we wait here
-  // for all the effects to finish loading
-  effects_loaded_mutex.lock();
-
-  const EffectMeta* meta = nullptr;
-
-  // find effect with this name
-  if (!effect_name.isEmpty()) {
-    meta = get_meta_from_name(effect_name);
-  }
-
-  effects_loaded_mutex.unlock();
-
-  int type;
-  if (tag == "opening") {
-    type = kTransitionOpening;
-  } else if (tag == "closing") {
-    type = kTransitionClosing;
-  } else {
-    type = kTransitionNone;
-  }
-
-  // effect construction
-  if (cancelled_) return;
+// Construct and attach the effect/transition to clip c.
+static void load_effect_create(QXmlStreamReader& stream, Clip* c, const EffectMeta* meta, const QString& effect_name,
+                               bool effect_enabled, long effect_length, int type) {
   if (type == kTransitionNone) {
-    if (meta == nullptr) {
-      // create void effect
-      EffectPtr ve(new VoidEffect(c, effect_name));
-      ve->SetEnabled(effect_enabled);
-      ve->load(stream);
-
-      ve->moveToThread(QApplication::instance()->thread());
-
-      c->effects.append(ve);
-    } else {
-      EffectPtr e(Effect::Create(c, meta));
-      e->SetEnabled(effect_enabled);
-      e->load(stream);
-
-      e->moveToThread(QApplication::instance()->thread());
-
-      c->effects.append(e);
-    }
+    EffectPtr e = meta ? EffectPtr(Effect::Create(c, meta)) : EffectPtr(new VoidEffect(c, effect_name));
+    e->SetEnabled(effect_enabled);
+    e->load(stream);
+    e->moveToThread(QApplication::instance()->thread());
+    c->effects.append(e);
   } else {
     TransitionPtr t = Transition::Create(c, nullptr, meta);
     if (effect_length > -1) t->set_length(effect_length);
     t->SetEnabled(effect_enabled);
     t->load(stream);
-
     t->moveToThread(QApplication::instance()->thread());
-
     if (type == kTransitionOpening) {
       c->opening_transition = t;
     } else {
       c->closing_transition = t;
     }
   }
+}
+
+void LoadThread::load_effect(QXmlStreamReader& stream, Clip* c) {
+  if (!c) {
+    qWarning() << "load_effect: c is null";
+    return;
+  }
+  QString tag = stream.name().toString();
+
+  // Check for "shared" attribute first — requires early return if found
+  for (int j = 0; j < stream.attributes().size(); j++) {
+    if (load_effect_handle_shared(stream.attributes().at(j), tag, c)) return;
+  }
+
+  int effect_id = -1;
+  QString effect_name;
+  bool effect_enabled = true;
+  long effect_length = -1;
+  load_effect_parse_attrs(stream, effect_id, effect_name, effect_enabled, effect_length);
+
+  // Effect loading occurs in another thread, and while it's usually very quick, just for safety we wait here
+  // for all the effects to finish loading
+  effects_loaded_mutex.lock();
+  const EffectMeta* meta = effect_name.isEmpty() ? nullptr : get_meta_from_name(effect_name);
+  effects_loaded_mutex.unlock();
+
+  int type = kTransitionNone;
+  if (tag == "opening")
+    type = kTransitionOpening;
+  else if (tag == "closing")
+    type = kTransitionClosing;
+
+  if (cancelled_) return;
+  load_effect_create(stream, c, meta, effect_name, effect_enabled, effect_length, type);
 }
 
 void LoadThread::read_next(QXmlStreamReader& stream) {
@@ -305,43 +291,50 @@ void LoadThread::parse_folder(QXmlStreamReader& stream) {
   loaded_folders.append(folder);
 }
 
+// Parse a single footage attribute into f/folder.
+static void parse_footage_attr(const QXmlStreamAttribute& attr, Footage* f, int& folder,
+                               const std::function<QString(const QString&)>& resolve_url) {
+  const auto name = attr.name();
+  const auto value = attr.value();
+  if (name == QLatin1String("id")) {
+    f->save_id = value.toInt();
+  } else if (name == QLatin1String("folder")) {
+    folder = value.toInt();
+  } else if (name == QLatin1String("name")) {
+    f->name = value.toString();
+  } else if (name == QLatin1String("url")) {
+    f->url = resolve_url(value.toString());
+  } else if (name == QLatin1String("duration")) {
+    f->length = value.toLongLong();
+  } else if (name == QLatin1String("using_inout")) {
+    f->using_inout = (value == QLatin1String("1"));
+  } else if (name == QLatin1String("in")) {
+    f->in = value.toLong();
+  } else if (name == QLatin1String("out")) {
+    f->out = value.toLong();
+  } else if (name == QLatin1String("speed")) {
+    f->speed = value.toDouble();
+  } else if (name == QLatin1String("alphapremul")) {
+    f->alpha_is_premultiplied = (value == QLatin1String("1"));
+  } else if (name == QLatin1String("proxy")) {
+    f->proxy = (value == QLatin1String("1"));
+  } else if (name == QLatin1String("proxypath")) {
+    f->proxy_path = value.toString();
+  } else if (name == QLatin1String("startnumber")) {
+    f->start_number = value.toInt();
+  }
+}
+
 void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& child_search) {
   int folder = 0;
 
   MediaPtr item = std::make_shared<Media>();
   FootagePtr f = std::make_shared<Footage>();
-
   f->using_inout = false;
 
   for (int j = 0; j < stream.attributes().size(); j++) {
-    const QXmlStreamAttribute& attr = stream.attributes().at(j);
-    if (attr.name() == QLatin1String("id")) {
-      f->save_id = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("folder")) {
-      folder = attr.value().toInt();
-    } else if (attr.name() == QLatin1String("name")) {
-      f->name = attr.value().toString();
-    } else if (attr.name() == QLatin1String("url")) {
-      f->url = resolve_footage_url(attr.value().toString());
-    } else if (attr.name() == QLatin1String("duration")) {
-      f->length = attr.value().toLongLong();
-    } else if (attr.name() == QLatin1String("using_inout")) {
-      f->using_inout = (attr.value() == QLatin1String("1"));
-    } else if (attr.name() == QLatin1String("in")) {
-      f->in = attr.value().toLong();
-    } else if (attr.name() == QLatin1String("out")) {
-      f->out = attr.value().toLong();
-    } else if (attr.name() == QLatin1String("speed")) {
-      f->speed = attr.value().toDouble();
-    } else if (attr.name() == QLatin1String("alphapremul")) {
-      f->alpha_is_premultiplied = (attr.value() == QLatin1String("1"));
-    } else if (attr.name() == QLatin1String("proxy")) {
-      f->proxy = (attr.value() == QLatin1String("1"));
-    } else if (attr.name() == QLatin1String("proxypath")) {
-      f->proxy_path = attr.value().toString();
-    } else if (attr.name() == QLatin1String("startnumber")) {
-      f->start_number = attr.value().toInt();
-    }
+    parse_footage_attr(stream.attributes().at(j), f.get(), folder,
+                       [this](const QString& url) { return resolve_footage_url(url); });
   }
 
   while (!cancelled_ && !(stream.name() == child_search && stream.isEndElement()) && !stream.atEnd()) {
@@ -352,19 +345,13 @@ void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& chil
   }
 
   item->set_footage(f);
-
   amber::project_model.appendChild(find_loaded_folder_by_id(folder), item);
-
-  // analyze media to see if it's the same
   loaded_media_items.append(item.get());
 }
 
-// Apply a single clip attribute to the clip, color, speed, and media fields.
-static void apply_clip_attr(const QXmlStreamAttribute& attr, Clip* c, QColor& clip_color, ClipSpeed& speed_info,
-                            int& media_type, int& media_id, int& stream_id, QVector<ClipPtr>& loaded_clips,
-                            ClipPtr c_ptr) {
-  const auto name = attr.name();
-  const auto value = attr.value();
+// Apply basic clip identity/timing attributes (name, enabled, id, in/out/track, color, autoscale).
+// Returns true if the attribute was handled.
+static bool apply_clip_attr_basic(const QStringView& name, const QStringView& value, Clip* c, QColor& clip_color) {
   if (name == QLatin1String("name")) {
     c->set_name(value.toString());
   } else if (name == QLatin1String("enabled")) {
@@ -387,7 +374,17 @@ static void apply_clip_attr(const QXmlStreamAttribute& attr, Clip* c, QColor& cl
     clip_color.setBlue(value.toInt());
   } else if (name == QLatin1String("autoscale")) {
     c->set_autoscaled(value == QLatin1String("1"));
-  } else if (name == QLatin1String("media")) {
+  } else {
+    return false;
+  }
+  return true;
+}
+
+// Apply clip speed/media/playback attributes.
+static void apply_clip_attr_media(const QStringView& name, const QStringView& value, Clip* c, ClipSpeed& speed_info,
+                                  int& media_type, int& media_id, int& stream_id, QVector<ClipPtr>& loaded_clips,
+                                  ClipPtr c_ptr) {
+  if (name == QLatin1String("media")) {
     media_type = MEDIA_TYPE_FOOTAGE;
     media_id = value.toInt();
   } else if (name == QLatin1String("stream")) {
@@ -409,6 +406,17 @@ static void apply_clip_attr(const QXmlStreamAttribute& attr, Clip* c, QColor& cl
   }
 }
 
+// Apply a single clip attribute to the clip, color, speed, and media fields.
+static void apply_clip_attr(const QXmlStreamAttribute& attr, Clip* c, QColor& clip_color, ClipSpeed& speed_info,
+                            int& media_type, int& media_id, int& stream_id, QVector<ClipPtr>& loaded_clips,
+                            ClipPtr c_ptr) {
+  const auto name = attr.name();
+  const auto value = attr.value();
+  if (!apply_clip_attr_basic(name, value, c, clip_color)) {
+    apply_clip_attr_media(name, value, c, speed_info, media_type, media_id, stream_id, loaded_clips, c_ptr);
+  }
+}
+
 void LoadThread::parse_clip_attributes(QXmlStreamReader& stream, ClipPtr c, int& media_type, int& media_id,
                                        int& stream_id) {
   if (!c) {
@@ -427,45 +435,47 @@ void LoadThread::parse_clip_attributes(QXmlStreamReader& stream, ClipPtr c, int&
   c->set_speed(speed_info);
 }
 
+// Handle one start element inside a <clip> body. Returns false if loading should abort.
+bool LoadThread::parse_clip_child_element(QXmlStreamReader& stream, ClipPtr c) {
+  if (!stream.isStartElement()) return true;
+  if (stream.name() == QLatin1String("linked")) {
+    parse_clip_links(stream, c.get());
+    return !cancelled_;
+  }
+  if (stream.name() == QLatin1String("effect") || stream.name() == QLatin1String("opening") ||
+      stream.name() == QLatin1String("closing")) {
+    load_effect(stream, c.get());
+    return true;
+  }
+  if (stream.name() == QLatin1String("marker")) {
+    c->get_markers().append(parse_marker(stream));
+  }
+  return true;
+}
+
 bool LoadThread::parse_clip(QXmlStreamReader& stream, SequencePtr s) {
   int media_type = -1;
   int media_id = -1;
   int stream_id = -1;
 
   ClipPtr c = std::make_shared<Clip>(s.get());
-
   parse_clip_attributes(stream, c, media_type, media_id, stream_id);
 
   // set media and media stream
-  switch (media_type) {
-    case MEDIA_TYPE_FOOTAGE:
-      if (media_id >= 0 && stream_id >= 0) {
-        for (auto loaded_media_item : loaded_media_items) {
-          Footage* m = loaded_media_item->to_footage();
-          if (m->save_id == media_id) {
-            c->set_media(loaded_media_item, stream_id);
-            break;
-          }
-        }
+  if (media_type == MEDIA_TYPE_FOOTAGE && media_id >= 0 && stream_id >= 0) {
+    for (auto loaded_media_item : loaded_media_items) {
+      Footage* m = loaded_media_item->to_footage();
+      if (m->save_id == media_id) {
+        c->set_media(loaded_media_item, stream_id);
+        break;
       }
-      break;
+    }
   }
 
   // load links and effects
   while (!cancelled_ && !(stream.name() == QLatin1String("clip") && stream.isEndElement()) && !stream.atEnd()) {
     read_next(stream);
-    if (stream.isStartElement()) {
-      if (stream.name() == QLatin1String("linked")) {
-        parse_clip_links(stream, c.get());
-        if (cancelled_) return false;
-      } else if (stream.isStartElement() &&
-                 (stream.name() == QLatin1String("effect") || stream.name() == QLatin1String("opening") ||
-                  stream.name() == QLatin1String("closing"))) {
-        load_effect(stream, c.get());
-      } else if (stream.name() == QLatin1String("marker") && stream.isStartElement()) {
-        c->get_markers().append(parse_marker(stream));
-      }
-    }
+    if (!parse_clip_child_element(stream, c)) return false;
   }
   if (cancelled_) return false;
 
@@ -473,37 +483,41 @@ bool LoadThread::parse_clip(QXmlStreamReader& stream, SequencePtr s) {
   return true;
 }
 
+// Apply a single sequence attribute.
+void LoadThread::apply_sequence_attr(const QXmlStreamAttribute& attr, SequencePtr s, Media*& parent) {
+  const auto name = attr.name();
+  const auto value = attr.value();
+  if (name == QLatin1String("name")) {
+    s->name = value.toString();
+  } else if (name == QLatin1String("folder")) {
+    int folder = value.toInt();
+    if (folder > 0) parent = find_loaded_folder_by_id(folder);
+  } else if (name == QLatin1String("id")) {
+    s->save_id = value.toInt();
+  } else if (name == QLatin1String("width")) {
+    s->width = value.toInt();
+  } else if (name == QLatin1String("height")) {
+    s->height = value.toInt();
+  } else if (name == QLatin1String("framerate")) {
+    s->frame_rate = value.toDouble();
+  } else if (name == QLatin1String("afreq")) {
+    s->audio_frequency = value.toInt();
+  } else if (name == QLatin1String("alayout")) {
+    s->audio_layout = value.toInt();
+  } else if (name == QLatin1String("open")) {
+    open_seq = s;
+  } else if (name == QLatin1String("workarea")) {
+    s->using_workarea = (value == QLatin1String("1"));
+  } else if (name == QLatin1String("workareaIn")) {
+    s->workarea_in = value.toLong();
+  } else if (name == QLatin1String("workareaOut")) {
+    s->workarea_out = value.toLong();
+  }
+}
+
 void LoadThread::parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent) {
   for (int j = 0; j < stream.attributes().size(); j++) {
-    const QXmlStreamAttribute& attr = stream.attributes().at(j);
-    const auto name = attr.name();
-    const auto value = attr.value();
-    if (name == QLatin1String("name")) {
-      s->name = value.toString();
-    } else if (name == QLatin1String("folder")) {
-      int folder = value.toInt();
-      if (folder > 0) parent = find_loaded_folder_by_id(folder);
-    } else if (name == QLatin1String("id")) {
-      s->save_id = value.toInt();
-    } else if (name == QLatin1String("width")) {
-      s->width = value.toInt();
-    } else if (name == QLatin1String("height")) {
-      s->height = value.toInt();
-    } else if (name == QLatin1String("framerate")) {
-      s->frame_rate = value.toDouble();
-    } else if (name == QLatin1String("afreq")) {
-      s->audio_frequency = value.toInt();
-    } else if (name == QLatin1String("alayout")) {
-      s->audio_layout = value.toInt();
-    } else if (name == QLatin1String("open")) {
-      open_seq = s;
-    } else if (name == QLatin1String("workarea")) {
-      s->using_workarea = (value == QLatin1String("1"));
-    } else if (name == QLatin1String("workareaIn")) {
-      s->workarea_in = value.toLong();
-    } else if (name == QLatin1String("workareaOut")) {
-      s->workarea_out = value.toLong();
-    }
+    apply_sequence_attr(stream.attributes().at(j), s, parent);
   }
 
   // Validate sequence dimensions — prevent division-by-zero cascades
@@ -618,13 +632,8 @@ bool LoadThread::parse_collection_child(QXmlStreamReader& stream, int type, cons
   return true;
 }
 
-bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
-  f.seek(0);
-  stream.setDevice(stream.device());
-
-  QString root_search;
-  QString child_search;
-
+// Resolve the XML root/child element names for a given load type.
+static void load_worker_resolve_search(int type, QString& root_search, QString& child_search) {
   switch (type) {
     case LOAD_TYPE_VERSION:
       root_search = "version";
@@ -648,24 +657,40 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
       child_search = "sequence";
       break;
   }
+}
+
+// Traverse the collection root element, calling parse_collection_child for each child.
+bool LoadThread::load_worker_traverse_collection(QXmlStreamReader& stream, int type, const QString& root_search,
+                                                 const QString& child_search) {
+  while (!cancelled_ && !stream.atEnd() && !(stream.name() == root_search && stream.isEndElement())) {
+    read_next(stream);
+    if (stream.name() == child_search && stream.isStartElement()) {
+      if (!parse_collection_child(stream, type, child_search)) return false;
+    }
+  }
+  return !cancelled_;
+}
+
+bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
+  f.seek(0);
+  stream.setDevice(stream.device());
+
+  QString root_search;
+  QString child_search;
+  load_worker_resolve_search(type, root_search, child_search);
 
   show_err = true;
+
+  bool is_collection = (type == MEDIA_TYPE_FOLDER || type == MEDIA_TYPE_FOOTAGE || type == MEDIA_TYPE_SEQUENCE);
 
   while (!stream.atEnd() && !cancelled_) {
     read_next_start_element(stream);
     if (stream.name() != root_search) continue;
 
-    bool is_collection = (type == MEDIA_TYPE_FOLDER || type == MEDIA_TYPE_FOOTAGE || type == MEDIA_TYPE_SEQUENCE);
     if (!is_collection) {
       if (!handle_scalar_load_type(stream, type)) return false;
     } else {
-      while (!cancelled_ && !stream.atEnd() && !(stream.name() == root_search && stream.isEndElement())) {
-        read_next(stream);
-        if (stream.name() == child_search && stream.isStartElement()) {
-          if (!parse_collection_child(stream, type, child_search)) return false;
-        }
-      }
-      if (cancelled_) return false;
+      if (!load_worker_traverse_collection(stream, type, root_search, child_search)) return false;
     }
     break;
   }
@@ -729,103 +754,80 @@ void LoadThread::finalize_loaded_media() {
   }
 }
 
+// Count total elements for progress reporting.
+int LoadThread::count_elements(QXmlStreamReader& stream) {
+  int count = 0;
+  while (!cancelled_ && !stream.atEnd()) {
+    stream.readNextStartElement();
+    if (is_element(stream)) count++;
+  }
+  return count;
+}
+
+// Load all project data phases (version, url, folders, media, sequences). Returns true on success.
+bool LoadThread::load_all_phases(QFile& file, QXmlStreamReader& stream) {
+  if (!load_worker(file, stream, LOAD_TYPE_VERSION)) return false;
+  if (!load_worker(file, stream, LOAD_TYPE_URL)) return false;
+  load_worker(file, stream, LOAD_TYPE_PREVIEW_RES);  // optional
+  if (!load_worker(file, stream, MEDIA_TYPE_FOLDER)) return false;
+  OrganizeFolders();
+  if (!load_worker(file, stream, MEDIA_TYPE_FOOTAGE)) return false;
+  return load_worker(file, stream, MEDIA_TYPE_SEQUENCE);
+}
+
+// Handle post-load success/error state. Returns true if loading succeeded.
+bool LoadThread::handle_load_result(QXmlStreamReader& stream, bool cont) {
+  if (cancelled_) return false;
+  if (!cont) {
+    xml_error = false;
+    if (show_err) emit error();
+    return false;
+  }
+  if (stream.hasError()) {
+    error_str =
+        tr("%1 - Line: %2 Col: %3")
+            .arg(stream.errorString(), QString::number(stream.lineNumber()), QString::number(stream.columnNumber()));
+    xml_error = true;
+    emit error();
+    return false;
+  }
+  link_nested_sequence_clips();
+  return true;
+}
+
 void LoadThread::run() {
   mutex.lock();
 
   QFile file(filename_);
   if (!file.open(QIODevice::ReadOnly)) {
     qCritical() << "Could not open file";
+    mutex.unlock();
     return;
   }
 
-  /* set up directories to search for media
-   * most of the time, these will be the same but in
-   * case the project file has moved without the footage,
-   * we check both
-   */
   proj_dir = QFileInfo(filename_).absoluteDir();
   internal_proj_dir = QFileInfo(filename_).absoluteDir();
   internal_proj_url = filename_;
 
   QXmlStreamReader stream(&file);
-
-  bool cont = false;
   error_str.clear();
   show_err = true;
-
   open_seq = nullptr;
 
-  // get "element" count
+  // get "element" count for progress reporting
   current_element_count = 0;
-  total_element_count = 0;
-  while (!cancelled_ && !stream.atEnd()) {
-    stream.readNextStartElement();
-    if (is_element(stream)) {
-      total_element_count++;
-    }
-  }
-  cont = !cancelled_;
+  total_element_count = count_elements(stream);
 
-  // find project file version
-  if (cont) {
-    cont = load_worker(file, stream, LOAD_TYPE_VERSION);
-  }
+  bool cont = !cancelled_ && load_all_phases(file, stream);
 
-  // find project's internal URL
-  if (cont) {
-    cont = load_worker(file, stream, LOAD_TYPE_URL);
-  }
-
-  // restore preview resolution (optional — missing element is fine for older projects)
-  if (cont) {
-    load_worker(file, stream, LOAD_TYPE_PREVIEW_RES);
-  }
-
-  // load folders first
-  if (cont) {
-    cont = load_worker(file, stream, MEDIA_TYPE_FOLDER);
-  }
-
-  if (cont) {
-    // since folders loaded correctly, organize them appropriately
-    OrganizeFolders();
-
-    // load media
-    cont = load_worker(file, stream, MEDIA_TYPE_FOOTAGE);
-  }
-
-  // load sequences
-  if (cont) {
-    cont = load_worker(file, stream, MEDIA_TYPE_SEQUENCE);
-  }
-
-  if (!cancelled_) {
-    if (!cont) {
-      xml_error = false;
-      if (show_err) emit error();
-    } else if (stream.hasError()) {
-      error_str =
-          tr("%1 - Line: %2 Col: %3")
-              .arg(stream.errorString(), QString::number(stream.lineNumber()), QString::number(stream.columnNumber()));
-      xml_error = true;
-      emit error();
-      cont = false;
-    } else {
-      link_nested_sequence_clips();
-    }
-  }
-
-  if (cont) {
+  if (handle_load_result(stream, cont)) {
     finalize_loaded_media();
-  } else {
-    if (error_str.isEmpty()) {
-      error_str = tr("User aborted loading");
-    }
+  } else if (!cancelled_) {
+    if (error_str.isEmpty()) error_str = tr("User aborted loading");
     emit error();
   }
 
   file.close();
-
   mutex.unlock();
 }
 

@@ -23,9 +23,11 @@
 
 #include <QElapsedTimer>
 #include <QFontMetrics>
+#include <QPainter>
 #include <QWidget>
 class Viewer;
 class QScrollBar;
+class Menu;
 
 bool center_scroll_to_playhead(QScrollBar* bar, double zoom, long playhead);
 
@@ -62,6 +64,12 @@ class TimelineHeader : public QWidget {
 
  private:
   void update_parents();
+  void move_drag_workarea(int mouse_x);
+  void move_drag_markers(int mouse_x);
+  void hover_check_workarea(int mouse_x);
+  void paint_ticks(QPainter& p, int w, int h, int yoff);
+  void paint_markers(QPainter& p, int yoff, int h);
+  void add_marker_color_menu(Menu& menu);
 
   bool dragging{false};
 

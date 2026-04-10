@@ -1,73 +1,48 @@
 #include "effectui.h"
 
+#include <QCoreApplication>
 #include <QPoint>
 #include <QtMath>
 
 #include "effects/ui/effectfieldwidget.h"
 
 #include "engine/clip.h"
-#include "ui/menuhelper.h"
-#include "ui/keyframenavigator.h"
-#include "ui/clickablelabel.h"
-#include "ui/icons.h"
-#include "ui/menu.h"
-#include "panels/panels.h"
 #include "engine/undo/undo_effect.h"
 #include "global/global.h"
+#include "panels/panels.h"
+#include "ui/clickablelabel.h"
+#include "ui/icons.h"
+#include "ui/keyframenavigator.h"
+#include "ui/menu.h"
+#include "ui/menuhelper.h"
 
-EffectUI::EffectUI(Effect* e) :
-  effect_(e),
-  effect_reset_button_(nullptr)
-{
+static QString transition_display_name(Transition* t) {
+  bool both_selected = false;
+  Clip* selected_clip = t->parent_clip;
+
+  if (t->secondary_clip != nullptr) {
+    if (t->secondary_clip->IsSelected()) {
+      selected_clip = t->secondary_clip;
+      if (t->parent_clip->IsSelected()) both_selected = true;
+    } else if (!t->parent_clip->IsSelected()) {
+      both_selected = true;
+    }
+  }
+
+  if (both_selected) return t->name;
+  if (selected_clip->opening_transition.get() == t)
+    return QCoreApplication::translate("EffectUI", "%1 (Opening)").arg(t->name);
+  return QCoreApplication::translate("EffectUI", "%1 (Closing)").arg(t->name);
+}
+
+EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr) {
   Q_ASSERT(e != nullptr);
 
   QString effect_name;
-
-  // If this effect is actually a transition
   if (e->meta->type == EFFECT_TYPE_TRANSITION) {
-
-    Transition* t = static_cast<Transition*>(e);
-
-    // Since effects can have two clip attachments, find out which one is selected
-    Clip* selected_clip = t->parent_clip;
-    bool both_selected = false;
-
-    // Check if this is a shared transition
-    if (t->secondary_clip != nullptr) {
-
-      // Check which clips are selected
-      if (t->secondary_clip->IsSelected()) {
-
-        selected_clip = t->secondary_clip;
-
-        if (t->parent_clip->IsSelected()) {
-          // Both clips are selected
-          both_selected = true;
-        }
-
-      } else if (!t->parent_clip->IsSelected()) {
-
-        // Neither are selected, but the naming scheme (no "opening" or "closing" modifier) will be the same
-        both_selected = true;
-
-      }
-
-    }
-
-    // See if the transition is the clip's opening or closing transition and label it accordingly
-    if (both_selected) {
-      effect_name = t->name;
-    } else if (selected_clip->opening_transition.get() == t) {
-      effect_name = tr("%1 (Opening)").arg(t->name);
-    } else {
-      effect_name = tr("%1 (Closing)").arg(t->name);
-    }
-
+    effect_name = transition_display_name(static_cast<Transition*>(e));
   } else {
-
-    // Otherwise just set the title normally
     effect_name = e->name;
-
   }
 
   SetTitle(effect_name);
@@ -82,10 +57,7 @@ EffectUI::EffectUI(Effect* e) :
   layout_ = new QGridLayout(ui);
   layout_->setSpacing(4);
 
-  connect(title_bar,
-          &QWidget::customContextMenuRequested,
-          this,
-          &EffectUI::show_context_menu);
+  connect(title_bar, &QWidget::customContextMenuRequested, this, &EffectUI::show_context_menu);
 
   // Effect-level reset button in the title bar
   if (e->meta->type == EFFECT_TYPE_EFFECT) {
@@ -107,7 +79,7 @@ EffectUI::EffectUI(Effect* e) :
   widgets_.resize(e->row_count());
   field_widgets_.resize(e->row_count());
 
-  for (int i=0;i<e->row_count();i++) {
+  for (int i = 0; i < e->row_count(); i++) {
     EffectRow* row = e->row(i);
 
     ClickableLabel* row_label = new ClickableLabel(row->name());
@@ -121,7 +93,7 @@ EffectUI::EffectUI(Effect* e) :
     field_widgets_[i].resize(row->FieldCount());
 
     int column = 1;
-    for (int j=0;j<row->FieldCount();j++) {
+    for (int j = 0; j < row->FieldCount(); j++) {
       EffectField* field = row->Field(j);
 
       EffectFieldWidget* fw = EffectFieldWidget::Create(field, this);
@@ -145,12 +117,12 @@ EffectUI::EffectUI(Effect* e) :
 
   row_reset_buttons_.resize(e->row_count());
 
-  for (int i=0;i<e->row_count();i++) {
+  for (int i = 0; i < e->row_count(); i++) {
     EffectRow* row = e->row(i);
 
     // Only create reset button for rows that have fields with defaults
     bool has_defaults = false;
-    for (int j=0;j<row->FieldCount();j++) {
+    for (int j = 0; j < row->FieldCount(); j++) {
       if (row->Field(j)->HasDefault()) {
         has_defaults = true;
         break;
@@ -181,13 +153,12 @@ EffectUI::EffectUI(Effect* e) :
 
   keyframe_navigators_.resize(e->row_count());
 
-  for (int i=0;i<e->row_count();i++) {
+  for (int i = 0; i < e->row_count(); i++) {
     EffectRow* row = e->row(i);
 
     KeyframeNavigator* nav;
 
     if (row->IsKeyframable()) {
-
       nav = new KeyframeNavigator();
 
       nav->enable_keyframes(row->IsKeyframing());
@@ -197,13 +168,10 @@ EffectUI::EffectUI(Effect* e) :
       layout_->addWidget(nav, i, maximum_column);
 
     } else {
-
       nav = nullptr;
-
     }
 
     keyframe_navigators_[i] = nav;
-
   }
 
   enabled_check->setChecked(e->IsEnabled());
@@ -223,8 +191,7 @@ EffectUI::EffectUI(Effect* e) :
   });
 }
 
-void EffectUI::AddAdditionalEffect(Effect *e)
-{
+void EffectUI::AddAdditionalEffect(Effect* e) {
   // Ensure this is the same kind of effect and will be fully compatible
   Q_ASSERT(e->meta == effect_->meta);
 
@@ -239,43 +206,34 @@ void EffectUI::AddAdditionalEffect(Effect *e)
   additional_effects_.append(e);
 
   // Attach this UI's widgets to the additional effect
-  for (int i=0;i<effect_->row_count();i++) {
-
+  for (int i = 0; i < effect_->row_count(); i++) {
     EffectRow* row = effect_->row(i);
 
     // Attach existing keyframe navigator to this effect's row
     AttachKeyframeNavigationToRow(e->row(i), keyframe_navigators_.at(i));
 
-    for (int j=0;j<row->FieldCount();j++) {
-
+    for (int j = 0; j < row->FieldCount(); j++) {
       // Attach existing field widget to this effect's field
       QWidget* existing_widget = Widget(i, j);
       if (i < field_widgets_.size() && j < field_widgets_[i].size() && field_widgets_[i][j]) {
         field_widgets_[i][j]->CreateWidget(existing_widget);
       }
-
     }
-
   }
 }
 
-Effect *EffectUI::GetEffect()
-{
-  return effect_;
-}
+Effect* EffectUI::GetEffect() { return effect_; }
 
 int EffectUI::GetRowY(int row, QWidget* mapToWidget) {
-
   // Currently to get a Y value in the context of `mapToWidget`, we use `panel_effect_controls` as the base. Mapping
   // to global doesn't work for some reason, so this is the best reference point we have.
 
   QLabel* row_label = labels_.at(row);
 
   // Get center point of label (label->rect()->center()->y() - instead of y()+height/2 - produces an inaccurate result)
-  return row_label->y()
-      + row_label->height() / 2
-      + mapToWidget->mapFrom(panel_effect_controls, contents->mapTo(panel_effect_controls, contents->pos())).y()
-      - title_bar->height();
+  return row_label->y() + row_label->height() / 2 +
+         mapToWidget->mapFrom(panel_effect_controls, contents->mapTo(panel_effect_controls, contents->pos())).y() -
+         title_bar->height();
 }
 
 bool EffectUI::IsFieldAtDefault(EffectField* field) {
@@ -290,77 +248,58 @@ bool EffectUI::IsFieldAtDefault(EffectField* field) {
   return current == def;
 }
 
-void EffectUI::UpdateFromEffect()
-{
-  Effect* effect = GetEffect();
+void EffectUI::update_field_widget(int row, int col, EffectField* field) {
+  QWidget* w = Widget(row, col);
+  if (row >= field_widgets_.size() || col >= field_widgets_[row].size() || !field_widgets_[row][col]) return;
 
+  if (additional_effects_.isEmpty()) {
+    field_widgets_[row][col]->UpdateWidgetValue(w, field->Now());
+    return;
+  }
+
+  for (int i = 0; i < additional_effects_.size(); i++) {
+    EffectField* prev = i > 0 ? additional_effects_.at(i - 1)->row(row)->Field(col) : field;
+    EffectField* cur = additional_effects_.at(i)->row(row)->Field(col);
+    if (cur->GetValueAt(cur->Now()) != prev->GetValueAt(prev->Now())) {
+      field_widgets_[row][col]->UpdateWidgetValue(w, qSNaN());
+      return;
+    }
+  }
+  field_widgets_[row][col]->UpdateWidgetValue(w, field->Now());
+}
+
+bool EffectUI::is_row_at_default(EffectRow* row) {
+  for (int k = 0; k < row->FieldCount(); k++) {
+    if (!IsFieldAtDefault(row->Field(k))) return false;
+  }
+  return true;
+}
+
+void EffectUI::UpdateFromEffect() {
+  Effect* effect = GetEffect();
   bool any_row_not_default = false;
 
-  for (int j=0;j<effect->row_count();j++) {
-
+  for (int j = 0; j < effect->row_count(); j++) {
     EffectRow* row = effect->row(j);
-    bool row_at_default = true;
 
-    for (int k=0;k<row->FieldCount();k++) {
-      EffectField* field = row->Field(k);
-
-      // Check if this UI object is attached to one effect or many
-      auto update_widget = [&](double timecode) {
-        QWidget* w = Widget(j, k);
-        if (j < field_widgets_.size() && k < field_widgets_[j].size() && field_widgets_[j][k]) {
-          field_widgets_[j][k]->UpdateWidgetValue(w, timecode);
-        }
-      };
-
-      if (additional_effects_.isEmpty()) {
-
-        update_widget(field->Now());
-
-      } else {
-
-        bool same_value = true;
-
-        for (int i=0;i<additional_effects_.size();i++) {
-          EffectField* previous_field = i > 0 ? additional_effects_.at(i-1)->row(j)->Field(k) : field;
-          EffectField* additional_field = additional_effects_.at(i)->row(j)->Field(k);
-
-          if (additional_field->GetValueAt(additional_field->Now()) != previous_field->GetValueAt(previous_field->Now())) {
-            same_value = false;
-            break;
-          }
-        }
-
-        if (same_value) {
-          update_widget(field->Now());
-        } else {
-          update_widget(qSNaN());
-        }
-
-      }
-
-      if (!IsFieldAtDefault(field)) {
-        row_at_default = false;
-      }
+    for (int k = 0; k < row->FieldCount(); k++) {
+      update_field_widget(j, k, row->Field(k));
     }
 
-    // Update per-row reset button visibility
+    bool row_at_default = is_row_at_default(row);
+
     if (j < row_reset_buttons_.size() && row_reset_buttons_[j] != nullptr) {
       row_reset_buttons_[j]->setVisible(!row_at_default);
     }
-
-    if (!row_at_default) {
-      any_row_not_default = true;
-    }
+    if (!row_at_default) any_row_not_default = true;
   }
 
-  // Update effect-level reset button visibility
   if (effect_reset_button_ != nullptr) {
     effect_reset_button_->setVisible(any_row_not_default);
   }
 }
 
-bool EffectUI::IsAttachedToClip(Clip *c)
-{
+bool EffectUI::IsAttachedToClip(Clip* c) {
   if (GetEffect()->parent_clip == c) {
     return true;
   }
@@ -374,13 +313,9 @@ bool EffectUI::IsAttachedToClip(Clip *c)
   return false;
 }
 
-QWidget *EffectUI::Widget(int row, int field)
-{
-  return widgets_.at(row).at(field);
-}
+QWidget* EffectUI::Widget(int row, int field) { return widgets_.at(row).at(field); }
 
-void EffectUI::AttachKeyframeNavigationToRow(EffectRow *row, KeyframeNavigator *nav)
-{
+void EffectUI::AttachKeyframeNavigationToRow(EffectRow* row, KeyframeNavigator* nav) {
   if (nav == nullptr) {
     return;
   }

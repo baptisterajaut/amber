@@ -657,6 +657,14 @@ class Cacher : public QThread {
                             long timeline_in, long target_frame, long frame_skip);
 
   /**
+   * @brief Decode one audio frame from the filter graph (handles reverse/forward logic).
+   *
+   * @param audio_just_reset  True if this is the first frame after a seek reset
+   * @return true if a frame was decoded and ready; false if the outer loop should break
+   */
+  bool cacheAudioDecodeOneFrame(AVFrame* frame, bool reverse_audio, double timebase, bool audio_just_reset);
+
+  /**
    * @brief Result codes for cacheAudioMixToBuffer
    */
   enum AudioMixResult { AudioMixContinue, AudioMixBreak, AudioMixReturn };
@@ -796,6 +804,28 @@ class Cacher : public QThread {
    * Returns false and sets ok=false on any filter creation failure.
    */
   bool openWorkerBuildAtempoChain(double playback_speed, AVFilterContext*& last_filter, bool& ok);
+  bool openWorkerCreateAudioFilters(int target_sample_rate, AVFilterContext*& aformat_ctx);
+
+  // ---------------------------------------------------------------------------
+  // Private helpers — CacheAudioWorker
+  // ---------------------------------------------------------------------------
+
+  /**
+   * @brief Fetch the next audio frame dispatch: null-media, footage, or unknown.
+   *
+   * Handles the if/else if/else media-type dispatch inside CacheAudioWorker's loop.
+   * Sets frame and nb_bytes on success.
+   *
+   * @return true if a frame was fetched and mixing should continue, false if the loop should break.
+   */
+  bool cacheAudioWorkerFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_audio, bool& audio_just_reset,
+                                  double last_fr, long timeline_in, long timeline_out, long target_frame,
+                                  long frame_skip);
+
+  /**
+   * @brief Finalize a CacheAudioWorker cycle: record scrub contribution and wake audio consumer.
+   */
+  void cacheAudioWorkerFinalize(qint64 scrub_bytes_mixed);
 
   // ---------------------------------------------------------------------------
   // Private helpers — Cache() queue search
@@ -808,6 +838,9 @@ class Cacher : public QThread {
    * Must be called with retrieve_lock_ and queue_ both locked.
    */
   bool cacheFindFrameInQueue(int64_t target_pts);
+  bool cacheServeStillImage();
+  bool cacheTryQueueHit();
+  void cacheWaitForResponse();
 };
 
 #endif  // CACHER_H

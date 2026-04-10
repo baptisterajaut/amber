@@ -21,6 +21,7 @@
 #ifndef EFFECTFIELD_H
 #define EFFECTFIELD_H
 
+#include <QColor>
 #include <QObject>
 #include <QVariant>
 #include <QVector>
@@ -452,6 +453,17 @@ class EffectField : public QObject {
    * @brief Interpolate a DOUBLE field between two keyframes.
    */
   double InterpolateDouble(double timecode, int before_keyframe, int after_keyframe, double progress);
+
+  /**
+   * @brief Interpolate a COLOR field between two keyframes.
+   */
+  QColor InterpolateColor(int before_keyframe, int after_keyframe, double progress);
+
+  /**
+   * @brief Find the nearest adjacent keyframe (next if post=true, previous if post=false).
+   * Returns -1 if none exists.
+   */
+  int FindAdjacentKeyframe(int key, bool post) const;
 
   /**
    * @brief Retrieve the current clip as a frame number

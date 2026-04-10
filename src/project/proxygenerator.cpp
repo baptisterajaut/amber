@@ -147,43 +147,106 @@ static void encode_proxy_frame(int stream_index, AVFrame* dec_frame, AVPacket* p
   }
 }
 
+// Open the input/output format contexts for proxy transcoding.
+// Returns false on any error; on failure all already-opened contexts are freed.
+static bool proxy_open_contexts(const QString& input_url, const QString& output_path, int start_number,
+                                AVFormatContext*& input_fmt_ctx, AVFormatContext*& output_fmt_ctx) {
+  AVDictionary* format_opts = nullptr;
+  if (start_number > 0) {
+    av_dict_set(&format_opts, "start_number", QString::number(start_number).toUtf8(), 0);
+  }
+
+  input_fmt_ctx = nullptr;
+  if (avformat_open_input(&input_fmt_ctx, input_url.toUtf8(), nullptr, &format_opts) < 0) {
+    qCritical() << "Proxy: could not open input" << input_url;
+    return false;
+  }
+
+  output_fmt_ctx = nullptr;
+  avformat_alloc_output_context2(&output_fmt_ctx, nullptr, nullptr, output_path.toUtf8());
+  if (!output_fmt_ctx) {
+    qCritical() << "Proxy: could not allocate output context";
+    avformat_close_input(&input_fmt_ctx);
+    return false;
+  }
+
+  if (avio_open(&output_fmt_ctx->pb, output_path.toUtf8(), AVIO_FLAG_WRITE) < 0) {
+    qCritical() << "Proxy: could not open output" << output_path;
+    avformat_close_input(&input_fmt_ctx);
+    avformat_free_context(output_fmt_ctx);
+    return false;
+  }
+
+  if (avformat_find_stream_info(input_fmt_ctx, nullptr) < 0) {
+    qCritical() << "Proxy: could not find stream info" << input_url;
+    avio_closep(&output_fmt_ctx->pb);
+    avformat_close_input(&input_fmt_ctx);
+    avformat_free_context(output_fmt_ctx);
+    return false;
+  }
+  return true;
+}
+
+// Process one packet in the decode loop — passthrough or decode+encode for video.
+// Returns false if read failed or skip was set.
+static bool proxy_process_packet(AVPacket* packet, AVFrame* dec_frame, AVFormatContext* input_fmt_ctx,
+                                 AVFormatContext* output_fmt_ctx, QVector<AVCodecContext*>& input_streams,
+                                 QVector<AVCodecContext*>& output_streams, QVector<SwsContext*>& sws_contexts,
+                                 int& stream_index, bool& skip, double& current_progress) {
+  int read_ret = -1;
+  do {
+    read_ret = av_read_frame(input_fmt_ctx, packet);
+    if (read_ret < 0) {
+      if (read_ret != AVERROR_EOF) {
+        qWarning() << "Proxy generation ended prematurely (read error" << read_ret << ")";
+      }
+      return false;
+    }
+    stream_index = packet->stream_index;
+    if (input_streams.at(stream_index) == nullptr) {
+      av_packet_rescale_ts(packet, input_fmt_ctx->streams[stream_index]->time_base,
+                           output_fmt_ctx->streams[stream_index]->time_base);
+      av_interleaved_write_frame(output_fmt_ctx, packet);
+    } else {
+      avcodec_send_packet(input_streams.at(stream_index), packet);
+      current_progress =
+          qCeil((double(packet->pts) / double(input_fmt_ctx->streams[packet->stream_index]->duration)) * 100);
+    }
+    av_packet_unref(packet);
+  } while (avcodec_receive_frame(input_streams.at(packet->stream_index), dec_frame) == AVERROR(EAGAIN) && !skip);
+
+  return !skip;
+}
+
+// Main decode/encode loop for proxy transcoding.
+static void proxy_decode_loop(AVFormatContext* input_fmt_ctx, AVFormatContext* output_fmt_ctx,
+                              QVector<AVCodecContext*>& input_streams, QVector<AVCodecContext*>& output_streams,
+                              QVector<SwsContext*>& sws_contexts, bool& skip, double& current_progress) {
+  AVPacket* packet = av_packet_alloc();
+  AVFrame* dec_frame = av_frame_alloc();
+
+  while (!skip) {
+    int stream_index = 0;
+    if (!proxy_process_packet(packet, dec_frame, input_fmt_ctx, output_fmt_ctx, input_streams, output_streams,
+                              sws_contexts, stream_index, skip, current_progress)) {
+      break;
+    }
+    av_packet_unref(packet);
+    encode_proxy_frame(stream_index, dec_frame, packet, input_fmt_ctx, output_fmt_ctx, input_streams, output_streams,
+                       sws_contexts, skip);
+  }
+
+  av_packet_free(&packet);
+  av_frame_free(&dec_frame);
+}
+
 void ProxyGenerator::transcode(const ProxyInfo& info) {
   Footage* footage = info.media->to_footage();
   current_progress = 0.0;
 
-  AVDictionary* format_opts = nullptr;
-  if (footage->start_number > 0) {
-    av_dict_set(&format_opts, "start_number", QString::number(footage->start_number).toUtf8(), 0);
-  }
-
   AVFormatContext* input_fmt_ctx = nullptr;
-  if (avformat_open_input(&input_fmt_ctx, footage->url.toUtf8(), nullptr, &format_opts) < 0) {
-    qCritical() << "Proxy: could not open input" << footage->url;
-    return;
-  }
-
   AVFormatContext* output_fmt_ctx = nullptr;
-  avformat_alloc_output_context2(&output_fmt_ctx, nullptr, nullptr, info.path.toUtf8());
-  if (!output_fmt_ctx) {
-    qCritical() << "Proxy: could not allocate output context";
-    avformat_close_input(&input_fmt_ctx);
-    return;
-  }
-
-  if (avio_open(&output_fmt_ctx->pb, info.path.toUtf8(), AVIO_FLAG_WRITE) < 0) {
-    qCritical() << "Proxy: could not open output" << info.path;
-    avformat_close_input(&input_fmt_ctx);
-    avformat_free_context(output_fmt_ctx);
-    return;
-  }
-
-  if (avformat_find_stream_info(input_fmt_ctx, nullptr) < 0) {
-    qCritical() << "Proxy: could not find stream info" << footage->url;
-    avio_closep(&output_fmt_ctx->pb);
-    avformat_close_input(&input_fmt_ctx);
-    avformat_free_context(output_fmt_ctx);
-    return;
-  }
+  if (!proxy_open_contexts(footage->url, info.path, footage->start_number, input_fmt_ctx, output_fmt_ctx)) return;
 
   QVector<AVCodecContext*> input_streams(input_fmt_ctx->nb_streams, nullptr);
   QVector<AVCodecContext*> output_streams(input_fmt_ctx->nb_streams, nullptr);
@@ -197,9 +260,7 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
     bool video_ok = (in_stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) &&
                     setup_proxy_video_stream(i, input_fmt_ctx, output_fmt_ctx, out_stream, info, footage->url.toUtf8(),
                                              input_streams, output_streams, sws_contexts);
-    if (!video_ok) {
-      avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
-    }
+    if (!video_ok) avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
   }
 
   if (avformat_write_header(output_fmt_ctx, nullptr) < 0) {
@@ -208,43 +269,8 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
     skip = true;
   }
 
-  AVPacket* packet = av_packet_alloc();
-  AVFrame* dec_frame = av_frame_alloc();
+  proxy_decode_loop(input_fmt_ctx, output_fmt_ctx, input_streams, output_streams, sws_contexts, skip, current_progress);
 
-  while (!skip) {
-    int stream_index = packet->stream_index;
-    int read_ret = -1;
-    int recfr_ret = -1;
-    do {
-      read_ret = av_read_frame(input_fmt_ctx, packet);
-      if (read_ret < 0) {
-        if (read_ret != AVERROR_EOF) qWarning() << "Proxy generation for file" << footage->url << "ended prematurely";
-        break;
-      }
-      stream_index = packet->stream_index;
-      if (input_streams.at(stream_index) == nullptr) {
-        av_packet_rescale_ts(packet, input_fmt_ctx->streams[stream_index]->time_base,
-                             output_fmt_ctx->streams[stream_index]->time_base);
-        av_interleaved_write_frame(output_fmt_ctx, packet);
-      } else {
-        avcodec_send_packet(input_streams.at(stream_index), packet);
-        current_progress =
-            qCeil((double(packet->pts) / double(input_fmt_ctx->streams[packet->stream_index]->duration)) * 100);
-      }
-      av_packet_unref(packet);
-    } while ((recfr_ret = avcodec_receive_frame(input_streams.at(packet->stream_index), dec_frame)) ==
-                 AVERROR(EAGAIN) &&
-             !skip);
-
-    if (read_ret < 0 || skip) break;
-
-    av_packet_unref(packet);
-    encode_proxy_frame(stream_index, dec_frame, packet, input_fmt_ctx, output_fmt_ctx, input_streams, output_streams,
-                       sws_contexts, skip);
-  }
-
-  av_packet_free(&packet);
-  av_frame_free(&dec_frame);
   av_write_trailer(output_fmt_ctx);
 
   for (int i = 0; i < int(input_fmt_ctx->nb_streams); i++) {

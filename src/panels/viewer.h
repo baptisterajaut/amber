@@ -132,6 +132,8 @@ class Viewer : public Panel {
   void set_preview_resolution(QAction* action);
 
  private:
+  void maybe_seek_before_play(long sequence_end_frame);
+  void check_playback_end();
   void update_window_title();
   void clean_created_seq();
   void set_sequence(bool main, SequencePtr s);

@@ -55,67 +55,91 @@ static RhiBackend parseRhiBackend(const char* name) {
   return RhiBackend::Auto;
 }
 
+static void print_version() {
+#ifndef GITHASH
+  qWarning() << "No Git commit information found";
+#endif
+  printf("%s\n", amber::AppName.toUtf8().constData());
+}
+
+static void print_help(const char* prog) {
+  printf(
+      "Usage: %s [options] [filename]\n\n"
+      "[filename] is the file to open on startup.\n\n"
+      "Options:\n"
+      "\t-v, --version\t\tShow version information\n"
+      "\t-h, --help\t\tShow this help\n"
+      "\t-f, --fullscreen\tStart in full screen mode\n"
+      "\t--rhi-backend <name>\tSet RHI backend (vulkan, metal, d3d12, d3d11, opengl)\n"
+      "\t--disable-shaders\tDisable shaders (for debugging)\n"
+      "\t--no-debug\t\tDisable internal debug log and output directly to console\n"
+      "\t--disable-blend-modes\tDisable shader-based blending for older GPUs\n"
+      "\t--translation <file>\tSet an external language file to use\n"
+      "\n"
+      "Environment Variables:\n"
+      "\tAMBER_RHI_BACKEND\tSet RHI backend (vulkan, metal, d3d12, d3d11, opengl)\n"
+      "\tOLIVE_EFFECTS_PATH\tSpecify a path to search for GLSL shader effects\n"
+      "\tFREI0R_PATH\t\tSpecify a path to search for Frei0r effects\n"
+      "\tOLIVE_LANG_PATH\t\tSpecify a path to search for translation files\n"
+      "\n",
+      prog);
+}
+
+// Process a single flag argument at argv[i]. Returns false if the caller should exit.
+// `i` may be incremented if the flag consumes the next token.
+static bool handle_flag(int argc, char* argv[], int& i, bool& launch_fullscreen, bool& use_internal_logger) {
+  const char* arg = argv[i];
+  if (!strcmp(arg, "--version") || !strcmp(arg, "-v")) {
+    print_version();
+    return false;
+  }
+  if (!strcmp(arg, "--help") || !strcmp(arg, "-h")) {
+    print_help(argv[0]);
+    return false;
+  }
+  if (!strcmp(arg, "--fullscreen") || !strcmp(arg, "-f")) {
+    launch_fullscreen = true;
+    return true;
+  }
+  if (!strcmp(arg, "--rhi-backend")) {
+    if (i + 1 < argc) {
+      amber::CurrentRuntimeConfig.rhi_backend = parseRhiBackend(argv[++i]);
+      return true;
+    }
+    printf("[ERROR] No backend name specified\n");
+    return false;
+  }
+  if (!strcmp(arg, "--disable-shaders")) {
+    amber::CurrentRuntimeConfig.shaders_are_enabled = false;
+    return true;
+  }
+  if (!strcmp(arg, "--no-debug")) {
+    use_internal_logger = false;
+    return true;
+  }
+  if (!strcmp(arg, "--disable-blend-modes")) {
+    amber::CurrentRuntimeConfig.disable_blending = true;
+    return true;
+  }
+  if (!strcmp(arg, "--translation")) {
+    if (i + 1 < argc && argv[i + 1][0] != '-') {
+      amber::CurrentRuntimeConfig.external_translation_file = argv[++i];
+      return true;
+    }
+    printf("[ERROR] No translation file specified\n");
+    return false;
+  }
+  printf("[ERROR] Unknown argument '%s'\n", arg);
+  return false;
+}
+
 // Parse command-line arguments. Returns false if the caller should exit (--version/--help/error).
 // Sets launch_fullscreen, load_proj, use_internal_logger via out-params; also mutates
 // amber::CurrentRuntimeConfig directly for backend/shader flags.
-static bool parse_args(int argc, char* argv[], bool& launch_fullscreen, QString& load_proj,
-                       bool& use_internal_logger) {
+static bool parse_args(int argc, char* argv[], bool& launch_fullscreen, QString& load_proj, bool& use_internal_logger) {
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] == '-') {
-      if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-v")) {
-#ifndef GITHASH
-        qWarning() << "No Git commit information found";
-#endif
-        printf("%s\n", amber::AppName.toUtf8().constData());
-        return false;
-      } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
-        printf(
-            "Usage: %s [options] [filename]\n\n"
-            "[filename] is the file to open on startup.\n\n"
-            "Options:\n"
-            "\t-v, --version\t\tShow version information\n"
-            "\t-h, --help\t\tShow this help\n"
-            "\t-f, --fullscreen\tStart in full screen mode\n"
-            "\t--rhi-backend <name>\tSet RHI backend (vulkan, metal, d3d12, d3d11, opengl)\n"
-            "\t--disable-shaders\tDisable shaders (for debugging)\n"
-            "\t--no-debug\t\tDisable internal debug log and output directly to console\n"
-            "\t--disable-blend-modes\tDisable shader-based blending for older GPUs\n"
-            "\t--translation <file>\tSet an external language file to use\n"
-            "\n"
-            "Environment Variables:\n"
-            "\tAMBER_RHI_BACKEND\tSet RHI backend (vulkan, metal, d3d12, d3d11, opengl)\n"
-            "\tOLIVE_EFFECTS_PATH\tSpecify a path to search for GLSL shader effects\n"
-            "\tFREI0R_PATH\t\tSpecify a path to search for Frei0r effects\n"
-            "\tOLIVE_LANG_PATH\t\tSpecify a path to search for translation files\n"
-            "\n",
-            argv[0]);
-        return false;
-      } else if (!strcmp(argv[i], "--fullscreen") || !strcmp(argv[i], "-f")) {
-        launch_fullscreen = true;
-      } else if (!strcmp(argv[i], "--rhi-backend")) {
-        if (i + 1 < argc) {
-          amber::CurrentRuntimeConfig.rhi_backend = parseRhiBackend(argv[++i]);
-        } else {
-          printf("[ERROR] No backend name specified\n");
-          return false;
-        }
-      } else if (!strcmp(argv[i], "--disable-shaders")) {
-        amber::CurrentRuntimeConfig.shaders_are_enabled = false;
-      } else if (!strcmp(argv[i], "--no-debug")) {
-        use_internal_logger = false;
-      } else if (!strcmp(argv[i], "--disable-blend-modes")) {
-        amber::CurrentRuntimeConfig.disable_blending = true;
-      } else if (!strcmp(argv[i], "--translation")) {
-        if (i + 1 < argc && argv[i + 1][0] != '-') {
-          amber::CurrentRuntimeConfig.external_translation_file = argv[++i];
-        } else {
-          printf("[ERROR] No translation file specified\n");
-          return false;
-        }
-      } else {
-        printf("[ERROR] Unknown argument '%s'\n", argv[i]);
-        return false;
-      }
+      if (!handle_flag(argc, argv, i, launch_fullscreen, use_internal_logger)) return false;
     } else if (load_proj.isEmpty()) {
       load_proj = argv[i];
     }
@@ -191,6 +215,40 @@ static void resolve_auto_backend() {
 #endif
 }
 
+static void apply_env_rhi_backend() {
+  if (amber::CurrentRuntimeConfig.rhi_backend != RhiBackend::Auto) return;
+  QByteArray env = qgetenv("AMBER_RHI_BACKEND");
+  if (!env.isEmpty()) {
+    amber::CurrentRuntimeConfig.rhi_backend = parseRhiBackend(env.constData());
+  }
+}
+
+static void setup_qt_surface_format() {
+  QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+  QSurfaceFormat format;
+  format.setDepthBufferSize(24);
+  format.setVersion(3, 2);
+  format.setProfile(QSurfaceFormat::CompatibilityProfile);
+  QSurfaceFormat::setDefaultFormat(format);
+}
+
+static void set_app_metadata() {
+  QCoreApplication::setOrganizationName("ambervideoeditor.org");
+  QCoreApplication::setOrganizationDomain("ambervideoeditor.org");
+  QCoreApplication::setApplicationName("Amber");
+  QGuiApplication::setDesktopFileName("org.ambervideoeditor.Amber");
+}
+
+#if AMBER_HAS_VULKAN
+static void attach_vulkan_to_window(MainWindow& w) {
+  if (!s_vulkanInstance.isValid()) return;
+  w.winId();  // force native window handle creation
+  if (w.windowHandle()) {
+    w.windowHandle()->setVulkanInstance(&s_vulkanInstance);
+  }
+}
+#endif
+
 int main(int argc, char* argv[]) {
   amber::Global = std::unique_ptr<OliveGlobal>(new OliveGlobal);
 
@@ -198,36 +256,20 @@ int main(int argc, char* argv[]) {
   QString load_proj;
   bool use_internal_logger = true;
 
-  if (argc > 1) {
-    if (!parse_args(argc, argv, launch_fullscreen, load_proj, use_internal_logger)) {
-      return 0;
-    }
+  if (argc > 1 && !parse_args(argc, argv, launch_fullscreen, load_proj, use_internal_logger)) {
+    return 0;
   }
 
-  // Env var override (CLI takes precedence)
-  if (amber::CurrentRuntimeConfig.rhi_backend == RhiBackend::Auto) {
-    QByteArray env = qgetenv("AMBER_RHI_BACKEND");
-    if (!env.isEmpty()) {
-      amber::CurrentRuntimeConfig.rhi_backend = parseRhiBackend(env.constData());
-    }
-  }
+  apply_env_rhi_backend();
 
-  if (use_internal_logger) {
-    qInstallMessageHandler(debug_message_handler);
-  }
+  if (use_internal_logger) qInstallMessageHandler(debug_message_handler);
 
   // Work around Qt 6.10 PipeWire backend bug: Bluetooth audio sinks are not
   // enumerated.  Force the PulseAudio backend which works correctly through
   // pipewire-pulse.  Safe on native PulseAudio systems and no-ops on Windows/macOS.
   qputenv("QT_AUDIO_BACKEND", "pulseaudio");
 
-  // OpenGL fallback surface format (used when GL backend is selected)
-  QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
-  QSurfaceFormat format;
-  format.setDepthBufferSize(24);
-  format.setVersion(3, 2);
-  format.setProfile(QSurfaceFormat::CompatibilityProfile);
-  QSurfaceFormat::setDefaultFormat(format);
+  setup_qt_surface_format();
 
   QApplication a(argc, argv);
   a.setWindowIcon(QIcon(":/icons/amber64.png"));
@@ -243,21 +285,13 @@ int main(int argc, char* argv[]) {
 
   amber::media_icon_service = std::unique_ptr<MediaIconService>(new MediaIconService());
 
-  QCoreApplication::setOrganizationName("ambervideoeditor.org");
-  QCoreApplication::setOrganizationDomain("ambervideoeditor.org");
-  QCoreApplication::setApplicationName("Amber");
-  QGuiApplication::setDesktopFileName("org.ambervideoeditor.Amber");
+  set_app_metadata();
 
   MainWindow w(nullptr);
 
   // Associate Vulkan instance with the main window (required for QRhiWidget Vulkan backend)
 #if AMBER_HAS_VULKAN
-  if (s_vulkanInstance.isValid()) {
-    w.winId();  // force native window handle creation
-    if (w.windowHandle()) {
-      w.windowHandle()->setVulkanInstance(&s_vulkanInstance);
-    }
-  }
+  attach_vulkan_to_window(w);
 #endif
 
   amber::timeline::MultiplyTrackSizesByDPI();
@@ -265,9 +299,8 @@ int main(int argc, char* argv[]) {
   QObject::connect(&w, &MainWindow::finished_first_paint, amber::Global.get(), &OliveGlobal::finished_initialize,
                    Qt::QueuedConnection);
 
-  if (!load_proj.isEmpty()) {
-    amber::Global->load_project_on_launch(load_proj);
-  }
+  if (!load_proj.isEmpty()) amber::Global->load_project_on_launch(load_proj);
+
   if (launch_fullscreen) {
     w.showFullScreen();
   } else {

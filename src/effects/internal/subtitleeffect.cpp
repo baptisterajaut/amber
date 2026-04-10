@@ -257,12 +257,19 @@ void SubtitleEffect::DrawSubtitleOutline(QPainter& p, QTextDocument& td, const Q
   p.drawImage(0, 0, outline_img);
 }
 
-void SubtitleEffect::redraw(double timecode) {
-  img.fill(Qt::transparent);
+static QString HalignToString(int halign) {
+  if (halign == Qt::AlignLeft) return QStringLiteral("left");
+  if (halign == Qt::AlignRight) return QStringLiteral("right");
+  return QStringLiteral("center");
+}
 
-  qint64 time_ms = qRound64(timecode * 1000.0);
+static int CalcVerticalOffset(int valign, int height, int doc_height) {
+  if (valign == Qt::AlignVCenter) return height / 2 - doc_height / 2;
+  if (valign == Qt::AlignBottom) return height - doc_height;
+  return 0;
+}
 
-  // Collect all active cues (overlapping cues joined with <br>)
+QString SubtitleEffect::CollectActiveCues(qint64 time_ms) const {
   QString active_text;
   for (int i = 0; i < cues_.size(); i++) {
     if (cues_[i].start_ms <= time_ms && time_ms < cues_[i].end_ms) {
@@ -270,7 +277,14 @@ void SubtitleEffect::redraw(double timecode) {
       active_text += cues_[i].text;
     }
   }
+  return active_text;
+}
 
+void SubtitleEffect::redraw(double timecode) {
+  img.fill(Qt::transparent);
+
+  qint64 time_ms = qRound64(timecode * 1000.0);
+  QString active_text = CollectActiveCues(time_ms);
   if (active_text.isEmpty()) return;
 
   int padding = qRound(padding_field_->GetDoubleAt(timecode));
@@ -283,16 +297,7 @@ void SubtitleEffect::redraw(double timecode) {
 
   QColor text_color = color_field_->GetColorAt(timecode);
   QString font_family = font_field_->GetFontAt(timecode);
-
-  // Build HTML with inline styling and alignment
-  int halign = halign_field_->GetValueAt(timecode).toInt();
-  QString align_str;
-  if (halign == Qt::AlignLeft)
-    align_str = QStringLiteral("left");
-  else if (halign == Qt::AlignRight)
-    align_str = QStringLiteral("right");
-  else
-    align_str = QStringLiteral("center");
+  QString align_str = HalignToString(halign_field_->GetValueAt(timecode).toInt());
 
   QString html =
       QStringLiteral(
@@ -307,15 +312,8 @@ void SubtitleEffect::redraw(double timecode) {
 
   int doc_height = qRound(td.size().height());
 
-  // Calculate vertical position
   int translate_x = padding;
-  int translate_y = padding;
-  int valign = valign_field_->GetValueAt(timecode).toInt();
-  if (valign == Qt::AlignVCenter) {
-    translate_y += height / 2 - doc_height / 2;
-  } else if (valign == Qt::AlignBottom) {
-    translate_y += height - doc_height;
-  }
+  int translate_y = padding + CalcVerticalOffset(valign_field_->GetValueAt(timecode).toInt(), height, doc_height);
 
   QRect clip_rect = img.rect();
   clip_rect.translate(-translate_x, -translate_y);

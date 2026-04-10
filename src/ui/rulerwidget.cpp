@@ -22,10 +22,11 @@
 
 #include <QMouseEvent>
 #include <QPainter>
+#include <algorithm>
 
-#include "panels/viewer.h"
 #include "engine/sequence.h"
 #include "global/config.h"
+#include "panels/viewer.h"
 #include "ui/viewercontainer.h"
 #include "ui/viewerwidget.h"
 
@@ -83,6 +84,64 @@ int RulerWidget::widget_to_video(double widget_pos) const {
   }
 }
 
+static void compute_tick_intervals(double ppvp, int& major, int& minor_out, int& tiny_out) {
+  static const int kCandidates[] = {1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000};
+  major = kCandidates[11];
+  for (int c : kCandidates) {
+    if (c * ppvp >= 60.0) {
+      major = c;
+      break;
+    }
+  }
+  minor_out = qMax(1, major / 5);
+  tiny_out = qMax(1, major / 10);
+}
+
+void RulerWidget::paint_tick(QPainter& p, double wp, int vp, bool is_major, bool is_minor) {
+  int tick_len = is_major ? kRulerThickness - 4 : (is_minor ? kRulerThickness / 2 : kRulerThickness / 4);
+
+  if (orientation_ == Guide::Horizontal) {
+    int x = qRound(wp);
+    p.drawLine(x, kRulerThickness - tick_len, x, kRulerThickness);
+    if (is_major) p.drawText(x + 3, 10, QString::number(vp));
+  } else {
+    int y = qRound(wp);
+    p.drawLine(kRulerThickness - tick_len, y, kRulerThickness, y);
+    if (is_major) {
+      p.save();
+      p.translate(10, y + 3);
+      p.rotate(90);
+      p.drawText(0, 0, QString::number(vp));
+      p.restore();
+    }
+  }
+}
+
+void RulerWidget::paint_cursor_triangle(QPainter& p, double wp) {
+  p.setPen(Qt::NoPen);
+  p.setBrush(Qt::white);
+  QPolygon tri;
+  if (orientation_ == Guide::Horizontal) {
+    int x = qRound(wp);
+    tri << QPoint(x - 4, kRulerThickness) << QPoint(x + 4, kRulerThickness) << QPoint(x, kRulerThickness - 6);
+  } else {
+    int y = qRound(wp);
+    tri << QPoint(kRulerThickness, y - 4) << QPoint(kRulerThickness, y + 4) << QPoint(kRulerThickness - 6, y);
+  }
+  p.drawPolygon(tri);
+}
+
+void RulerWidget::paint_drag_indicator(QPainter& p, double wp) {
+  p.setPen(QPen(QColor(0xff, 0xa5, 0x00), 1));  // amber
+  if (orientation_ == Guide::Horizontal) {
+    int x = qRound(wp);
+    p.drawLine(x, 0, x, kRulerThickness);
+  } else {
+    int y = qRound(wp);
+    p.drawLine(0, y, kRulerThickness, y);
+  }
+}
+
 void RulerWidget::paintEvent(QPaintEvent*) {
   QPainter p(this);
   p.fillRect(rect(), QColor(0x3a, 0x3a, 0x3a));
@@ -92,39 +151,18 @@ void RulerWidget::paintEvent(QPaintEvent*) {
   int video_size = (orientation_ == Guide::Horizontal) ? viewer_->seq->width : viewer_->seq->height;
   if (video_size <= 0) return;
 
-  // Compute pixels-per-video-pixel from the child widget geometry
-  double ppvp;
-  if (orientation_ == Guide::Horizontal) {
-    ppvp = double(container_->child->width()) / double(video_size);
-  } else {
-    ppvp = double(container_->child->height()) / double(video_size);
-  }
+  double ppvp = (orientation_ == Guide::Horizontal) ? double(container_->child->width()) / double(video_size)
+                                                    : double(container_->child->height()) / double(video_size);
   if (ppvp <= 0) return;
 
-  // Pick adaptive tick interval: we want major ticks at least ~60 widget-pixels apart
-  static const int kCandidates[] = {1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000};
-  int major_interval = kCandidates[11];  // fallback: 5000
-  for (int c : kCandidates) {
-    if (c * ppvp >= 60.0) {
-      major_interval = c;
-      break;
-    }
-  }
+  int major_interval, minor_interval, tiny_interval;
+  compute_tick_intervals(ppvp, major_interval, minor_interval, tiny_interval);
 
-  // Minor ticks at 1/5 of major if there's room, tiny at 1/10
-  int minor_interval = major_interval / 5;
-  if (minor_interval < 1) minor_interval = 1;
-  int tiny_interval = major_interval / 10;
-  if (tiny_interval < 1) tiny_interval = 1;
-
-  QPen tick_pen(QColor(0xcc, 0xcc, 0xcc));
-  p.setPen(tick_pen);
-
+  p.setPen(QPen(QColor(0xcc, 0xcc, 0xcc)));
   QFont font = p.font();
   font.setPixelSize(9);
   p.setFont(font);
 
-  // Determine visible range in video pixels
   int vis_start = widget_to_video(0);
   int widget_extent = (orientation_ == Guide::Horizontal) ? width() : height();
   int vis_end = widget_to_video(widget_extent);
@@ -132,71 +170,16 @@ void RulerWidget::paintEvent(QPaintEvent*) {
   vis_start = qMax(0, vis_start - major_interval);
   vis_end = qMin(video_size, vis_end + major_interval);
 
-  // Draw ticks
-  // Start from aligned position
   int tick_start = (vis_start / tiny_interval) * tiny_interval;
   for (int vp = tick_start; vp <= vis_end; vp += tiny_interval) {
     double wp = video_to_widget(vp);
-
     bool is_major = (vp % major_interval == 0);
-    bool is_minor = (!is_major && minor_interval > 0 && vp % minor_interval == 0);
-
-    int tick_len;
-    if (is_major)
-      tick_len = kRulerThickness - 4;
-    else if (is_minor)
-      tick_len = kRulerThickness / 2;
-    else
-      tick_len = kRulerThickness / 4;
-
-    if (orientation_ == Guide::Horizontal) {
-      int x = qRound(wp);
-      p.drawLine(x, kRulerThickness - tick_len, x, kRulerThickness);
-      if (is_major) {
-        p.drawText(x + 3, 10, QString::number(vp));
-      }
-    } else {
-      int y = qRound(wp);
-      p.drawLine(kRulerThickness - tick_len, y, kRulerThickness, y);
-      if (is_major) {
-        p.save();
-        p.translate(10, y + 3);
-        p.rotate(90);
-        p.drawText(0, 0, QString::number(vp));
-        p.restore();
-      }
-    }
+    bool is_minor = (!is_major && vp % minor_interval == 0);
+    paint_tick(p, wp, vp, is_major, is_minor);
   }
 
-  // Draw cursor tracker triangle
-  if (cursor_video_pos_ >= 0) {
-    double wp = video_to_widget(cursor_video_pos_);
-    p.setPen(Qt::NoPen);
-    p.setBrush(Qt::white);
-
-    QPolygon tri;
-    if (orientation_ == Guide::Horizontal) {
-      int x = qRound(wp);
-      tri << QPoint(x - 4, kRulerThickness) << QPoint(x + 4, kRulerThickness) << QPoint(x, kRulerThickness - 6);
-    } else {
-      int y = qRound(wp);
-      tri << QPoint(kRulerThickness, y - 4) << QPoint(kRulerThickness, y + 4) << QPoint(kRulerThickness - 6, y);
-    }
-    p.drawPolygon(tri);
-  }
-
-  // Draw drag indicator
-  if (dragging_ && drag_video_pos_ >= 0) {
-    double wp = video_to_widget(drag_video_pos_);
-    p.setPen(QPen(QColor(0xff, 0xa5, 0x00), 1));  // amber
-    if (orientation_ == Guide::Horizontal) {
-      int x = qRound(wp);
-      p.drawLine(x, 0, x, kRulerThickness);
-    } else {
-      int y = qRound(wp);
-      p.drawLine(0, y, kRulerThickness, y);
-    }
-  }
+  if (cursor_video_pos_ >= 0) paint_cursor_triangle(p, video_to_widget(cursor_video_pos_));
+  if (dragging_ && drag_video_pos_ >= 0) paint_drag_indicator(p, video_to_widget(drag_video_pos_));
 }
 
 void RulerWidget::mousePressEvent(QMouseEvent* event) {
@@ -222,8 +205,7 @@ void RulerWidget::mouseReleaseEvent(QMouseEvent* event) {
 
     if (drag_video_pos_ >= 0) {
       // Perpendicular: top ruler → vertical guide, left ruler → horizontal guide
-      Guide::Orientation perpendicular =
-          (orientation_ == Guide::Horizontal) ? Guide::Vertical : Guide::Horizontal;
+      Guide::Orientation perpendicular = (orientation_ == Guide::Horizontal) ? Guide::Vertical : Guide::Horizontal;
       emit guide_created(perpendicular, drag_video_pos_);
     }
 

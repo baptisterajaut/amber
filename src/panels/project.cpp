@@ -499,13 +499,15 @@ static int confirm_footage_delete(QWidget* parent, Media* item, Sequence* s, int
   Footage* media = item->to_footage();
   QMessageBox confirm(parent);
   confirm.setWindowTitle(QCoreApplication::translate("Project", "Delete media in use?"));
-  confirm.setText(QCoreApplication::translate("Project",
-                      "The media '%1' is currently used in '%2'. Deleting it will remove all instances in "
-                      "the sequence. Are you sure you want to do this?")
-                      .arg(media->name, s->name));
+  confirm.setText(
+      QCoreApplication::translate("Project",
+                                  "The media '%1' is currently used in '%2'. Deleting it will remove all instances in "
+                                  "the sequence. Are you sure you want to do this?")
+          .arg(media->name, s->name));
   QAbstractButton* yes_button = confirm.addButton(QMessageBox::Yes);
   QAbstractButton* skip_button = nullptr;
-  if (items_count > 1) skip_button = confirm.addButton(QCoreApplication::translate("Project", "Skip"), QMessageBox::NoRole);
+  if (items_count > 1)
+    skip_button = confirm.addButton(QCoreApplication::translate("Project", "Skip"), QMessageBox::NoRole);
   QAbstractButton* abort_button = confirm.addButton(QMessageBox::Cancel);
   confirm.exec();
   if (confirm.clickedButton() == yes_button) return 1;
@@ -540,7 +542,7 @@ static void skip_media_item(Media* item, QList<Media*>& items, QVector<Media*>& 
 // Check all footage items and confirm deletion with the user for those in use.
 // Returns false if the user aborted the whole delete operation.
 static bool check_footage_in_use(QWidget* parent, ComboAction* ca, QList<Media*>& items,
-                                  const QList<Media*>& sequence_items, QVector<Media*>& parents, bool& redraw) {
+                                 const QList<Media*>& sequence_items, QVector<Media*>& parents, bool& redraw) {
   QList<Media*> media_items;
   // Using a local helper scope — avoid capturing `parent` arg as a raw pointer in lambdas
   for (const auto& it : items) {
@@ -585,7 +587,7 @@ static bool check_footage_in_use(QWidget* parent, ComboAction* ca, QList<Media*>
 // Check nested-sequence references and confirm with the user.
 // Returns false if the user cancelled.
 static bool check_sequence_references(QWidget* parent, ComboAction* ca, const QList<Media*>& items,
-                                       const QList<Media*>& sequence_items, bool& redraw) {
+                                      const QList<Media*>& sequence_items, bool& redraw) {
   for (int i = 0; i < items.size(); i++) {
     Media* item = items.at(i);
     if (item->get_type() != MEDIA_TYPE_SEQUENCE) continue;
@@ -604,8 +606,8 @@ static bool check_sequence_references(QWidget* parent, ComboAction* ca, const QL
           QMessageBox confirm(parent);
           confirm.setWindowTitle(QCoreApplication::translate("Project", "Delete sequence in use?"));
           confirm.setText(QCoreApplication::translate("Project",
-                              "The sequence '%1' is used as a nested sequence in '%2'. "
-                              "Deleting it will remove all instances. Are you sure?")
+                                                      "The sequence '%1' is used as a nested sequence in '%2'. "
+                                                      "Deleting it will remove all instances. Are you sure?")
                               .arg(item->to_sequence()->name, s->name));
           confirm.addButton(QMessageBox::Yes);
           QAbstractButton* cancel_button = confirm.addButton(QMessageBox::Cancel);
@@ -721,7 +723,7 @@ static bool classify_as_image(const QString& file, const QStringList& image_sequ
 // Returns the FFmpeg-format pattern (e.g. "frame%04d.png"), the digit_test position, the
 // file_number, and digit_count.  Returns empty string if the last char before ext isn't a digit.
 static QString build_sequence_pattern(const QString& file, int lastcharindex, int& digit_test, int& digit_count,
-                                       int& file_number) {
+                                      int& file_number) {
   if (lastcharindex < 1 || !file[lastcharindex - 1].isDigit()) return QString();
 
   digit_count = 0;
@@ -754,18 +756,17 @@ static QString build_sequence_pattern(const QString& file, int lastcharindex, in
 // Mutates `file` to the FFmpeg pattern if they said yes, and computes `start_number`.
 // Returns true if this file should be skipped (already part of an accepted sequence).
 static bool handle_new_image_sequence(QWidget* parent, const QString& new_filename, QString& file, int digit_test,
-                                       int digit_count, int file_number, int lastcharindex,
-                                       QVector<QString>& image_sequence_urls,
-                                       QVector<bool>& image_sequence_importassequence, int& start_number) {
+                                      int digit_count, int file_number, int lastcharindex,
+                                      QVector<QString>& image_sequence_urls,
+                                      QVector<bool>& image_sequence_importassequence, int& start_number) {
   image_sequence_urls.append(new_filename);
 
-  if (QMessageBox::question(parent,
-                             QCoreApplication::translate("Project", "Image sequence detected"),
-                             QCoreApplication::translate("Project",
-                                 "The file '%1' appears to be part of an image sequence. "
-                                 "Would you like to import it as such?")
-                                 .arg(file),
-                             QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) == QMessageBox::Yes) {
+  if (QMessageBox::question(parent, QCoreApplication::translate("Project", "Image sequence detected"),
+                            QCoreApplication::translate("Project",
+                                                        "The file '%1' appears to be part of an image sequence. "
+                                                        "Would you like to import it as such?")
+                                .arg(file),
+                            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) == QMessageBox::Yes) {
     file = new_filename;
     image_sequence_importassequence.append(true);
 
@@ -774,8 +775,8 @@ static bool handle_new_image_sequence(QWidget* parent, const QString& new_filena
     int test_file_number = file_number;
     do {
       test_file_number--;
-    } while (QFileInfo::exists(
-        test_filename_format.arg(QString("%1").arg(test_file_number, digit_count, 10, QChar('0')))));
+    } while (
+        QFileInfo::exists(test_filename_format.arg(QString("%1").arg(test_file_number, digit_count, 10, QChar('0')))));
     start_number = test_file_number + 1;
     return false;
   }
@@ -1051,8 +1052,8 @@ static void save_clip_media_attributes(QXmlStreamWriter& stream, const ClipPtr& 
 }
 
 static void save_clip_transitions(QXmlStreamWriter& stream, const ClipPtr& c, int j,
-                                   QVector<TransitionPtr>& transition_save_cache,
-                                   QVector<int>& transition_clip_save_cache) {
+                                  QVector<TransitionPtr>& transition_save_cache,
+                                  QVector<int>& transition_clip_save_cache) {
   for (int t = kTransitionOpening; t <= kTransitionClosing; t++) {
     TransitionPtr transition = (t == kTransitionOpening) ? c->opening_transition : c->closing_transition;
     if (transition == nullptr) continue;
@@ -1203,6 +1204,38 @@ static void save_sequence_item(QXmlStreamWriter& stream, Media* m, int folder) {
   stream.writeEndElement();  // sequence
 }
 
+void Project::save_folder_item(QXmlStreamWriter& stream, Media* m, const QModelIndex& item, bool set_ids_only) {
+  if (set_ids_only) {
+    m->temp_id = folder_id++;
+    return;
+  }
+  stream.writeStartElement("folder");
+  stream.writeAttribute("name", m->get_name());
+  stream.writeAttribute("id", QString::number(m->temp_id));
+  if (!item.parent().isValid()) {
+    stream.writeAttribute("parent", "0");
+  } else {
+    stream.writeAttribute("parent", QString::number(amber::project_model.getItem(item.parent())->temp_id));
+  }
+  stream.writeEndElement();
+}
+
+void Project::save_footage_or_sequence_item(QXmlStreamWriter& stream, Media* m, int type, bool set_ids_only) {
+  int folder = m->parentItem()->temp_id;
+  if (type == MEDIA_TYPE_FOOTAGE) {
+    m->to_footage()->save_id = media_id;
+    save_footage_item(stream, m, media_id, proj_dir);
+    media_id++;
+  } else if (type == MEDIA_TYPE_SEQUENCE) {
+    Sequence* s = m->to_sequence().get();
+    if (set_ids_only) {
+      s->save_id = sequence_id++;
+    } else {
+      save_sequence_item(stream, m, folder);
+    }
+  }
+}
+
 void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only, const QModelIndex& parent) {
   for (int i = 0; i < amber::project_model.rowCount(parent); i++) {
     const QModelIndex& item = amber::project_model.index(i, 0, parent);
@@ -1210,33 +1243,9 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
 
     if (type == m->get_type()) {
       if (m->get_type() == MEDIA_TYPE_FOLDER) {
-        if (set_ids_only) {
-          m->temp_id = folder_id++;
-        } else {
-          stream.writeStartElement("folder");
-          stream.writeAttribute("name", m->get_name());
-          stream.writeAttribute("id", QString::number(m->temp_id));
-          if (!item.parent().isValid()) {
-            stream.writeAttribute("parent", "0");
-          } else {
-            stream.writeAttribute("parent", QString::number(amber::project_model.getItem(item.parent())->temp_id));
-          }
-          stream.writeEndElement();
-        }
+        save_folder_item(stream, m, item, set_ids_only);
       } else {
-        int folder = m->parentItem()->temp_id;
-        if (type == MEDIA_TYPE_FOOTAGE) {
-          m->to_footage()->save_id = media_id;
-          save_footage_item(stream, m, media_id, proj_dir);
-          media_id++;
-        } else if (type == MEDIA_TYPE_SEQUENCE) {
-          Sequence* s = m->to_sequence().get();
-          if (set_ids_only) {
-            s->save_id = sequence_id++;
-          } else {
-            save_sequence_item(stream, m, folder);
-          }
-        }
+        save_footage_or_sequence_item(stream, m, type, set_ids_only);
       }
     }
 

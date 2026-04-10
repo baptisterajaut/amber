@@ -93,6 +93,8 @@ class KeyframeView : public QWidget {
   void move_rect_select(QMouseEvent* event);
   // Keyframe move update during drag.
   void move_keys_drag(QMouseEvent* event);
+  // Draw keyframes for a single row.
+  void paint_row_keyframes(QPainter& p, EffectRow* row, int field_count, int keyframe_y);
  private slots:
   void show_context_menu(const QPoint& pos);
   void menu_set_key_type(QAction*);

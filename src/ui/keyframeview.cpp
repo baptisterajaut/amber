@@ -109,6 +109,39 @@ void KeyframeView::menu_set_key_type(QAction* a) {
   }
 }
 
+// Returns true if the keyframe at (field, keyframe_index) is the only field contributing at its time.
+static bool keyframe_has_unique_time(EffectRow* row, EffectField* field, int keyframe_index) {
+  long t = field->keyframes.at(keyframe_index).time;
+  int appearances = 0;
+  for (int m = 0; m < row->FieldCount(); m++) {
+    for (const auto& kf : row->Field(m)->keyframes) {
+      if (kf.time == t) appearances++;
+    }
+  }
+  return appearances != row->FieldCount();
+}
+
+void KeyframeView::paint_row_keyframes(QPainter& p, EffectRow* row, int field_count, int keyframe_y) {
+  QVector<long> key_times;
+  for (int l = 0; l < field_count; l++) {
+    EffectField* f = row->Field(l);
+    for (int k = 0; k < f->keyframes.size(); k++) {
+      if (key_times.contains(f->keyframes.at(k).time)) continue;
+      bool keyframe_selected = keyframeIsSelected(f, k);
+      long keyframe_frame = adjust_row_keyframe(row, f->keyframes.at(k).time, visible_in);
+      int screen_x = getScreenPointFromFrame(panel_effect_controls->zoom, keyframe_frame) - x_scroll;
+      if (keyframe_has_unique_time(row, f, k)) {
+        QColor cc = get_curve_color(l, field_count);
+        draw_keyframe(p, f->keyframes.at(k).type, screen_x, keyframe_y, keyframe_selected, cc.red(), cc.green(),
+                      cc.blue());
+      } else {
+        draw_keyframe(p, f->keyframes.at(k).type, screen_x, keyframe_y, keyframe_selected);
+      }
+      key_times.append(f->keyframes.at(k).time);
+    }
+  }
+}
+
 void KeyframeView::paintEvent(QPaintEvent*) {
   QPainter p(this);
 
@@ -127,52 +160,13 @@ void KeyframeView::paintEvent(QPaintEvent*) {
 
     for (auto container : open_effects_) {
       Effect* e = container->GetEffect();
-
-      if (container->IsExpanded()) {
-        for (int j = 0; j < e->row_count(); j++) {
-          EffectRow* row = e->row(j);
-
-          int keyframe_y = container->GetRowY(j, this);
-
-          QVector<long> key_times;
-
-          for (int l = 0; l < row->FieldCount(); l++) {
-            EffectField* f = row->Field(l);
-            for (int k = 0; k < f->keyframes.size(); k++) {
-              if (!key_times.contains(f->keyframes.at(k).time)) {
-                bool keyframe_selected = keyframeIsSelected(f, k);
-                long keyframe_frame = adjust_row_keyframe(row, f->keyframes.at(k).time, visible_in);
-
-                // see if any other keyframes have this time
-                int appearances = 0;
-                for (int m = 0; m < row->FieldCount(); m++) {
-                  EffectField* compf = row->Field(m);
-                  for (const auto& keyframe : compf->keyframes) {
-                    if (f->keyframes.at(k).time == keyframe.time) {
-                      appearances++;
-                    }
-                  }
-                }
-
-                if (appearances != row->FieldCount()) {
-                  QColor cc = get_curve_color(l, row->FieldCount());
-                  draw_keyframe(p, f->keyframes.at(k).type,
-                                getScreenPointFromFrame(panel_effect_controls->zoom, keyframe_frame) - x_scroll,
-                                keyframe_y, keyframe_selected, cc.red(), cc.green(), cc.blue());
-                } else {
-                  draw_keyframe(p, f->keyframes.at(k).type,
-                                getScreenPointFromFrame(panel_effect_controls->zoom, keyframe_frame) - x_scroll,
-                                keyframe_y, keyframe_selected);
-                }
-
-                key_times.append(f->keyframes.at(k).time);
-              }
-            }
-          }
-
-          rows.append(row);
-          rowY.append(keyframe_y);
-        }
+      if (!container->IsExpanded()) continue;
+      for (int j = 0; j < e->row_count(); j++) {
+        EffectRow* row = e->row(j);
+        int keyframe_y = container->GetRowY(j, this);
+        paint_row_keyframes(p, row, row->FieldCount(), keyframe_y);
+        rows.append(row);
+        rowY.append(keyframe_y);
       }
     }
 
@@ -185,22 +179,13 @@ void KeyframeView::paintEvent(QPaintEvent*) {
 
     int playhead_x =
         getScreenPointFromFrame(panel_effect_controls->zoom, amber::ActiveSequence->playhead - visible_in) - x_scroll;
-    if (dragging && panel_timeline->snapped) {
-      p.setPen(Qt::white);
-    } else {
-      p.setPen(Qt::red);
-    }
+    p.setPen((dragging && panel_timeline->snapped) ? Qt::white : Qt::red);
     p.drawLine(playhead_x, 0, playhead_x, height());
   }
 
   if (select_rect) {
     draw_selection_rectangle(p, QRect(rect_select_x, rect_select_y, rect_select_w, rect_select_h));
   }
-
-  /*if (mouseover && mouseover_row < rowY.size()) {
-    draw_keyframe(p, getScreenPointFromFrame(panel_effect_controls->zoom, mouseover_frame - visible_in),
-    rowY.at(mouseover_row), true);
-    }*/
 }
 
 void KeyframeView::wheelEvent(QWheelEvent* e) { emit wheel_event_signal(e); }

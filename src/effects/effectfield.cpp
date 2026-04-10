@@ -117,6 +117,15 @@ double EffectField::InterpolateDouble(double timecode, int before_keyframe, int 
   return double_lerp(before_dbl, after_dbl, progress);
 }
 
+QColor EffectField::InterpolateColor(int before_keyframe, int after_keyframe, double progress) {
+  if (before_keyframe == after_keyframe) return keyframes.at(before_keyframe).data.value<QColor>();
+  QColor before_data = keyframes.at(before_keyframe).data.value<QColor>();
+  QColor after_data = keyframes.at(after_keyframe).data.value<QColor>();
+  return QColor(lerp(before_data.red(), after_data.red(), progress),
+                lerp(before_data.green(), after_data.green(), progress),
+                lerp(before_data.blue(), after_data.blue(), progress));
+}
+
 QVariant EffectField::GetValueAt(double timecode) {
   if (!HasKeyframes()) return persistent_data_;
 
@@ -130,18 +139,9 @@ QVariant EffectField::GetValueAt(double timecode) {
     case EFFECT_FIELD_DOUBLE:
       persistent_data_ = InterpolateDouble(timecode, before_keyframe, after_keyframe, progress);
       break;
-    case EFFECT_FIELD_COLOR: {
-      if (before_keyframe == after_keyframe) {
-        persistent_data_ = keyframes.at(before_keyframe).data.value<QColor>();
-      } else {
-        QColor before_data = keyframes.at(before_keyframe).data.value<QColor>();
-        QColor after_data = keyframes.at(after_keyframe).data.value<QColor>();
-        persistent_data_ = QColor(lerp(before_data.red(), after_data.red(), progress),
-                                  lerp(before_data.green(), after_data.green(), progress),
-                                  lerp(before_data.blue(), after_data.blue(), progress));
-      }
+    case EFFECT_FIELD_COLOR:
+      persistent_data_ = InterpolateColor(before_keyframe, after_keyframe, progress);
       break;
-    }
     case EFFECT_FIELD_STRING:
     case EFFECT_FIELD_BOOL:
     case EFFECT_FIELD_COMBO:
@@ -233,24 +233,27 @@ const EffectField::EffectFieldType &EffectField::type() { return type_; }
 
 const QString &EffectField::id() { return id_; }
 
-double EffectField::GetValidKeyframeHandlePosition(int key, bool post) {
+// Find the nearest adjacent keyframe index: post=true → next (time >), post=false → prev (time <).
+// Returns -1 if none exists.
+int EffectField::FindAdjacentKeyframe(int key, bool post) const {
   int comp_key = -1;
-
-  // find keyframe before or after this one
+  long key_time = keyframes.at(key).time;
   for (int i = 0; i < keyframes.size(); i++) {
-    if (i != key && ((keyframes.at(i).time > keyframes.at(key).time) == post) &&
-        (comp_key == -1 || ((keyframes.at(i).time < keyframes.at(comp_key).time) == post))) {
-      // compare with next keyframe for post or previous frame for pre
-      comp_key = i;
-    }
+    if (i == key) continue;
+    bool correct_side = (keyframes.at(i).time > key_time) == post;
+    if (!correct_side) continue;
+    bool closer = (comp_key == -1) || ((keyframes.at(i).time < keyframes.at(comp_key).time) == post);
+    if (closer) comp_key = i;
   }
+  return comp_key;
+}
 
+double EffectField::GetValidKeyframeHandlePosition(int key, bool post) {
+  int comp_key = FindAdjacentKeyframe(key, post);
   double adjusted_key = post ? keyframes.at(key).post_handle_x : keyframes.at(key).pre_handle_x;
 
   // if this is the earliest/latest keyframe, no validation is required
-  if (comp_key == -1) {
-    return adjusted_key;
-  }
+  if (comp_key == -1) return adjusted_key;
 
   double comp = keyframes.at(comp_key).time - keyframes.at(key).time;
 
@@ -258,23 +261,16 @@ double EffectField::GetValidKeyframeHandlePosition(int key, bool post) {
   if (keyframes.at(comp_key).type == EFFECT_KEYFRAME_BEZIER) {
     double relative_comp_handle =
         comp + (post ? keyframes.at(comp_key).pre_handle_x : keyframes.at(comp_key).post_handle_x);
-    // return an average
-    if ((post && keyframes.at(key).post_handle_x > relative_comp_handle) ||
-        (!post && keyframes.at(key).pre_handle_x < relative_comp_handle)) {
+    double raw = post ? keyframes.at(key).post_handle_x : keyframes.at(key).pre_handle_x;
+    if ((post && raw > relative_comp_handle) || (!post && raw < relative_comp_handle)) {
       adjusted_key = (adjusted_key + relative_comp_handle) * 0.5;
     }
   }
 
   // don't let handle go beyond the compare keyframe's time
-  if (post == (adjusted_key > comp)) {
-    return comp;
-  }
+  if (post == (adjusted_key > comp)) return comp;
+  if (post == (adjusted_key < 0)) return 0;
 
-  if (post == (adjusted_key < 0)) {
-    return 0;
-  }
-
-  // original value is valid
   return adjusted_key;
 }
 

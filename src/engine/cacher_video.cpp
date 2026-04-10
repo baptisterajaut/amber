@@ -197,6 +197,34 @@ bool Cacher::cacheVideoProcessDecodedFrame(AVFrame* decoded_frame, int retrieve_
   return false;
 }
 
+// Scan the queue for earliest/latest pts and count frames above target.
+struct QueueStats {
+  int64_t earliest_pts;
+  int64_t latest_pts;
+  int frames_greater_than_target;
+};
+
+static QueueStats scan_queue(ClipQueue& queue_, int64_t target_pts) {
+  QueueStats stats{INT64_MAX, INT64_MIN, 0};
+  queue_.lock();
+  for (int i = 0; i < queue_.size(); i++) {
+    stats.earliest_pts = qMin(stats.earliest_pts, queue_.at(i)->pts);
+    stats.latest_pts = qMax(stats.latest_pts, queue_.at(i)->pts);
+    if (queue_.at(i)->pts > target_pts) stats.frames_greater_than_target++;
+  }
+  queue_.unlock();
+  return stats;
+}
+
+// Returns true if the upcoming queue is already full (no need to decode more frames).
+static bool upcoming_queue_is_full(const QueueConfig& cfg, int64_t latest_pts, int frames_greater_than_target,
+                                   int64_t maximum_ts) {
+  if (cfg.upcoming_queue_type == amber::FRAME_QUEUE_TYPE_FRAMES) {
+    return frames_greater_than_target >= maximum_ts;
+  }
+  return latest_pts > maximum_ts;
+}
+
 // ---------------------------------------------------------------------------
 // cacheVideoDynamicClip — handle non-still-image (dynamic) clip caching
 // ---------------------------------------------------------------------------
@@ -205,29 +233,18 @@ void Cacher::cacheVideoDynamicClip() {
   int64_t target_pts = seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
   int64_t second_pts = seconds_to_timestamp(clip, 1);
 
-  // Check which range of frames we have in the queue
-  int64_t earliest_pts = INT64_MAX;
-  int64_t latest_pts = INT64_MIN;
-  int frames_greater_than_target = 0;
-
-  queue_.lock();
-  for (int i = 0; i < queue_.size(); i++) {
-    earliest_pts = qMin(earliest_pts, queue_.at(i)->pts);
-    latest_pts = qMax(latest_pts, queue_.at(i)->pts);
-    if (queue_.at(i)->pts > target_pts) frames_greater_than_target++;
-  }
-  queue_.unlock();
+  QueueStats stats = scan_queue(queue_, target_pts);
 
   AVFrame* decoded_frame = nullptr;
   bool have_existing_frame_to_use = false;
   bool seeked_to_zero = false;
 
   // Seek if target is outside the cached window
-  if (target_pts < earliest_pts || target_pts > latest_pts + second_pts || queue_.size() == 0) {
+  if (target_pts < stats.earliest_pts || target_pts > stats.latest_pts + second_pts || queue_.size() == 0) {
     cacheVideoSeekToTarget(target_pts, second_pts, decoded_frame, seeked_to_zero);
     have_existing_frame_to_use = true;
-    frames_greater_than_target = 0;
-    latest_pts = INT64_MIN;
+    stats.frames_greater_than_target = 0;
+    stats.latest_pts = INT64_MIN;
   }
 
   QueueConfig cfg = resolve_queue_config(reversed);
@@ -240,17 +257,10 @@ void Cacher::cacheVideoDynamicClip() {
                            ? qCeil(cfg.upcoming_queue_size)
                            : qRound(target_pts + second_pts * cfg.upcoming_queue_size);
 
-  // Check if we already have enough upcoming frames
-  bool start_loop =
-      !((cfg.upcoming_queue_type == amber::FRAME_QUEUE_TYPE_FRAMES && frames_greater_than_target >= maximum_ts) ||
-        (cfg.upcoming_queue_type == amber::FRAME_QUEUE_TYPE_SECONDS && latest_pts > maximum_ts));
-
-  if (have_existing_frame_to_use && !start_loop) {
-    av_frame_free(&decoded_frame);
-    have_existing_frame_to_use = false;
+  if (upcoming_queue_is_full(cfg, stats.latest_pts, stats.frames_greater_than_target, maximum_ts)) {
+    if (have_existing_frame_to_use) av_frame_free(&decoded_frame);
+    return;
   }
-
-  if (!start_loop) return;
 
   interrupt_ = false;
   do {
@@ -262,7 +272,8 @@ void Cacher::cacheVideoDynamicClip() {
     }
 
     if (cacheVideoProcessDecodedFrame(decoded_frame, retrieve_code, target_pts, seeked_to_zero, cfg.previous_queue_type,
-                                      cfg.upcoming_queue_type, minimum_ts, maximum_ts, frames_greater_than_target)) {
+                                      cfg.upcoming_queue_type, minimum_ts, maximum_ts,
+                                      stats.frames_greater_than_target)) {
       break;
     }
   } while (!interrupt_);

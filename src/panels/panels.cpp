@@ -51,38 +51,22 @@ void update_ui(bool modified, bool scrubbing) {
 }
 
 QDockWidget* get_focused_panel(bool force_hover) {
-  QDockWidget* w = nullptr;
   if (amber::CurrentConfig.hover_focus || force_hover) {
-    if (panel_project->underMouse()) {
-      w = panel_project;
-    } else if (panel_effect_controls->underMouse()) {
-      w = panel_effect_controls;
-    } else if (panel_sequence_viewer->underMouse()) {
-      w = panel_sequence_viewer;
-    } else if (panel_footage_viewer->underMouse()) {
-      w = panel_footage_viewer;
-    } else if (panel_timeline->underMouse()) {
-      w = panel_timeline;
-    } else if (panel_graph_editor->view_is_under_mouse()) {
-      w = panel_graph_editor;
+    QDockWidget* panels_hover[] = {panel_project, panel_effect_controls, panel_sequence_viewer, panel_footage_viewer,
+                                   panel_timeline};
+    for (auto* p : panels_hover) {
+      if (p->underMouse()) return p;
     }
+    if (panel_graph_editor->view_is_under_mouse()) return panel_graph_editor;
   }
-  if (w == nullptr) {
-    if (panel_project->is_focused()) {
-      w = panel_project;
-    } else if (panel_effect_controls->keyframe_focus() || panel_effect_controls->is_focused()) {
-      w = panel_effect_controls;
-    } else if (panel_sequence_viewer->is_focused()) {
-      w = panel_sequence_viewer;
-    } else if (panel_footage_viewer->is_focused()) {
-      w = panel_footage_viewer;
-    } else if (panel_timeline->focused()) {
-      w = panel_timeline;
-    } else if (panel_graph_editor->view_is_focused()) {
-      w = panel_graph_editor;
-    }
-  }
-  return w;
+
+  if (panel_project->is_focused()) return panel_project;
+  if (panel_effect_controls->keyframe_focus() || panel_effect_controls->is_focused()) return panel_effect_controls;
+  if (panel_sequence_viewer->is_focused()) return panel_sequence_viewer;
+  if (panel_footage_viewer->is_focused()) return panel_footage_viewer;
+  if (panel_timeline->focused()) return panel_timeline;
+  if (panel_graph_editor->view_is_focused()) return panel_graph_editor;
+  return nullptr;
 }
 
 void alloc_panels(QWidget* parent) {

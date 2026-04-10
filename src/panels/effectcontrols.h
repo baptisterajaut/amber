@@ -21,43 +21,41 @@
 #ifndef EFFECTCONTROLS_H
 #define EFFECTCONTROLS_H
 
-#include <QUndoCommand>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QMenu>
 #include <QScrollArea>
-#include <QVBoxLayout>
-#include <QLabel>
 #include <QScrollBar>
-#include <QHBoxLayout>
 #include <QSplitter>
+#include <QUndoCommand>
+#include <QVBoxLayout>
 
 #include "project/projectelements.h"
-#include "ui/timelineheader.h"
-#include "ui/keyframeview.h"
-#include "ui/resizablescrollbar.h"
+#include "ui/effectui.h"
 #include "ui/keyframeview.h"
 #include "ui/panel.h"
-#include "ui/effectui.h"
+#include "ui/resizablescrollbar.h"
+#include "ui/timelineheader.h"
 
 class EffectsArea : public QWidget {
   Q_OBJECT
-public:
+ public:
   EffectsArea(QWidget* parent = nullptr);
   QScrollArea* parent_widget;
   KeyframeView* keyframe_area;
   TimelineHeader* header;
-protected:
+
+ protected:
   void resizeEvent(QResizeEvent*) override;
-public slots:
+ public slots:
   void receive_wheel_event(QWheelEvent* e);
 };
 
-class EffectControls : public Panel
-{
+class EffectControls : public Panel {
   Q_OBJECT
-public:
-  explicit EffectControls(QWidget *parent = nullptr);
+ public:
+  explicit EffectControls(QWidget* parent = nullptr);
   ~EffectControls() override;
-
 
   void Reload();
   void SetClips();
@@ -81,11 +79,11 @@ public:
 
   void LoadLayoutState(const QByteArray& data) override;
   QByteArray SaveLayoutState() override;
-public slots:
+ public slots:
   void cut();
   void copy(bool del = false);
   void update_keyframes();
-private slots:
+ private slots:
   void menu_select(QAction* q);
 
   void video_effect_click();
@@ -99,19 +97,22 @@ private slots:
   void queue_post_update();
 
   void effects_area_context_menu();
-protected:
-  void resizeEvent(QResizeEvent *event) override;
-private:
+
+ protected:
+  void resizeEvent(QResizeEvent* event) override;
+
+ private:
   QVector<Clip*> selected_clips_;
   QVector<EffectUI*> open_effects_;
 
   void Load();
+  bool load_one_effect(QVBoxLayout* layout, Clip* c, Effect* e);
 
   void DeleteEffect(ComboAction* ca, Effect* effect_ref);
 
   void show_effect_menu(int type, int subtype);
   void load_keyframes();
-  void open_effect(QVBoxLayout* hlayout, Effect *e);
+  void open_effect(QVBoxLayout* hlayout, Effect* e);
   void UpdateTitle();
 
   void setup_ui();
@@ -140,4 +141,4 @@ private:
   QWidget* acontainer;
 };
 
-#endif // EFFECTCONTROLS_H
+#endif  // EFFECTCONTROLS_H

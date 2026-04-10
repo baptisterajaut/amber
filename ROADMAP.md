@@ -8,32 +8,6 @@ Amber inherits Olive 0.1's greatest strength: everything is where you expect it.
 
 1.x receives bug fixes and security updates throughout 2.0 development. Once 2.0 is fully released, 1.x reaches end of life.
 
-## 1.x — Maintenance
-
-Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak backports (1.3.0), core/engine layer extraction, QoL batch (1.4.0), subtitles + 3-point editing + freeze frame + nesting + preview resolution (1.5.0) — all shipped.
-
-### 1.4.0 — Quality-of-life (shipped)
-
-- Export single frame (File → Export Frame, Ctrl+Shift+E)
-- Match frame (right-click → Match Frame, opens source in footage viewer)
-- Duplicate sequence (right-click → Duplicate, was already wired)
-- Built-in export presets (YouTube 1080p/4K, ProRes, VP9, MP3)
-- Portable Windows zip alongside NSIS installer
-- Shader effect Y-flip fix on Vulkan/Metal/D3D (#4)
-- Hold last frame during scrub (fixes title bleed-through)
-- Audio data race fix (lock ibuffer reads)
-- Nested clip gizmo fix, color label menu consistency, cover art import fix
-
-### 1.5.0 — Quality-of-life (shipped)
-
-- Subtitle import (.srt) with SubtitleEffect rendering
-- 3-point editing (Insert Edit `,`, Overwrite Edit `.` from footage viewer)
-- Freeze frame (Shift+F toggle, speed=0 guards, "(Frozen)" label)
-- Nesting fixes (circular reference detection, deletion protection, navigation stack + Escape/double-click, breadcrumb)
-- Unnest/flatten nested sequence
-- Set Duration shortcut (Ctrl+R)
-- Preview resolution (Full / 1/2 / 1/4) in View menu
-- Contextual Clip/In-Out submenus in Edit menu
 
 ### 1.6.0 — Quality-of-life
 
@@ -42,13 +16,10 @@ Core feature work complete. Qt RHI port (1.2.0), audio scrubbing (1.2.4), Oak ba
 - Shift+Arrow multi-frame skip — bind Shift+Left/Right as alias for Jump Backward/Forward (existing `Ctrl+[`/`Ctrl+]`, configurable step in preferences) (#15)
 - **Canvas Painter for viewer overlays (Qt 6.11)** — replace QPainter with Qt Canvas Painter (GPU-accelerated 2D on QRhi, 2-10x faster) for title-safe, guides, gizmos. Drop-in API swap, same drawing logic. Tech preview — API may shift in 6.12.
 - **Callback-based audio I/O (Qt 6.11)** — `QAudioSink::start()` now accepts a callback for real-time audio processing, replacing QIODevice push/pull. Adopt for audio monitoring and scrub playback — cleaner, lower latency.
-
-### 1.x maintenance
-
-Bug fixes and security patches only.
-
 - **Bold timecodes** — increase font weight on timecode displays (viewer, effect controls). Trivial QSS/font change. (#12)
 - **PipeWire Bluetooth audio** — Qt 6.11 ships a new PipeWire backend. Test if Bluetooth sink enumeration works; if so, remove the `QT_AUDIO_BACKEND=pulseaudio` workaround in `main.cpp`.
+
+
 
 ## 2.0
 

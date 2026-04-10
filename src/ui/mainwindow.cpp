@@ -69,71 +69,51 @@
 
 MainWindow* amber::MainWindow;
 
-void MainWindow::setup_layout(bool reset) {
-  // load panels from file
-  if (!reset) {
-    QFile panel_config(get_config_dir().filePath("layout"));
-    if (panel_config.exists() && panel_config.open(QFile::ReadOnly)) {
-      // default to resetting unless we find layout data in the XML file
-      reset = true;
-
-      // read XML layout file
-      QXmlStreamReader stream(&panel_config);
-
-      // loop through XML for all data
-      while (!stream.atEnd()) {
-        stream.readNext();
-
-        if (stream.name() == QLatin1String("panels") && stream.isStartElement()) {
-          // element contains MainWindow layout data to restore
-          stream.readNext();
-          restoreState(QByteArray::fromBase64(stream.text().toUtf8()), 0);
-          reset = false;
-
-        } else if (stream.name() == QLatin1String("panel") && stream.isStartElement()) {
-          // element contains layout data specific to a panel, we'll find the panel and load it
-
-          // get panel name from XML attribute
-          QString panel_name;
-          const QXmlStreamAttributes& attributes = stream.attributes();
-          for (const auto& attr : attributes) {
-            if (attr.name() == QLatin1String("name")) {
-              panel_name = attr.value().toString();
-              break;
-            }
-          }
-
-          if (panel_name.isEmpty()) {
-            qWarning() << "Layout file specified data for a panel but didn't specify a name. Layout wasn't loaded.";
-          } else {
-            // loop through panels for a panel with the same name
-
-            bool found_panel = false;
-
-            for (auto panel : amber::panels) {
-              if (panel->objectName() == panel_name) {
-                // found the panel, so we can load its state
-                stream.readNext();
-                panel->LoadLayoutState(QByteArray::fromBase64(stream.text().toUtf8()));
-
-                // we found it, no more need to loop through panels
-                found_panel = true;
-
-                break;
-              }
-            }
-
-            if (!found_panel) {
-              qWarning() << "Panel specified in layout data doesn't exist. Layout wasn't loaded.";
-            }
-          }
-        }
-      }
-
-      panel_config.close();
-    } else {
-      reset = true;
+static void layout_restore_panel_element(QXmlStreamReader& stream) {
+  QString panel_name;
+  for (const auto& attr : stream.attributes()) {
+    if (attr.name() == QLatin1String("name")) {
+      panel_name = attr.value().toString();
+      break;
     }
+  }
+  if (panel_name.isEmpty()) {
+    qWarning() << "Layout file specified data for a panel but didn't specify a name. Layout wasn't loaded.";
+    return;
+  }
+  for (auto panel : amber::panels) {
+    if (panel->objectName() != panel_name) continue;
+    stream.readNext();
+    panel->LoadLayoutState(QByteArray::fromBase64(stream.text().toUtf8()));
+    return;
+  }
+  qWarning() << "Panel specified in layout data doesn't exist. Layout wasn't loaded.";
+}
+
+// Returns false if reset should remain false (layout was loaded successfully).
+static bool load_layout_from_file(QMainWindow* win) {
+  QFile panel_config(get_config_dir().filePath("layout"));
+  if (!panel_config.exists() || !panel_config.open(QFile::ReadOnly)) return true;
+
+  bool reset = true;
+  QXmlStreamReader stream(&panel_config);
+  while (!stream.atEnd()) {
+    stream.readNext();
+    if (stream.name() == QLatin1String("panels") && stream.isStartElement()) {
+      stream.readNext();
+      win->restoreState(QByteArray::fromBase64(stream.text().toUtf8()), 0);
+      reset = false;
+    } else if (stream.name() == QLatin1String("panel") && stream.isStartElement()) {
+      layout_restore_panel_element(stream);
+    }
+  }
+  panel_config.close();
+  return reset;
+}
+
+void MainWindow::setup_layout(bool reset) {
+  if (!reset) {
+    reset = load_layout_from_file(this);
   }
 
   if (reset) {
@@ -236,6 +216,28 @@ static void load_config_if_exists() {
   if (QFileInfo::exists(config_fn)) amber::CurrentConfig.load(config_fn);
 }
 
+void MainWindow::init_window_frame() {
+  QWidget* centralWidget = new QWidget(this);
+  centralWidget->setMaximumSize(QSize(0, 0));
+  setCentralWidget(centralWidget);
+  setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
+  setDockNestingEnabled(true);
+  layout()->invalidate();
+}
+
+void MainWindow::init_panels_and_menus() {
+  alloc_panels(this);
+  amber::app_ctx = new AppContextImpl();
+  setup_menus();
+
+  QStatusBar* statusBar = new QStatusBar(this);
+  statusBar->showMessage(tr("Welcome to %1").arg(amber::AppName));
+  setStatusBar(statusBar);
+
+  amber::Global->check_for_autorecovery_file();
+  set_panels_locked(amber::CurrentConfig.locked_panels);
+}
+
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 
@@ -245,18 +247,9 @@ MainWindow::MainWindow(QWidget* parent)
   open_debug_file();
 
   amber::DebugDialog = new DebugDialog(this);
-
   amber::MainWindow = this;
 
-  QWidget* centralWidget = new QWidget(this);
-  centralWidget->setMaximumSize(QSize(0, 0));
-  setCentralWidget(centralWidget);
-
-  setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
-
-  setDockNestingEnabled(true);
-
-  layout()->invalidate();
+  init_window_frame();
 
   cleanup_data_dir();
   load_config_if_exists();
@@ -265,31 +258,12 @@ MainWindow::MainWindow(QWidget* parent)
 
   amber::icon::Initialize();
 
-  alloc_panels(this);
-  amber::app_ctx = new AppContextImpl();
+  init_panels_and_menus();
 
-  // populate menu bars
-  setup_menus();
-
-  QStatusBar* statusBar = new QStatusBar(this);
-  statusBar->showMessage(tr("Welcome to %1").arg(amber::AppName));
-  setStatusBar(statusBar);
-
-  amber::Global->check_for_autorecovery_file();
-
-  // lock panels if the config says so
-  set_panels_locked(amber::CurrentConfig.locked_panels);
-
-  // set up output audio device
   init_audio();
-
-  // start omnipotent proxy generator process
   amber::proxy_generator.start();
-
-  // load preferred language from file
   amber::Global->load_translation_from_config();
 
-  // set default strings
   Retranslate();
 }
 
@@ -300,49 +274,44 @@ MainWindow::~MainWindow() {
   close_debug_file();
 }
 
+static void kbd_save_action(QByteArray& file, QAction* a) {
+  if (a->property("default").isNull()) return;
+  QKeySequence defks(a->property("default").toString());
+  if (a->shortcut() == defks) return;
+  if (!file.isEmpty()) file.append('\n');
+  file.append(a->property("id").toString().toUtf8());
+  file.append('\t');
+  file.append(a->shortcut().toString().toUtf8());
+}
+
+static void kbd_load_action(QByteArray& file, QAction* a, bool first) {
+  if (first) {
+    a->setProperty("default", a->shortcut().toString());
+  } else {
+    a->setShortcut(a->property("default").toString());
+  }
+  if (a->property("id").isNull()) return;
+  QString comp_str = a->property("id").toString();
+  int shortcut_index = file.indexOf(comp_str.toUtf8());
+  if (shortcut_index != 0 && (shortcut_index < 0 || file.at(shortcut_index - 1) != '\n')) return;
+  shortcut_index += comp_str.size() + 1;
+  QString shortcut;
+  while (shortcut_index < file.size() && file.at(shortcut_index) != '\n') {
+    shortcut.append(file.at(shortcut_index++));
+  }
+  QKeySequence ks(shortcut);
+  if (!ks.isEmpty()) a->setShortcut(ks);
+}
+
 void kbd_shortcut_processor(QByteArray& file, QMenu* menu, bool save, bool first) {
-  QList<QAction*> actions = menu->actions();
-  for (auto a : actions) {
+  for (auto a : menu->actions()) {
     if (a->menu() != nullptr) {
       kbd_shortcut_processor(file, a->menu(), save, first);
     } else if (!a->isSeparator()) {
       if (save) {
-        // saving custom shortcuts
-        if (!a->property("default").isNull()) {
-          QKeySequence defks(a->property("default").toString());
-          if (a->shortcut() != defks) {
-            // custom shortcut
-            if (!file.isEmpty()) file.append('\n');
-            file.append(a->property("id").toString().toUtf8());
-            file.append('\t');
-            file.append(a->shortcut().toString().toUtf8());
-          }
-        }
+        kbd_save_action(file, a);
       } else {
-        // loading custom shortcuts
-        if (first) {
-          // store default shortcut
-          a->setProperty("default", a->shortcut().toString());
-        } else {
-          // restore default shortcut
-          a->setShortcut(a->property("default").toString());
-        }
-        if (!a->property("id").isNull()) {
-          QString comp_str = a->property("id").toString();
-          int shortcut_index = file.indexOf(comp_str.toUtf8());
-          if (shortcut_index == 0 || (shortcut_index > 0 && file.at(shortcut_index - 1) == '\n')) {
-            shortcut_index += comp_str.size() + 1;
-            QString shortcut;
-            while (shortcut_index < file.size() && file.at(shortcut_index) != '\n') {
-              shortcut.append(file.at(shortcut_index));
-              shortcut_index++;
-            }
-            QKeySequence ks(shortcut);
-            if (!ks.isEmpty()) {
-              a->setShortcut(ks);
-            }
-          }
-        }
+        kbd_load_action(file, a, first);
       }
     }
   }

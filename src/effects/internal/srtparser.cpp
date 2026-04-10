@@ -8,8 +8,7 @@ namespace {
 
 // Parse "HH:MM:SS,mmm" → milliseconds. Returns -1 on failure.
 qint64 parse_timestamp(const QStringView& s) {
-  static const QRegularExpression re(
-      QStringLiteral("^(\\d{1,2}):(\\d{2}):(\\d{2})[,\\.](\\d{3})$"));
+  static const QRegularExpression re(QStringLiteral("^(\\d{1,2}):(\\d{2}):(\\d{2})[,\\.](\\d{3})$"));
   QRegularExpressionMatch m = re.matchView(s);
   if (!m.hasMatch()) return -1;
 
@@ -46,36 +45,18 @@ bool parse_timecode_line(const QString& line, qint64& start_ms, qint64& end_ms) 
 
 }  // namespace
 
-SrtParseResult parse_srt(const QString& filepath) {
-  SrtParseResult result;
-  result.skipped = 0;
+namespace {
 
-  QFile file(filepath);
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    return result;
-  }
+enum SrtState { EXPECT_INDEX, EXPECT_TIMECODE, READING_TEXT };
 
-  QTextStream stream(&file);
-  QString content = stream.readAll();
-
-  // Skip BOM if present
-  if (content.startsWith(QChar(0xFEFF))) {
-    content = content.mid(1);
-  }
-
-  // Normalize line endings
-  content.replace(QLatin1String("\r\n"), QLatin1String("\n"));
-  content.replace(QLatin1Char('\r'), QLatin1Char('\n'));
-
-  QStringList lines = content.split(QLatin1Char('\n'));
-
-  enum State { EXPECT_INDEX, EXPECT_TIMECODE, READING_TEXT };
-  State state = EXPECT_INDEX;
-
-  qint64 cur_start = 0, cur_end = 0;
+struct SrtParserCtx {
+  SrtParseResult& result;
+  SrtState state{EXPECT_INDEX};
+  qint64 cur_start{0};
+  qint64 cur_end{0};
   QStringList cur_text_lines;
 
-  auto flush_cue = [&]() {
+  void flush_cue() {
     while (!cur_text_lines.isEmpty() && cur_text_lines.last().trimmed().isEmpty()) {
       cur_text_lines.removeLast();
     }
@@ -92,63 +73,98 @@ SrtParseResult parse_srt(const QString& filepath) {
       result.cues.append(cue);
     }
     cur_text_lines.clear();
-  };
+  }
+
+  // Returns false to signal outer loop should `continue` (skip to next line).
+  bool handle_expect_index(const QString& line) {
+    QString trimmed = line.trimmed();
+    if (trimmed.isEmpty()) return false;
+    bool ok = false;
+    trimmed.toInt(&ok);
+    if (ok) {
+      state = EXPECT_TIMECODE;
+    } else if (parse_timecode_line(trimmed, cur_start, cur_end)) {
+      state = READING_TEXT;
+    }
+    return true;
+  }
+
+  void handle_expect_timecode(const QString& line) {
+    QString trimmed = line.trimmed();
+    if (parse_timecode_line(trimmed, cur_start, cur_end)) {
+      state = READING_TEXT;
+    } else {
+      result.skipped++;
+      state = EXPECT_INDEX;
+    }
+  }
+
+  // Returns true if the outer loop should `break` out of the switch (implicit in for-loop).
+  bool handle_reading_text(const QString& line, int i, const QStringList& lines) {
+    QString trimmed = line.trimmed();
+    if (trimmed.isEmpty()) {
+      flush_cue();
+      state = EXPECT_INDEX;
+      return false;
+    }
+    // Check if this line is actually a new cue index (missing blank line)
+    bool ok = false;
+    trimmed.toInt(&ok);
+    if (ok && i + 1 < lines.size()) {
+      qint64 next_start, next_end;
+      if (parse_timecode_line(lines[i + 1].trimmed(), next_start, next_end)) {
+        flush_cue();
+        state = EXPECT_TIMECODE;
+        return true;
+      }
+    }
+    cur_text_lines.append(line);
+    return false;
+  }
+};
+
+}  // namespace
+
+SrtParseResult parse_srt(const QString& filepath) {
+  SrtParseResult result;
+  result.skipped = 0;
+
+  QFile file(filepath);
+  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    return result;
+  }
+
+  QTextStream stream(&file);
+  QString content = stream.readAll();
+
+  // Skip BOM if present
+  if (content.startsWith(QChar(0xFEFF))) content = content.mid(1);
+
+  // Normalize line endings
+  content.replace(QLatin1String("\r\n"), QLatin1String("\n"));
+  content.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+
+  QStringList lines = content.split(QLatin1Char('\n'));
+
+  SrtParserCtx ctx{result};
 
   for (int i = 0; i < lines.size(); i++) {
-    QString line = lines[i];
-
-    switch (state) {
-      case EXPECT_INDEX: {
-        QString trimmed = line.trimmed();
-        if (trimmed.isEmpty()) continue;
-
-        bool ok;
-        trimmed.toInt(&ok);
-        if (ok) {
-          state = EXPECT_TIMECODE;
-        } else if (parse_timecode_line(trimmed, cur_start, cur_end)) {
-          state = READING_TEXT;
-        }
+    const QString& line = lines[i];
+    switch (ctx.state) {
+      case EXPECT_INDEX:
+        if (!ctx.handle_expect_index(line)) continue;
         break;
-      }
-      case EXPECT_TIMECODE: {
-        QString trimmed = line.trimmed();
-        if (parse_timecode_line(trimmed, cur_start, cur_end)) {
-          state = READING_TEXT;
-        } else {
-          result.skipped++;
-          state = EXPECT_INDEX;
-        }
+      case EXPECT_TIMECODE:
+        ctx.handle_expect_timecode(line);
         break;
-      }
-      case READING_TEXT: {
-        QString trimmed = line.trimmed();
-        if (trimmed.isEmpty()) {
-          flush_cue();
-          state = EXPECT_INDEX;
-        } else {
-          // Check if this line is actually a new cue index (missing blank line)
-          bool ok = false;
-          trimmed.toInt(&ok);
-          if (ok && i + 1 < lines.size()) {
-            qint64 next_start, next_end;
-            if (parse_timecode_line(lines[i + 1].trimmed(), next_start, next_end)) {
-              flush_cue();
-              state = EXPECT_TIMECODE;
-              break;
-            }
-          }
-          cur_text_lines.append(line);
-        }
+      case READING_TEXT:
+        ctx.handle_reading_text(line, i, lines);
         break;
-      }
     }
   }
 
   // Flush last cue if file doesn't end with blank line
-  if (state == READING_TEXT) {
-    flush_cue();
-  }
+  if (ctx.state == READING_TEXT) ctx.flush_cue();
 
   // Sort by start_ms
   std::sort(result.cues.begin(), result.cues.end(),

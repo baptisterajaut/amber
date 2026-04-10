@@ -476,22 +476,54 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
   QRhiWidget::keyPressEvent(event);
 }
 
-void ViewerWidget::mousePressEvent(QMouseEvent* event) {
-  if (color_pick_mode_) {
-    if (event->button() == Qt::LeftButton) {
-      QColor c = readPixelAt(qRound(event->position().x()), qRound(event->position().y()));
-      if (c.isValid()) {
-        emit colorPicked(c);
-      } else {
-        emit colorPickCancelled();
-      }
-      exitColorPickMode();
-    } else if (event->button() == Qt::RightButton) {
-      exitColorPickMode();
-      emit colorPickCancelled();
-    }
-    return;
+bool ViewerWidget::press_handle_color_pick(QMouseEvent* event) {
+  if (!color_pick_mode_) return false;
+  if (event->button() == Qt::LeftButton) {
+    QColor c = readPixelAt(qRound(event->position().x()), qRound(event->position().y()));
+    emit c.isValid() ? colorPicked(c) : colorPickCancelled();
+    exitColorPickMode();
+  } else if (event->button() == Qt::RightButton) {
+    exitColorPickMode();
+    emit colorPickCancelled();
   }
+  return true;
+}
+
+bool ViewerWidget::press_handle_guide(int video_x, int image_y, QMouseEvent* event) {
+  if (event->buttons() & Qt::RightButton) {
+    bool hit_mirror = false;
+    int idx = find_guide_at(video_x, image_y, &hit_mirror);
+    if (idx < 0) return false;
+    show_guide_context_menu(idx, event->globalPosition().toPoint(), hit_mirror);
+    setContextMenuPolicy(Qt::PreventContextMenu);
+    QTimer::singleShot(0, this, [this]() { setContextMenuPolicy(Qt::CustomContextMenu); });
+    return true;
+  }
+  if (event->buttons() & Qt::LeftButton) {
+    bool hit_mirror = false;
+    int idx = find_guide_at(video_x, image_y, &hit_mirror);
+    if (idx >= 0) {
+      dragging_guide_index_ = idx;
+      dragging_guide_old_pos_ = viewer->seq->guides[idx].position;
+      dragging_mirror_side_ = hit_mirror;
+      dragging = true;
+      return true;
+    }
+  }
+  return false;
+}
+
+void ViewerWidget::press_set_gizmo_drag(QMouseEvent* event) {
+  drag_start_x = event->position().toPoint().x();
+  drag_start_y = event->position().toPoint().y();
+  gizmo_x_mvmt = 0;
+  gizmo_y_mvmt = 0;
+  selected_gizmo = get_gizmo_from_mouse(drag_start_x, drag_start_y);
+}
+
+void ViewerWidget::mousePressEvent(QMouseEvent* event) {
+  if (press_handle_color_pick(event)) return;
+
   if (waveform) {
     seek_from_click(qRound(event->position().x()));
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
@@ -501,43 +533,10 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
     double multiplier_y = double(viewer->seq->height) / double(height());
     int video_x = qRound(event->position().x() * multiplier_x);
     int image_y = qRound(event->position().y() * multiplier_y);
-
-    if (event->buttons() & Qt::RightButton) {
-      bool hit_mirror = false;
-      int idx = find_guide_at(video_x, image_y, &hit_mirror);
-      if (idx >= 0) {
-        show_guide_context_menu(idx, event->globalPosition().toPoint(), hit_mirror);
-        setContextMenuPolicy(Qt::PreventContextMenu);
-        QTimer::singleShot(0, this, [this]() { setContextMenuPolicy(Qt::CustomContextMenu); });
-        return;
-      }
-    } else if (event->buttons() & Qt::LeftButton) {
-      bool hit_mirror = false;
-      int idx = find_guide_at(video_x, image_y, &hit_mirror);
-      if (idx >= 0) {
-        dragging_guide_index_ = idx;
-        dragging_guide_old_pos_ = viewer->seq->guides[idx].position;
-        dragging_mirror_side_ = hit_mirror;
-        dragging = true;
-        return;
-      }
-      // Fall through to gizmo handling
-      drag_start_x = event->position().toPoint().x();
-      drag_start_y = event->position().toPoint().y();
-
-      gizmo_x_mvmt = 0;
-      gizmo_y_mvmt = 0;
-
-      selected_gizmo = get_gizmo_from_mouse(event->position().toPoint().x(), event->position().toPoint().y());
-    }
+    if (press_handle_guide(video_x, image_y, event)) return;
+    if (event->buttons() & Qt::LeftButton) press_set_gizmo_drag(event);
   } else if (event->buttons() & Qt::LeftButton) {
-    drag_start_x = event->position().toPoint().x();
-    drag_start_y = event->position().toPoint().y();
-
-    gizmo_x_mvmt = 0;
-    gizmo_y_mvmt = 0;
-
-    selected_gizmo = get_gizmo_from_mouse(event->position().toPoint().x(), event->position().toPoint().y());
+    press_set_gizmo_drag(event);
   }
   dragging = true;
 }
@@ -1024,6 +1023,30 @@ QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
                 static_cast<unsigned char>(data[offset + 2]), static_cast<unsigned char>(data[offset + 3]));
 }
 
+void ViewerWidget::render_update_frame_texture(QRhiResourceUpdateBatch* u, const char* frame_data, int fw, int fh) {
+  if (fw != cached_tex_w_ || fh != cached_tex_h_) {
+    delete frame_tex_;
+    frame_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(fw, fh));
+    frame_tex_->create();
+
+    srb_->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, vert_ubuf_),
+        QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, frag_ubuf_),
+        QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, frame_tex_, sampler_),
+    });
+    srb_->create();
+
+    pipeline_->setShaderResourceBindings(srb_);
+    pipeline_->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+    pipeline_->create();
+
+    cached_tex_w_ = fw;
+    cached_tex_h_ = fh;
+  }
+  QRhiTextureSubresourceUploadDescription desc(reinterpret_cast<const uchar*>(frame_data), fw * fh * 4);
+  u->uploadTexture(frame_tex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+}
+
 void ViewerWidget::render(QRhiCommandBuffer* cb) {
   if (waveform) {
     const QColor clearColor(0, 0, 0, 255);
@@ -1045,30 +1068,7 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
   bool has_frame = (frame_data != nullptr && fw > 0 && fh > 0 && viewer->seq != nullptr);
 
   QRhiResourceUpdateBatch* u = rhi_->nextResourceUpdateBatch();
-  if (has_frame) {
-    if (fw != cached_tex_w_ || fh != cached_tex_h_) {
-      delete frame_tex_;
-      frame_tex_ = rhi_->newTexture(QRhiTexture::RGBA8, QSize(fw, fh));
-      frame_tex_->create();
-
-      srb_->setBindings({
-          QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, vert_ubuf_),
-          QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, frag_ubuf_),
-          QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, frame_tex_, sampler_),
-      });
-      srb_->create();
-
-      pipeline_->setShaderResourceBindings(srb_);
-      pipeline_->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
-      pipeline_->create();
-
-      cached_tex_w_ = fw;
-      cached_tex_h_ = fh;
-    }
-
-    QRhiTextureSubresourceUploadDescription desc(reinterpret_cast<const uchar*>(frame_data), fw * fh * 4);
-    u->uploadTexture(frame_tex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
-  }
+  if (has_frame) render_update_frame_texture(u, frame_data, fw, fh);
 
   // Update gizmo tracking — detect stale gizmo (user selected a different clip while paused)
   gizmos = renderer->gizmos;
@@ -1077,11 +1077,7 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
     QTimer::singleShot(0, this, &ViewerWidget::frame_update);
   }
 
-  // Pass frame to fullscreen window (copies data)
-  if (has_frame && window->isVisible()) {
-    window->set_frame(frame_data, fw, fh);
-  }
-
+  if (has_frame && window->isVisible()) window->set_frame(frame_data, fw, fh);
   frame_lock->unlock();
   // --- end CPU bridge ---
 
@@ -1126,13 +1122,10 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
 
   cb->endPass();
 
-  // Retry render if texture failed
   if (renderer->did_texture_fail() && !viewer->playing) {
     renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0,
                            amber::CurrentConfig.preview_resolution_divider);
   }
-
-  // Schedule overlay repaint
   if (overlay_) overlay_->update();
 }
 

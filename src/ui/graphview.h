@@ -106,6 +106,7 @@ class GraphView : public QWidget {
 
   void draw_lines(QPainter& p, bool vert);
   void draw_line_text(QPainter& p, bool vert, int line_no, int line_pos, int next_line_pos);
+  void paint_field_curves(QPainter& p, int field_index);
 
   EffectRow* row;
 

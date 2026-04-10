@@ -237,6 +237,9 @@ class MainWindow : public QMainWindow {
    */
   void setup_menus();
 
+  void init_window_frame();
+  void init_panels_and_menus();
+
   void Retranslate();
 
   // file menu actions

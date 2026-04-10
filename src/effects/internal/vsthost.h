@@ -71,6 +71,8 @@ class VSTHost : public Effect {
 
   void send_data_cache_to_plugin();
   void StartIdleTimer();
+  void HideInterface();
+  bool ShowInterfacePlatform();
 
   QLibrary modulePtr;
   QTimer* idle_timer{nullptr};

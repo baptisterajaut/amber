@@ -314,6 +314,44 @@ bool Cacher::openWorkerBuildAtempoChain(double playback_speed, AVFilterContext*&
 }
 
 // ---------------------------------------------------------------------------
+// openWorkerAudioFilter helpers
+// ---------------------------------------------------------------------------
+
+// Create abuffer, abuffersink, and aformat filters. Returns false on any failure.
+bool Cacher::openWorkerCreateAudioFilters(int target_sample_rate, AVFilterContext*& aformat_ctx) {
+  char filter_args[512];
+  {
+    char ch_layout_str[64];
+    av_channel_layout_describe(&codecCtx->ch_layout, ch_layout_str, sizeof(ch_layout_str));
+    snprintf(filter_args, sizeof(filter_args), "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
+             stream->time_base.num, stream->time_base.den, stream->codecpar->sample_rate,
+             av_get_sample_fmt_name(codecCtx->sample_fmt), ch_layout_str);
+  }
+
+  if (avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("abuffer"), "in", filter_args, nullptr,
+                                   filter_graph) < 0) {
+    qCritical() << "Could not create audio buffer source";
+    return false;
+  }
+
+  if (avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out", nullptr, nullptr,
+                                   filter_graph) < 0) {
+    qCritical() << "Could not create audio buffer sink";
+    return false;
+  }
+
+  char aformat_args[128];
+  snprintf(aformat_args, sizeof(aformat_args), "sample_fmts=%s:channel_layouts=stereo:sample_rates=%d",
+           av_get_sample_fmt_name(kDestSampleFmt), target_sample_rate);
+  if (avfilter_graph_create_filter(&aformat_ctx, avfilter_get_by_name("aformat"), "aformat", aformat_args, nullptr,
+                                   filter_graph) < 0) {
+    qCritical() << "Could not create aformat filter";
+    return false;
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // openWorkerAudioFilter
 // ---------------------------------------------------------------------------
 void Cacher::openWorkerAudioFilter(Footage* m) {
@@ -325,9 +363,8 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
     av_channel_layout_default(&codecCtx->ch_layout, stream->codecpar->ch_layout.nb_channels);
   }
 
-  // Set up cache
+  // Set up decode frame cache (forward frame + reverse accumulation frame)
   queue_.append(av_frame_alloc());
-
   {
     AVFrame* reverse_frame = av_frame_alloc();
     reverse_frame->format = kDestSampleFmt;
@@ -338,64 +375,21 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
     queue_.append(reverse_frame);
   }
 
-  char filter_args[512];
-  {
-    char ch_layout_str[64];
-    av_channel_layout_describe(&codecCtx->ch_layout, ch_layout_str, sizeof(ch_layout_str));
-    snprintf(filter_args, sizeof(filter_args), "time_base=%d/%d:sample_rate=%d:sample_fmt=%s:channel_layout=%s",
-             stream->time_base.num, stream->time_base.den, stream->codecpar->sample_rate,
-             av_get_sample_fmt_name(codecCtx->sample_fmt), ch_layout_str);
-  }
-
-  bool ok = true;
-
-  if (avfilter_graph_create_filter(&buffersrc_ctx, avfilter_get_by_name("abuffer"), "in", filter_args, nullptr,
-                                   filter_graph) < 0) {
-    qCritical() << "Could not create audio buffer source";
-    ok = false;
-  }
-
-  // Compute target sample rate early -- needed for buffersink options
+  double playback_speed = clip->speed().value * m->speed;
   int target_sample_rate = current_audio_freq();
-  double playback_speed = 1.0;
-  if (ok) {
-    playback_speed = clip->speed().value * m->speed;
-    if (!qFuzzyIsNull(playback_speed) && !qFuzzyCompare(playback_speed, 1.0) && !clip->speed().maintain_audio_pitch) {
-      target_sample_rate = qRound64(target_sample_rate / playback_speed);
-    }
+  if (!qFuzzyIsNull(playback_speed) && !qFuzzyCompare(playback_speed, 1.0) && !clip->speed().maintain_audio_pitch) {
+    target_sample_rate = qRound64(target_sample_rate / playback_speed);
   }
 
-  // Create abuffersink (no constraints — aformat filter handles conversion)
-  if (ok) {
-    if (avfilter_graph_create_filter(&buffersink_ctx, avfilter_get_by_name("abuffersink"), "out", nullptr, nullptr,
-                                     filter_graph) < 0) {
-      qCritical() << "Could not create audio buffer sink";
-      ok = false;
-    }
-  }
-
-  // Explicit aformat filter: converts sample format, channel layout, and sample rate.
   AVFilterContext* aformat_ctx = nullptr;
-  if (ok) {
-    char aformat_args[128];
-    snprintf(aformat_args, sizeof(aformat_args), "sample_fmts=%s:channel_layouts=stereo:sample_rates=%d",
-             av_get_sample_fmt_name(kDestSampleFmt), target_sample_rate);
-    if (avfilter_graph_create_filter(&aformat_ctx, avfilter_get_by_name("aformat"), "aformat", aformat_args, nullptr,
-                                     filter_graph) < 0) {
-      qCritical() << "Could not create aformat filter";
-      ok = false;
-    }
-  }
+  bool ok = openWorkerCreateAudioFilters(target_sample_rate, aformat_ctx);
 
   // Build filter chain: abuffer → [atempo chain] → aformat → abuffersink
   if (ok) {
     AVFilterContext* last_filter = buffersrc_ctx;
-
     bool need_atempo =
         !qFuzzyCompare(playback_speed, 1.0) && !qFuzzyIsNull(playback_speed) && clip->speed().maintain_audio_pitch;
-    if (need_atempo) {
-      openWorkerBuildAtempoChain(playback_speed, last_filter, ok);
-    }
+    if (need_atempo) openWorkerBuildAtempoChain(playback_speed, last_filter, ok);
 
     if (ok) {
       avfilter_link(last_filter, 0, aformat_ctx, 0);
@@ -580,23 +574,50 @@ bool Cacher::cacheFindFrameInQueue(int64_t target_pts) {
 }
 
 // ---------------------------------------------------------------------------
+// Cache helpers
+// ---------------------------------------------------------------------------
+
+// Try to serve a still-image clip from the existing queue without waking the cacher.
+// Returns true if the frame was found and retrieved_frame is set.
+bool Cacher::cacheServeStillImage() {
+  if (clip->media_stream() == nullptr || !clip->media_stream()->infinite_length) return false;
+  queue_.lock();
+  if (queue_.size() > 0) retrieved_frame = queue_.at(0);
+  queue_.unlock();
+  return retrieved_frame != nullptr;
+}
+
+// Check queue for a frame matching the current playhead. Returns false if cacher must run.
+bool Cacher::cacheTryQueueHit() {
+  if (clip->media() == nullptr) return false;
+  retrieve_lock_.lock();
+  queue_.lock();
+  retrieved_frame = nullptr;
+  int64_t target_pts = seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
+  bool found = cacheFindFrameInQueue(target_pts);
+  queue_.unlock();
+  retrieve_lock_.unlock();
+  return found;
+}
+
+// Block the calling thread until the cacher responds (or timeout), then unlock.
+void Cacher::cacheWaitForResponse() {
+  main_thread_lock_.lock();
+  main_thread_woken_ = false;
+  wait_cond_.wakeAll();
+  interrupt_ = true;
+  if (!main_thread_woken_) {
+    main_thread_wait_.wait(&main_thread_lock_, 2000);
+  }
+  main_thread_lock_.unlock();
+}
+
+// ---------------------------------------------------------------------------
 // Cache
 // ---------------------------------------------------------------------------
 void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed) {
-  if (!is_valid_state_) {
-    return;
-  }
-
-  if (clip->media_stream() != nullptr && clip->media_stream()->infinite_length) {
-    queue_.lock();
-    if (queue_.size() > 0) {
-      retrieved_frame = queue_.at(0);
-    }
-    queue_.unlock();
-    if (retrieved_frame != nullptr) {
-      return;
-    }
-  }
+  if (!is_valid_state_) return;
+  if (cacheServeStillImage()) return;
 
   playhead_ = playhead;
   nests_ = nests;
@@ -604,42 +625,16 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   playback_speed_ = playback_speed;
   queued_ = true;
 
-  bool wait_for_cacher_to_respond = true;
-
-  if (clip->media() != nullptr) {
-    // see if we already have this frame
-    retrieve_lock_.lock();
-    queue_.lock();
-    retrieved_frame = nullptr;
-    int64_t target_pts = seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
-    if (cacheFindFrameInQueue(target_pts)) {
-      wait_for_cacher_to_respond = false;
-    }
-    queue_.unlock();
-    retrieve_lock_.unlock();
-  }
+  bool need_wait = !cacheTryQueueHit();
 
   // Audio scrub: fire-and-forget — never block the UI thread.
   bool audio_scrub = (scrubbing && clip->track() >= 0);
 
-  if (wait_for_cacher_to_respond && !audio_scrub) {
-    main_thread_lock_.lock();
-    main_thread_woken_ = false;
-  }
-
-  // wake up cacher
-  wait_cond_.wakeAll();
-
-  // wait for cacher to respond (video and audio playback only, not audio scrub)
-  if (wait_for_cacher_to_respond && !audio_scrub) {
-    interrupt_ = true;
-    if (!main_thread_woken_) {
-      main_thread_wait_.wait(&main_thread_lock_, 2000);
-    }
-  }
-
-  if (wait_for_cacher_to_respond && !audio_scrub) {
-    main_thread_lock_.unlock();
+  if (need_wait && !audio_scrub) {
+    cacheWaitForResponse();
+  } else {
+    // just wake the cacher without blocking
+    wait_cond_.wakeAll();
   }
 }
 

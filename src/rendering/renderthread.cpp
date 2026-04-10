@@ -84,54 +84,75 @@ void RenderThread::setGlFallbackSurface(QOffscreenSurface* surface) {
   owns_fallback_surface_ = false;
 }
 
-// Attempt to create QRhi using the configured backend, with OpenGL and software Vulkan fallbacks.
-// Returns true on success; on failure rhi_ remains null and the caller should skip the frame.
-bool RenderThread::try_create_rhi() {
-  RhiBackend backend = amber::CurrentRuntimeConfig.rhi_backend;
+// Try to create QRhi using a Vulkan instance (used for both hardware and software Vulkan).
+#if AMBER_HAS_VULKAN
+static QRhi* try_create_vulkan_rhi(void* vulkan_instance_ptr) {
+  auto* vi = static_cast<QVulkanInstance*>(vulkan_instance_ptr);
+  if (!vi || !vi->isValid()) return nullptr;
+  QRhiVulkanInitParams vkParams;
+  vkParams.inst = vi;
+  return QRhi::create(QRhi::Vulkan, &vkParams);
+}
+#endif
 
+// Try to create QRhi using the preferred (non-OpenGL) backend. Returns nullptr if unavailable/failed.
+static QRhi* try_create_preferred_rhi(RhiBackend backend) {
   switch (backend) {
 #if AMBER_HAS_VULKAN
     case RhiBackend::Vulkan: {
-      auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
-      if (vi && vi->isValid()) {
-        QRhiVulkanInitParams vkParams;
-        vkParams.inst = vi;
-        rhi_ = QRhi::create(QRhi::Vulkan, &vkParams);
-      }
-      if (!rhi_) qWarning() << "Vulkan QRhi creation failed, falling back to OpenGL";
-      break;
+      QRhi* rhi = try_create_vulkan_rhi(amber::CurrentRuntimeConfig.vulkan_instance);
+      if (!rhi) qWarning() << "Vulkan QRhi creation failed, falling back to OpenGL";
+      return rhi;
     }
 #endif
 #if defined(Q_OS_MACOS) || defined(Q_OS_IOS)
     case RhiBackend::Metal: {
       QRhiMetalInitParams mtlParams;
-      rhi_ = QRhi::create(QRhi::Metal, &mtlParams);
-      if (!rhi_) qWarning() << "Metal QRhi creation failed, falling back to OpenGL";
-      break;
+      QRhi* rhi = QRhi::create(QRhi::Metal, &mtlParams);
+      if (!rhi) qWarning() << "Metal QRhi creation failed, falling back to OpenGL";
+      return rhi;
     }
 #endif
 #if defined(Q_OS_WIN)
     case RhiBackend::D3D12: {
       QRhiD3D12InitParams d3d12Params;
-      rhi_ = QRhi::create(QRhi::D3D12, &d3d12Params);
-      if (!rhi_) {
-        qWarning() << "D3D12 QRhi creation failed, trying D3D11";
-        QRhiD3D11InitParams d3d11Params;
-        rhi_ = QRhi::create(QRhi::D3D11, &d3d11Params);
-        if (!rhi_) qWarning() << "D3D11 also failed, falling back to OpenGL";
-      }
-      break;
+      QRhi* rhi = QRhi::create(QRhi::D3D12, &d3d12Params);
+      if (rhi) return rhi;
+      qWarning() << "D3D12 QRhi creation failed, trying D3D11";
+      QRhiD3D11InitParams d3d11Params;
+      rhi = QRhi::create(QRhi::D3D11, &d3d11Params);
+      if (!rhi) qWarning() << "D3D11 also failed, falling back to OpenGL";
+      return rhi;
     }
     case RhiBackend::D3D11: {
       QRhiD3D11InitParams d3d11Params;
-      rhi_ = QRhi::create(QRhi::D3D11, &d3d11Params);
-      if (!rhi_) qWarning() << "D3D11 QRhi creation failed, falling back to OpenGL";
-      break;
+      QRhi* rhi = QRhi::create(QRhi::D3D11, &d3d11Params);
+      if (!rhi) qWarning() << "D3D11 QRhi creation failed, falling back to OpenGL";
+      return rhi;
     }
 #endif
     default:
-      break;
+      return nullptr;
   }
+}
+
+// Load shaders and create sampler after QRhi is ready.
+void RenderThread::init_rhi_resources() {
+  passthroughVert_ = loadQsb(QStringLiteral(":/shaders/common.vert.qsb"));
+  passthroughFrag_ = loadQsb(QStringLiteral(":/shaders/passthrough.frag.qsb"));
+  blendingFrag_ = loadQsb(QStringLiteral(":/shaders/blending.frag.qsb"));
+  premultiplyFrag_ = loadQsb(QStringLiteral(":/shaders/premultiply.frag.qsb"));
+  yuvFrag_ = loadQsb(QStringLiteral(":/shaders/yuv2rgb.frag.qsb"));
+
+  sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None, QRhiSampler::ClampToEdge,
+                              QRhiSampler::ClampToEdge);
+  sampler_->create();
+}
+
+// Attempt to create QRhi using the configured backend, with OpenGL and software Vulkan fallbacks.
+// Returns true on success; on failure rhi_ remains null and the caller should skip the frame.
+bool RenderThread::try_create_rhi() {
+  rhi_ = try_create_preferred_rhi(amber::CurrentRuntimeConfig.rhi_backend);
 
   // OpenGL fallback
   if (!rhi_) {
@@ -147,13 +168,8 @@ bool RenderThread::try_create_rhi() {
 #if AMBER_HAS_VULKAN
   // Last resort: software Vulkan (llvmpipe)
   if (!rhi_ && amber::CurrentRuntimeConfig.vulkan_is_software) {
-    auto* vi = static_cast<QVulkanInstance*>(amber::CurrentRuntimeConfig.vulkan_instance);
-    if (vi && vi->isValid()) {
-      qWarning() << "OpenGL failed, falling back to software Vulkan (llvmpipe)";
-      QRhiVulkanInitParams vkParams;
-      vkParams.inst = vi;
-      rhi_ = QRhi::create(QRhi::Vulkan, &vkParams);
-    }
+    qWarning() << "OpenGL failed, falling back to software Vulkan (llvmpipe)";
+    rhi_ = try_create_vulkan_rhi(amber::CurrentRuntimeConfig.vulkan_instance);
   }
 #endif
 
@@ -163,15 +179,7 @@ bool RenderThread::try_create_rhi() {
   }
   qInfo() << "QRhi initialized, backend:" << rhi_->backendName() << "driver:" << rhi_->driverInfo().deviceName;
 
-  passthroughVert_ = loadQsb(QStringLiteral(":/shaders/common.vert.qsb"));
-  passthroughFrag_ = loadQsb(QStringLiteral(":/shaders/passthrough.frag.qsb"));
-  blendingFrag_ = loadQsb(QStringLiteral(":/shaders/blending.frag.qsb"));
-  premultiplyFrag_ = loadQsb(QStringLiteral(":/shaders/premultiply.frag.qsb"));
-  yuvFrag_ = loadQsb(QStringLiteral(":/shaders/yuv2rgb.frag.qsb"));
-
-  sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None, QRhiSampler::ClampToEdge,
-                              QRhiSampler::ClampToEdge);
-  sampler_->create();
+  init_rhi_resources();
   return true;
 }
 

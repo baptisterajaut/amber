@@ -367,6 +367,37 @@ static void reverseAudioSeekBack(AVCodecContext* codecCtx, AVFormatContext* form
 
 // ---------------------------------------------------------------------------
 
+// Decode one audio frame from the filter graph (handles reverse/forward logic).
+// Returns true if a frame was decoded; false if the outer loop should break.
+bool Cacher::cacheAudioDecodeOneFrame(AVFrame* frame, bool reverse_audio, double timebase, bool audio_just_reset) {
+  if (reverse_audio && !audio_just_reset) {
+    reverseAudioSeekBack(codecCtx, formatCtx, stream, reverse_target_, reached_end);
+  }
+
+  int loop = 0;
+  do {
+    av_frame_unref(frame);
+    int ret = cacheAudioPullFiltered(frame, reverse_audio);
+
+    if (ret < 0) {
+      if (ret != AVERROR_EOF) return false;
+      if (!reverse_audio) return false;
+    }
+
+    if (reverse_audio) {
+      if (cacheAudioAccumulateReverse(frame, frame, loop, ret, timebase)) return true;
+      loop++;
+#ifdef AUDIOWARNINGS
+      dout << "loop" << loop;
+#endif
+    } else {
+      frame->pts = frame_->pts;
+      return true;
+    }
+  } while (true);
+  return false;
+}
+
 bool Cacher::cacheAudioFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_audio, bool& audio_just_reset,
                                   double last_fr, long timeline_in, long target_frame, long frame_skip) {
   // skip audio processing if filter graph failed to initialize
@@ -384,32 +415,7 @@ bool Cacher::cacheAudioFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_a
   while ((frame_sample_index_ == -1 || frame_sample_index_ >= nb_bytes) && nb_bytes > 0) {
     if (reached_end) break;
 
-    if (reverse_audio && !audio_just_reset) {
-      reverseAudioSeekBack(codecCtx, formatCtx, stream, reverse_target_, reached_end);
-    }
-
-    int loop = 0;
-    do {
-      av_frame_unref(frame);
-
-      int ret = cacheAudioPullFiltered(frame, reverse_audio);
-
-      if (ret < 0) {
-        if (ret != AVERROR_EOF) break;
-        if (!reverse_audio) break;
-      }
-
-      if (reverse_audio) {
-        if (cacheAudioAccumulateReverse(frame, frame, loop, ret, timebase)) break;
-        loop++;
-#ifdef AUDIOWARNINGS
-        dout << "loop" << loop;
-#endif
-      } else {
-        frame->pts = frame_->pts;
-        break;
-      }
-    } while (true);
+    cacheAudioDecodeOneFrame(frame, reverse_audio, timebase, audio_just_reset);
 
     new_frame = true;
 
@@ -587,6 +593,39 @@ static bool processNullMediaAudio(Clip* clip, AVFrame* frame_, int& frame_sample
 
 // ---------------------------------------------------------------------------
 
+bool Cacher::cacheAudioWorkerFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_audio, bool& audio_just_reset,
+                                        double last_fr, long timeline_in, long /*timeline_out*/, long target_frame,
+                                        long frame_skip) {
+  if (clip->media() == nullptr) {
+    if (!processNullMediaAudio(clip, frame_, frame_sample_index_, audio_buffer_write, nests_, last_fr, timeline_in,
+                               target_frame)) {
+      return false;
+    }
+    frame = frame_;
+    nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
+               frame->ch_layout.nb_channels;
+    return true;
+  }
+
+  if (clip->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
+    return cacheAudioFetchFrame(frame, nb_bytes, reverse_audio, audio_just_reset, last_fr, timeline_in, target_frame,
+                                frame_skip);
+  }
+
+  return false;
+}
+
+void Cacher::cacheAudioWorkerFinalize(qint64 scrub_bytes_mixed) {
+  if (scrubbing_) {
+    last_scrub_id_ = audio_scrub_id.load();
+    if (scrub_bytes_mixed > 0) {
+      audio_scrub_data_ready.store(true);
+      if (audio_thread != nullptr) audio_thread->notifyReceiver();
+    }
+  }
+  WakeAudioWakeObject();
+}
+
 void Cacher::CacheAudioWorker() {
   // main thread waits until cacher starts fully, wake it up here
   WakeMainThread();
@@ -636,23 +675,11 @@ void Cacher::CacheAudioWorker() {
   qint64 scrub_bytes_mixed = 0;
 
   while (true) {
-    AVFrame* frame;
+    AVFrame* frame = nullptr;
     int nb_bytes = INT_MAX;
 
-    if (clip->media() == nullptr) {
-      if (!processNullMediaAudio(clip, frame_, frame_sample_index_, audio_buffer_write, nests_, last_fr, timeline_in,
-                                 target_frame)) {
-        break;
-      }
-      frame = frame_;
-      nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
-                 frame->ch_layout.nb_channels;
-    } else if (clip->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
-      if (!cacheAudioFetchFrame(frame, nb_bytes, reverse_audio, audio_just_reset, last_fr, timeline_in, target_frame,
-                                frame_skip)) {
-        break;
-      }
-    } else {
+    if (!cacheAudioWorkerFetchFrame(frame, nb_bytes, reverse_audio, audio_just_reset, last_fr, timeline_in,
+                                    timeline_out, target_frame, frame_skip)) {
       break;
     }
 
@@ -672,17 +699,7 @@ void Cacher::CacheAudioWorker() {
     }
   }
 
-  // Mark this cacher as having contributed to the current scrub event.
-  if (scrubbing_) {
-    last_scrub_id_ = audio_scrub_id.load();
-    if (scrub_bytes_mixed > 0) {
-      audio_scrub_data_ready.store(true);
-      if (audio_thread != nullptr) audio_thread->notifyReceiver();
-    }
-  }
-
-  // If there's a QObject waiting for audio to be rendered, wake it now
-  WakeAudioWakeObject();
+  cacheAudioWorkerFinalize(scrub_bytes_mixed);
 }
 
 bool Cacher::IsReversed() {

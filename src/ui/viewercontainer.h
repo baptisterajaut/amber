@@ -63,6 +63,8 @@ class ViewerContainer : public QWidget {
   void scroll_changed();
 
  private:
+  void ensure_rulers_created();
+  void adjust_fit_or_overflow(int avail_x, int avail_y, int avail_w, int avail_h, int zoomed_width, int zoomed_height);
   int drag_start_x;
   int drag_start_y;
   int horiz_start;

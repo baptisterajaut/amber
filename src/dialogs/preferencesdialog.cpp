@@ -223,6 +223,26 @@ void PreferencesDialog::handle_preview_resolution_changes() {
   delete_previews(delete_match);
 }
 
+bool PreferencesDialog::AnyBoolRequiresRestart() const {
+  for (int i = 0; i < bool_restart_required.size(); i++) {
+    if (bool_restart_required.at(i) && bool_ui.at(i)->isChecked() != *bool_value.at(i)) return true;
+  }
+  return false;
+}
+
+bool PreferencesDialog::SettingsRequireRestart() const {
+  return AnyBoolRequiresRestart() || amber::CurrentConfig.thumbnail_resolution != thumbnail_res_spinbox->value() ||
+         amber::CurrentConfig.waveform_resolution != waveform_res_spinbox->value() ||
+         amber::CurrentConfig.css_path != custom_css_fn->text() ||
+         amber::CurrentConfig.style != static_cast<amber::styling::Style>(ui_style->currentData().toInt());
+}
+
+bool PreferencesDialog::AudioSettingsChanged() const {
+  return amber::CurrentConfig.preferred_audio_output != audio_output_devices->currentData().toString() ||
+         amber::CurrentConfig.preferred_audio_input != audio_input_devices->currentData().toString() ||
+         amber::CurrentConfig.audio_rate != audio_sample_rate->currentData().toInt();
+}
+
 void PreferencesDialog::accept() {
   // Validate whether the specified CSS file exists
   if (!custom_css_fn->text().isEmpty() && !QFileInfo::exists(custom_css_fn->text())) {
@@ -231,21 +251,10 @@ void PreferencesDialog::accept() {
   }
 
   bool reload_effects = (amber::CurrentConfig.effect_textbox_lines != effect_textbox_lines_field->value());
-
-  bool bool_requires_restart = false;
-  for (int i = 0; i < bool_restart_required.size(); i++) {
-    if (bool_restart_required.at(i) && bool_ui.at(i)->isChecked() != *bool_value.at(i)) {
-      bool_requires_restart = true;
-      break;
-    }
-  }
-
-  // Check if any settings will require a restart
+  bool reinit_audio = AudioSettingsChanged();
   bool restart_after_saving = false;
-  if (bool_requires_restart || amber::CurrentConfig.thumbnail_resolution != thumbnail_res_spinbox->value() ||
-      amber::CurrentConfig.waveform_resolution != waveform_res_spinbox->value() ||
-      amber::CurrentConfig.css_path != custom_css_fn->text() ||
-      amber::CurrentConfig.style != static_cast<amber::styling::Style>(ui_style->currentData().toInt())) {
+
+  if (SettingsRequireRestart()) {
     int ret = QMessageBox::question(this, "Restart Required",
                                     "Some of the changed settings will require a restart of Olive. Would you like "
                                     "to restart now?",
@@ -256,10 +265,6 @@ void PreferencesDialog::accept() {
       restart_after_saving = true;
     }
   }
-
-  bool reinit_audio = (amber::CurrentConfig.preferred_audio_output != audio_output_devices->currentData().toString() ||
-                       amber::CurrentConfig.preferred_audio_input != audio_input_devices->currentData().toString() ||
-                       amber::CurrentConfig.audio_rate != audio_sample_rate->currentData().toInt());
 
   bool reload_language =
       (!restart_after_saving && amber::CurrentConfig.language_file != language_combobox->currentData().toString());

@@ -26,13 +26,13 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "engine/sequence.h"
+#include "engine/undo/undo_guide.h"
+#include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/debug.h"
 #include "panels/viewer.h"
 #include "rulerwidget.h"
-#include "engine/sequence.h"
-#include "engine/undo/undo_guide.h"
-#include "engine/undo/undostack.h"
 #include "viewerwidget.h"
 
 // enforces aspect ratio
@@ -89,123 +89,104 @@ void ViewerContainer::parseWheelEvent(QWheelEvent *event) {
   }
 }
 
+void ViewerContainer::ensure_rulers_created() {
+  if (horizontal_ruler != nullptr) return;
+  horizontal_ruler = new RulerWidget(Guide::Horizontal, this, viewer, this);
+  vertical_ruler = new RulerWidget(Guide::Vertical, this, viewer, this);
+  auto make_guide_handler = [this](Guide::Orientation o, int pos) {
+    if (viewer->seq != nullptr) {
+      auto *cmd = new AddGuideAction(viewer->seq.get(), {o, pos});
+      cmd->setText(tr("Add Guide"));
+      amber::UndoStack.push(cmd);
+      child->update();
+    }
+  };
+  connect(horizontal_ruler, &RulerWidget::guide_created, this, make_guide_handler);
+  connect(vertical_ruler, &RulerWidget::guide_created, this, make_guide_handler);
+  horizontal_ruler->setVisible(amber::CurrentConfig.show_guides);
+  vertical_ruler->setVisible(amber::CurrentConfig.show_guides);
+}
+
+void ViewerContainer::adjust_fit_or_overflow(int avail_x, int avail_y, int avail_w, int avail_h, int zoomed_width,
+                                             int zoomed_height) {
+  double aspect_ratio = double(viewer->seq->width) / double(viewer->seq->height);
+  int widget_x = avail_x, widget_y = avail_y;
+  int widget_width = avail_w, widget_height = avail_h;
+
+  if (!fit) {
+    widget_width -= vertical_scrollbar->sizeHint().width();
+    widget_height -= horizontal_scrollbar->sizeHint().height();
+  }
+
+  double widget_ar = double(widget_width) / double(widget_height);
+  if (widget_ar > aspect_ratio) {
+    widget_width = widget_height * aspect_ratio;
+    widget_x = avail_x + (avail_w / 2) - (widget_width / 2);
+  } else {
+    widget_height = widget_width / aspect_ratio;
+    widget_y = avail_y + (avail_h / 2) - (widget_height / 2);
+  }
+
+  child->move(widget_x, widget_y);
+  child->resize(widget_width, widget_height);
+
+  if (fit) {
+    zoom = double(widget_width) / double(viewer->seq->width);
+  } else if (zoomed_width > avail_w || zoomed_height > avail_h) {
+    horizontal_scrollbar->setVisible(true);
+    vertical_scrollbar->setVisible(true);
+    horizontal_scrollbar->setMaximum(zoomed_width - avail_w);
+    vertical_scrollbar->setMaximum(zoomed_height - avail_h);
+    horizontal_scrollbar->setValue(horizontal_scrollbar->maximum() / 2);
+    vertical_scrollbar->setValue(vertical_scrollbar->maximum() / 2);
+    adjust_scrollbars();
+  }
+}
+
 void ViewerContainer::adjust() {
-  if (viewer->seq != nullptr) {
-    // Lazy-create rulers (viewer is set after construction)
-    if (horizontal_ruler == nullptr) {
-      horizontal_ruler = new RulerWidget(Guide::Horizontal, this, viewer, this);
-      vertical_ruler = new RulerWidget(Guide::Vertical, this, viewer, this);
+  if (viewer->seq == nullptr) return;
 
-      connect(horizontal_ruler, &RulerWidget::guide_created, this, [this](Guide::Orientation o, int pos) {
-        if (viewer->seq != nullptr) {
-          auto* cmd = new AddGuideAction(viewer->seq.get(), {o, pos});
-          cmd->setText(tr("Add Guide"));
-          amber::UndoStack.push(cmd);
-          child->update();
-        }
-      });
-      connect(vertical_ruler, &RulerWidget::guide_created, this, [this](Guide::Orientation o, int pos) {
-        if (viewer->seq != nullptr) {
-          auto* cmd = new AddGuideAction(viewer->seq.get(), {o, pos});
-          cmd->setText(tr("Add Guide"));
-          amber::UndoStack.push(cmd);
-          child->update();
-        }
-      });
+  ensure_rulers_created();
 
-      horizontal_ruler->setVisible(amber::CurrentConfig.show_guides);
-      vertical_ruler->setVisible(amber::CurrentConfig.show_guides);
-    }
+  horizontal_ruler->setVisible(amber::CurrentConfig.show_guides);
+  vertical_ruler->setVisible(amber::CurrentConfig.show_guides);
 
-    // Sync ruler visibility with config on every adjust
-    horizontal_ruler->setVisible(amber::CurrentConfig.show_guides);
-    vertical_ruler->setVisible(amber::CurrentConfig.show_guides);
+  bool rulers_visible = amber::CurrentConfig.show_guides;
+  int ruler_h = rulers_visible ? RulerWidget::kRulerThickness : 0;
 
-    bool rulers_visible = amber::CurrentConfig.show_guides;
-    int ruler_h = rulers_visible ? RulerWidget::kRulerThickness : 0;
+  if (child->waveform) {
+    child->move(0, 0);
+    child->resize(size());
+  } else {
+    horizontal_scrollbar->setVisible(false);
+    vertical_scrollbar->setVisible(false);
 
-    if (child->waveform) {
-      child->move(0, 0);
-      child->resize(size());
+    int avail_x = ruler_h, avail_y = ruler_h;
+    int avail_w = width() - ruler_h, avail_h = height() - ruler_h;
+    int zoomed_width = qRound(double(viewer->seq->width) * zoom);
+    int zoomed_height = qRound(double(viewer->seq->height) * zoom);
+
+    if (fit || zoomed_width > avail_w || zoomed_height > avail_h) {
+      adjust_fit_or_overflow(avail_x, avail_y, avail_w, avail_h, zoomed_width, zoomed_height);
     } else {
-      horizontal_scrollbar->setVisible(false);
-      vertical_scrollbar->setVisible(false);
-
-      // Available area for the viewer, accounting for rulers
-      int avail_x = ruler_h;
-      int avail_y = ruler_h;
-      int avail_w = width() - ruler_h;
-      int avail_h = height() - ruler_h;
-
-      int zoomed_width = qRound(double(viewer->seq->width) * zoom);
-      int zoomed_height = qRound(double(viewer->seq->height) * zoom);
-
-      if (fit || zoomed_width > avail_w || zoomed_height > avail_h) {
-        double aspect_ratio = double(viewer->seq->width) / double(viewer->seq->height);
-
-        int widget_x = avail_x;
-        int widget_y = avail_y;
-        int widget_width = avail_w;
-        int widget_height = avail_h;
-
-        if (!fit) {
-          widget_width -= vertical_scrollbar->sizeHint().width();
-          widget_height -= horizontal_scrollbar->sizeHint().height();
-        }
-
-        double widget_ar = double(widget_width) / double(widget_height);
-        bool widget_is_wider_than_sequence = widget_ar > aspect_ratio;
-
-        if (widget_is_wider_than_sequence) {
-          widget_width = widget_height * aspect_ratio;
-          widget_x = avail_x + (avail_w / 2) - (widget_width / 2);
-        } else {
-          widget_height = widget_width / aspect_ratio;
-          widget_y = avail_y + (avail_h / 2) - (widget_height / 2);
-        }
-
-        child->move(widget_x, widget_y);
-        child->resize(widget_width, widget_height);
-
-        if (fit) {
-          zoom = double(widget_width) / double(viewer->seq->width);
-        } else if (zoomed_width > avail_w || zoomed_height > avail_h) {
-          horizontal_scrollbar->setVisible(true);
-          vertical_scrollbar->setVisible(true);
-
-          horizontal_scrollbar->setMaximum(zoomed_width - avail_w);
-          vertical_scrollbar->setMaximum(zoomed_height - avail_h);
-
-          horizontal_scrollbar->setValue(horizontal_scrollbar->maximum() / 2);
-          vertical_scrollbar->setValue(vertical_scrollbar->maximum() / 2);
-
-          adjust_scrollbars();
-        }
-      } else {
-        int zoomed_x = avail_x;
-        int zoomed_y = avail_y;
-
-        if (zoomed_width < avail_w) zoomed_x = avail_x + (avail_w >> 1) - (zoomed_width >> 1);
-        if (zoomed_height < avail_h) zoomed_y = avail_y + (avail_h >> 1) - (zoomed_height >> 1);
-
-        child->move(zoomed_x, zoomed_y);
-        child->resize(zoomed_width, zoomed_height);
-      }
+      int zoomed_x = avail_x, zoomed_y = avail_y;
+      if (zoomed_width < avail_w) zoomed_x = avail_x + (avail_w >> 1) - (zoomed_width >> 1);
+      if (zoomed_height < avail_h) zoomed_y = avail_y + (avail_h >> 1) - (zoomed_height >> 1);
+      child->move(zoomed_x, zoomed_y);
+      child->resize(zoomed_width, zoomed_height);
     }
+  }
 
-    // Position overlay to match viewer widget (overlay is a sibling)
-    if (child->overlay_) {
-      child->overlay_->setGeometry(child->geometry());
-      child->overlay_->raise();
-    }
+  if (child->overlay_) {
+    child->overlay_->setGeometry(child->geometry());
+    child->overlay_->raise();
+  }
 
-    // Position rulers to align with the viewer area
-    if (rulers_visible) {
-      horizontal_ruler->setGeometry(ruler_h, 0, width() - ruler_h, ruler_h);
-      vertical_ruler->setGeometry(0, ruler_h, ruler_h, height() - ruler_h);
-      horizontal_ruler->update();
-      vertical_ruler->update();
-    }
+  if (rulers_visible) {
+    horizontal_ruler->setGeometry(ruler_h, 0, width() - ruler_h, ruler_h);
+    vertical_ruler->setGeometry(0, ruler_h, ruler_h, height() - ruler_h);
+    horizontal_ruler->update();
+    vertical_ruler->update();
   }
 }
 

@@ -20,39 +20,42 @@
 
 #include "menuhelper.h"
 
-#include <QMessageBox>
-#include <QRegularExpression>
 #include <QInputDialog>
+#include <QMessageBox>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QStyleFactory>
 
-#include "global/config.h"
-#include "project/clipboard.h"
-#include "project/media.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
-#include "ui/mainwindow.h"
+#include "global/config.h"
 #include "global/global.h"
 #include "panels/panels.h"
+#include "project/clipboard.h"
+#include "project/media.h"
 #include "ui/focusfilter.h"
+#include "ui/mainwindow.h"
 
 MenuHelper amber::MenuHelper;
 
-void MenuHelper::InitializeSharedMenus()
-{
-  new_project_ = create_menu_action(nullptr, "newproj", amber::Global.get(), SLOT(new_project()), QKeySequence("Ctrl+N"));
+void MenuHelper::InitializeSharedMenus() {
+  new_project_ =
+      create_menu_action(nullptr, "newproj", amber::Global.get(), SLOT(new_project()), QKeySequence("Ctrl+N"));
   new_project_->setParent(this);
 
-  new_sequence_ = create_menu_action(nullptr, "newseq", panel_project, SLOT(new_sequence()), QKeySequence("Ctrl+Shift+N"));
+  new_sequence_ =
+      create_menu_action(nullptr, "newseq", panel_project, SLOT(new_sequence()), QKeySequence("Ctrl+Shift+N"));
   new_sequence_->setParent(this);
 
   new_folder_ = create_menu_action(nullptr, "newfolder", panel_project, SLOT(new_folder()));
   new_folder_->setParent(this);
 
-  set_in_point_ = create_menu_action(nullptr, "setinpoint", &amber::FocusFilter, SLOT(set_in_point()), QKeySequence("I"));
+  set_in_point_ =
+      create_menu_action(nullptr, "setinpoint", &amber::FocusFilter, SLOT(set_in_point()), QKeySequence("I"));
   set_in_point_->setParent(this);
 
-  set_out_point_ = create_menu_action(nullptr, "setoutpoint", &amber::FocusFilter, SLOT(set_out_point()), QKeySequence("O"));
+  set_out_point_ =
+      create_menu_action(nullptr, "setoutpoint", &amber::FocusFilter, SLOT(set_out_point()), QKeySequence("O"));
   set_out_point_->setParent(this);
 
   reset_in_point_ = create_menu_action(nullptr, "resetin", &amber::FocusFilter, SLOT(clear_in()));
@@ -61,16 +64,20 @@ void MenuHelper::InitializeSharedMenus()
   reset_out_point_ = create_menu_action(nullptr, "resetout", &amber::FocusFilter, SLOT(clear_out()));
   reset_out_point_->setParent(this);
 
-  clear_inout_point = create_menu_action(nullptr, "clearinout", &amber::FocusFilter, SLOT(clear_inout()), QKeySequence("G"));
+  clear_inout_point =
+      create_menu_action(nullptr, "clearinout", &amber::FocusFilter, SLOT(clear_inout()), QKeySequence("G"));
   clear_inout_point->setParent(this);
 
-  add_default_transition_ = create_menu_action(nullptr, "deftransition", panel_timeline, SLOT(add_transition()), QKeySequence("Ctrl+Shift+D"));
+  add_default_transition_ = create_menu_action(nullptr, "deftransition", panel_timeline, SLOT(add_transition()),
+                                               QKeySequence("Ctrl+Shift+D"));
   add_default_transition_->setParent(this);
 
-  link_unlink_ = create_menu_action(nullptr, "linkunlink", panel_timeline, SLOT(toggle_links()), QKeySequence("Ctrl+L"));
+  link_unlink_ =
+      create_menu_action(nullptr, "linkunlink", panel_timeline, SLOT(toggle_links()), QKeySequence("Ctrl+L"));
   link_unlink_->setParent(this);
 
-  enable_disable_ = create_menu_action(nullptr, "enabledisable", panel_timeline, SLOT(toggle_enable_on_selected_clips()), QKeySequence("Shift+E"));
+  enable_disable_ = create_menu_action(nullptr, "enabledisable", panel_timeline,
+                                       SLOT(toggle_enable_on_selected_clips()), QKeySequence("Shift+E"));
   enable_disable_->setParent(this);
 
   nest_ = create_menu_action(nullptr, "nest", panel_timeline, SLOT(nest()));
@@ -88,7 +95,8 @@ void MenuHelper::InitializeSharedMenus()
   paste_ = create_menu_action(nullptr, "paste", amber::Global.get(), SLOT(paste()), QKeySequence("Ctrl+V"));
   paste_->setParent(this);
 
-  paste_insert_ = create_menu_action(nullptr, "pasteinsert", amber::Global.get(), SLOT(paste_insert()), QKeySequence("Ctrl+Shift+V"));
+  paste_insert_ = create_menu_action(nullptr, "pasteinsert", amber::Global.get(), SLOT(paste_insert()),
+                                     QKeySequence("Ctrl+Shift+V"));
   paste_insert_->setParent(this);
 
   duplicate_ = create_menu_action(nullptr, "duplicate", &amber::FocusFilter, SLOT(duplicate()), QKeySequence("Ctrl+D"));
@@ -97,38 +105,44 @@ void MenuHelper::InitializeSharedMenus()
   delete_ = create_menu_action(nullptr, "delete", &amber::FocusFilter, SLOT(delete_function()), QKeySequence("Del"));
   delete_->setParent(this);
 
-  ripple_delete_ = create_menu_action(nullptr, "rippledelete", panel_timeline, SLOT(ripple_delete()), QKeySequence("Shift+Del"));
+  ripple_delete_ =
+      create_menu_action(nullptr, "rippledelete", panel_timeline, SLOT(ripple_delete()), QKeySequence("Shift+Del"));
   ripple_delete_->setParent(this);
 
   split_ = create_menu_action(nullptr, "split", panel_timeline, SLOT(split_at_playhead()), QKeySequence("Ctrl+K"));
   split_->setParent(this);
 
-  three_point_insert_ = create_menu_action(nullptr, "3ptinsert", panel_timeline, SLOT(three_point_insert()), QKeySequence(","));
+  three_point_insert_ =
+      create_menu_action(nullptr, "3ptinsert", panel_timeline, SLOT(three_point_insert()), QKeySequence(","));
   three_point_insert_->setParent(this);
 
-  three_point_overwrite_ = create_menu_action(nullptr, "3ptoverwrite", panel_timeline, SLOT(three_point_overwrite()), QKeySequence("."));
+  three_point_overwrite_ =
+      create_menu_action(nullptr, "3ptoverwrite", panel_timeline, SLOT(three_point_overwrite()), QKeySequence("."));
   three_point_overwrite_->setParent(this);
 
-  speed_duration_ = create_menu_action(nullptr, "speedduration", amber::Global.get(), SLOT(open_speed_dialog()), QKeySequence("Ctrl+R"));
+  speed_duration_ = create_menu_action(nullptr, "speedduration", amber::Global.get(), SLOT(open_speed_dialog()),
+                                       QKeySequence("Ctrl+R"));
   speed_duration_->setParent(this);
 
-  freeze_frame_ = create_menu_action(nullptr, "freezeframe", panel_timeline, SLOT(freeze_frame()), QKeySequence("Shift+F"));
+  freeze_frame_ =
+      create_menu_action(nullptr, "freezeframe", panel_timeline, SLOT(freeze_frame()), QKeySequence("Shift+F"));
   freeze_frame_->setParent(this);
 
-  go_back_sequence_ = create_menu_action(nullptr, "gobackseq", amber::Global.get(), SLOT(go_back_sequence()), QKeySequence(Qt::Key_Backspace));
+  go_back_sequence_ = create_menu_action(nullptr, "gobackseq", amber::Global.get(), SLOT(go_back_sequence()),
+                                         QKeySequence(Qt::Key_Backspace));
   go_back_sequence_->setParent(this);
 
   Retranslate();
 }
 
-void MenuHelper::make_new_menu(QMenu *parent) {
+void MenuHelper::make_new_menu(QMenu* parent) {
   parent->addAction(new_project_);
   parent->addSeparator();
   parent->addAction(new_sequence_);
   parent->addAction(new_folder_);
 }
 
-void MenuHelper::make_inout_menu(QMenu *parent, bool as_submenu) {
+void MenuHelper::make_inout_menu(QMenu* parent, bool as_submenu) {
   QMenu* target = parent;
   if (as_submenu) {
     inout_submenu_ = create_submenu(parent);
@@ -142,7 +156,7 @@ void MenuHelper::make_inout_menu(QMenu *parent, bool as_submenu) {
   target->addAction(clear_inout_point);
 }
 
-void MenuHelper::make_clip_functions_menu(QMenu *parent, bool as_submenu) {
+void MenuHelper::make_clip_functions_menu(QMenu* parent, bool as_submenu) {
   QMenu* target = parent;
   if (as_submenu) {
     clip_submenu_ = create_submenu(parent);
@@ -157,54 +171,38 @@ void MenuHelper::make_clip_functions_menu(QMenu *parent, bool as_submenu) {
   target->addAction(freeze_frame_);
 }
 
-void MenuHelper::updateClipActions(const QVector<Clip*>& selected_clips) {
-  bool show_nest = false;
-  bool show_unnest = false;
-
-  if (!selected_clips.isEmpty()) {
-    // Unnest: at least one selected clip is a nested sequence
-    for (auto* c : selected_clips) {
-      if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
-        show_unnest = true;
-        break;
-      }
-    }
-
-    // Nest: multiple independent clips (not just a single linked A/V pair)
-    if (selected_clips.size() > 1) {
-      // Check if all selected clips are linked to each other (single linked group)
-      bool all_same_group = true;
-      Clip* first = selected_clips.at(0);
-      int first_idx = -1;
-      for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
-        if (amber::ActiveSequence->clips.at(i).get() == first) {
-          first_idx = i;
-          break;
-        }
-      }
-      if (first_idx >= 0) {
-        for (int i = 1; i < selected_clips.size(); i++) {
-          int idx = -1;
-          for (int j = 0; j < amber::ActiveSequence->clips.size(); j++) {
-            if (amber::ActiveSequence->clips.at(j).get() == selected_clips.at(i)) {
-              idx = j;
-              break;
-            }
-          }
-          if (!first->linked.contains(idx)) {
-            all_same_group = false;
-            break;
-          }
-        }
-      }
-      show_nest = !all_same_group;
-    }
+static bool clips_can_unnest(const QVector<Clip*>& clips) {
+  for (auto* c : clips) {
+    if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) return true;
   }
+  return false;
+}
+
+static int clip_index_in_sequence(Clip* c) {
+  for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
+    if (amber::ActiveSequence->clips.at(i).get() == c) return i;
+  }
+  return -1;
+}
+
+static bool clips_form_independent_group(const QVector<Clip*>& clips) {
+  int first_idx = clip_index_in_sequence(clips.at(0));
+  if (first_idx < 0) return false;
+  Clip* first = clips.at(0);
+  for (int i = 1; i < clips.size(); i++) {
+    int idx = clip_index_in_sequence(clips.at(i));
+    if (!first->linked.contains(idx)) return true;
+  }
+  return false;
+}
+
+void MenuHelper::updateClipActions(const QVector<Clip*>& selected_clips) {
+  bool show_unnest = !selected_clips.isEmpty() && clips_can_unnest(selected_clips);
+  bool show_nest = selected_clips.size() > 1 && clips_form_independent_group(selected_clips);
 
   nest_->setVisible(show_nest);
   unnest_->setVisible(show_unnest);
 
-  // Freeze/unfreeze: show unfreeze if any selected clip is frozen
   bool any_frozen = false;
   for (auto* c : selected_clips) {
     if (qFuzzyIsNull(c->speed().value)) {
@@ -216,7 +214,7 @@ void MenuHelper::updateClipActions(const QVector<Clip*>& selected_clips) {
   speed_duration_->setVisible(!selected_clips.isEmpty());
 }
 
-void MenuHelper::make_edit_functions_menu(QMenu *parent, bool objects_are_selected) {
+void MenuHelper::make_edit_functions_menu(QMenu* parent, bool objects_are_selected) {
   if (objects_are_selected) {
     parent->addAction(cut_);
     parent->addAction(copy_);
@@ -236,25 +234,24 @@ void MenuHelper::make_edit_functions_menu(QMenu *parent, bool objects_are_select
   }
 }
 
-void MenuHelper::set_bool_action_checked(QAction *a) {
+void MenuHelper::set_bool_action_checked(QAction* a) {
   if (!a->data().isNull()) {
     bool* variable = reinterpret_cast<bool*>(a->data().value<quintptr>());
     a->setChecked(*variable);
   }
 }
 
-void MenuHelper::set_int_action_checked(QAction *a, const int& i) {
+void MenuHelper::set_int_action_checked(QAction* a, const int& i) {
   if (!a->data().isNull()) {
     a->setChecked(a->data() == i);
   }
 }
 
-void MenuHelper::set_button_action_checked(QAction *a) {
+void MenuHelper::set_button_action_checked(QAction* a) {
   a->setChecked(reinterpret_cast<QPushButton*>(a->data().value<quintptr>())->isChecked());
 }
 
-void MenuHelper::Retranslate()
-{
+void MenuHelper::Retranslate() {
   new_project_->setText(tr("&Project"));
   new_sequence_->setText(tr("&Sequence"));
   new_folder_->setText(tr("&Folder"));
@@ -296,28 +293,23 @@ void MenuHelper::set_titlesafe_from_menu() {
   double tsa = static_cast<QAction*>(sender())->data().toDouble();
 
   if (qIsNaN(tsa)) {
-
     // disable title safe area
     amber::CurrentConfig.show_title_safe_area = false;
 
   } else {
-
     // using title safe area
     amber::CurrentConfig.show_title_safe_area = true;
 
     // are we using the default area aspect ratio, or a specific one
     if (qIsNull(tsa)) {
-
       // default title safe area
       amber::CurrentConfig.use_custom_title_safe_ratio = false;
 
     } else {
-
       // using a specific aspect ratio
       amber::CurrentConfig.use_custom_title_safe_ratio = true;
 
       if (tsa < 0.0) {
-
         // set a custom title safe area
         QString input;
         bool invalid = false;
@@ -325,26 +317,26 @@ void MenuHelper::set_titlesafe_from_menu() {
 
         do {
           if (invalid) {
-            QMessageBox::critical(amber::MainWindow, tr("Invalid aspect ratio"), tr("The aspect ratio '%1' is invalid. Please try again.").arg(input));
+            QMessageBox::critical(amber::MainWindow, tr("Invalid aspect ratio"),
+                                  tr("The aspect ratio '%1' is invalid. Please try again.").arg(input));
           }
 
-          input = QInputDialog::getText(amber::MainWindow, tr("Enter custom aspect ratio"), tr("Enter the aspect ratio to use for the title/action safe area (e.g. 16:9):"));
+          input =
+              QInputDialog::getText(amber::MainWindow, tr("Enter custom aspect ratio"),
+                                    tr("Enter the aspect ratio to use for the title/action safe area (e.g. 16:9):"));
           invalid = !arTest.match(input).hasMatch() && !input.isEmpty();
         } while (invalid);
 
         if (!input.isEmpty()) {
           QStringList inputList = input.split(':');
-          amber::CurrentConfig.custom_title_safe_ratio = inputList.at(0).toDouble()/inputList.at(1).toDouble();
+          amber::CurrentConfig.custom_title_safe_ratio = inputList.at(0).toDouble() / inputList.at(1).toDouble();
         }
 
       } else {
-
         // specified tsa is a specific custom aspect ratio
         amber::CurrentConfig.custom_title_safe_ratio = tsa;
       }
-
     }
-
   }
 
   panel_sequence_viewer->viewer_widget->update();
@@ -370,15 +362,12 @@ void MenuHelper::open_recent_from_menu() {
   amber::Global.get()->open_recent(index);
 }
 
-void MenuHelper::create_effect_paste_action(QMenu *menu)
-{
+void MenuHelper::create_effect_paste_action(QMenu* menu) {
   QAction* paste_action = menu->addAction(tr("&Paste"), panel_timeline, &Timeline::paste);
   paste_action->setEnabled(clipboard.size() > 0 && clipboard_type == CLIPBOARD_TYPE_EFFECT);
 }
 
-Menu* MenuHelper::create_submenu(QMenuBar* parent,
-                                  const QObject *receiver,
-                                  const char *member) {
+Menu* MenuHelper::create_submenu(QMenuBar* parent, const QObject* receiver, const char* member) {
   Menu* menu = new Menu(parent);
 
   /*
@@ -409,11 +398,8 @@ Menu* MenuHelper::create_submenu(QMenu* parent) {
   return menu;
 }
 
-QAction* MenuHelper::create_menu_action(QWidget *parent,
-                                        const char* id,
-                                        const QObject *receiver,
-                                        const char *member,
-                                        const QKeySequence &shortcut) {
+QAction* MenuHelper::create_menu_action(QWidget* parent, const char* id, const QObject* receiver, const char* member,
+                                        const QKeySequence& shortcut) {
   QAction* action = new QAction(parent);
   action->setProperty("id", id);
   action->setShortcut(shortcut);

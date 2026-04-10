@@ -114,6 +114,13 @@ class ViewerWidget : public QRhiWidget {
   // Returns true if the event was fully handled (caller should return).
   bool move_handle_guide_drag(int video_x, int image_y);
   void move_handle_dragging(QMouseEvent* event);
+  // Returns true if the event was fully handled by color-pick mode (caller should return).
+  bool press_handle_color_pick(QMouseEvent* event);
+  // Returns true if a guide was hit (right-click context menu or left-click drag started).
+  bool press_handle_guide(int video_x, int image_y, QMouseEvent* event);
+  void press_set_gizmo_drag(QMouseEvent* event);
+  // Uploads a new frame texture to the RHI pipeline if the frame dimensions changed.
+  void render_update_frame_texture(QRhiResourceUpdateBatch* u, const char* frame_data, int fw, int fh);
   bool creating_guide_{false};
   Guide::Orientation creating_guide_orientation_;
   int creating_guide_pos_{0};

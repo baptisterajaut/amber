@@ -135,6 +135,39 @@ Config::Config()
 
 {}
 
+namespace {
+
+// Returns true if the element name was recognised and the config field updated.
+bool apply_config_element(Config* cfg, const QStringView& name, const QStringView& text) {
+  for (const auto& e : kBoolEntries) {
+    if (name == QLatin1String(e.name)) {
+      cfg->*e.field = (text == QLatin1String("1"));
+      return true;
+    }
+  }
+  for (const auto& e : kIntEntries) {
+    if (name == QLatin1String(e.name)) {
+      cfg->*e.field = text.toInt();
+      return true;
+    }
+  }
+  for (const auto& e : kDoubleEntries) {
+    if (name == QLatin1String(e.name)) {
+      cfg->*e.field = text.toDouble();
+      return true;
+    }
+  }
+  for (const auto& e : kStringEntries) {
+    if (name == QLatin1String(e.name)) {
+      cfg->*e.field = text.toString();
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
 void Config::load(QString path) {
   QFile f(path);
   if (!f.exists() || !f.open(QIODevice::ReadOnly)) return;
@@ -149,42 +182,7 @@ void Config::load(QString path) {
     stream.readNext();
     auto text = stream.text();
 
-    bool handled = false;
-    for (const auto& e : kBoolEntries) {
-      if (name == QLatin1String(e.name)) {
-        this->*e.field = (text == QLatin1String("1"));
-        handled = true;
-        break;
-      }
-    }
-    if (!handled) {
-      for (const auto& e : kIntEntries) {
-        if (name == QLatin1String(e.name)) {
-          this->*e.field = text.toInt();
-          handled = true;
-          break;
-        }
-      }
-    }
-    if (!handled) {
-      for (const auto& e : kDoubleEntries) {
-        if (name == QLatin1String(e.name)) {
-          this->*e.field = text.toDouble();
-          handled = true;
-          break;
-        }
-      }
-    }
-    if (!handled) {
-      for (const auto& e : kStringEntries) {
-        if (name == QLatin1String(e.name)) {
-          this->*e.field = text.toString();
-          handled = true;
-          break;
-        }
-      }
-    }
-    if (!handled && name == QLatin1String("Style")) {
+    if (!apply_config_element(this, name, text) && name == QLatin1String("Style")) {
       style = static_cast<amber::styling::Style>(text.toInt());
     }
   }

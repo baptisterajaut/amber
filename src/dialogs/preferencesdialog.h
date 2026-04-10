@@ -135,6 +135,21 @@ class PreferencesDialog : public QDialog {
   void handle_preview_resolution_changes();
 
   /**
+   * @brief Return true if any bool pref marked restart_required has changed.
+   */
+  bool AnyBoolRequiresRestart() const;
+
+  /**
+   * @brief Return true if any setting that requires a restart has changed.
+   */
+  bool SettingsRequireRestart() const;
+
+  /**
+   * @brief Return true if any audio device/rate setting has changed.
+   */
+  bool AudioSettingsChanged() const;
+
+  /**
    * @brief Create and arrange all UI widgets
    */
   void setup_ui();

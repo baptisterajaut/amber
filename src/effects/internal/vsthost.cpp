@@ -491,33 +491,32 @@ void VSTHost::StartIdleTimer() {
   idle_timer->start(50);
 }
 
-void VSTHost::show_interface(bool show) {
-  if (!show) {
-    if (idle_timer) idle_timer->stop();
-    dispatcher(plugin, effEditClose, 0, 0, nullptr, 0);
+void VSTHost::HideInterface() {
+  if (idle_timer) idle_timer->stop();
+  dispatcher(plugin, effEditClose, 0, 0, nullptr, 0);
 #if defined(Q_OS_LINUX)
-    if (x11_display_ && x11_window_) {
-      auto dpy = static_cast<Display*>(x11_display_);
-      XUnmapWindow(dpy, static_cast<Window>(x11_window_));
-      XSync(dpy, False);
-    }
-#else
-    if (dialog) dialog->hide();
-#endif
-    return;
+  if (x11_display_ && x11_window_) {
+    auto dpy = static_cast<Display*>(x11_display_);
+    XUnmapWindow(dpy, static_cast<Window>(x11_window_));
+    XSync(dpy, False);
   }
+#else
+  if (dialog) dialog->hide();
+#endif
+}
 
+// Returns false if the platform setup failed (caller should abort show).
+bool VSTHost::ShowInterfacePlatform() {
 #if defined(Q_OS_LINUX)
   // Direct X11 window for plugin embedding.
   // Works on native X11 and Wayland (via XWayland).
   // 24-bit visual (no alpha) prevents compositor transparency.
-  if (!EnsureX11Window()) return;
+  if (!EnsureX11Window()) return false;
 
   auto dpy = static_cast<Display*>(x11_display_);
   XMapRaised(dpy, static_cast<Window>(x11_window_));
   XSync(dpy, False);
   dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(x11_window_), 0);
-
 #else  // Windows, macOS, Haiku — use QDialog
   CreateDialogIfNull();
   dialog->show();
@@ -530,7 +529,16 @@ void VSTHost::show_interface(bool show) {
   dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(nativeWin), 0);
 #endif
 #endif  // Q_OS_LINUX
+  return true;
+}
 
+void VSTHost::show_interface(bool show) {
+  if (!show) {
+    HideInterface();
+    return;
+  }
+
+  if (!ShowInterfacePlatform()) return;
   StartIdleTimer();
 }
 

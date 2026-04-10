@@ -52,6 +52,9 @@ class RulerWidget : public QWidget {
  private:
   double video_to_widget(int video_pos) const;
   int widget_to_video(double widget_pos) const;
+  void paint_tick(QPainter& p, double wp, int vp, bool is_major, bool is_minor);
+  void paint_cursor_triangle(QPainter& p, double wp);
+  void paint_drag_indicator(QPainter& p, double wp);
 
   Guide::Orientation orientation_;
   ViewerContainer* container_;

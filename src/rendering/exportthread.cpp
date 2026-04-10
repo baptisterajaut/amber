@@ -420,6 +420,68 @@ bool ExportThread::EncodeAudioFrames(long& file_audio_samples, double timecode_s
   return true;
 }
 
+// Encode all frames in the sequence range. Returns false if encoding failed, sets interrupt_ on interrupt.
+// renderer is always cleaned up (cancelled + deleted) on both success and failure paths.
+bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samples) {
+  qint64 total_time = 0;
+  long frame_count = 1;
+
+  while (seq_->playhead <= params_.end_frame && !interrupt_) {
+    qint64 frame_start_time = QDateTime::currentMSecsSinceEpoch();
+
+    if (params_.audio_enabled) {
+      waiting_for_audio_ = true;
+      SetAudioWakeObject(this);
+      amber::rendering::compose_audio(seq_, false, 1, true);
+    }
+
+    double timecode_secs = double(seq_->playhead - params_.start_frame) / seq_->frame_rate;
+
+    if (params_.video_enabled) {
+      if (!EncodeVideoFrame(renderer, timecode_secs)) return false;
+    }
+
+    if (params_.audio_enabled) {
+      if (!EncodeAudioFrames(file_audio_samples, timecode_secs)) return false;
+    }
+
+    qint64 frame_time = QDateTime::currentMSecsSinceEpoch() - frame_start_time;
+    total_time += frame_time;
+    long remaining_frames = params_.end_frame - seq_->playhead;
+    qint64 avg_time = total_time / frame_count;
+    qint64 eta = remaining_frames * avg_time;
+
+    emit ProgressChanged(
+        qRound((double(seq_->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) *
+               100.0),
+        eta);
+
+    seq_->playhead++;
+    frame_count++;
+  }
+  return true;
+}
+
+// Flush swresample residual audio after the encode loop. Returns false on encoder error.
+bool ExportThread::FlushSwrAudio(long& file_audio_samples) {
+  if (!params_.audio_enabled) return true;
+  int flush_iter = 0;
+  do {
+    ret = swr_convert_frame(swr_ctx, swr_frame, nullptr);
+    if (ret < 0 || swr_frame->nb_samples == 0) break;
+    swr_frame->pts = file_audio_samples;
+    if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) return false;
+    file_audio_samples += swr_frame->nb_samples;
+  } while (swr_frame->nb_samples > 0 && ++flush_iter < 1000);
+  return true;
+}
+
+// Flush encoder drain (send nullptr frame) to emit any buffered packets.
+void ExportThread::FlushEncoders() {
+  if (params_.video_enabled) Encode(fmt_ctx, vcodec_ctx, nullptr, video_pkt, video_stream);
+  if (params_.audio_enabled) Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
+}
+
 void ExportThread::Export() {
   QByteArray ba = params_.filename.toUtf8();
   c_filename = qstrdup(ba.constData());
@@ -436,100 +498,29 @@ void ExportThread::Export() {
   }
 
   long file_audio_samples = 0;
-  qint64 frame_start_time, frame_time, avg_time, eta, total_time = 0;
-  long remaining_frames, frame_count = 1;
 
   RenderThread* renderer = new RenderThread();
-  if (gl_fallback_surface_) {
-    renderer->setGlFallbackSurface(gl_fallback_surface_);
-  }
+  if (gl_fallback_surface_) renderer->setGlFallbackSurface(gl_fallback_surface_);
   renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
-  while (seq_->playhead <= params_.end_frame && !interrupt_) {
-    frame_start_time = QDateTime::currentMSecsSinceEpoch();
+  bool frames_ok = EncodeAllFrames(renderer, file_audio_samples);
 
-    if (params_.audio_enabled) {
-      waiting_for_audio_ = true;
-      SetAudioWakeObject(this);
-      amber::rendering::compose_audio(seq_, false, 1, true);
-    }
-
-    double timecode_secs = double(seq_->playhead - params_.start_frame) / seq_->frame_rate;
-
-    if (params_.video_enabled) {
-      if (!EncodeVideoFrame(renderer, timecode_secs)) {
-        if (interrupt_) {
-          renderer->cancel();
-          delete renderer;
-          goto cleanup_state;
-        }
-        goto cleanup_renderer;
-      }
-    }
-
-    if (params_.audio_enabled) {
-      if (!EncodeAudioFrames(file_audio_samples, timecode_secs)) {
-        goto cleanup_renderer;
-      }
-    }
-
-    frame_time = (QDateTime::currentMSecsSinceEpoch() - frame_start_time);
-    total_time += frame_time;
-    remaining_frames = (params_.end_frame - seq_->playhead);
-    avg_time = (total_time / frame_count);
-    eta = (remaining_frames * avg_time);
-
-    emit ProgressChanged(
-        qRound((double(seq_->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) *
-               100.0),
-        eta);
-
-    seq_->playhead++;
-    frame_count++;
-  }
-
-cleanup_renderer:
-  // Clean up export render thread
   renderer->cancel();
   delete renderer;
 
-cleanup_state:
   // Clean up clip state.  Rendering state (audio_rendering flag + autorecovery
   // timer) is restored on the main thread in ExportDialog::export_thread_finished
   // — starting a QTimer from this thread triggers "Timers cannot be started
   // from another thread".
   close_active_clips(seq_);
 
-  if (interrupt_) {
-    return;
-  }
+  if (interrupt_ || !frames_ok) return;
 
-  // If audio is enabled, flush the rest of the audio out of swresample
-  if (params_.audio_enabled) {
-    int flush_iter = 0;
-    do {
-      ret = swr_convert_frame(swr_ctx, swr_frame, nullptr);
-      if (ret < 0 || swr_frame->nb_samples == 0) break;
-      swr_frame->pts = file_audio_samples;
-      if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) {
-        return;
-      }
-      file_audio_samples += swr_frame->nb_samples;
-    } while (swr_frame->nb_samples > 0 && ++flush_iter < 1000);
-  }
+  if (!FlushSwrAudio(file_audio_samples)) return;
+  if (interrupt_) return;
 
-  if (interrupt_) {
-    return;
-  }
-
-  // Flush remaining packets out of video and audio encoders by sending a null frame
-  if (params_.video_enabled) {
-    Encode(fmt_ctx, vcodec_ctx, nullptr, video_pkt, video_stream);
-  }
-  if (params_.audio_enabled) {
-    Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
-  }
+  FlushEncoders();
 
   // Write container trailer
   ret = av_write_trailer(fmt_ctx);

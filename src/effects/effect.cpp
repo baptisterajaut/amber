@@ -186,6 +186,44 @@ void WriteFieldUboValue(EffectField* field, double timecode, const UniformEntry&
   }
 }
 
+// Write built-in automatic uniforms (resolution, time, iteration) into uboData.
+void WriteAutoUniforms(const QVector<UniformEntry>& entries, double timecode, int iteration, float resW, float resH,
+                       QByteArray& uboData) {
+  for (const auto& entry : entries) {
+    if (entry.name == QLatin1String("resolution")) {
+      float res[2] = {resW, resH};
+      memcpy(uboData.data() + entry.offset, res, qMin(entry.size, 8));
+    } else if (entry.name == QLatin1String("resolution_x")) {
+      memcpy(uboData.data() + entry.offset, &resW, 4);
+    } else if (entry.name == QLatin1String("resolution_y")) {
+      memcpy(uboData.data() + entry.offset, &resH, 4);
+    } else if (entry.name == QLatin1String("time")) {
+      float v = float(timecode);
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("iteration")) {
+      int v = iteration;
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    }
+  }
+}
+
+// Write all field-driven uniforms into uboData by matching field IDs to uniform names.
+void WriteFieldUniforms(Effect* effect, const QVector<UniformEntry>& entries, double timecode, QByteArray& uboData) {
+  for (int r = 0; r < effect->row_count(); r++) {
+    EffectRow* erow = effect->row(r);
+    for (int j = 0; j < erow->FieldCount(); j++) {
+      EffectField* field = erow->Field(j);
+      if (field->id().isEmpty()) continue;
+      for (const auto& entry : entries) {
+        if (entry.name == field->id()) {
+          WriteFieldUboValue(field, timecode, entry, uboData);
+          break;
+        }
+      }
+    }
+  }
+}
+
 }  // namespace
 
 static EffectPtr CreateInternalEffect(Clip* c, const EffectMeta* em) {
@@ -891,38 +929,8 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QB
   float resW = renderSize.isValid() ? float(renderSize.width()) : float(parent_clip->media_width());
   float resH = renderSize.isValid() ? float(renderSize.height()) : float(parent_clip->media_height());
 
-  // Set automatic uniforms by looking up their entries
-  for (const auto& entry : uniformEntries_) {
-    if (entry.name == QLatin1String("resolution")) {
-      float res[2] = {resW, resH};
-      memcpy(uboData.data() + entry.offset, res, qMin(entry.size, 8));
-    } else if (entry.name == QLatin1String("resolution_x")) {
-      memcpy(uboData.data() + entry.offset, &resW, 4);
-    } else if (entry.name == QLatin1String("resolution_y")) {
-      memcpy(uboData.data() + entry.offset, &resH, 4);
-    } else if (entry.name == QLatin1String("time")) {
-      float v = float(timecode);
-      memcpy(uboData.data() + entry.offset, &v, 4);
-    } else if (entry.name == QLatin1String("iteration")) {
-      int v = iteration;
-      memcpy(uboData.data() + entry.offset, &v, 4);
-    }
-  }
-
-  // Set field uniforms by name lookup
-  for (int r = 0; r < row_count(); r++) {
-    EffectRow* erow = row(r);
-    for (int j = 0; j < erow->FieldCount(); j++) {
-      EffectField* field = erow->Field(j);
-      if (field->id().isEmpty()) continue;
-      for (const auto& entry : uniformEntries_) {
-        if (entry.name == field->id()) {
-          WriteFieldUboValue(field, timecode, entry, uboData);
-          break;  // found matching entry
-        }
-      }
-    }
-  }
+  WriteAutoUniforms(uniformEntries_, timecode, iteration, resW, resH, uboData);
+  WriteFieldUniforms(this, uniformEntries_, timecode, uboData);
 }
 
 void Effect::process_coords(double, GLTextureCoords&, int) {}

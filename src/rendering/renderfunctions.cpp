@@ -667,9 +667,14 @@ static void apply_clip_effects(Clip* c, long playhead, double timecode, GLTextur
   }
 }
 
-// Determine the back-buffer targets: either the nested FBO slot or the main backend buffers.
-static void resolve_backbuffer_targets(const ComposeSequenceParams& params, QRhiTextureRenderTarget*& back_target1,
-                                       QRhiTexture*& back_tex1, QRhiRenderPassDescriptor*& back_rpd) {
+// Apply Y-flip compensation for RGBA clips and then render+blend to final target.
+static void render_and_blend_clip(Clip* c, ComposeSequenceParams& params, QRhiTexture* textureID,
+                                  GLTextureCoords& coords, const QMatrix4x4& clip_mvp,
+                                  QRhiTextureRenderTarget* final_target) {
+  // Resolve back-buffer targets
+  QRhiTextureRenderTarget* back_target1;
+  QRhiTexture* back_tex1;
+  QRhiRenderPassDescriptor* back_rpd;
   if (!params.nests.isEmpty() && params.nests.last()->fbo_rhi != nullptr) {
     ClipRhiResources* nestRes = static_cast<ClipRhiResources*>(params.nests.last()->fbo_rhi);
     back_target1 = nestRes->rt[1];
@@ -679,6 +684,20 @@ static void resolve_backbuffer_targets(const ComposeSequenceParams& params, QRhi
     back_target1 = params.backend_target1;
     back_tex1 = params.backend_tex1;
     back_rpd = params.backend_rpd;
+  }
+
+  // RGBA path flip compensation (see comment in original)
+  if (!params.rhi->isYUpInFramebuffer() && c->rgba_tex != nullptr && c->cached_rhi_tex == c->rgba_tex) {
+    std::swap(coords.textureTopLeftY, coords.textureBottomLeftY);
+    std::swap(coords.textureTopRightY, coords.textureBottomRightY);
+  }
+
+  render_clip_to_backbuffer(params, textureID, coords, clip_mvp, back_target1, back_rpd);
+
+  if (!amber::CurrentRuntimeConfig.disable_blending) {
+    rhi_blit_srcover(params, final_target, params.main_rpd, back_tex1, coords.opacity);
+  } else {
+    rhi_blit_passthrough(params, final_target, params.main_rpd, back_tex1, coords.opacity);
   }
 }
 
@@ -743,24 +762,7 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
 
   if (textureID == nullptr) return;
 
-  QRhiTextureRenderTarget* back_target1;
-  QRhiTexture* back_tex1;
-  QRhiRenderPassDescriptor* back_rpd;
-  resolve_backbuffer_targets(params, back_target1, back_tex1, back_rpd);
-
-  // RGBA path flip compensation (see comment in original)
-  if (!params.rhi->isYUpInFramebuffer() && c->rgba_tex != nullptr && c->cached_rhi_tex == c->rgba_tex) {
-    std::swap(coords.textureTopLeftY, coords.textureBottomLeftY);
-    std::swap(coords.textureTopRightY, coords.textureBottomRightY);
-  }
-
-  render_clip_to_backbuffer(params, textureID, coords, clip_mvp, back_target1, back_rpd);
-
-  if (!amber::CurrentRuntimeConfig.disable_blending) {
-    rhi_blit_srcover(params, final_target, params.main_rpd, back_tex1, coords.opacity);
-  } else {
-    rhi_blit_passthrough(params, final_target, params.main_rpd, back_tex1, coords.opacity);
-  }
+  render_and_blend_clip(c, params, textureID, coords, clip_mvp, final_target);
 }
 
 // Process a single audio clip: handle nested sequences or cache audio data.

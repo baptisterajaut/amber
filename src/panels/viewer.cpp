@@ -396,35 +396,30 @@ void Viewer::decrease_speed() {
   set_playback_speed(new_speed);
 }
 
-void Viewer::play(bool in_to_out) {
-  if (seq == nullptr) {
-    return;
+void Viewer::maybe_seek_before_play(long sequence_end_frame) {
+  bool seek_to_in = (seq->using_workarea && (amber::CurrentConfig.loop || playing_in_to_out));
+  bool at_end = (amber::CurrentConfig.auto_seek_to_beginning && seq->playhead >= sequence_end_frame);
+  bool past_workarea = (seek_to_in && seq->playhead >= seq->workarea_out);
+  if (!is_recording_cued() && playback_speed >= 0 && (playing_in_to_out || at_end || past_workarea)) {
+    seek(seek_to_in ? seq->workarea_in : 0);
   }
+}
+
+void Viewer::play(bool in_to_out) {
+  if (seq == nullptr) return;
 
   if (panel_sequence_viewer->playing) panel_sequence_viewer->pause();
   if (panel_footage_viewer->playing) panel_footage_viewer->pause();
 
   long sequence_end_frame = seq->getEndFrame();
-  if (sequence_end_frame == 0) {
-    return;
-  }
+  if (sequence_end_frame == 0) return;
 
   playing_in_to_out = in_to_out;
+  if (playing_in_to_out) uncue_recording();
 
-  if (playing_in_to_out) {
-    uncue_recording();
-  }
+  maybe_seek_before_play(sequence_end_frame);
 
-  bool seek_to_in = (seq->using_workarea && (amber::CurrentConfig.loop || playing_in_to_out));
-  if (!is_recording_cued() && playback_speed >= 0 &&
-      (playing_in_to_out || (amber::CurrentConfig.auto_seek_to_beginning && seq->playhead >= sequence_end_frame) ||
-       (seek_to_in && seq->playhead >= seq->workarea_out))) {
-    seek(seek_to_in ? seq->workarea_in : 0);
-  }
-
-  if (playback_speed == 0) {
-    playback_speed = 1;
-  }
+  if (playback_speed == 0) playback_speed = 1;
 
   reset_all_audio();
   if (is_recording_cued() && !start_recording(amber::ActiveProjectFilename)) {
@@ -908,41 +903,41 @@ void Viewer::set_media(Media* m) {
 
 void Viewer::update_playhead() { seek(current_timecode_slider->value()); }
 
-void Viewer::timer_update() {
-  previous_playhead = seq->playhead;
-
-  seq->playhead = qMax(0, qRound(playhead_start + ((QDateTime::currentMSecsSinceEpoch() - start_msecs) * 0.001 *
-                                                   seq->frame_rate * playback_speed)));
-
-  if (amber::CurrentConfig.seek_also_selects) {
-    panel_timeline->select_from_playhead();
+void Viewer::check_playback_end() {
+  if (playback_speed < 0 && seq->playhead == 0) {
+    pause();
+    return;
   }
-
-  update_parents(amber::CurrentConfig.seek_also_selects);
-
-  if (playing) {
-    if (playback_speed < 0 && seq->playhead == 0) {
+  if (recording) {
+    if (recording_start != recording_end && seq->playhead >= recording_end) pause();
+    return;
+  }
+  if (playback_speed > 0) {
+    long end_frame = seq->getEndFrame();
+    if ((amber::CurrentConfig.auto_seek_to_beginning || previous_playhead < end_frame) && seq->playhead >= end_frame) {
       pause();
-    } else if (recording) {
-      if (recording_start != recording_end && seq->playhead >= recording_end) {
+      return;
+    }
+    if (seq->using_workarea && seq->playhead >= seq->workarea_out) {
+      if (amber::CurrentConfig.loop) {
+        play();
+      } else if (playing_in_to_out) {
         pause();
-      }
-    } else if (playback_speed > 0) {
-      long end_frame = seq->getEndFrame();
-      if ((amber::CurrentConfig.auto_seek_to_beginning || previous_playhead < end_frame) &&
-          seq->playhead >= end_frame) {
-        pause();
-      }
-      if (seq->using_workarea && seq->playhead >= seq->workarea_out) {
-        if (amber::CurrentConfig.loop) {
-          // loop
-          play();
-        } else if (playing_in_to_out) {
-          pause();
-        }
       }
     }
   }
+}
+
+void Viewer::timer_update() {
+  previous_playhead = seq->playhead;
+  seq->playhead = qMax(0, qRound(playhead_start + ((QDateTime::currentMSecsSinceEpoch() - start_msecs) * 0.001 *
+                                                   seq->frame_rate * playback_speed)));
+
+  if (amber::CurrentConfig.seek_also_selects) panel_timeline->select_from_playhead();
+
+  update_parents(amber::CurrentConfig.seek_also_selects);
+
+  if (playing) check_playback_end();
 }
 
 void Viewer::recording_flasher_update() {
@@ -968,9 +963,15 @@ void Viewer::set_preview_resolution(QAction* action) {
 void Viewer::update_preview_res_label() {
   int div = amber::CurrentConfig.preview_resolution_divider;
   switch (div) {
-    case 2: preview_res_button_->setText(tr("1/2")); break;
-    case 4: preview_res_button_->setText(tr("1/4")); break;
-    default: preview_res_button_->setText(tr("Full")); break;
+    case 2:
+      preview_res_button_->setText(tr("1/2"));
+      break;
+    case 4:
+      preview_res_button_->setText(tr("1/4"));
+      break;
+    default:
+      preview_res_button_->setText(tr("Full"));
+      break;
   }
 }
 

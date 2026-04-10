@@ -27,6 +27,7 @@ class SubtitleEffect : public Effect {
 
  private:
   int find_active_cue(qint64 time_ms) const;
+  QString CollectActiveCues(qint64 time_ms) const;
   void DrawSubtitleShadow(QPainter& p, QTextDocument& td, const QRect& clip_rect, int translate_x, int translate_y,
                           double timecode);
   void DrawSubtitleOutline(QPainter& p, QTextDocument& td, const QRect& clip_rect, int translate_x, int translate_y,

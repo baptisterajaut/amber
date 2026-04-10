@@ -83,6 +83,7 @@ class RenderThread : public QThread {
 
   // RHI initialization helpers
   bool try_create_rhi();
+  void init_rhi_resources();
   void ensure_render_buffers();
 
   // RHI resources

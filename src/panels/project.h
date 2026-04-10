@@ -106,6 +106,8 @@ class Project : public Panel {
 
  private:
   void save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only, const QModelIndex& parent = QModelIndex());
+  void save_folder_item(QXmlStreamWriter& stream, Media* m, const QModelIndex& item, bool set_ids_only);
+  void save_footage_or_sequence_item(QXmlStreamWriter& stream, Media* m, int type, bool set_ids_only);
   int folder_id;
   int media_id;
   int sequence_id;

@@ -101,6 +101,9 @@ class ExportThread : public QThread {
   void Cleanup();
   bool EncodeVideoFrame(RenderThread* renderer, double timecode_secs);
   bool EncodeAudioFrames(long& file_audio_samples, double timecode_secs);
+  bool EncodeAllFrames(RenderThread* renderer, long& file_audio_samples);
+  bool FlushSwrAudio(long& file_audio_samples);
+  void FlushEncoders();
 
   std::atomic<bool> interrupt_;
 
