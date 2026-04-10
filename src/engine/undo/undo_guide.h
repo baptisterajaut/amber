@@ -26,7 +26,7 @@
 
 class Sequence;
 
-class AddGuideAction : public OliveAction {
+class AddGuideAction : public AmberAction {
  public:
   AddGuideAction(Sequence* seq, const Guide& guide);
   void doUndo() override;
@@ -37,7 +37,7 @@ class AddGuideAction : public OliveAction {
   Guide guide_;
 };
 
-class DeleteGuideAction : public OliveAction {
+class DeleteGuideAction : public AmberAction {
  public:
   DeleteGuideAction(Sequence* seq, int index);
   void doUndo() override;
@@ -49,7 +49,7 @@ class DeleteGuideAction : public OliveAction {
   Guide guide_;
 };
 
-class MoveGuideAction : public OliveAction {
+class MoveGuideAction : public AmberAction {
  public:
   MoveGuideAction(Sequence* seq, int index, int old_position, int new_position);
   void doUndo() override;
@@ -62,7 +62,7 @@ class MoveGuideAction : public OliveAction {
   int new_position_;
 };
 
-class SetGuideMirrorAction : public OliveAction {
+class SetGuideMirrorAction : public AmberAction {
  public:
   SetGuideMirrorAction(Sequence* seq, int index, bool mirror);
   void doUndo() override;

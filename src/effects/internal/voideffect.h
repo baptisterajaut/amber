@@ -21,7 +21,7 @@
 #ifndef VOIDEFFECT_H
 #define VOIDEFFECT_H
 
-/* VoidEffect is a placeholder used when Olive is unable to find an effect
+/* VoidEffect is a placeholder used when Amber is unable to find an effect
  * requested by a loaded project. It displays a missing effect so the user knows
  * an effect is missing, and stores the XML project data verbatim so that it
  * isn't lost if the user saves over the project.

@@ -42,7 +42,7 @@ class ClickableLabel;
  * Primarily a way of grouping EffectField objects together. As UI objects, Effects are largely formatted as a table
  * and you can think of EffectRows as the rows of the table and EffectFields as the columns.
  *
- * Within Olive, keyframing is enabled on the EffectRow (rather than individual EffectFields) so all attached fields
+ * Within Amber, keyframing is enabled on the EffectRow (rather than individual EffectFields) so all attached fields
  * will be keyframed together.
  *
  * Unlike EffectField, there's no reason to derive from EffectRow as it's simply a container of fields and a few

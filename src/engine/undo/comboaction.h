@@ -7,7 +7,7 @@
 /**
  * @brief The ComboAction class
  *
- * The Undo/Redo system works by stacking an action that knows how to "do" and also "undo" itself. As Olive is
+ * The Undo/Redo system works by stacking an action that knows how to "do" and also "undo" itself. As Amber is
  * a very complex program, there are many actions that can in one "user action". For example, moving a clip over
  * another will delete the clip under it, which is at least two actions that need to be undone if the user clicks
  * undo, however the user only (knowingly) did one thing and would find it confusing if this one user action required

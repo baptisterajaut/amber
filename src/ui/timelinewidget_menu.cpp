@@ -45,7 +45,7 @@ void TimelineWidget::buildSelectedClipsMenu(Menu& menu, const QVector<Clip*>& se
   }
 
   menu.addSeparator();
-  menu.addAction(tr("&Speed/Duration"), amber::Global.get(), &OliveGlobal::open_speed_dialog);
+  menu.addAction(tr("&Speed/Duration"), amber::Global.get(), &AmberGlobal::open_speed_dialog);
 
   bool any_frozen = false;
   for (auto c : selected_clips) {
@@ -61,7 +61,7 @@ void TimelineWidget::buildSelectedClipsMenu(Menu& menu, const QVector<Clip*>& se
   }
 
   if (audio_clips_are_selected) {
-    menu.addAction(tr("Auto-Cut Silence"), amber::Global.get(), &OliveGlobal::open_autocut_silence_dialog);
+    menu.addAction(tr("Auto-Cut Silence"), amber::Global.get(), &AmberGlobal::open_autocut_silence_dialog);
   }
 
   QAction* autoscaleAction = menu.addAction(tr("Auto-S&cale"), this, &TimelineWidget::toggle_autoscale);
@@ -115,8 +115,8 @@ void TimelineWidget::show_context_menu(const QPoint& pos) {
 
     QAction* undoAction = menu.addAction(tr("&Undo"));
     QAction* redoAction = menu.addAction(tr("&Redo"));
-    connect(undoAction, &QAction::triggered, amber::Global.get(), &OliveGlobal::undo);
-    connect(redoAction, &QAction::triggered, amber::Global.get(), &OliveGlobal::redo);
+    connect(undoAction, &QAction::triggered, amber::Global.get(), &AmberGlobal::undo);
+    connect(redoAction, &QAction::triggered, amber::Global.get(), &AmberGlobal::redo);
     undoAction->setEnabled(amber::UndoStack.canUndo());
     redoAction->setEnabled(amber::UndoStack.canRedo());
     menu.addSeparator();

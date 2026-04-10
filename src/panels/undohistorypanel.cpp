@@ -39,7 +39,7 @@ UndoHistoryPanel::UndoHistoryPanel(QWidget* parent) : Panel(parent) {
   setWidget(central);
 
   // QUndoView calls QUndoStack::setIndex() when the user clicks an entry,
-  // but that bypasses OliveGlobal::undo()/redo() which normally refresh the UI.
+  // but that bypasses AmberGlobal::undo()/redo() which normally refresh the UI.
   // Connect indexChanged to update_ui so all panels repaint after navigation.
   connect(&amber::UndoStack, &QUndoStack::indexChanged, this, [](int) {
     update_ui(true);

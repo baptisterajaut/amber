@@ -39,7 +39,7 @@ class MainWindow : public QMainWindow {
    *
    * Updates the window title to reflect the current project filename. Call if the project filename changes.
    *
-   * NOTE: It's recommended to use update_project_filename() from Olive::Global to update the filename completely
+   * NOTE: It's recommended to use update_project_filename() from Amber::Global to update the filename completely
    * instead of calling this function directly (update_project_filename() calls this function in the process).
    */
   void updateTitle();
@@ -47,7 +47,7 @@ class MainWindow : public QMainWindow {
   /**
    * @brief Load shortcut file.
    *
-   * Loads a shortcut configuration from file and sets Olive to use them.
+   * Loads a shortcut configuration from file and sets Amber to use them.
    *
    * @param fn
    *
@@ -68,7 +68,7 @@ class MainWindow : public QMainWindow {
   void save_shortcuts(const QString& fn);
 
   /**
-   * @brief Load a CSS/QSS style from file to customize Olive's interface.
+   * @brief Load a CSS/QSS style from file to customize Amber's interface.
    *
    * @param fn
    *

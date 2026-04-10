@@ -23,7 +23,7 @@
 
 #include "undoactions.h"
 
-class MoveClipAction : public OliveAction {
+class MoveClipAction : public AmberAction {
 public:
   MoveClipAction(Clip* c, long iin, long iout, long iclip_in, int itrack, bool irelative);
   void doUndo() override;
@@ -44,7 +44,7 @@ private:
   bool relative;
 };
 
-class DeleteClipAction : public OliveAction {
+class DeleteClipAction : public AmberAction {
 public:
   DeleteClipAction(Sequence* s, int clip);
   ~DeleteClipAction() override;
@@ -62,7 +62,7 @@ private:
   QVector<int> linkLinkIndex;
 };
 
-class AddClipCommand : public OliveAction {
+class AddClipCommand : public AmberAction {
 public:
   AddClipCommand(Sequence* s, QVector<ClipPtr>& add);
   ~AddClipCommand() override;
@@ -74,7 +74,7 @@ private:
   int link_offset_;
 };
 
-class ReplaceClipMediaCommand : public OliveAction {
+class ReplaceClipMediaCommand : public AmberAction {
 public:
   ReplaceClipMediaCommand(Media *, Media *, bool);
   void doUndo() override;
@@ -95,7 +95,7 @@ enum SetClipPropertyType : uint8_t {
   kSetClipPropertyEnabled
 };
 
-class SetClipProperty : public OliveAction {
+class SetClipProperty : public AmberAction {
 public:
   explicit SetClipProperty(SetClipPropertyType type);
   void doUndo() override;
@@ -110,7 +110,7 @@ private:
   void MainLoop(bool undo);
 };
 
-class SetSpeedAction : public OliveAction {
+class SetSpeedAction : public AmberAction {
 public:
   SetSpeedAction(Clip* c, double speed);
   void doUndo() override;
@@ -121,7 +121,7 @@ private:
   double new_speed;
 };
 
-class RenameClipCommand : public OliveAction {
+class RenameClipCommand : public AmberAction {
 public:
   RenameClipCommand(Clip* clip, QString new_name);
   void doUndo() override;
@@ -132,7 +132,7 @@ private:
   Clip* clip_;
 };
 
-class RemoveClipsFromClipboard : public OliveAction {
+class RemoveClipsFromClipboard : public AmberAction {
 public:
   explicit RemoveClipsFromClipboard(int index);
   ~RemoveClipsFromClipboard() override;
@@ -144,7 +144,7 @@ private:
   bool done;
 };
 
-class RefreshClips : public OliveAction {
+class RefreshClips : public AmberAction {
 public:
   explicit RefreshClips(Media* m);
   void doUndo() override;
@@ -153,7 +153,7 @@ private:
   Media* media;
 };
 
-class LinkCommand : public OliveAction {
+class LinkCommand : public AmberAction {
 public:
   LinkCommand();
   void doUndo() override;

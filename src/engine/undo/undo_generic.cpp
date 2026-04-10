@@ -23,13 +23,13 @@
 #include "core/appcontext.h"
 #include "rendering/renderfunctions.h"
 
-OliveAction::OliveAction(bool iset_window_modified) {
+AmberAction::AmberAction(bool iset_window_modified) {
   set_window_modified = iset_window_modified;
 }
 
-OliveAction::~OliveAction() = default;
+AmberAction::~AmberAction() = default;
 
-void OliveAction::undo() {
+void AmberAction::undo() {
   doUndo();
 
   if (set_window_modified && amber::app_ctx) {
@@ -37,7 +37,7 @@ void OliveAction::undo() {
   }
 }
 
-void OliveAction::redo() {
+void AmberAction::redo() {
   doRedo();
 
   if (set_window_modified && amber::app_ctx) {

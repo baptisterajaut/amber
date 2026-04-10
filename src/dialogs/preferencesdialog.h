@@ -354,7 +354,7 @@ class PreferencesDialog : public QDialog {
    *
    * @param restart_required
    *
-   * Defaults to FALSE, set this to TRUE if changing this setting should prompt the user for a restart of Olive before
+   * Defaults to FALSE, set this to TRUE if changing this setting should prompt the user for a restart of Amber before
    * the setting change takes effect.
    */
   void AddBoolPair(QCheckBox* ui, bool* value, bool restart_required = false);
@@ -421,7 +421,7 @@ class KeySequenceEditor : public QKeySequenceEdit {
   /**
    * @brief Return attached QAction's unique ID
    *
-   * Each of Olive's menu actions has a unique string ID (that, unlike the text, is not translated) for matching with
+   * Each of Amber's menu actions has a unique string ID (that, unlike the text, is not translated) for matching with
    * an external shortcut configuration file. The ID is stored in the QAction's `property("id")`. This function returns
    * that ID.
    *

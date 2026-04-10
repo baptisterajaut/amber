@@ -4,7 +4,7 @@
 #include "engine/undo/undoactions.h"
 #include <QCheckBox>
 
-class CheckboxCommand : public OliveAction {
+class CheckboxCommand : public AmberAction {
  public:
   explicit CheckboxCommand(QCheckBox* b);
   ~CheckboxCommand() override;

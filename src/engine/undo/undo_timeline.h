@@ -23,7 +23,7 @@
 
 #include "undoactions.h"
 
-class RippleAction : public OliveAction {
+class RippleAction : public AmberAction {
 public:
   RippleAction(Sequence* is, long ipoint, long ilength, const QVector<int>& iignore);
   void doUndo() override;
@@ -36,7 +36,7 @@ private:
   ComboAction* ca = nullptr;
 };
 
-class ChangeSequenceAction : public OliveAction {
+class ChangeSequenceAction : public AmberAction {
 public:
   explicit ChangeSequenceAction(SequencePtr s);
   void doUndo() override;
@@ -46,7 +46,7 @@ private:
   SequencePtr new_sequence;
 };
 
-class SetTimelineInOutCommand : public OliveAction {
+class SetTimelineInOutCommand : public AmberAction {
 public:
   SetTimelineInOutCommand(Sequence* s, bool enabled, long in, long out);
   void doUndo() override;
@@ -63,7 +63,7 @@ private:
   long new_out;
 };
 
-class SetSelectionsCommand : public OliveAction {
+class SetSelectionsCommand : public AmberAction {
 public:
   explicit SetSelectionsCommand(Sequence* s);
   void doUndo() override;
@@ -75,7 +75,7 @@ private:
   bool done;
 };
 
-class EditSequenceCommand : public OliveAction {
+class EditSequenceCommand : public AmberAction {
 public:
   EditSequenceCommand(Media *i, const SequencePtr& s);
   void doUndo() override;
@@ -100,7 +100,7 @@ private:
   int old_audio_layout;
 };
 
-class AddMarkerAction : public OliveAction {
+class AddMarkerAction : public AmberAction {
 public:
   AddMarkerAction(QVector<Marker>* m, long t, QString n);
   void doUndo() override;
@@ -113,7 +113,7 @@ private:
   int index;
 };
 
-class MoveMarkerAction : public OliveAction {
+class MoveMarkerAction : public AmberAction {
 public:
   MoveMarkerAction(Marker* m, long o, long n);
   void doUndo() override;
@@ -124,7 +124,7 @@ private:
   long new_time;
 };
 
-class DeleteMarkerAction : public OliveAction {
+class DeleteMarkerAction : public AmberAction {
 public:
   explicit DeleteMarkerAction(QVector<Marker>* m);
   void doUndo() override;

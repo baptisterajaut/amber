@@ -256,7 +256,7 @@ void PreferencesDialog::accept() {
 
   if (SettingsRequireRestart()) {
     int ret = QMessageBox::question(this, "Restart Required",
-                                    "Some of the changed settings will require a restart of Olive. Would you like "
+                                    "Some of the changed settings will require a restart of Amber. Would you like "
                                     "to restart now?",
                                     QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
     if (ret == QMessageBox::Cancel) return;
@@ -713,8 +713,8 @@ void PreferencesDialog::setup_ui() {
   appearance_layout->addWidget(new QLabel(tr("Theme")), row, 0);
 
   ui_style = new QComboBox();
-  ui_style->addItem(tr("Amber Dark (Default)"), amber::styling::kOliveDefaultDark);
-  ui_style->addItem(tr("Amber Light"), amber::styling::kOliveDefaultLight);
+  ui_style->addItem(tr("Amber Dark (Default)"), amber::styling::kAmberDefaultDark);
+  ui_style->addItem(tr("Amber Light"), amber::styling::kAmberDefaultLight);
   ui_style->addItem(tr("Native"), amber::styling::kNativeDarkIcons);
   ui_style->addItem(tr("Native (Light Icons)"), amber::styling::kNativeLightIcons);
   ui_style->setCurrentIndex(amber::CurrentConfig.style);

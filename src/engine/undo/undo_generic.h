@@ -23,7 +23,7 @@
 
 #include "undoactions.h"
 
-class SetBool : public OliveAction {
+class SetBool : public AmberAction {
 public:
   SetBool(bool* b, bool setting);
   void doUndo() override;
@@ -34,7 +34,7 @@ private:
   bool new_setting;
 };
 
-class SetInt : public OliveAction {
+class SetInt : public AmberAction {
 public:
   SetInt(int* pointer, int new_value);
   void doUndo() override;
@@ -45,7 +45,7 @@ private:
   int newval;
 };
 
-class SetLong : public OliveAction {
+class SetLong : public AmberAction {
 public:
   SetLong(long* pointer, long old_value, long new_value);
   void doUndo() override;
@@ -56,7 +56,7 @@ private:
   long newval;
 };
 
-class SetDouble : public OliveAction {
+class SetDouble : public AmberAction {
 public:
   SetDouble(double* pointer, double old_value, double new_value);
   void doUndo() override;
@@ -67,7 +67,7 @@ private:
   double newval;
 };
 
-class SetString : public OliveAction {
+class SetString : public AmberAction {
 public:
   SetString(QString* pointer, QString new_value);
   void doUndo() override;
@@ -78,7 +78,7 @@ private:
   QString newval;
 };
 
-class SetPointer : public OliveAction {
+class SetPointer : public AmberAction {
 public:
   SetPointer(void** pointer, void* data);
   void doUndo() override;
@@ -90,7 +90,7 @@ private:
   void* old_data;
 };
 
-class SetQVariant : public OliveAction {
+class SetQVariant : public AmberAction {
 public:
   SetQVariant(QVariant* itarget, const QVariant& iold, const QVariant& inew);
   void doUndo() override;
@@ -101,13 +101,13 @@ private:
   QVariant new_val;
 };
 
-class CloseAllClipsCommand : public OliveAction {
+class CloseAllClipsCommand : public AmberAction {
 public:
   void doUndo() override;
   void doRedo() override;
 };
 
-class UpdateViewer : public OliveAction {
+class UpdateViewer : public AmberAction {
 public:
   void doUndo() override;
   void doRedo() override;

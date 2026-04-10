@@ -95,25 +95,25 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   QPushButton* toolbar_open = new QPushButton();
   toolbar_open->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/open.svg")));
   toolbar_open->setToolTip(tr("Open Project"));
-  connect(toolbar_open, &QPushButton::clicked, amber::Global.get(), &OliveGlobal::OpenProject);
+  connect(toolbar_open, &QPushButton::clicked, amber::Global.get(), &AmberGlobal::OpenProject);
   toolbar->addWidget(toolbar_open);
 
   QPushButton* toolbar_save = new QPushButton();
   toolbar_save->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/save.svg")));
   toolbar_save->setToolTip(tr("Save Project"));
-  connect(toolbar_save, &QPushButton::clicked, amber::Global.get(), &OliveGlobal::save_project);
+  connect(toolbar_save, &QPushButton::clicked, amber::Global.get(), &AmberGlobal::save_project);
   toolbar->addWidget(toolbar_save);
 
   QPushButton* toolbar_undo = new QPushButton();
   toolbar_undo->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/undo.svg")));
   toolbar_undo->setToolTip(tr("Undo"));
-  connect(toolbar_undo, &QPushButton::clicked, amber::Global.get(), &OliveGlobal::undo);
+  connect(toolbar_undo, &QPushButton::clicked, amber::Global.get(), &AmberGlobal::undo);
   toolbar->addWidget(toolbar_undo);
 
   QPushButton* toolbar_redo = new QPushButton();
   toolbar_redo->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/redo.svg")));
   toolbar_redo->setToolTip(tr("Redo"));
-  connect(toolbar_redo, &QPushButton::clicked, amber::Global.get(), &OliveGlobal::redo);
+  connect(toolbar_redo, &QPushButton::clicked, amber::Global.get(), &AmberGlobal::redo);
   toolbar->addWidget(toolbar_redo);
 
   toolbar_search = new QLineEdit();
@@ -855,7 +855,7 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
 
     if (file.endsWith(".ove", Qt::CaseInsensitive)) {
       if (QMessageBox::question(this, tr("Import a Project"),
-                                tr("\"%1\" is an Olive project file. It will merge with this project. "
+                                tr("\"%1\" is an Amber project file. It will merge with this project. "
                                    "Do you wish to continue?")
                                     .arg(file),
                                 QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {

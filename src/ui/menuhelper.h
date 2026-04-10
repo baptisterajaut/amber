@@ -192,7 +192,7 @@ public slots:
   void set_timecode_view();
 
   /**
-   * @brief Calls open_recent() in Olive::Global using the index from a QAction
+   * @brief Calls open_recent() in Amber::Global using the index from a QAction
    *
    * Assumes the sender() is a QAction with an integer as its data variable. The data variable is an index of
    * the internal auto-recovery project list.
@@ -249,7 +249,7 @@ private slots:
 
 namespace amber {
 /**
-     * @brief A global MenuHelper object to assist menu creation throughout Olive.
+     * @brief A global MenuHelper object to assist menu creation throughout Amber.
      */
 extern MenuHelper MenuHelper;
 };

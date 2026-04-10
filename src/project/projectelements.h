@@ -23,7 +23,7 @@
 
 /**
 
-  Simple header to include all classes used for an Olive project file
+  Simple header to include all classes used for an Amber project file
 
   */
 

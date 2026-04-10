@@ -46,7 +46,7 @@ class ComboAction;
  * EffectField objects are *not* UI objects on their own. Instead, they're largely a system of values that can change
  * over time. For a widget that the user can use to edit/modify these values, use EffectFieldWidget::Create().
  *
- * If the field is intended to be saved and loaded from Olive project files (as most will be), ConvertStringToValue()
+ * If the field is intended to be saved and loaded from Amber project files (as most will be), ConvertStringToValue()
  * and ConvertValueToString() may also have to be overridden depending on how the derived class's data works.
  */
 class EffectField : public QObject {
@@ -55,7 +55,7 @@ class EffectField : public QObject {
   /**
    * @brief The EffectFieldType enum
    *
-   * Predetermined types of fields. Used throughout Olive to identify what kind of data to expect from GetValueAt().
+   * Predetermined types of fields. Used throughout Amber to identify what kind of data to expect from GetValueAt().
    *
    * This enum is also currently used to match an external XML effect's fields with the correct derived class (e.g.
    * EFFECT_FIELD_DOUBLE matches to DoubleField).
@@ -143,7 +143,7 @@ class EffectField : public QObject {
    * @brief Get the value of this field at a given timecode
    *
    * EffectFields are designed to be keyframable, meaning the user can make the values change over the course of the
-   * Sequence. This is the main function used through Olive to retrieve what value this field will be at a given time.
+   * Sequence. This is the main function used through Amber to retrieve what value this field will be at a given time.
    *
    * A common use case for this function would be EffectField::GetValueAt(EffectField::Now()), which will automatically
    * retrieve the timecode at the current playhead.
@@ -168,7 +168,7 @@ class EffectField : public QObject {
    * @brief Set the value of this field at a given timecode
    *
    * EffectFields are designed to be keyframable, meaning the user can make the values change over the course of the
-   * Sequence. This is the main function used through Olive to set what value this field will be at a given time.
+   * Sequence. This is the main function used through Amber to set what value this field will be at a given time.
    *
    * If the parent EffectRow is keyframing, this function will determine whether a keyframe exists at this time already.
    * If it does, it will change the value at that keyframe to `value`. Otherwise, it'll create a new keyframe at the

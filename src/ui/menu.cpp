@@ -7,7 +7,7 @@ Menu::Menu(QWidget *parent) :
   QMenu(parent)
 {
   if (amber::CurrentConfig.use_native_menu_styling) {
-    OliveGlobal::SetNativeStyling(this);
+    AmberGlobal::SetNativeStyling(this);
   }
 }
 
@@ -15,6 +15,6 @@ Menu::Menu(const QString &title, QWidget *parent) :
   QMenu(title, parent)
 {
   if (amber::CurrentConfig.use_native_menu_styling) {
-    OliveGlobal::SetNativeStyling(this);
+    AmberGlobal::SetNativeStyling(this);
   }
 }

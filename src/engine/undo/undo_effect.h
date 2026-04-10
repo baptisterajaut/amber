@@ -23,7 +23,7 @@
 
 #include "undoactions.h"
 
-class SetEffectEnabled : public OliveAction {
+class SetEffectEnabled : public AmberAction {
 public:
   SetEffectEnabled(Effect* e, bool enabled);
   void doUndo() override;
@@ -34,7 +34,7 @@ private:
   bool new_val_;
 };
 
-class AddEffectCommand : public OliveAction {
+class AddEffectCommand : public AmberAction {
 public:
   AddEffectCommand(Clip* c, EffectPtr e, const EffectMeta* m, int insert_pos = -1);
   void doUndo() override;
@@ -47,7 +47,7 @@ private:
   bool done;
 };
 
-class EffectDeleteCommand : public OliveAction {
+class EffectDeleteCommand : public AmberAction {
 public:
   explicit EffectDeleteCommand(Effect* e);
   void doUndo() override;
@@ -59,7 +59,7 @@ private:
   int index_;
 };
 
-class MoveEffectCommand : public OliveAction {
+class MoveEffectCommand : public AmberAction {
 public:
   MoveEffectCommand();
   void doUndo() override;
@@ -69,7 +69,7 @@ public:
   int to;
 };
 
-class SetEffectData : public OliveAction {
+class SetEffectData : public AmberAction {
 public:
   SetEffectData(Effect* e, const QByteArray &s);
   void doUndo() override;
@@ -80,13 +80,13 @@ private:
   QByteArray old_data;
 };
 
-class ReloadEffectsCommand : public OliveAction {
+class ReloadEffectsCommand : public AmberAction {
 public:
   void doUndo() override;
   void doRedo() override;
 };
 
-class SetIsKeyframing : public OliveAction {
+class SetIsKeyframing : public AmberAction {
 public:
   SetIsKeyframing(EffectRow* irow, bool ib);
   void doUndo() override;
@@ -96,7 +96,7 @@ private:
   bool b;
 };
 
-class AddTransitionCommand : public OliveAction {
+class AddTransitionCommand : public AmberAction {
 public:
   AddTransitionCommand(Clip* iopen, Clip* iclose, TransitionPtr copy, const EffectMeta* itransition, int ilength);
   void doUndo() override;
@@ -112,7 +112,7 @@ private:
   TransitionPtr new_transition_ref_;
 };
 
-class ModifyTransitionCommand : public OliveAction {
+class ModifyTransitionCommand : public AmberAction {
 public:
   ModifyTransitionCommand(TransitionPtr t, long ilength);
   void doUndo() override;
@@ -123,7 +123,7 @@ private:
   long old_length_;
 };
 
-class DeleteTransitionCommand : public OliveAction {
+class DeleteTransitionCommand : public AmberAction {
 public:
   explicit DeleteTransitionCommand(TransitionPtr t);
   void doUndo() override;
@@ -134,7 +134,7 @@ private:
   Clip* closed_clip_;
 };
 
-class KeyframeDelete : public OliveAction {
+class KeyframeDelete : public AmberAction {
 public:
   KeyframeDelete(EffectField* ifield, int iindex);
   void doUndo() override;
@@ -146,7 +146,7 @@ private:
   EffectKeyframe deleted_key;
 };
 
-class KeyframeAdd : public OliveAction {
+class KeyframeAdd : public AmberAction {
 public:
   KeyframeAdd(EffectField* ifield, int ii);
   void doUndo() override;
@@ -158,7 +158,7 @@ private:
   bool done{true};
 };
 
-class KeyframeDataChange : public OliveAction {
+class KeyframeDataChange : public AmberAction {
 public:
   explicit KeyframeDataChange(EffectField* field);
 

@@ -52,10 +52,10 @@ struct EffectMeta;
 class EffectRow;
 class EffectField;
 
-class OliveAction : public QUndoCommand {
+class AmberAction : public QUndoCommand {
 public:
-  OliveAction(bool iset_window_modified = true);
-  ~OliveAction() override;
+  AmberAction(bool iset_window_modified = true);
+  ~AmberAction() override;
 
   void undo() override;
   void redo() override;

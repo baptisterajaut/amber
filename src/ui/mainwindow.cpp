@@ -370,7 +370,7 @@ void MainWindow::Restyle() {
       // set default palette
       QPalette palette;
 
-      if (amber::CurrentConfig.style == amber::styling::kOliveDefaultLight) {
+      if (amber::CurrentConfig.style == amber::styling::kAmberDefaultLight) {
         palette.setColor(QPalette::Window, QColor(208, 208, 208));
         palette.setColor(QPalette::WindowText, Qt::black);
         palette.setColor(QPalette::Base, QColor(240, 240, 240));
@@ -386,7 +386,7 @@ void MainWindow::Restyle() {
         palette.setColor(QPalette::Highlight, QColor(42, 130, 218));
         palette.setColor(QPalette::HighlightedText, Qt::white);
 
-        /* Olive Mid
+        /* Amber Mid
         palette.setColor(QPalette::Window, QColor(128, 128, 128));
         palette.setColor(QPalette::WindowText, Qt::black);
         palette.setColor(QPalette::Base, QColor(192, 192, 192));
@@ -453,7 +453,7 @@ void MainWindow::setup_menus() {
   QMenuBar* menuBar = new QMenuBar(this);
 
   if (amber::CurrentConfig.use_native_menu_styling) {
-    OliveGlobal::SetNativeStyling(menuBar);
+    AmberGlobal::SetNativeStyling(menuBar);
   }
 
   setMenuBar(menuBar);

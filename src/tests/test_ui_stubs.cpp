@@ -29,7 +29,7 @@ class UndoHistoryPanel;
 // --- amber namespace globals ---
 
 namespace amber {
-std::unique_ptr<OliveGlobal> Global;
+std::unique_ptr<AmberGlobal> Global;
 QString ActiveProjectFilename;
 QString AppName;
 
@@ -76,10 +76,10 @@ void alloc_panels(QWidget*) {}
 void free_panels() {}
 void scroll_to_frame_internal(QScrollBar*, long, double, int) {}
 
-// --- OliveGlobal methods referenced from loadthread.cpp / undo_timeline.cpp ---
-void OliveGlobal::set_sequence(SequencePtr, bool) {}
-void OliveGlobal::update_project_filename(const QString&) {}
-void OliveGlobal::set_modified(bool) {}
+// --- AmberGlobal methods referenced from loadthread.cpp / undo_timeline.cpp ---
+void AmberGlobal::set_sequence(SequencePtr, bool) {}
+void AmberGlobal::update_project_filename(const QString&) {}
+void AmberGlobal::set_modified(bool) {}
 
 // --- Project methods referenced from loadthread.cpp ---
 MediaPtr Project::create_folder_internal(QString) { return nullptr; }

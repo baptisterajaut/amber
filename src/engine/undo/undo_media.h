@@ -23,7 +23,7 @@
 
 #include "undoactions.h"
 
-class AddMediaCommand : public OliveAction {
+class AddMediaCommand : public AmberAction {
 public:
   AddMediaCommand(MediaPtr iitem, Media* iparent);
   void doUndo() override;
@@ -34,7 +34,7 @@ private:
   bool done_{false};
 };
 
-class DeleteMediaCommand : public OliveAction {
+class DeleteMediaCommand : public AmberAction {
 public:
   explicit DeleteMediaCommand(const MediaPtr& i);
   void doUndo() override;
@@ -44,7 +44,7 @@ private:
   Media* parent;
 };
 
-class ReplaceMediaCommand : public OliveAction {
+class ReplaceMediaCommand : public AmberAction {
 public:
   ReplaceMediaCommand(MediaPtr, QString);
   void doUndo() override;
@@ -56,7 +56,7 @@ private:
   void replace(QString& filename);
 };
 
-class MediaMove : public OliveAction {
+class MediaMove : public AmberAction {
 public:
   MediaMove();
   QVector<MediaPtr> items;
@@ -67,7 +67,7 @@ private:
   QVector<Media*> froms;
 };
 
-class MediaRename : public OliveAction {
+class MediaRename : public AmberAction {
 public:
   MediaRename(Media* iitem, QString to);
   void doUndo() override;
@@ -78,7 +78,7 @@ private:
   QString to;
 };
 
-class UpdateFootageTooltip : public OliveAction {
+class UpdateFootageTooltip : public AmberAction {
 public:
   explicit UpdateFootageTooltip(Media* i);
   void doUndo() override;

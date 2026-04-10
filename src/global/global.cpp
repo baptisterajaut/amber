@@ -49,11 +49,11 @@
 #include "ui/mediaiconservice.h"
 #include "ui/menuhelper.h"
 
-std::unique_ptr<OliveGlobal> amber::Global;
+std::unique_ptr<AmberGlobal> amber::Global;
 QString amber::ActiveProjectFilename;
 QString amber::AppName;
 
-OliveGlobal::OliveGlobal()
+AmberGlobal::AmberGlobal()
 
 {
   // sets current app name
@@ -66,7 +66,7 @@ OliveGlobal::OliveGlobal()
 
   amber::AppName = QString("Amber (%1%2)").arg(APPVERSION, version_id);
 
-  // set the file filter used in all file dialogs pertaining to Olive project files.
+  // set the file filter used in all file dialogs pertaining to Amber project files.
   project_file_filter = tr("Amber Project %1").arg("(*.ove)");
 
   // set default value
@@ -85,9 +85,9 @@ OliveGlobal::OliveGlobal()
   });
 }
 
-const QString& OliveGlobal::get_project_file_filter() { return project_file_filter; }
+const QString& AmberGlobal::get_project_file_filter() { return project_file_filter; }
 
-void OliveGlobal::update_project_filename(const QString& s) {
+void AmberGlobal::update_project_filename(const QString& s) {
   // set filename to s
   amber::ActiveProjectFilename = s;
   project_io_->setProjectFilename(s);
@@ -96,7 +96,7 @@ void OliveGlobal::update_project_filename(const QString& s) {
   if (amber::MainWindow != nullptr) amber::MainWindow->updateTitle();
 }
 
-void OliveGlobal::check_for_autorecovery_file() {
+void AmberGlobal::check_for_autorecovery_file() {
   project_io_->initAutorecovery();
   const QString& ar_filename = project_io_->autorecoveryFilename();
   if (!ar_filename.isEmpty() && QFile::exists(ar_filename)) {
@@ -110,7 +110,7 @@ void OliveGlobal::check_for_autorecovery_file() {
   }
 }
 
-void OliveGlobal::reconfigure_autorecovery() {
+void AmberGlobal::reconfigure_autorecovery() {
   autorecovery_timer.stop();
   if (amber::CurrentConfig.autorecovery_enabled) {
     autorecovery_timer.setInterval(amber::CurrentConfig.autorecovery_interval * 60000);
@@ -119,7 +119,7 @@ void OliveGlobal::reconfigure_autorecovery() {
   project_io_->reconfigureAutorecovery();
 }
 
-void OliveGlobal::set_rendering_state(bool rendering) {
+void AmberGlobal::set_rendering_state(bool rendering) {
   project_io_->setRenderingState(rendering);
   if (rendering) {
     autorecovery_timer.stop();
@@ -128,23 +128,23 @@ void OliveGlobal::set_rendering_state(bool rendering) {
   }
 }
 
-void OliveGlobal::set_modified(bool modified) {
+void AmberGlobal::set_modified(bool modified) {
   project_io_->setModified(modified);
   if (amber::MainWindow == nullptr) return;
   amber::MainWindow->setWindowModified(modified);
   changed_since_last_autorecovery = modified;
 }
 
-bool OliveGlobal::is_modified() { return project_io_->isModified(); }
+bool AmberGlobal::is_modified() { return project_io_->isModified(); }
 
-void OliveGlobal::load_project_on_launch(const QString& s) {
+void AmberGlobal::load_project_on_launch(const QString& s) {
   amber::ActiveProjectFilename = s;
   enable_load_project_on_init = true;
 }
 
-QString OliveGlobal::get_recent_project_list_file() { return project_io_->recentProjectListFile(); }
+QString AmberGlobal::get_recent_project_list_file() { return project_io_->recentProjectListFile(); }
 
-void OliveGlobal::load_translation_from_config() {
+void AmberGlobal::load_translation_from_config() {
   QString language_file = amber::CurrentRuntimeConfig.external_translation_file.isEmpty()
                               ? amber::CurrentConfig.language_file
                               : amber::CurrentRuntimeConfig.external_translation_file;
@@ -168,7 +168,7 @@ void OliveGlobal::load_translation_from_config() {
   }
 }
 
-void OliveGlobal::SetNativeStyling(QWidget* w) {
+void AmberGlobal::SetNativeStyling(QWidget* w) {
 #ifdef Q_OS_WIN
   w->setStyleSheet("");
   w->setPalette(w->style()->standardPalette());
@@ -176,7 +176,7 @@ void OliveGlobal::SetNativeStyling(QWidget* w) {
 #endif
 }
 
-void OliveGlobal::LoadProject(const QString& fn, bool autorecovery) {
+void AmberGlobal::LoadProject(const QString& fn, bool autorecovery) {
   // QSortFilterProxyModels are not thread-safe, and as we'll be loading in another thread, leaving it connected
   // can cause glitches in its presentation. Therefore for the duration of the loading process, we disconnect it,
   // and reconnect it later once the loading is complete.
@@ -191,7 +191,7 @@ void OliveGlobal::LoadProject(const QString& fn, bool autorecovery) {
   connect(&ld, &LoadDialog::cancel, lt, &LoadThread::cancel);
   connect(lt, &LoadThread::success, &ld, &QDialog::accept);
   connect(lt, &LoadThread::error, &ld, &QDialog::reject);
-  connect(lt, &LoadThread::error, this, &OliveGlobal::new_project);
+  connect(lt, &LoadThread::error, this, &AmberGlobal::new_project);
   connect(lt, &LoadThread::report_progress, &ld, &LoadDialog::setValue);
   connect(lt, &LoadThread::found_invalid_footage, this, [](QVector<QPair<Media*, Footage*>> invalid) {
     FootageRelinkDialog dlg(amber::MainWindow, invalid);
@@ -205,7 +205,7 @@ void OliveGlobal::LoadProject(const QString& fn, bool autorecovery) {
   panel_project->ConnectFilterToModel();
 }
 
-void OliveGlobal::ClearProject() {
+void AmberGlobal::ClearProject() {
   // clear graph editor
   panel_graph_editor->set_row(nullptr);
 
@@ -232,12 +232,12 @@ void OliveGlobal::ClearProject() {
   amber::Global->set_modified(false);
 }
 
-void OliveGlobal::ImportProject(const QString& fn) {
+void AmberGlobal::ImportProject(const QString& fn) {
   LoadProject(fn, false);
   set_modified(true);
 }
 
-void OliveGlobal::new_project() {
+void AmberGlobal::new_project() {
   if (amber::project_model.childCount() == 0 && !is_modified()) {
     QString shortcut = amber::MenuHelper.new_sequence_action()->shortcut().toString(QKeySequence::NativeText);
     QMessageBox::information(amber::MainWindow, tr("Project Already Empty"),
@@ -251,14 +251,14 @@ void OliveGlobal::new_project() {
   }
 }
 
-void OliveGlobal::OpenProject() {
+void AmberGlobal::OpenProject() {
   QString fn = QFileDialog::getOpenFileName(amber::MainWindow, tr("Open Project..."), "", project_file_filter);
   if (!fn.isEmpty() && can_close_project()) {
     OpenProjectWorker(fn, false);
   }
 }
 
-void OliveGlobal::open_recent(int index) {
+void AmberGlobal::open_recent(int index) {
   QString recent_url = amber::project_io->recentProjects().at(index);
   if (!QFile::exists(recent_url)) {
     if (QMessageBox::question(
@@ -274,7 +274,7 @@ void OliveGlobal::open_recent(int index) {
   }
 }
 
-bool OliveGlobal::save_project_as() {
+bool AmberGlobal::save_project_as() {
   QString fn = QFileDialog::getSaveFileName(amber::MainWindow, tr("Save Project As..."), "", project_file_filter);
   if (!fn.isEmpty()) {
     if (!fn.endsWith(".ove", Qt::CaseInsensitive)) {
@@ -287,7 +287,7 @@ bool OliveGlobal::save_project_as() {
   return false;
 }
 
-bool OliveGlobal::save_project() {
+bool AmberGlobal::save_project() {
   if (amber::ActiveProjectFilename.isEmpty()) {
     return save_project_as();
   } else {
@@ -296,7 +296,7 @@ bool OliveGlobal::save_project() {
   }
 }
 
-bool OliveGlobal::can_close_project() {
+bool AmberGlobal::can_close_project() {
   if (is_modified()) {
     QMessageBox* m = new QMessageBox(
         QMessageBox::Question, tr("Unsaved Project"),
@@ -314,14 +314,14 @@ bool OliveGlobal::can_close_project() {
   return true;
 }
 
-void OliveGlobal::open_export_dialog() {
+void AmberGlobal::open_export_dialog() {
   if (CheckForActiveSequence()) {
     ExportDialog e(amber::MainWindow);
     e.exec();
   }
 }
 
-void OliveGlobal::finished_initialize() {
+void AmberGlobal::finished_initialize() {
   if (enable_load_project_on_init) {
     // if a project was set as a command line argument, we load it here
     if (QFileInfo::exists(amber::ActiveProjectFilename)) {
@@ -345,7 +345,7 @@ void OliveGlobal::finished_initialize() {
   }
 }
 
-void OliveGlobal::save_autorecovery_file() {
+void AmberGlobal::save_autorecovery_file() {
   if (changed_since_last_autorecovery) {
     panel_project->save_project(true);
 
@@ -355,7 +355,7 @@ void OliveGlobal::save_autorecovery_file() {
   }
 }
 
-void OliveGlobal::open_preferences() {
+void AmberGlobal::open_preferences() {
   panel_sequence_viewer->pause();
   panel_footage_viewer->pause();
 
@@ -363,7 +363,7 @@ void OliveGlobal::open_preferences() {
   pd.exec();
 }
 
-void OliveGlobal::set_sequence(SequencePtr s, bool record_history) {
+void AmberGlobal::set_sequence(SequencePtr s, bool record_history) {
   project_io_->setSequence(s, record_history);
 
   panel_graph_editor->set_row(nullptr);
@@ -373,7 +373,7 @@ void OliveGlobal::set_sequence(SequencePtr s, bool record_history) {
   panel_timeline->setFocus();
 }
 
-void OliveGlobal::go_back_sequence() {
+void AmberGlobal::go_back_sequence() {
   if (!project_io_->canGoBack()) return;
   project_io_->goBackSequence();
 
@@ -384,20 +384,20 @@ void OliveGlobal::go_back_sequence() {
   panel_timeline->setFocus();
 }
 
-bool OliveGlobal::can_go_back() const { return project_io_->canGoBack(); }
+bool AmberGlobal::can_go_back() const { return project_io_->canGoBack(); }
 
-const QVector<SequencePtr>& OliveGlobal::sequence_history() const { return project_io_->sequenceHistory(); }
+const QVector<SequencePtr>& AmberGlobal::sequence_history() const { return project_io_->sequenceHistory(); }
 
-void OliveGlobal::clear_sequence_history() { project_io_->clearSequenceHistory(); }
+void AmberGlobal::clear_sequence_history() { project_io_->clearSequenceHistory(); }
 
-void OliveGlobal::OpenProjectWorker(QString fn, bool autorecovery) {
+void AmberGlobal::OpenProjectWorker(QString fn, bool autorecovery) {
   ClearProject();
   update_project_filename(fn);
   LoadProject(fn, autorecovery);
   amber::UndoStack.clear();
 }
 
-bool OliveGlobal::CheckForActiveSequence(bool show_msg) {
+bool AmberGlobal::CheckForActiveSequence(bool show_msg) {
   if (amber::ActiveSequence == nullptr) {
     if (show_msg) {
       QMessageBox::information(amber::MainWindow, tr("No active sequence"),
@@ -409,7 +409,7 @@ bool OliveGlobal::CheckForActiveSequence(bool show_msg) {
   return true;
 }
 
-void OliveGlobal::undo() {
+void AmberGlobal::undo() {
   // workaround to prevent crash (and also users should never need to do this)
   if (!panel_timeline->importing) {
     amber::UndoStack.undo();
@@ -417,7 +417,7 @@ void OliveGlobal::undo() {
   }
 }
 
-void OliveGlobal::redo() {
+void AmberGlobal::redo() {
   // workaround to prevent crash (and also users should never need to do this)
   if (!panel_timeline->importing) {
     amber::UndoStack.redo();
@@ -425,28 +425,28 @@ void OliveGlobal::redo() {
   }
 }
 
-void OliveGlobal::paste() {
+void AmberGlobal::paste() {
   if (amber::ActiveSequence != nullptr) {
     panel_timeline->paste(false);
   }
 }
 
-void OliveGlobal::paste_insert() {
+void AmberGlobal::paste_insert() {
   if (amber::ActiveSequence != nullptr) {
     panel_timeline->paste(true);
   }
 }
 
-void OliveGlobal::open_about_dialog() {
+void AmberGlobal::open_about_dialog() {
   AboutDialog a(amber::MainWindow);
   a.exec();
 }
 
-void OliveGlobal::open_debug_log() {
+void AmberGlobal::open_debug_log() {
   if (amber::DebugDialog != nullptr) amber::DebugDialog->show();
 }
 
-void OliveGlobal::open_speed_dialog() {
+void AmberGlobal::open_speed_dialog() {
   if (amber::ActiveSequence != nullptr) {
     QVector<Clip*> selected_clips = amber::ActiveSequence->SelectedClips();
 
@@ -457,7 +457,7 @@ void OliveGlobal::open_speed_dialog() {
   }
 }
 
-void OliveGlobal::open_autocut_silence_dialog() {
+void AmberGlobal::open_autocut_silence_dialog() {
   if (CheckForActiveSequence()) {
     QVector<int> selected_clips = amber::ActiveSequence->SelectedClipIndexes();
 
@@ -471,9 +471,9 @@ void OliveGlobal::open_autocut_silence_dialog() {
   }
 }
 
-void OliveGlobal::clear_undo_stack() { amber::UndoStack.clear(); }
+void AmberGlobal::clear_undo_stack() { amber::UndoStack.clear(); }
 
-void OliveGlobal::open_action_search() {
+void AmberGlobal::open_action_search() {
   ActionSearch as(amber::MainWindow);
   as.exec();
 }

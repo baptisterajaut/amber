@@ -15,7 +15,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-set(OLIVE_DEFINITIONS -DQT_DEPRECATED_WARNINGS)
+set(AMBER_DEFINITIONS -DQT_DEPRECATED_WARNINGS)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -55,13 +55,13 @@ find_package(FFMPEG 3.4 REQUIRED
 
 option(NOFREI0R "Disable Frei0r plugin support" OFF)
 if(NOFREI0R)
-  list(APPEND OLIVE_DEFINITIONS -DNOFREI0R)
+  list(APPEND AMBER_DEFINITIONS -DNOFREI0R)
 endif()
 
 if(WIN32)
   find_package(OpenColorIO)
   if(OPENCOLORIO_FOUND)
-    list(APPEND OLIVE_DEFINITIONS -DOLIVE_OCIO)
+    list(APPEND AMBER_DEFINITIONS -DAMBER_OCIO)
   endif()
 endif()
 
@@ -85,10 +85,10 @@ if(NOT DEFINED GIT_HASH)
     )
   endif()
 endif()
-list(APPEND OLIVE_DEFINITIONS -DAPPVERSION="${AMBER_VERSION}")
+list(APPEND AMBER_DEFINITIONS -DAPPVERSION="${AMBER_VERSION}")
 if(DEFINED GIT_HASH)
   message("Amber: git hash = " "${GIT_HASH}")
-  list(APPEND OLIVE_DEFINITIONS -DGITHASH="${GIT_HASH}")
+  list(APPEND AMBER_DEFINITIONS -DGITHASH="${GIT_HASH}")
 else()
   message("Amber: No git hash defined!")
 endif()
@@ -167,7 +167,7 @@ add_subdirectory(engine)
 
 target_include_directories(amber-engine PUBLIC ${CMAKE_SOURCE_DIR})
 set_target_properties(amber-engine PROPERTIES AUTOMOC ON AUTORCC ON)
-target_compile_definitions(amber-engine PUBLIC ${OLIVE_DEFINITIONS})
+target_compile_definitions(amber-engine PUBLIC ${AMBER_DEFINITIONS})
 
 target_link_libraries(amber-engine PUBLIC
   OpenGL::GL
@@ -268,12 +268,12 @@ set(UI_SOURCES
   main.cpp
 )
 
-set(OLIVE_RESOURCES
+set(AMBER_RESOURCES
   cursors/cursors.qrc
   icons/icons.qrc
 )
 
-set(OLIVE_EFFECTS
+set(AMBER_EFFECTS
   effects/shaders/boxblur.frag
   effects/shaders/boxblur.xml
   effects/shaders/bulge.frag
@@ -337,7 +337,7 @@ set(OLIVE_EFFECTS
   effects/shaders/wave.xml
 )
 
-qt_add_translation(OLIVE_QM_FILES
+qt_add_translation(AMBER_QM_FILES
   ts/amber_ar.ts
   ts/amber_bs.ts
   ts/amber_cs.ts
@@ -355,32 +355,32 @@ qt_add_translation(OLIVE_QM_FILES
   ts/amber_zh-TW.ts
 )
 
-set(OLIVE_TARGET "amber-editor")
+set(AMBER_TARGET "amber-editor")
 if(APPLE)
-  set(OLIVE_TARGET "Amber")
+  set(AMBER_TARGET "Amber")
 endif()
 
-add_executable(${OLIVE_TARGET}
+add_executable(${AMBER_TARGET}
   ${UI_SOURCES}
-  ${OLIVE_RESOURCES}
-  ${OLIVE_EFFECTS}
-  ${OLIVE_QM_FILES}
+  ${AMBER_RESOURCES}
+  ${AMBER_EFFECTS}
+  ${AMBER_QM_FILES}
 )
 
-target_link_libraries(${OLIVE_TARGET} PRIVATE
+target_link_libraries(${AMBER_TARGET} PRIVATE
   amber-engine
   $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
 )
 
 if(WIN32 AND OPENCOLORIO_FOUND)
-  target_link_libraries(${OLIVE_TARGET} PRIVATE OpenColorIO)
+  target_link_libraries(${AMBER_TARGET} PRIVATE OpenColorIO)
 endif()
 
 # Link-time optimization for Release builds (recovers overhead from function decomposition)
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
 if(ipo_supported)
-  set_property(TARGET ${OLIVE_TARGET} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  set_property(TARGET ${AMBER_TARGET} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 endif()
 
 # Test suite (only when not cross-compiling)
@@ -402,22 +402,22 @@ qt_add_shaders(amber-engine "amber_shaders"
 )
 
 # Copy shader effects next to the binary so dev builds find them
-add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EFFECTS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+add_custom_command(TARGET ${AMBER_TARGET} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${AMBER_TARGET}>/effects"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${AMBER_EFFECTS} "$<TARGET_FILE_DIR:${AMBER_TARGET}>/effects"
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Copying shader effects to build directory"
 )
 
-file(GLOB OLIVE_EXPORT_PRESETS "${CMAKE_CURRENT_SOURCE_DIR}/exportpresets/*")
-add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/exportpresets"
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EXPORT_PRESETS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/exportpresets"
+file(GLOB AMBER_EXPORT_PRESETS "${CMAKE_CURRENT_SOURCE_DIR}/exportpresets/*")
+add_custom_command(TARGET ${AMBER_TARGET} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${AMBER_TARGET}>/exportpresets"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${AMBER_EXPORT_PRESETS} "$<TARGET_FILE_DIR:${AMBER_TARGET}>/exportpresets"
   COMMENT "Copying export presets to build directory"
 )
 
 if(APPLE)
-  target_compile_definitions(${OLIVE_TARGET} PRIVATE GL_SILENCE_DEPRECATION)
+  target_compile_definitions(${AMBER_TARGET} PRIVATE GL_SILENCE_DEPRECATION)
 endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -431,9 +431,9 @@ if(DOXYGEN_FOUND AND BUILD_DOXYGEN)
 endif()
 
 if(UNIX AND NOT APPLE)
-  install(TARGETS ${OLIVE_TARGET} RUNTIME DESTINATION bin)
-  install(FILES ${OLIVE_EFFECTS} DESTINATION share/amber-editor/effects)
-  install(FILES ${OLIVE_EXPORT_PRESETS} DESTINATION share/amber-editor/exportpresets)
+  install(TARGETS ${AMBER_TARGET} RUNTIME DESTINATION bin)
+  install(FILES ${AMBER_EFFECTS} DESTINATION share/amber-editor/effects)
+  install(FILES ${AMBER_EXPORT_PRESETS} DESTINATION share/amber-editor/exportpresets)
   install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../LICENSE DESTINATION share/amber-editor)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.desktop DESTINATION share/applications)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/org.ambervideoeditor.Amber.appdata.xml DESTINATION share/metainfo)
@@ -452,5 +452,5 @@ if(UNIX AND NOT APPLE)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/128x128/application-vnd.olive-project.png DESTINATION share/icons/hicolor/128x128/mimetypes)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/256x256/application-vnd.olive-project.png DESTINATION share/icons/hicolor/256x256/mimetypes)
   install(FILES ${CMAKE_SOURCE_DIR}/../packaging/linux/icons/512x512/application-vnd.olive-project.png DESTINATION share/icons/hicolor/512x512/mimetypes)
-  install(FILES ${OLIVE_QM_FILES} DESTINATION share/amber-editor/ts)
+  install(FILES ${AMBER_QM_FILES} DESTINATION share/amber-editor/ts)
 endif()

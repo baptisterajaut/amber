@@ -4,7 +4,7 @@
 
 bool amber::styling::UseDarkIcons()
 {
-  return amber::CurrentConfig.style == kOliveDefaultLight || amber::CurrentConfig.style == kNativeDarkIcons;
+  return amber::CurrentConfig.style == kAmberDefaultLight || amber::CurrentConfig.style == kNativeDarkIcons;
 }
 
 QColor amber::styling::GetIconColor()

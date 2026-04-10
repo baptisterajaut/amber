@@ -394,7 +394,7 @@ bool start_recording(const QString& project_filename) {
 
   output_recording.setFileName(audio_file_path);
   if (!output_recording.open(QFile::WriteOnly)) {
-    qCritical() << "Failed to open output file. Does Olive have permission to write to this directory?";
+    qCritical() << "Failed to open output file. Does Amber have permission to write to this directory?";
     return false;
   }
 

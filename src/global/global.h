@@ -18,8 +18,8 @@
 
 ***/
 
-#ifndef OLIVEGLOBAL_H
-#define OLIVEGLOBAL_H
+#ifndef AMBERGLOBAL_H
+#define AMBERGLOBAL_H
 
 #include <memory>
 #include "engine/undo/undo.h"
@@ -30,24 +30,24 @@
 #include <QTranslator>
 
 /**
- * @brief The Olive Global class
+ * @brief The Amber Global class
  *
- * A resource for various global functions used throughout Olive.
+ * A resource for various global functions used throughout Amber.
  */
-class OliveGlobal : public QObject {
+class AmberGlobal : public QObject {
   Q_OBJECT
  public:
   /**
-   * @brief OliveGlobal Constructor
+   * @brief AmberGlobal Constructor
    *
-   * Creates Olive Global object. Also sets some default runtime settings and the application name.
+   * Creates Amber Global object. Also sets some default runtime settings and the application name.
    */
-  OliveGlobal();
+  AmberGlobal();
 
   /**
-   * @brief Returns the file dialog filter used when interfacing with Olive project files.
+   * @brief Returns the file dialog filter used when interfacing with Amber project files.
    *
-   * @return The file filter string used by QFileDialog to limit the files shown to Olive (*.ove) files.
+   * @return The file filter string used by QFileDialog to limit the files shown to Amber (*.ove) files.
    */
   const QString& get_project_file_filter();
 
@@ -57,13 +57,13 @@ class OliveGlobal : public QObject {
    * @brief Change the current active project filename
    *
    * Triggered to change the current active project filename. Call this before calling any internal project
-   * saving or loading functions in order to set which file to work with (OliveGlobal::open_project() and
-   * OliveGlobal::save_project_as() do this automatically). Also updates the main window title to reflect the
+   * saving or loading functions in order to set which file to work with (AmberGlobal::open_project() and
+   * AmberGlobal::save_project_as() do this automatically). Also updates the main window title to reflect the
    * project filename.
    *
    * @param s
    *
-   * The URL of the project file to work with. Can be an empty string, in which case Olive will treat the project
+   * The URL of the project file to work with. Can be an empty string, in which case Amber will treat the project
    * as an unsaved project.
    */
   void update_project_filename(const QString& s);
@@ -71,7 +71,7 @@ class OliveGlobal : public QObject {
   /**
    * @brief Check whether an auto-recovery file exists and ask the user if they want to load it.
    *
-   * Usually called on initialization. Checks if an auto-recovery file exists (meaning the last session of Olive
+   * Usually called on initialization. Checks if an auto-recovery file exists (meaning the last session of Amber
    * didn't close correctly). If it finds one, asks the user if they want to load it. If so, loads the auto-recovery
    * project.
    */
@@ -87,18 +87,18 @@ class OliveGlobal : public QObject {
   /**
    * @brief Set the application state depending on if the user is exporting a video
    *
-   * Some background functions shouldn't run while Olive is exporting a video. This function will disable/enable them
+   * Some background functions shouldn't run while Amber is exporting a video. This function will disable/enable them
    * as necessary.
    *
    * The current functions are as follows:
-   * * Auto-recovery interval. Olive saves an auto-recovery just before exporting anyway and seeing as the user
+   * * Auto-recovery interval. Amber saves an auto-recovery just before exporting anyway and seeing as the user
    * cannot make changes while rendering, there's no reason to continue saving auto-recovery files.
-   * * Audio device playback. Olive uses the same internal audio buffer for exporting as it does for playback, but
+   * * Audio device playback. Amber uses the same internal audio buffer for exporting as it does for playback, but
    * this buffer does not need to be forwarded to the output device when exporting.
    *
    * @param rendering
    *
-   * **TRUE** if Olive is about to export a video. **FALSE** if Olive has finished exporting.
+   * **TRUE** if Amber is about to export a video. **FALSE** if Amber has finished exporting.
    */
   void set_rendering_state(bool rendering);
 
@@ -130,7 +130,7 @@ class OliveGlobal : public QObject {
   /**
    * @brief Set a project to load just after launching
    *
-   * Called by main() if Olive was called with a project file as a running argument. Sets up Olive to load the
+   * Called by main() if Amber was called with a project file as a running argument. Sets up Amber to load the
    * specified project once its finished initializing.
    *
    * @param s
@@ -208,7 +208,7 @@ class OliveGlobal : public QObject {
   /**
    * @brief Import project from file
    *
-   * Imports an Olive project into the current project, effectively merging them.
+   * Imports an Amber project into the current project, effectively merging them.
    *
    * @param fn
    *
@@ -255,7 +255,7 @@ class OliveGlobal : public QObject {
    * @brief Determine whether the current project can be closed.
    *
    * Queried any time the current project is going to be closed (e.g. starting a new project, loading a project,
-   * exiting Olive, etc.) If the project has unsaved changes, this function asks the user whether they want to save or
+   * exiting Amber, etc.) If the project has unsaved changes, this function asks the user whether they want to save or
    * not. If the user does, calls save_project() (which may in turn call save_project_as() if the project has never
    * been saved).
    *
@@ -271,7 +271,7 @@ class OliveGlobal : public QObject {
   void open_export_dialog();
 
   /**
-   * @brief Open the About Olive dialog.
+   * @brief Open the About Amber dialog.
    */
   void open_about_dialog();
 
@@ -303,9 +303,9 @@ class OliveGlobal : public QObject {
   void clear_undo_stack();
 
   /**
-   * @brief Function called when Olive has finished starting up
+   * @brief Function called when Amber has finished starting up
    *
-   * Sets up some last things for Olive that must be run after Olive has completed initialization. If a project was
+   * Sets up some last things for Amber that must be run after Amber has completed initialization. If a project was
    * loaded as a command line argument, it's loaded here.
    */
   void finished_initialize();
@@ -357,9 +357,9 @@ class OliveGlobal : public QObject {
    *
    * @param autorecovery
    *
-   * Whether this file is an autorecovery file. If it is, after the load Olive will set the project URL to a new file
+   * Whether this file is an autorecovery file. If it is, after the load Amber will set the project URL to a new file
    * beside the original project file so that it does not overwrite the original and so that the user is not working
-   * on the autorecovery project in Olive's application data directory.
+   * on the autorecovery project in Amber's application data directory.
    */
   void OpenProjectWorker(QString fn, bool autorecovery);
 
@@ -378,7 +378,7 @@ class OliveGlobal : public QObject {
   /**
    * @brief Create a LoadDialog and start a LoadThread to load data from a project
    *
-   * Loads data from an Olive project file creating a LoadDialog to show visual information and a LoadThread to load
+   * Loads data from an Amber project file creating a LoadDialog to show visual information and a LoadThread to load
    * outside of the main/GUI thread.
    *
    * All project loading functions eventually lead to this one and there's no reason to use it directly. Instead use
@@ -412,7 +412,7 @@ class OliveGlobal : public QObject {
   void ClearProject();
 
   /**
-   * @brief File filter used for any file dialogs relating to Olive project files.
+   * @brief File filter used for any file dialogs relating to Amber project files.
    */
   QString project_file_filter;
 
@@ -448,9 +448,9 @@ class OliveGlobal : public QObject {
 
 namespace amber {
 /**
- * @brief Object resource for various global functions used throughout Olive
+ * @brief Object resource for various global functions used throughout Amber
  */
-extern std::unique_ptr<OliveGlobal> Global;
+extern std::unique_ptr<AmberGlobal> Global;
 
 /**
  * @brief Currently active project filename
@@ -466,4 +466,4 @@ extern QString ActiveProjectFilename;
 extern QString AppName;
 }  // namespace amber
 
-#endif  // OLIVEGLOBAL_H
+#endif  // AMBERGLOBAL_H

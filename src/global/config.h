@@ -29,8 +29,8 @@ namespace amber {
 /**
  * @brief Version identifier for saved projects
  *
- * This constant is used to identify what version of Olive a project file was saved with. Every project file
- * is saved with the current version number and the version is checked whenever an Olive project is loaded to
+ * This constant is used to identify what version of Amber a project file was saved with. Every project file
+ * is saved with the current version number and the version is checked whenever an Amber project is loaded to
  * determine how compatible it'll be with the current version.
  *
  * Sometimes this version identifier is used to invoke backwards compatibility in order to keep older project files
@@ -42,10 +42,10 @@ namespace amber {
 const int kSaveVersion = 190219;  // YYMMDD
 
 /**
- * @brief Minimum project version that this version of Olive can open
+ * @brief Minimum project version that this version of Amber can open
  *
  * When loading a project, the project's version number is actually checked whether it is somewhere between
- * kSaveVersion and this value (inclusive). This is used if the current version of Olive contains backwards
+ * kSaveVersion and this value (inclusive). This is used if the current version of Amber contains backwards
  * compatibility functionality for older project versions, and is bumped up if such backwards compatibility is
  * ever removed.
  *
@@ -79,7 +79,7 @@ enum TimecodeType : uint8_t {
 /**
  * @brief The RecordingMode enum
  *
- * Olive currently supports recording mono or stereo and gives users the option of which mode to use when
+ * Amber currently supports recording mono or stereo and gives users the option of which mode to use when
  * recording audio in-app. Audio recording responds to Config::recording_mode to a value from this enum.
  */
 enum RecordingMode : uint8_t {
@@ -93,7 +93,7 @@ enum RecordingMode : uint8_t {
 /**
  * @brief The AutoScrollMode enum
  *
- * The Timeline in Olive can automatically scroll to follow the playhead when the sequence is playing.
+ * The Timeline in Amber can automatically scroll to follow the playhead when the sequence is playing.
  * The Timeline will respond to Config::autoscroll set to a value from this enum.
  */
 enum AutoScrollMode : uint8_t {
@@ -104,7 +104,7 @@ enum AutoScrollMode : uint8_t {
    * one "page" to follow it */
   AUTOSCROLL_PAGE_SCROLL,
 
-  /** Smooth auto-scroll, Olive will scroll to keep the playhead in the center of the screen at all times while
+  /** Smooth auto-scroll, Amber will scroll to keep the playhead in the center of the screen at all times while
    * playing */
   AUTOSCROLL_SMOOTH_SCROLL
 };
@@ -129,7 +129,7 @@ enum ProjectView : uint8_t {
 /**
  * @brief The FrameQueueType enum
  *
- * Olive keeps a "frame queue" in memory to allow smoother playback/seeking. In order to give users control over
+ * Amber keeps a "frame queue" in memory to allow smoother playback/seeking. In order to give users control over
  * the amount of memory consumption vs. playback performance, they can control how many frames are cached into
  * memory. For extra fidelity, they can choose this value as a metric of either frames or seconds.
  *
@@ -152,7 +152,7 @@ QString frame_to_timecode(long f, int view, double frame_rate);
 /**
  * @brief The Config struct
  *
- * This struct handles any configuration that should persist between restarting Olive. It contains several variables
+ * This struct handles any configuration that should persist between restarting Amber. It contains several variables
  * as well as functions that load and save all the variables to file.
  */
 struct Config {
@@ -173,7 +173,7 @@ struct Config {
   /**
    * @brief Use hardware-accelerated video decoding
    *
-   * **TRUE** if Olive should attempt to use hardware decoding (VAAPI on Linux, D3D11VA on Windows,
+   * **TRUE** if Amber should attempt to use hardware decoding (VAAPI on Linux, D3D11VA on Windows,
    * VideoToolbox on macOS). Falls back to software decoding if unavailable.
    */
   bool hardware_decoding{true};
@@ -217,14 +217,14 @@ struct Config {
   /**
    * @brief Image sequence formats
    *
-   * A '|' separated list of file extensions that Olive will perform an image sequence test heuristic on when importing
+   * A '|' separated list of file extensions that Amber will perform an image sequence test heuristic on when importing
    */
   QString img_seq_formats;
 
   /**
    * @brief Use rectified waveforms
    *
-   * **TRUE** if Olive should display waveforms as "rectified". Rectified waveforms start at the bottom rather than
+   * **TRUE** if Amber should display waveforms as "rectified". Rectified waveforms start at the bottom rather than
    * from the middle.
    */
   bool rectified_waveforms{false};
@@ -270,9 +270,9 @@ struct Config {
   double custom_title_safe_ratio{1};
 
   /**
-   * @brief Enable dragging files outside Olive directly into the Timeline
+   * @brief Enable dragging files outside Amber directly into the Timeline
    *
-   * **TRUE** if the Timeline should respond to files dropped from outside Olive.
+   * **TRUE** if the Timeline should respond to files dropped from outside Amber.
    */
   bool enable_drag_files_to_timeline{true};
 
@@ -287,7 +287,7 @@ struct Config {
   /**
    * @brief Recording mode/channel layout
    *
-   * When recording audio within Olive, use this mode/channel layout (e.g. mono or stereo).
+   * When recording audio within Amber, use this mode/channel layout (e.g. mono or stereo).
    *
    * Set to a member of enum RecordingMode.
    */
@@ -310,7 +310,7 @@ struct Config {
   /**
    * @brief Enable drop on media to replace
    *
-   * **TRUE** if dropping a file from outside Olive onto a media item in the Project panel should prompt the user
+   * **TRUE** if dropping a file from outside Amber onto a media item in the Project panel should prompt the user
    * whether the dropped file should replace the media item that the file was dropped on.
    */
   bool drop_on_media_to_replace{true};
@@ -336,7 +336,7 @@ struct Config {
    * @brief Enable hover focus
    *
    * Default behavior is panels are focused (and therefore respond to certain keyboard shortcuts)when they are clicked
-   * on, but Olive also supports panels being considered "focused" if the mouse is hovered over them.
+   * on, but Amber also supports panels being considered "focused" if the mouse is hovered over them.
    *
    * **TRUE** to enable hover focus mode.
    */
@@ -354,7 +354,7 @@ struct Config {
   /**
    * @brief Ask for a marker name when setting a marker
    *
-   * **TRUE** if Olive should ask the user to name a marker when setting one. **FALSE** if markers should just be
+   * **TRUE** if Amber should ask the user to name a marker when setting one. **FALSE** if markers should just be
    * created without asking.
    */
   bool set_name_with_marker{true};
@@ -362,7 +362,7 @@ struct Config {
   /**
    * @brief Show the project toolbar
    *
-   * Olive has an optional toolbar for the Project panel.
+   * Amber has an optional toolbar for the Project panel.
    *
    * Set to **TRUE** to show it.
    */
@@ -371,7 +371,7 @@ struct Config {
   /**
    * @brief Previous frame queue size
    *
-   * Olive caches frames in memory to improve playback performance (see enum FrameQueueType documentation for more
+   * Amber caches frames in memory to improve playback performance (see enum FrameQueueType documentation for more
    * details). This variable states how many frames to keep in memory prior to the playhead (in most cases, frames that
    * have already been played, but are kept in memory in case the user wants to backtrack at any time).
    *
@@ -392,7 +392,7 @@ struct Config {
   /**
    * @brief Upcoming frame queue size
    *
-   * Olive caches frames in memory to improve playback performance (see enum FrameQueueType documentation for more
+   * Amber caches frames in memory to improve playback performance (see enum FrameQueueType documentation for more
    * details). This variable states how many upcoming frames are stored in memory. Generally this value will be higher
    * than Config::previous_queue_size since the user will be playing forwards most of the time.
    *
@@ -413,7 +413,7 @@ struct Config {
   /**
    * @brief Loop
    *
-   * If an in/out point are set on the Sequence (Sequence::using_workarea is **TRUE**), set this to **TRUE** if Olive
+   * If an in/out point are set on the Sequence (Sequence::using_workarea is **TRUE**), set this to **TRUE** if Amber
    * should rewind to the in point and start playing again after it reaches the out point repeatedly until the user
    * pauses.
    */
@@ -422,7 +422,7 @@ struct Config {
   /**
    * @brief Seeking also selects
    *
-   * Olive supports automatically selecting clips that the playhead is currently touching for a more efficient workflow.
+   * Amber supports automatically selecting clips that the playhead is currently touching for a more efficient workflow.
    *
    * **TRUE** if this mode should be enabled.
    */
@@ -455,27 +455,27 @@ struct Config {
   /**
    * @brief Use software fallbacks when possible
    *
-   * Olive uses a lot of OpenGL-based hardware acceleration for performance. Some older hardware has difficulty
+   * Amber uses a lot of OpenGL-based hardware acceleration for performance. Some older hardware has difficulty
    * supporting this functionality, so some of it has software-based (not hardware accelerated) fallbacks for these
    * users.
    *
-   * **TRUE** if Olive should prefer software fallbacks to hardware acceleration when they're available.
+   * **TRUE** if Amber should prefer software fallbacks to hardware acceleration when they're available.
    */
   bool use_software_fallback{false};
 
   /**
    * @brief Center Timeline timecodes
    *
-   * By default, Olive shows timecodes in the TimelineHeader centered to the corresponding frame point. This may not
+   * By default, Amber shows timecodes in the TimelineHeader centered to the corresponding frame point. This may not
    * always be desirable as, for example, this forces the initial 00:00:00;00 timecode's left half to be cut off.
-   * Olive supports aligning the timecode to the right of the frame rather than the center to address this.
+   * Amber supports aligning the timecode to the right of the frame rather than the center to address this.
    */
   bool center_timeline_timecodes{true};
 
   /**
    * @brief Preferred audio output device
    *
-   * Sets the audio device Olive should use to output audio to.
+   * Sets the audio device Amber should use to output audio to.
    *
    * Set to the name of the audio device or **EMPTY** to try using the default.
    */
@@ -484,7 +484,7 @@ struct Config {
   /**
    * @brief Preferred audio input device
    *
-   * Sets the audio device Olive should use to input audio from.
+   * Sets the audio device Amber should use to input audio from.
    *
    * Set to the name of the audio device or **EMPTY** to try using the default.
    */
@@ -493,7 +493,7 @@ struct Config {
   /**
    * @brief Language/translation file
    *
-   * Sets the translation file to load to display Olive in a different language.
+   * Sets the translation file to load to display Amber in a different language.
    *
    * Set to the URL of the language file to load, or **EMPTY** to use default en-US language.
    */
@@ -532,11 +532,11 @@ struct Config {
   bool invert_timeline_scroll_axes{true};
 
   /**
-   * @brief Style to use when theming Olive.
+   * @brief Style to use when theming Amber.
    *
    * Set to a member of amber::styling::Style.
    */
-  amber::styling::Style style{amber::styling::kOliveDefaultDark};
+  amber::styling::Style style{amber::styling::kAmberDefaultDark};
 
   /**
    * @brief Use native menu styling
@@ -657,14 +657,14 @@ struct Config {
   /**
    * @brief Enable auto-recovery
    *
-   * **TRUE** if Olive should periodically save an auto-recovery file.
+   * **TRUE** if Amber should periodically save an auto-recovery file.
    */
   bool autorecovery_enabled{true};
 
   /**
    * @brief Auto-recovery interval in minutes
    *
-   * How often (in minutes) Olive should save an auto-recovery file.
+   * How often (in minutes) Amber should save an auto-recovery file.
    */
   int autorecovery_interval{5};
 
@@ -707,8 +707,8 @@ struct Config {
 /**
  * @brief The RuntimeConfig struct
  *
- * This struct handles any configuration that's set as a command-line argument to Olive, and shouldn't be persistent
- * between restarts of Olive.
+ * This struct handles any configuration that's set as a command-line argument to Amber, and shouldn't be persistent
+ * between restarts of Amber.
  */
 enum class RhiBackend { Auto, Vulkan, Metal, D3D12, D3D11, OpenGL };
 

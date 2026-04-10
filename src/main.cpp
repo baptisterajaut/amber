@@ -78,9 +78,9 @@ static void print_help(const char* prog) {
       "\n"
       "Environment Variables:\n"
       "\tAMBER_RHI_BACKEND\tSet RHI backend (vulkan, metal, d3d12, d3d11, opengl)\n"
-      "\tOLIVE_EFFECTS_PATH\tSpecify a path to search for GLSL shader effects\n"
+      "\tAMBER_EFFECTS_PATH\tSpecify a path to search for GLSL shader effects\n"
       "\tFREI0R_PATH\t\tSpecify a path to search for Frei0r effects\n"
-      "\tOLIVE_LANG_PATH\t\tSpecify a path to search for translation files\n"
+      "\tAMBER_LANG_PATH\t\tSpecify a path to search for translation files\n"
       "\n",
       prog);
 }
@@ -250,7 +250,7 @@ static void attach_vulkan_to_window(MainWindow& w) {
 #endif
 
 int main(int argc, char* argv[]) {
-  amber::Global = std::unique_ptr<OliveGlobal>(new OliveGlobal);
+  amber::Global = std::unique_ptr<AmberGlobal>(new AmberGlobal);
 
   bool launch_fullscreen = false;
   QString load_proj;
@@ -296,7 +296,7 @@ int main(int argc, char* argv[]) {
 
   amber::timeline::MultiplyTrackSizesByDPI();
 
-  QObject::connect(&w, &MainWindow::finished_first_paint, amber::Global.get(), &OliveGlobal::finished_initialize,
+  QObject::connect(&w, &MainWindow::finished_first_paint, amber::Global.get(), &AmberGlobal::finished_initialize,
                    Qt::QueuedConnection);
 
   if (!load_proj.isEmpty()) amber::Global->load_project_on_launch(load_proj);

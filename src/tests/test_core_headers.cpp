@@ -45,8 +45,8 @@ class TestCoreHeaders : public QObject {
   }
 
   void testStyleEnum() {
-    QCOMPARE(static_cast<int>(amber::styling::kOliveDefaultDark), 0);
-    QCOMPARE(static_cast<int>(amber::styling::kOliveDefaultLight), 1);
+    QCOMPARE(static_cast<int>(amber::styling::kAmberDefaultDark), 0);
+    QCOMPARE(static_cast<int>(amber::styling::kAmberDefaultLight), 1);
   }
 };
 

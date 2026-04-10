@@ -7,20 +7,20 @@ namespace amber {
 namespace styling {
 
 /**
- * @brief Officially supported styles to use in Olive
+ * @brief Officially supported styles to use in Amber
  */
 enum Style : uint8_t {
   /**
-    Qt Fusion-based cross-platform UI. The default styling of Olive. Can also be heavily customized with a CSS
+    Qt Fusion-based cross-platform UI. The default styling of Amber. Can also be heavily customized with a CSS
     file.
     */
-  kOliveDefaultDark,
+  kAmberDefaultDark,
 
   /**
-    Qt Fusion-based cross-platform UI. The default styling of Olive. Can also be heavily customized with a CSS
+    Qt Fusion-based cross-platform UI. The default styling of Amber. Can also be heavily customized with a CSS
     file. This will use the
     */
-  kOliveDefaultLight,
+  kAmberDefaultLight,
 
   /**
     Use current OS's native styling (or at least Qt's default). Most UIs use a light theming, so this will
