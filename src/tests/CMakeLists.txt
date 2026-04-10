@@ -46,3 +46,9 @@ add_executable(amber-test-projectio test_projectio.cpp ${AMBER_TEST_STUBS})
 target_include_directories(amber-test-projectio PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-projectio PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-projectio COMMAND amber-test-projectio)
+
+# QRhi headless smoke test
+add_executable(amber-test-rhi-smoke test_rhi_smoke.cpp ${AMBER_TEST_STUBS})
+target_include_directories(amber-test-rhi-smoke PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-rhi-smoke PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-rhi-smoke COMMAND amber-test-rhi-smoke)
