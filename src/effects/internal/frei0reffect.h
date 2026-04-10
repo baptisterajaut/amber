@@ -28,23 +28,29 @@
 
 #include "effects/effect.h"
 
-using f0rGetParamInfo = void (*)(f0r_param_info_t * info,
-                int param_index );
+using f0rGetParamInfo = void (*)(f0r_param_info_t* info, int param_index);
+using f0rUpdateFunc = void (*)(f0r_instance_t instance, double time, const uint32_t* inframe, uint32_t* outframe);
+using f0rSetParamValue = void (*)(f0r_instance_t instance, f0r_param_t param, int param_index);
+using f0rDestructFunc = void (*)(f0r_instance_t instance);
 
 class Frei0rEffect : public Effect {
   Q_OBJECT
-public:
-    Frei0rEffect(Clip* c, const EffectMeta* em);
+ public:
+  Frei0rEffect(Clip* c, const EffectMeta* em);
   ~Frei0rEffect() override;
 
   void process_image(double timecode, uint8_t* input, uint8_t* output, int size) override;
 
   void refresh() override;
-private:
+
+ private:
   QLibrary handle;
   f0r_instance_t instance;
   int param_count;
-  f0rGetParamInfo get_param_info;
+  f0rGetParamInfo get_param_info{nullptr};
+  f0rUpdateFunc update_func_{nullptr};
+  f0rSetParamValue set_param_func_{nullptr};
+  f0rDestructFunc destruct_func_{nullptr};
   void destruct_module();
   void construct_module();
   bool open{false};

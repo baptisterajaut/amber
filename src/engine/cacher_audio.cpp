@@ -78,7 +78,7 @@ static void applyClosingTransition(Clip* clip, double timecode_start, double tim
 
 // ---------------------------------------------------------------------------
 
-void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int nb_bytes, QVector<Clip*> nests) {
+void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int nb_bytes, const QVector<Clip*>& nests) {
   if (!clip) {
     qWarning() << "apply_audio_effects: clip is null";
     return;
@@ -107,11 +107,10 @@ void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int 
 
   if (!nests.isEmpty()) {
     Clip* next_nest = nests.last();
-    nests.removeLast();
     apply_audio_effects(
         next_nest,
         timecode_start + (double(clip->timeline_in(true) - clip->clip_in(true)) / clip->sequence->frame_rate), frame,
-        nb_bytes, nests);
+        nb_bytes, nests.mid(0, nests.size() - 1));
   }
 }
 

@@ -274,21 +274,20 @@ int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
   if (consumed > 0) {
     int channels = audio_output->format().channelCount();
     qint64 lim = offset + consumed;
-    QVector<double> averages;
-    averages.resize(channels);
-    averages.fill(0);
+    if (vu_averages_.size() != channels) vu_averages_.resize(channels);
+    vu_averages_.fill(0);
 
     int counter = 0;
     qint16 sample;
     for (qint64 i = offset; i < lim; i += 2) {
       sample = qint16(((audio_ibuffer[i + 1] & 0xFF) << 8) | (audio_ibuffer[i] & 0xFF));
-      averages[counter] = qMax((double(qAbs(sample)) / 32768.0), averages[counter]);
+      vu_averages_[counter] = qMax((double(qAbs(sample)) / 32768.0), vu_averages_[counter]);
       counter = (counter + 1) % channels;
     }
     for (int i = 0; i < channels; i++) {
-      averages[i] = log_volume(1.0 - (averages[i]));
+      vu_averages_[i] = log_volume(1.0 - (vu_averages_[i]));
     }
-    amber::app_ctx->setAudioMonitorValues(averages);
+    amber::app_ctx->setAudioMonitorValues(vu_averages_);
   }
 
   memset(audio_ibuffer + offset, 0, consumed);

@@ -30,10 +30,7 @@
 using f0rConstructFunc = f0r_instance_t (*)(unsigned int width, unsigned int height);
 using f0rInitFunc = int (*)();
 using f0rDeinitFunc = void (*)();
-using f0rUpdateFunc = void (*)(f0r_instance_t instance, double time, const uint32_t* inframe, uint32_t* outframe);
-using f0rDestructFunc = void (*)(f0r_instance_t instance);
 using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
-using f0rSetParamValue = void (*)(f0r_instance_t instance, f0r_param_t param, int param_index);
 
 Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta* em)
     : Effect(c, em)
@@ -61,6 +58,10 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta* em)
     return;
   }
   init();
+
+  update_func_ = reinterpret_cast<f0rUpdateFunc>(handle.resolve("f0r_update"));
+  set_param_func_ = reinterpret_cast<f0rSetParamValue>(handle.resolve("f0r_set_param_value"));
+  destruct_func_ = reinterpret_cast<f0rDestructFunc>(handle.resolve("f0r_destruct"));
 
   construct_module();
 
@@ -167,20 +168,16 @@ void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* outpu
     construct_module();
   }
 
-  f0rUpdateFunc update_func = reinterpret_cast<f0rUpdateFunc>(handle.resolve("f0r_update"));
-  if (update_func == nullptr) return;
-
-  f0rSetParamValue set_param = reinterpret_cast<f0rSetParamValue>(handle.resolve("f0r_set_param_value"));
-  if (set_param == nullptr) return;
+  if (update_func_ == nullptr || set_param_func_ == nullptr) return;
 
   for (int i = 0, row_idx = 0; i < param_count; i++) {
     f0r_param_info_t param_info;
     get_param_info(&param_info, i);
     if (param_info.type < 0 || param_info.type > F0R_PARAM_STRING) continue;
-    ApplyFrei0rParam(instance, set_param, row(row_idx++), param_info.type, i, timecode);
+    ApplyFrei0rParam(instance, set_param_func_, row(row_idx++), param_info.type, i, timecode);
   }
 
-  update_func(instance, timecode, reinterpret_cast<uint32_t*>(input), reinterpret_cast<uint32_t*>(output));
+  update_func_(instance, timecode, reinterpret_cast<uint32_t*>(input), reinterpret_cast<uint32_t*>(output));
 }
 
 void Frei0rEffect::refresh() {
@@ -190,9 +187,7 @@ void Frei0rEffect::refresh() {
 
 void Frei0rEffect::destruct_module() {
   if (open) {
-    f0rDestructFunc destruct = reinterpret_cast<f0rDestructFunc>(handle.resolve("f0r_destruct"));
-    if (destruct != nullptr) destruct(instance);
-
+    if (destruct_func_ != nullptr) destruct_func_(instance);
     open = false;
   }
 }

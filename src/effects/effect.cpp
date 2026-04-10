@@ -169,8 +169,8 @@ void WriteFieldUboValue(EffectField* field, double timecode, const UniformEntry&
     } break;
     case EffectField::EFFECT_FIELD_COLOR: {
       ColorField* cf = static_cast<ColorField*>(field);
-      float rgb[3] = {float(cf->GetColorAt(timecode).redF()), float(cf->GetColorAt(timecode).greenF()),
-                      float(cf->GetColorAt(timecode).blueF())};
+      QColor c = cf->GetColorAt(timecode);
+      float rgb[3] = {float(c.redF()), float(c.greenF()), float(c.blueF())};
       memcpy(uboData.data() + entry.offset, rgb, qMin(entry.size, 12));
     } break;
     case EffectField::EFFECT_FIELD_BOOL: {
@@ -1043,10 +1043,11 @@ bool Effect::valueHasChanged(double timecode) {
       EffectRow* crow = row(i);
       for (int j = 0; j < crow->FieldCount(); j++) {
         EffectField* field = crow->Field(j);
-        if (cachedValues.at(index) != field->GetValueAt(timecode)) {
+        QVariant val = field->GetValueAt(timecode);
+        if (cachedValues.at(index) != val) {
           changed = true;
         }
-        cachedValues[index] = field->GetValueAt(timecode);
+        cachedValues[index] = val;
         index++;
       }
     }

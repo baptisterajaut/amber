@@ -51,6 +51,7 @@ class AudioSenderThread : public QThread {
   int scrub_grain_total_{0};
   int scrub_grain_played_{0};
   QByteArray staging_buffer_;
+  QVector<double> vu_averages_;
 };
 
 extern QAudioSink* audio_output;
