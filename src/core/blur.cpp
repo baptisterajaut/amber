@@ -2,24 +2,34 @@
 
 namespace {
 
-// Single IIR sweep along columns, top→bottom then bottom→top.
-static void blur_vertical_pass(QImage& result, int r1, int r2, int c1, int c2, int alpha, int i1, int i2) {
+static void blur_vertical_forward(QImage& result, int r1, int r2, int c1, int c2, int alpha, int i1, int i2) {
   int bpl = result.bytesPerLine();
   int rgba[4];
-  unsigned char* p;
-
-  // top → bottom
   for (int col = c1; col <= c2; col++) {
-    p = result.scanLine(r1) + col * 4;
+    unsigned char* p = result.scanLine(r1) + col * 4;
     for (int i = i1; i <= i2; i++) rgba[i] = p[i] << 4;
     p += bpl;
     for (int j = r1; j < r2; j++, p += bpl)
       for (int i = i1; i <= i2; i++) p[i] = (rgba[i] += ((p[i] << 4) - rgba[i]) * alpha / 16) >> 4;
   }
+}
 
-  // bottom → top
+static void blur_horizontal_forward(QImage& result, int r1, int r2, int c1, int c2, int alpha, int i1, int i2) {
+  int rgba[4];
+  for (int row = r1; row <= r2; row++) {
+    unsigned char* p = result.scanLine(row) + c1 * 4;
+    for (int i = i1; i <= i2; i++) rgba[i] = p[i] << 4;
+    p += 4;
+    for (int j = c1; j < c2; j++, p += 4)
+      for (int i = i1; i <= i2; i++) p[i] = (rgba[i] += ((p[i] << 4) - rgba[i]) * alpha / 16) >> 4;
+  }
+}
+
+static void blur_vertical_backward(QImage& result, int r1, int r2, int c1, int c2, int alpha, int i1, int i2) {
+  int bpl = result.bytesPerLine();
+  int rgba[4];
   for (int col = c1; col <= c2; col++) {
-    p = result.scanLine(r2) + col * 4;
+    unsigned char* p = result.scanLine(r2) + col * 4;
     for (int i = i1; i <= i2; i++) rgba[i] = p[i] << 4;
     p -= bpl;
     for (int j = r1; j < r2; j++, p -= bpl)
@@ -27,23 +37,10 @@ static void blur_vertical_pass(QImage& result, int r1, int r2, int c1, int c2, i
   }
 }
 
-// Single IIR sweep along rows, left→right then right→left.
-static void blur_horizontal_pass(QImage& result, int r1, int r2, int c1, int c2, int alpha, int i1, int i2) {
+static void blur_horizontal_backward(QImage& result, int r1, int r2, int c1, int c2, int alpha, int i1, int i2) {
   int rgba[4];
-  unsigned char* p;
-
-  // left → right
   for (int row = r1; row <= r2; row++) {
-    p = result.scanLine(row) + c1 * 4;
-    for (int i = i1; i <= i2; i++) rgba[i] = p[i] << 4;
-    p += 4;
-    for (int j = c1; j < c2; j++, p += 4)
-      for (int i = i1; i <= i2; i++) p[i] = (rgba[i] += ((p[i] << 4) - rgba[i]) * alpha / 16) >> 4;
-  }
-
-  // right → left
-  for (int row = r1; row <= r2; row++) {
-    p = result.scanLine(row) + c2 * 4;
+    unsigned char* p = result.scanLine(row) + c2 * 4;
     for (int i = i1; i <= i2; i++) rgba[i] = p[i] << 4;
     p -= 4;
     for (int j = c1; j < c2; j++, p -= 4)
@@ -66,6 +63,9 @@ void amber::blur(QImage& result, const QRect& rect, int radius, bool alphaOnly) 
   int i2 = 3;
   if (alphaOnly) i1 = i2 = (QSysInfo::ByteOrder == QSysInfo::BigEndian ? 0 : 3);
 
-  blur_vertical_pass(result, r1, r2, c1, c2, alpha, i1, i2);
-  blur_horizontal_pass(result, r1, r2, c1, c2, alpha, i1, i2);
+  // IIR passes must be interleaved (V,H,V,H) — grouping (V,V,H,H) produces anisotropic blur.
+  blur_vertical_forward(result, r1, r2, c1, c2, alpha, i1, i2);
+  blur_horizontal_forward(result, r1, r2, c1, c2, alpha, i1, i2);
+  blur_vertical_backward(result, r1, r2, c1, c2, alpha, i1, i2);
+  blur_horizontal_backward(result, r1, r2, c1, c2, alpha, i1, i2);
 }

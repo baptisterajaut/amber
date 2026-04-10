@@ -237,19 +237,20 @@ static void drawVideoThumbnail(QPainter& p, ClipPtr clip, const FootageStream* m
 }
 
 // Computes the waveform pixel limit and adjusts the checkerboard rect for audio clips.
-// Returns the waveform_limit to pass to draw_waveform.
+// Returns the waveform_limit to pass to draw_waveform. Sets out_waveform_length to the
+// corrected audio stream duration (in frames) for waveform index mapping.
 static int computeAudioWaveformBounds(ClipPtr clip, const FootageStream* ms, long media_length, const QRect& clip_rect,
-                                      int widget_width, bool& draw_checkerboard, QRect& checkerboard_rect) {
-  long waveform_length = media_length;
+                                      int widget_width, bool& draw_checkerboard, QRect& checkerboard_rect,
+                                      long& out_waveform_length) {
+  out_waveform_length = media_length;
   if (ms->stream_duration > 0 && !qFuzzyIsNull(clip->speed().value)) {
     double fr = clip->sequence->frame_rate / clip->speed().value;
-    waveform_length = static_cast<long>(
+    out_waveform_length = static_cast<long>(
         std::floor((double(ms->stream_duration) / double(AV_TIME_BASE)) * fr / clip->media()->to_footage()->speed));
   }
 
-  int waveform_start = -qMin(clip_rect.x(), 0);
   int waveform_limit =
-      qMin(clip_rect.width(), getScreenPointFromFrame(panel_timeline->zoom, waveform_length - clip->clip_in()));
+      qMin(clip_rect.width(), getScreenPointFromFrame(panel_timeline->zoom, out_waveform_length - clip->clip_in()));
 
   if ((clip_rect.x() + waveform_limit) > widget_width) {
     waveform_limit -= (clip_rect.x() + waveform_limit - widget_width);
@@ -258,7 +259,6 @@ static int computeAudioWaveformBounds(ClipPtr clip, const FootageStream* ms, lon
     if (waveform_limit > 0) checkerboard_rect.setLeft(checkerboard_rect.left() + waveform_limit);
   }
 
-  (void)waveform_start;  // waveform_start is passed directly to draw_waveform by caller
   return waveform_limit;
 }
 
@@ -322,9 +322,10 @@ static void drawFootageContent(QPainter& p, ClipPtr clip, const QRect& clip_rect
       // audio track: draw waveform
       p.setPen(QColor(80, 80, 80));
       int waveform_start = -qMin(clip_rect.x(), 0);
+      long waveform_length = 0;
       int waveform_limit = computeAudioWaveformBounds(clip, ms, media_length, clip_rect, widget_width,
-                                                      draw_checkerboard, checkerboard_rect);
-      draw_waveform(clip, ms, media_length, &p, clip_rect, waveform_start, waveform_limit, panel_timeline->zoom);
+                                                      draw_checkerboard, checkerboard_rect, waveform_length);
+      draw_waveform(clip, ms, waveform_length, &p, clip_rect, waveform_start, waveform_limit, panel_timeline->zoom);
     }
   }
 
