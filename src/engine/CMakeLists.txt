@@ -1,7 +1,7 @@
 # Engine sources — clip/cacher/sequence model + undo system.
 # Added to the main amber-editor target via OBJECT pattern.
 
-target_sources(${OLIVE_TARGET} PRIVATE
+target_sources(amber-engine PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/cacher.h
   ${CMAKE_CURRENT_SOURCE_DIR}/cacher.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/cacher_video.cpp

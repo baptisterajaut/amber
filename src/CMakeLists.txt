@@ -95,303 +95,180 @@ endif()
 
 find_package(Doxygen)
 
-set(OLIVE_SOURCES
-  dialogs/aboutdialog.cpp
-  dialogs/aboutdialog.h
-  dialogs/actionsearch.cpp
-  dialogs/actionsearch.h
-  dialogs/advancedvideodialog.cpp
-  dialogs/advancedvideodialog.h
-  dialogs/autocutsilencedialog.cpp
-  dialogs/autocutsilencedialog.h
-  dialogs/clippropertiesdialog.cpp
-  dialogs/clippropertiesdialog.h
-  dialogs/debugdialog.cpp
-  dialogs/debugdialog.h
-  dialogs/demonotice.cpp
-  dialogs/demonotice.h
-  dialogs/exportdialog.cpp
-  dialogs/exportdialog.h
-  dialogs/exportsavepresetdialog.cpp
-  dialogs/exportsavepresetdialog.h
-  dialogs/footagerelinkdialog.cpp
-  dialogs/footagerelinkdialog.h
-  dialogs/keyframepropertiesdialog.cpp
-  dialogs/keyframepropertiesdialog.h
-  dialogs/loaddialog.cpp
-  dialogs/loaddialog.h
-  dialogs/markerpropertiesdialog.cpp
-  dialogs/markerpropertiesdialog.h
-  dialogs/mediapropertiesdialog.cpp
-  dialogs/mediapropertiesdialog.h
-  dialogs/newsequencedialog.cpp
-  dialogs/newsequencedialog.h
-  dialogs/preferencesdialog.cpp
-  dialogs/preferencesdialog.h
-  dialogs/proxydialog.cpp
-  dialogs/proxydialog.h
-  dialogs/replaceclipmediadialog.cpp
-  dialogs/replaceclipmediadialog.h
-  dialogs/speeddialog.cpp
-  dialogs/speeddialog.h
-  dialogs/texteditdialog.cpp
-  dialogs/texteditdialog.h
-  effects/fields/boolfield.cpp
-  effects/fields/boolfield.h
-  effects/fields/buttonfield.cpp
-  effects/fields/buttonfield.h
-  effects/fields/colorfield.cpp
-  effects/fields/colorfield.h
-  effects/fields/combofield.cpp
-  effects/fields/combofield.h
-  effects/fields/doublefield.cpp
-  effects/fields/doublefield.h
-  effects/fields/filefield.cpp
-  effects/fields/filefield.h
-  effects/fields/fontfield.cpp
-  effects/fields/fontfield.h
-  effects/fields/labelfield.cpp
-  effects/fields/labelfield.h
-  effects/fields/stringfield.cpp
-  effects/fields/stringfield.h
-  effects/internal/audionoiseeffect.cpp
-  effects/internal/audionoiseeffect.h
-  effects/internal/common.vert
-  effects/internal/cornerpin.frag
-  effects/internal/cornerpin.vert
-  effects/internal/cornerpineffect.cpp
-  effects/internal/cornerpineffect.h
-  effects/internal/crossdissolvetransition.cpp
-  effects/internal/crossdissolvetransition.h
-  effects/internal/cubetransition.h
-  effects/internal/dropshadow.frag
-  effects/internal/dropshadoweffect.cpp
-  effects/internal/dropshadoweffect.h
-  effects/internal/exponentialfadetransition.cpp
-  effects/internal/exponentialfadetransition.h
-  effects/internal/fillleftrighteffect.cpp
-  effects/internal/fillleftrighteffect.h
-  effects/internal/frei0reffect.cpp
-  effects/internal/frei0reffect.h
-  effects/internal/internalshaders.qrc
-  effects/internal/linearfadetransition.cpp
-  effects/internal/linearfadetransition.h
-  effects/internal/logarithmicfadetransition.cpp
-  effects/internal/logarithmicfadetransition.h
-  effects/internal/paneffect.cpp
-  effects/internal/paneffect.h
-  effects/internal/richtexteffect.cpp
-  effects/internal/richtexteffect.h
-  effects/internal/shakeeffect.cpp
-  effects/internal/shakeeffect.h
-  effects/internal/solideffect.cpp
-  effects/internal/solideffect.h
-  effects/internal/srtparser.cpp
-  effects/internal/srtparser.h
-  effects/internal/subtitleeffect.cpp
-  effects/internal/subtitleeffect.h
-  effects/internal/texteffect.cpp
-  effects/internal/texteffect.h
-  effects/internal/timecodeeffect.cpp
-  effects/internal/timecodeeffect.h
-  effects/internal/toneeffect.cpp
-  effects/internal/toneeffect.h
-  effects/internal/transformeffect.cpp
-  effects/internal/transformeffect.h
-  effects/internal/voideffect.cpp
-  effects/internal/voideffect.h
-  effects/internal/volumeeffect.cpp
-  effects/internal/volumeeffect.h
-  effects/internal/vsthost.cpp
-  effects/internal/vsthost.h
-  effects/effect.cpp
-  effects/effect.h
-  effects/effectfield.cpp
-  effects/effectfield.h
+add_library(amber-engine OBJECT
+  # effects/ (not effects/ui/)
+  effects/effect.cpp effects/effect.h
+  effects/effectfield.cpp effects/effectfield.h
   effects/effectfields.h
-  effects/effectgizmo.cpp
-  effects/effectgizmo.h
-  effects/effectloaders.cpp
-  effects/effectloaders.h
-  effects/effectrow.cpp
-  effects/effectrow.h
-  effects/keyframe.cpp
-  effects/keyframe.h
-  effects/transition.cpp
-  effects/transition.h
-  effects/ui/boolfieldwidget.cpp
-  effects/ui/boolfieldwidget.h
-  effects/ui/buttonfieldwidget.cpp
-  effects/ui/buttonfieldwidget.h
-  effects/ui/colorfieldwidget.cpp
-  effects/ui/colorfieldwidget.h
-  effects/ui/combofieldwidget.cpp
-  effects/ui/combofieldwidget.h
-  effects/ui/doublefieldwidget.cpp
-  effects/ui/doublefieldwidget.h
-  effects/ui/effectfieldwidget.cpp
-  effects/ui/effectfieldwidget.h
-  effects/ui/filefieldwidget.cpp
-  effects/ui/filefieldwidget.h
-  effects/ui/fontfieldwidget.cpp
-  effects/ui/fontfieldwidget.h
-  effects/ui/labelfieldwidget.cpp
-  effects/ui/labelfieldwidget.h
-  effects/ui/stringfieldwidget.cpp
-  effects/ui/stringfieldwidget.h
-  global/config.cpp
-  global/config.h
-  global/debug.cpp
-  global/debug.h
-  global/global.cpp
-  global/global.h
-  global/projectio.cpp
-  global/projectio.h
-  include/vestige.h
-  panels/effectcontrols.cpp
-  panels/effectcontrols.h
-  panels/grapheditor.cpp
-  panels/grapheditor.h
-  panels/panels.cpp
-  panels/panels.h
-  panels/project.cpp
-  panels/project.h
-  panels/undohistorypanel.cpp
-  panels/undohistorypanel.h
-  panels/timeline.cpp
-  panels/timeline_clipboard.cpp
-  panels/timeline_splitting.cpp
-  panels/timeline_ui.cpp
-  panels/timeline.h
-  panels/viewer.cpp
-  panels/viewer.h
-  project/clipboard.cpp
-  project/clipboard.h
-  project/footage.cpp
-  project/footage.h
-  project/loadthread.cpp
-  project/loadthread.h
-  project/media.cpp
-  project/media.h
-  project/previewgenerator.cpp
-  project/previewgenerator.h
+  effects/effectgizmo.cpp effects/effectgizmo.h
+  effects/effectloaders.cpp effects/effectloaders.h
+  effects/effectrow.cpp effects/effectrow.h
+  effects/keyframe.cpp effects/keyframe.h
+  effects/transition.cpp effects/transition.h
+  # effects/fields/
+  effects/fields/boolfield.cpp effects/fields/boolfield.h
+  effects/fields/buttonfield.cpp effects/fields/buttonfield.h
+  effects/fields/colorfield.cpp effects/fields/colorfield.h
+  effects/fields/combofield.cpp effects/fields/combofield.h
+  effects/fields/doublefield.cpp effects/fields/doublefield.h
+  effects/fields/filefield.cpp effects/fields/filefield.h
+  effects/fields/fontfield.cpp effects/fields/fontfield.h
+  effects/fields/labelfield.cpp effects/fields/labelfield.h
+  effects/fields/stringfield.cpp effects/fields/stringfield.h
+  # effects/internal/
+  effects/internal/audionoiseeffect.cpp effects/internal/audionoiseeffect.h
+  effects/internal/cornerpineffect.cpp effects/internal/cornerpineffect.h
+  effects/internal/crossdissolvetransition.cpp effects/internal/crossdissolvetransition.h
+  effects/internal/cubetransition.h
+  effects/internal/dropshadoweffect.cpp effects/internal/dropshadoweffect.h
+  effects/internal/exponentialfadetransition.cpp effects/internal/exponentialfadetransition.h
+  effects/internal/fillleftrighteffect.cpp effects/internal/fillleftrighteffect.h
+  effects/internal/frei0reffect.cpp effects/internal/frei0reffect.h
+  effects/internal/linearfadetransition.cpp effects/internal/linearfadetransition.h
+  effects/internal/logarithmicfadetransition.cpp effects/internal/logarithmicfadetransition.h
+  effects/internal/paneffect.cpp effects/internal/paneffect.h
+  effects/internal/richtexteffect.cpp effects/internal/richtexteffect.h
+  effects/internal/shakeeffect.cpp effects/internal/shakeeffect.h
+  effects/internal/solideffect.cpp effects/internal/solideffect.h
+  effects/internal/srtparser.cpp effects/internal/srtparser.h
+  effects/internal/subtitleeffect.cpp effects/internal/subtitleeffect.h
+  effects/internal/texteffect.cpp effects/internal/texteffect.h
+  effects/internal/timecodeeffect.cpp effects/internal/timecodeeffect.h
+  effects/internal/toneeffect.cpp effects/internal/toneeffect.h
+  effects/internal/transformeffect.cpp effects/internal/transformeffect.h
+  effects/internal/voideffect.cpp effects/internal/voideffect.h
+  effects/internal/volumeeffect.cpp effects/internal/volumeeffect.h
+  effects/internal/vsthost.cpp effects/internal/vsthost.h
+  effects/internal/internalshaders.qrc
+  # rendering/ (not audio_ui)
+  rendering/audio.cpp rendering/audio.h
+  rendering/clipqueue.cpp rendering/clipqueue.h
+  rendering/exportthread.cpp rendering/exportthread.h
+  rendering/renderfunctions.cpp rendering/renderfunctions.h
+  rendering/renderthread.cpp rendering/renderthread.h
+  # project/ (data model only)
+  project/clipboard.cpp project/clipboard.h
+  project/footage.cpp project/footage.h
+  project/loadthread.cpp project/loadthread.h
+  project/media.cpp project/media.h
   project/projectelements.h
-  project/projectfilter.cpp
-  project/projectfilter.h
-  project/projectmodel.cpp
-  project/projectmodel.h
-  project/proxygenerator.cpp
-  project/proxygenerator.h
-  project/sourcescommon.cpp
-  project/sourcescommon.h
-  rendering/audio.cpp
-  rendering/audio.h
-  rendering/audio_ui.cpp
-  rendering/audio_ui.h
-  rendering/clipqueue.cpp
-  rendering/clipqueue.h
-  rendering/exportthread.cpp
-  rendering/exportthread.h
-  rendering/renderfunctions.cpp
-  rendering/renderfunctions.h
-  rendering/renderthread.cpp
-  rendering/renderthread.h
-  timeline/marker.cpp
-  timeline/marker.h
-  timeline/mediaimportdata.cpp
-  timeline/mediaimportdata.h
-  ui/appcontextimpl.cpp
-  ui/appcontextimpl.h
-  ui/audiomonitor.cpp
-  ui/audiomonitor.h
-  ui/blur.cpp
-  ui/blur.h
-  ui/checkbox_command.cpp
-  ui/checkbox_command.h
-  ui/clickablelabel.cpp
-  ui/clickablelabel.h
-  ui/collapsiblewidget.cpp
-  ui/collapsiblewidget.h
-  ui/colorlabel.cpp
-  ui/colorlabel.h
-  ui/columnedgridlayout.cpp
-  ui/columnedgridlayout.h
-  ui/colorbutton.cpp
-  ui/colorbutton.h
-  ui/comboboxex.cpp
-  ui/comboboxex.h
-  ui/cursors.cpp
-  ui/cursors.h
-  ui/effectui.cpp
-  ui/effectui.h
-  ui/embeddedfilechooser.cpp
-  ui/embeddedfilechooser.h
-  ui/flowlayout.cpp
-  ui/flowlayout.h
-  ui/focusfilter.cpp
-  ui/focusfilter.h
-  ui/fontcombobox.cpp
-  ui/fontcombobox.h
-  ui/graphview.cpp
-  ui/graphview.h
-  ui/icons.cpp
-  ui/icons.h
-  ui/keyframedrawing.cpp
-  ui/keyframedrawing.h
-  ui/keyframenavigator.cpp
-  ui/keyframenavigator.h
-  ui/keyframeview.cpp
-  ui/keyframeview.h
-  ui/labelslider.cpp
-  ui/labelslider.h
-  ui/mainwindow.cpp
-  ui/mainwindow.h
-  ui/mediaiconservice.cpp
-  ui/mediaiconservice.h
-  ui/menu.cpp
-  ui/menu.h
-  ui/menuhelper.cpp
-  ui/menuhelper.h
-  ui/panel.cpp
-  ui/panel.h
-  ui/playbutton.cpp
-  ui/playbutton.h
-  ui/rectangleselect.cpp
-  ui/rectangleselect.h
-  ui/rulerwidget.cpp
-  ui/rulerwidget.h
-  ui/resizablescrollbar.cpp
-  ui/resizablescrollbar.h
-  ui/scrollarea.cpp
-  ui/scrollarea.h
-  ui/sourceiconview.cpp
-  ui/sourceiconview.h
-  ui/sourcetable.cpp
-  ui/sourcetable.h
-  ui/styling.cpp
-  ui/styling.h
-  ui/texteditex.cpp
-  ui/texteditex.h
-  ui/timelineheader.cpp
-  ui/timelineheader.h
+  project/projectmodel.cpp project/projectmodel.h
+  # global/ (config/projectio/debug)
+  global/config.cpp global/config.h
+  global/debug.cpp global/debug.h
+  global/projectio.cpp global/projectio.h
+  # other
+  include/vestige.h
+  timeline/mediaimportdata.cpp timeline/mediaimportdata.h
+)
+
+add_subdirectory(core)
+add_subdirectory(engine)
+
+target_include_directories(amber-engine PUBLIC ${CMAKE_SOURCE_DIR})
+set_target_properties(amber-engine PROPERTIES AUTOMOC ON AUTORCC ON)
+target_compile_definitions(amber-engine PUBLIC ${OLIVE_DEFINITIONS})
+
+target_link_libraries(amber-engine PUBLIC
+  OpenGL::GL
+  Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::Widgets Qt6::Multimedia
+  Qt6::OpenGL Qt6::OpenGLWidgets Qt6::ShaderToolsPrivate Qt6::Svg
+  FFMPEG::avutil FFMPEG::avcodec FFMPEG::avformat FFMPEG::avfilter
+  FFMPEG::swscale FFMPEG::swresample
+)
+
+set(UI_SOURCES
+  dialogs/aboutdialog.cpp dialogs/aboutdialog.h
+  dialogs/actionsearch.cpp dialogs/actionsearch.h
+  dialogs/advancedvideodialog.cpp dialogs/advancedvideodialog.h
+  dialogs/autocutsilencedialog.cpp dialogs/autocutsilencedialog.h
+  dialogs/clippropertiesdialog.cpp dialogs/clippropertiesdialog.h
+  dialogs/debugdialog.cpp dialogs/debugdialog.h
+  dialogs/demonotice.cpp dialogs/demonotice.h
+  dialogs/exportdialog.cpp dialogs/exportdialog.h
+  dialogs/exportsavepresetdialog.cpp dialogs/exportsavepresetdialog.h
+  dialogs/footagerelinkdialog.cpp dialogs/footagerelinkdialog.h
+  dialogs/keyframepropertiesdialog.cpp dialogs/keyframepropertiesdialog.h
+  dialogs/loaddialog.cpp dialogs/loaddialog.h
+  dialogs/markerpropertiesdialog.cpp dialogs/markerpropertiesdialog.h
+  dialogs/mediapropertiesdialog.cpp dialogs/mediapropertiesdialog.h
+  dialogs/newsequencedialog.cpp dialogs/newsequencedialog.h
+  dialogs/preferencesdialog.cpp dialogs/preferencesdialog.h
+  dialogs/proxydialog.cpp dialogs/proxydialog.h
+  dialogs/replaceclipmediadialog.cpp dialogs/replaceclipmediadialog.h
+  dialogs/speeddialog.cpp dialogs/speeddialog.h
+  dialogs/texteditdialog.cpp dialogs/texteditdialog.h
+  effects/ui/boolfieldwidget.cpp effects/ui/boolfieldwidget.h
+  effects/ui/buttonfieldwidget.cpp effects/ui/buttonfieldwidget.h
+  effects/ui/colorfieldwidget.cpp effects/ui/colorfieldwidget.h
+  effects/ui/combofieldwidget.cpp effects/ui/combofieldwidget.h
+  effects/ui/doublefieldwidget.cpp effects/ui/doublefieldwidget.h
+  effects/ui/effectfieldwidget.cpp effects/ui/effectfieldwidget.h
+  effects/ui/filefieldwidget.cpp effects/ui/filefieldwidget.h
+  effects/ui/fontfieldwidget.cpp effects/ui/fontfieldwidget.h
+  effects/ui/labelfieldwidget.cpp effects/ui/labelfieldwidget.h
+  effects/ui/stringfieldwidget.cpp effects/ui/stringfieldwidget.h
+  global/global.cpp global/global.h
+  panels/effectcontrols.cpp panels/effectcontrols.h
+  panels/grapheditor.cpp panels/grapheditor.h
+  panels/panels.cpp panels/panels.h
+  panels/project.cpp panels/project.h
+  panels/undohistorypanel.cpp panels/undohistorypanel.h
+  panels/timeline.cpp panels/timeline_clipboard.cpp panels/timeline_splitting.cpp panels/timeline_ui.cpp panels/timeline.h
+  panels/viewer.cpp panels/viewer.h
+  project/previewgenerator.cpp project/previewgenerator.h
+  project/projectfilter.cpp project/projectfilter.h
+  project/proxygenerator.cpp project/proxygenerator.h
+  project/sourcescommon.cpp project/sourcescommon.h
+  rendering/audio_ui.cpp rendering/audio_ui.h
+  timeline/marker.cpp timeline/marker.h
+  ui/appcontextimpl.cpp ui/appcontextimpl.h
+  ui/audiomonitor.cpp ui/audiomonitor.h
+  ui/blur.cpp ui/blur.h
+  ui/checkbox_command.cpp ui/checkbox_command.h
+  ui/clickablelabel.cpp ui/clickablelabel.h
+  ui/collapsiblewidget.cpp ui/collapsiblewidget.h
+  ui/colorlabel.cpp ui/colorlabel.h
+  ui/columnedgridlayout.cpp ui/columnedgridlayout.h
+  ui/colorbutton.cpp ui/colorbutton.h
+  ui/comboboxex.cpp ui/comboboxex.h
+  ui/cursors.cpp ui/cursors.h
+  ui/effectui.cpp ui/effectui.h
+  ui/embeddedfilechooser.cpp ui/embeddedfilechooser.h
+  ui/flowlayout.cpp ui/flowlayout.h
+  ui/focusfilter.cpp ui/focusfilter.h
+  ui/fontcombobox.cpp ui/fontcombobox.h
+  ui/graphview.cpp ui/graphview.h
+  ui/icons.cpp ui/icons.h
+  ui/keyframedrawing.cpp ui/keyframedrawing.h
+  ui/keyframenavigator.cpp ui/keyframenavigator.h
+  ui/keyframeview.cpp ui/keyframeview.h
+  ui/labelslider.cpp ui/labelslider.h
+  ui/mainwindow.cpp ui/mainwindow.h
+  ui/mediaiconservice.cpp ui/mediaiconservice.h
+  ui/menu.cpp ui/menu.h
+  ui/menuhelper.cpp ui/menuhelper.h
+  ui/panel.cpp ui/panel.h
+  ui/playbutton.cpp ui/playbutton.h
+  ui/rectangleselect.cpp ui/rectangleselect.h
+  ui/rulerwidget.cpp ui/rulerwidget.h
+  ui/resizablescrollbar.cpp ui/resizablescrollbar.h
+  ui/scrollarea.cpp ui/scrollarea.h
+  ui/sourceiconview.cpp ui/sourceiconview.h
+  ui/sourcetable.cpp ui/sourcetable.h
+  ui/styling.cpp ui/styling.h
+  ui/texteditex.cpp ui/texteditex.h
+  ui/timelineheader.cpp ui/timelineheader.h
   ui/timelinetools.h
-  ui/timelinewidget.cpp
-  ui/timelinewidget_ghosts.cpp
-  ui/timelinewidget_menu.cpp
-  ui/timelinewidget_paint.cpp
-  ui/timelinewidget.h
-  ui/viewercontainer.cpp
-  ui/viewercontainer.h
-  ui/viewerwidget.cpp
-  ui/viewerwidget.h
-  ui/viewerwindow.cpp
-  ui/viewerwindow.h
+  ui/timelinewidget.cpp ui/timelinewidget_ghosts.cpp ui/timelinewidget_menu.cpp ui/timelinewidget_paint.cpp ui/timelinewidget.h
+  ui/viewercontainer.cpp ui/viewercontainer.h
+  ui/viewerwidget.cpp ui/viewerwidget.h
+  ui/viewerwindow.cpp ui/viewerwindow.h
   main.cpp
 )
 
 set(OLIVE_RESOURCES
   cursors/cursors.qrc
-  effects/internal/internalshaders.qrc
   icons/icons.qrc
 )
 
@@ -483,14 +360,20 @@ if(APPLE)
 endif()
 
 add_executable(${OLIVE_TARGET}
-  ${OLIVE_SOURCES}
+  ${UI_SOURCES}
   ${OLIVE_RESOURCES}
   ${OLIVE_EFFECTS}
   ${OLIVE_QM_FILES}
 )
 
-add_subdirectory(core)
-add_subdirectory(engine)
+target_link_libraries(${OLIVE_TARGET} PRIVATE
+  amber-engine
+  $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
+)
+
+if(WIN32 AND OPENCOLORIO_FOUND)
+  target_link_libraries(${OLIVE_TARGET} PRIVATE OpenColorIO)
+endif()
 
 # Link-time optimization for Release builds (recovers overhead from function decomposition)
 include(CheckIPOSupported)
@@ -505,7 +388,7 @@ if(NOT CMAKE_CROSSCOMPILING)
   add_subdirectory(tests)
 endif()
 
-qt_add_shaders(${OLIVE_TARGET} "amber_shaders"
+qt_add_shaders(amber-engine "amber_shaders"
   PREFIX "/shaders"
   GLSL "150"
   BASE "rendering/shaders"
@@ -532,45 +415,18 @@ add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
   COMMENT "Copying export presets to build directory"
 )
 
-target_compile_definitions(${OLIVE_TARGET} PRIVATE ${OLIVE_DEFINITIONS})
-
 if(APPLE)
   target_compile_definitions(${OLIVE_TARGET} PRIVATE GL_SILENCE_DEPRECATION)
 endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-target_link_libraries(${OLIVE_TARGET}
-  PRIVATE
-  OpenGL::GL
-  Qt6::Core
-  Qt6::Gui
-  Qt6::GuiPrivate
-  Qt6::Widgets
-  Qt6::Multimedia
-  Qt6::OpenGL
-  Qt6::OpenGLWidgets
-  Qt6::ShaderToolsPrivate
-  Qt6::Svg
-  FFMPEG::avutil
-  FFMPEG::avcodec
-  FFMPEG::avformat
-  FFMPEG::avfilter
-  FFMPEG::swscale
-  FFMPEG::swresample
-  $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
-)
-
-if(WIN32 AND OPENCOLORIO_FOUND)
-  target_link_libraries(${OLIVE_TARGET} PRIVATE OpenColorIO)
-endif()
-
 if(DOXYGEN_FOUND AND BUILD_DOXYGEN)
   set(DOXYGEN_PROJECT_NAME "Amber")
   set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/docs")
   set(DOXYGEN_EXTRACT_ALL "YES")
   set(DOXYGEN_EXTRACT_PRIVATE "YES")
-  doxygen_add_docs(docs ALL ${OLIVE_SOURCES})
+  doxygen_add_docs(docs ALL ${UI_SOURCES})
 endif()
 
 if(UNIX AND NOT APPLE)
