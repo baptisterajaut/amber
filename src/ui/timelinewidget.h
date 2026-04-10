@@ -35,6 +35,7 @@
 #include "project/media.h"
 #include "timelinetools.h"
 
+class Menu;
 class Timeline;
 
 struct TimelineTrackHeight {
@@ -92,6 +93,16 @@ class TimelineWidget : public QWidget {
   void mouseMoveHoverTrimDetection(QMouseEvent* event);
   void mouseMoveHoverTransition(QMouseEvent* event);
 
+  // mouseMoveMovingInit sub-helpers
+  void mouseMoveMovingInitBuildGhosts();
+  void mouseMoveMovingInitRipplePrep();
+
+  // mouseMoveHoverTrimDetection sub-helpers
+  void hoverCheckTrackResize(const QMouseEvent* event, bool cursor_contains_clip, int min_track, int max_track);
+
+  // show_context_menu sub-helpers
+  void buildSelectedClipsMenu(Menu& menu, const QVector<Clip*>& selected_clips);
+
   // update_ghosts sub-handlers
   void updateGhostsSnap(int effective_tool, long& frame_diff);
   void updateGhostsValidate(int effective_tool, bool clips_are_movable, long& frame_diff);
@@ -114,12 +125,14 @@ class TimelineWidget : public QWidget {
   // mousePressEvent sub-handlers
   void mousePressCreating();
   void mousePressPointer(int hovered_clip, bool shift, bool alt, int effective_tool);
+  void mousePressDispatchTool(int effective_tool, int hovered_clip, bool shift, bool alt);
 
   // mouseReleaseEvent sub-handlers
   bool mouseReleaseCreating(ComboAction* ca, bool shift);
   bool mouseReleaseMoving(ComboAction* ca, bool alt, bool ctrl);
   bool mouseReleaseTransition(ComboAction* ca);
   bool mouseReleaseSplitting(ComboAction* ca, bool alt);
+  void mouseReleaseResetState();
 
   bool track_resizing;
   int track_target;

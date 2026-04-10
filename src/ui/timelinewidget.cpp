@@ -20,48 +20,48 @@
 
 #include "timelinewidget.h"
 
-#include <QPainter>
 #include <QColor>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QObject>
-#include <QVariant>
+#include <QPainter>
 #include <QPoint>
-#include <QMessageBox>
-#include <QtMath>
 #include <QScrollBar>
-#include <QMimeData>
-#include <QToolTip>
-#include <QInputDialog>
 #include <QStatusBar>
+#include <QToolTip>
+#include <QVariant>
+#include <QtMath>
 
+#include "dialogs/clippropertiesdialog.h"
+#include "dialogs/newsequencedialog.h"
+#include "effects/effect.h"
+#include "effects/internal/solideffect.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
+#include "global/config.h"
+#include "global/debug.h"
 #include "global/global.h"
+#include "mainwindow.h"
 #include "panels/panels.h"
 #include "project/projectelements.h"
 #include "rendering/audio.h"
-#include "global/config.h"
-#include "ui/sourcetable.h"
-#include "ui/sourceiconview.h"
-#include "engine/undo/undo.h"
-#include "engine/undo/undostack.h"
-#include "ui/viewerwidget.h"
-#include "ui/resizablescrollbar.h"
-#include "dialogs/newsequencedialog.h"
-#include "mainwindow.h"
-#include "ui/rectangleselect.h"
 #include "rendering/renderfunctions.h"
 #include "ui/cursors.h"
-#include "ui/menuhelper.h"
-#include "ui/menu.h"
 #include "ui/focusfilter.h"
-#include "dialogs/clippropertiesdialog.h"
-#include "global/debug.h"
-#include "effects/effect.h"
-#include "effects/internal/solideffect.h"
+#include "ui/menu.h"
+#include "ui/menuhelper.h"
+#include "ui/rectangleselect.h"
+#include "ui/resizablescrollbar.h"
+#include "ui/sourceiconview.h"
+#include "ui/sourcetable.h"
+#include "ui/viewerwidget.h"
 
 #define MAX_TEXT_WIDTH 20
 #define TRANSITION_BETWEEN_RANGE 40
 
-TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent) {
+TimelineWidget::TimelineWidget(QWidget* parent) : QWidget(parent) {
   selection_command = nullptr;
   self_created_sequence = nullptr;
   scroll = 0;
@@ -80,15 +80,15 @@ TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent) {
 }
 
 // Defined in timelinewidget_ghosts.cpp
-void make_room_for_transition(ComboAction* ca, Clip* c, int type, long transition_start, long transition_end, bool delete_old_transitions, long timeline_in = -1, long timeline_out = -1);
-void VerifyTransitionsAfterCreating(ComboAction* ca, Clip* open, Clip* close, long transition_start, long transition_end);
+void make_room_for_transition(ComboAction* ca, Clip* c, int type, long transition_start, long transition_end,
+                              bool delete_old_transitions, long timeline_in = -1, long timeline_out = -1);
+void VerifyTransitionsAfterCreating(ComboAction* ca, Clip* open, Clip* close, long transition_start,
+                                    long transition_end);
 void validate_transitions(Clip* c, int transition_type, long& frame_diff);
 
-bool same_sign(int a, int b) {
-  return (a < 0) == (b < 0);
-}
+bool same_sign(int a, int b) { return (a < 0) == (b < 0); }
 
-void TimelineWidget::dragEnterEvent(QDragEnterEvent *event) {
+void TimelineWidget::dragEnterEvent(QDragEnterEvent* event) {
   bool import_init = false;
 
   QVector<amber::timeline::MediaImportData> media_list;
@@ -97,19 +97,19 @@ void TimelineWidget::dragEnterEvent(QDragEnterEvent *event) {
   if (panel_project->IsProjectWidget(event->source())) {
     QModelIndexList items = panel_project->get_current_selected();
     media_list.resize(items.size());
-    for (int i=0;i<items.size();i++) {
+    for (int i = 0; i < items.size(); i++) {
       media_list[i] = panel_project->item_to_media(items.at(i));
     }
     import_init = true;
   }
 
   if (event->source() == panel_footage_viewer) {
-    if (panel_footage_viewer->seq != amber::ActiveSequence) { // don't allow nesting the same sequence
+    if (panel_footage_viewer->seq != amber::ActiveSequence) {  // don't allow nesting the same sequence
 
-      media_list.append(amber::timeline::MediaImportData(panel_footage_viewer->media,
-                         static_cast<amber::timeline::MediaImportType>(event->mimeData()->text().toInt())));
+      media_list.append(amber::timeline::MediaImportData(
+          panel_footage_viewer->media,
+          static_cast<amber::timeline::MediaImportType>(event->mimeData()->text().toInt())));
       import_init = true;
-
     }
   }
 
@@ -118,7 +118,7 @@ void TimelineWidget::dragEnterEvent(QDragEnterEvent *event) {
     if (!urls.isEmpty()) {
       QStringList file_list;
 
-      for (const auto & url : urls) {
+      for (const auto& url : urls) {
         file_list.append(url.toLocalFile());
       }
 
@@ -170,7 +170,7 @@ void TimelineWidget::dragEnterEvent(QDragEnterEvent *event) {
   }
 }
 
-void TimelineWidget::dragMoveEvent(QDragMoveEvent *event) {
+void TimelineWidget::dragMoveEvent(QDragMoveEvent* event) {
   if (panel_timeline->importing) {
     event->acceptProposedAction();
 
@@ -178,14 +178,14 @@ void TimelineWidget::dragMoveEvent(QDragMoveEvent *event) {
       QPoint pos = event->position().toPoint();
       panel_timeline->scroll_to_frame(panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x()));
       update_ghosts(pos, event->modifiers() & Qt::ShiftModifier);
-      panel_timeline->move_insert = ((event->modifiers() & Qt::ControlModifier) && (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing));
+      panel_timeline->move_insert = ((event->modifiers() & Qt::ControlModifier) &&
+                                     (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing));
       update_ui(false);
     }
   }
 }
 
-void TimelineWidget::wheelEvent(QWheelEvent *event) {
-
+void TimelineWidget::wheelEvent(QWheelEvent* event) {
   // TODO: implement pixel scrolling
 
   bool shift = (event->modifiers() & Qt::ShiftModifier);
@@ -203,26 +203,22 @@ void TimelineWidget::wheelEvent(QWheelEvent *event) {
   // scroll, so the config swap maps vertical to horizontal panning.
   // Use device type (works on both Wayland and X11/XInput2) with pixelDelta
   // as fallback (populated on Wayland even for generic device types).
-  bool is_trackpad = (event->device()
-                      && event->device()->type() == QInputDevice::DeviceType::TouchPad)
-                     || !event->pixelDelta().isNull();
+  bool is_trackpad = (event->device() && event->device()->type() == QInputDevice::DeviceType::TouchPad) ||
+                     !event->pixelDelta().isNull();
   bool cfg_swap = is_trackpad ? false : amber::CurrentConfig.invert_timeline_scroll_axes;
 
   // Allow shift for axis swap, but don't swap on zoom... Unless
   // we need to override Qt's axis swap via Alt
-  bool swap_hv = ((shift != cfg_swap) &
-                  !zooming) | (alt & !shift & zooming);
+  bool swap_hv = ((shift != cfg_swap) & !zooming) | (alt & !shift & zooming);
 
   int delta_h = swap_hv ? event->angleDelta().y() : event->angleDelta().x();
   int delta_v = swap_hv ? event->angleDelta().x() : event->angleDelta().y();
 
   if (zooming) {
-
     // Zoom only uses vertical scrolling, to avoid glitches on touchpads.
     // Don't do anything if not scrolling vertically.
 
     if (delta_v != 0) {
-
       // delta_v == 120 for one click of a mousewheel. Less or more for a
       // touchpad gesture. Calculate speed to compensate.
       // 120 = ratio of 4/3 (1.33), -120 = ratio of 3/4 (.75)
@@ -237,7 +233,6 @@ void TimelineWidget::wheelEvent(QWheelEvent *event) {
     }
 
   } else {
-
     // Use the Timeline's main scrollbar for horizontal scrolling, and this
     // widget's scrollbar for vertical scrolling.
 
@@ -281,7 +276,7 @@ void delete_area_under_ghosts(ComboAction* ca) {
   }
   // delete areas before adding
   QVector<Selection> delete_areas;
-  for (const auto & g : panel_timeline->ghosts) {
+  for (const auto& g : panel_timeline->ghosts) {
     Selection sel;
     sel.in = g.in;
     sel.out = g.out;
@@ -289,6 +284,13 @@ void delete_area_under_ghosts(ComboAction* ca) {
     delete_areas.append(sel);
   }
   panel_timeline->delete_areas_and_relink(ca, delete_areas, false);
+}
+
+// Helper: check whether a stationary clip overlaps the old ghost range (used to decide gap closure)
+static bool clip_overlaps_old_range(ClipPtr c, long earliest_old_point, long latest_old_point) {
+  bool entirely_before = c->timeline_in() < earliest_old_point && c->timeline_out() <= earliest_old_point;
+  bool entirely_after = c->timeline_in() >= latest_old_point && c->timeline_out() > latest_old_point;
+  return !entirely_before && !entirely_after;
 }
 
 void insert_clips(ComboAction* ca) {
@@ -300,69 +302,59 @@ void insert_clips(ComboAction* ca) {
 
   long earliest_old_point = LONG_MAX;
   long latest_old_point = LONG_MIN;
-
   long earliest_new_point = LONG_MAX;
   long latest_new_point = LONG_MIN;
 
   QVector<int> ignore_clips;
-  for (const auto & g : panel_timeline->ghosts) {
+  for (const auto& g : panel_timeline->ghosts) {
     earliest_old_point = qMin(earliest_old_point, g.old_in);
     latest_old_point = qMax(latest_old_point, g.old_out);
     earliest_new_point = qMin(earliest_new_point, g.in);
     latest_new_point = qMax(latest_new_point, g.out);
-
     if (g.clip >= 0) {
       ignore_clips.append(g.clip);
     } else {
-      // don't try to close old gap if importing
-      ripple_old_point = false;
+      ripple_old_point = false;  // don't close old gap if importing
     }
   }
 
   panel_timeline->split_cache.clear();
 
-  for (int i=0;i<amber::ActiveSequence->clips.size();i++) {
+  for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     ClipPtr c = amber::ActiveSequence->clips.at(i);
-    if (c != nullptr) {
-      // don't split any clips that are moving
-      bool found = false;
-      for (const auto & ghost : panel_timeline->ghosts) {
-        if (ghost.clip == i) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        if (c->timeline_in() < earliest_new_point && c->timeline_out() > earliest_new_point) {
-          panel_timeline->split_clip_and_relink(ca, i, earliest_new_point, true);
-        }
+    if (c == nullptr) continue;
 
-        // determine if we should close the gap the old clips left behind
-        if (ripple_old_point
-            && !((c->timeline_in() < earliest_old_point && c->timeline_out() <= earliest_old_point) || (c->timeline_in() >= latest_old_point && c->timeline_out() > latest_old_point))
-            && !ignore_clips.contains(i)) {
-          ripple_old_point = false;
-        }
+    bool is_moving = false;
+    for (const auto& ghost : panel_timeline->ghosts) {
+      if (ghost.clip == i) {
+        is_moving = true;
+        break;
       }
+    }
+    if (is_moving) continue;
+
+    if (c->timeline_in() < earliest_new_point && c->timeline_out() > earliest_new_point) {
+      panel_timeline->split_clip_and_relink(ca, i, earliest_new_point, true);
+    }
+
+    if (ripple_old_point && clip_overlaps_old_range(c, earliest_old_point, latest_old_point) &&
+        !ignore_clips.contains(i)) {
+      ripple_old_point = false;
     }
   }
 
-  long ripple_length = (latest_new_point - earliest_new_point);
-
+  long ripple_length = latest_new_point - earliest_new_point;
   ripple_clips(ca, amber::ActiveSequence.get(), earliest_new_point, ripple_length, ignore_clips);
 
   if (ripple_old_point) {
-    // works for moving later clips earlier but not earlier to later
-    long second_ripple_length = (earliest_old_point - latest_old_point);
-
+    long second_ripple_length = earliest_old_point - latest_old_point;
     ripple_clips(ca, amber::ActiveSequence.get(), latest_old_point, second_ripple_length, ignore_clips);
-
     if (earliest_old_point < earliest_new_point) {
-      for (auto & g : panel_timeline->ghosts) {
+      for (auto& g : panel_timeline->ghosts) {
         g.in += second_ripple_length;
         g.out += second_ripple_length;
       }
-      for (auto & s : amber::ActiveSequence->selections) {
+      for (auto& s : amber::ActiveSequence->selections) {
         s.in += second_ripple_length;
         s.out += second_ripple_length;
       }
@@ -381,8 +373,9 @@ void TimelineWidget::dropEvent(QDropEvent* event) {
       QMessageBox mbox(this);
 
       mbox.setWindowTitle(tr("New Sequence"));
-      mbox.setText(tr("No sequence has been created yet. Would you like to make one based on this footage or set "
-                      "custom parameters?"));
+      mbox.setText(
+          tr("No sequence has been created yet. Would you like to make one based on this footage or set "
+             "custom parameters?"));
       mbox.addButton(tr("Use Footage Parameters"), QMessageBox::YesRole);
       QAbstractButton* custom_param_btn = mbox.addButton(tr("Custom Parameters"), QMessageBox::NoRole);
       QAbstractButton* cancel_btn = mbox.addButton(QMessageBox::Cancel);
@@ -392,18 +385,17 @@ void TimelineWidget::dropEvent(QDropEvent* event) {
       s = self_created_sequence.get();
       double old_fr = s->frame_rate;
 
-      if (mbox.clickedButton() == cancel_btn
-          || (mbox.clickedButton() == custom_param_btn && NewSequenceDialog(this, nullptr, s).exec() == QDialog::Rejected)) {
+      if (mbox.clickedButton() == cancel_btn || (mbox.clickedButton() == custom_param_btn &&
+                                                 NewSequenceDialog(this, nullptr, s).exec() == QDialog::Rejected)) {
         delete ca;
         self_created_sequence = nullptr;
         event->ignore();
         return;
       }
 
-      if (mbox.clickedButton() == custom_param_btn
-          && !qFuzzyCompare(old_fr, s->frame_rate)) {
+      if (mbox.clickedButton() == custom_param_btn && !qFuzzyCompare(old_fr, s->frame_rate)) {
         // If we're here, the user changed the frame rate so all the ghosts will need adjustment
-        for (auto & g : panel_timeline->ghosts) {
+        for (auto& g : panel_timeline->ghosts) {
           g.in = rescale_frame_number(g.in, old_fr, s->frame_rate);
           g.out = rescale_frame_number(g.out, old_fr, s->frame_rate);
           g.clip_in = rescale_frame_number(g.clip_in, old_fr, s->frame_rate);
@@ -431,7 +423,7 @@ void TimelineWidget::dropEvent(QDropEvent* event) {
   }
 }
 
-void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event) {
+void TimelineWidget::mouseDoubleClickEvent(QMouseEvent* event) {
   if (amber::ActiveSequence != nullptr) {
     if (panel_timeline->tool == TIMELINE_TOOL_EDIT) {
       int clip_index = getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track);
@@ -469,22 +461,23 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event) {
 }
 
 bool current_tool_shows_cursor() {
-  return (panel_timeline->tool == TIMELINE_TOOL_EDIT || panel_timeline->tool == TIMELINE_TOOL_RAZOR || panel_timeline->creating);
+  return (panel_timeline->tool == TIMELINE_TOOL_EDIT || panel_timeline->tool == TIMELINE_TOOL_RAZOR ||
+          panel_timeline->creating);
 }
 
 void TimelineWidget::mousePressCreating() {
   int comp = 0;
   switch (panel_timeline->creating_object) {
-  case ADD_OBJ_TITLE:
-  case ADD_OBJ_SOLID:
-  case ADD_OBJ_BARS:
-    comp = -1;
-    break;
-  case ADD_OBJ_TONE:
-  case ADD_OBJ_NOISE:
-  case ADD_OBJ_AUDIO:
-    comp = 1;
-    break;
+    case ADD_OBJ_TITLE:
+    case ADD_OBJ_SOLID:
+    case ADD_OBJ_BARS:
+      comp = -1;
+      break;
+    case ADD_OBJ_TONE:
+    case ADD_OBJ_NOISE:
+    case ADD_OBJ_AUDIO:
+      comp = 1;
+      break;
   }
 
   // if the track the user clicked is correct for the type of object we're adding
@@ -502,260 +495,171 @@ void TimelineWidget::mousePressCreating() {
   }
 }
 
-void TimelineWidget::mousePressPointer(int hovered_clip, bool shift, bool alt, int effective_tool) {
-  if (track_resizing && effective_tool != TIMELINE_TOOL_MENU) {
-
-    // if the cursor is currently hovering over a track, init track resizing
-    panel_timeline->moving_init = true;
-
-  } else {
-
-    // check if we're currently hovering over a clip or not
-    if (hovered_clip >= 0) {
-      Clip* clip = amber::ActiveSequence->clips.at(hovered_clip).get();
-
-      if (clip->IsSelected()) {
-
-        if (shift) {
-
-          // if the user clicks a selected clip while holding shift, deselect the clip
-          panel_timeline->deselect_area(clip->timeline_in(), clip->timeline_out(), clip->track());
-
-          // if the user isn't holding alt, also deselect all of its links as well
-          if (!alt) {
-            for (int i : clip->linked) {
-              ClipPtr link = amber::ActiveSequence->clips.at(i);
-              panel_timeline->deselect_area(link->timeline_in(), link->timeline_out(), link->track());
-            }
-          }
-
-        } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER
-                    && panel_timeline->transition_select != kTransitionNone) {
-
-          // if the clip was selected by then the user clicked a transition, de-select the clip and its links
-          // and select the transition only
-
-          panel_timeline->deselect_area(clip->timeline_in(), clip->timeline_out(), clip->track());
-
-          for (int i : clip->linked) {
-            ClipPtr link = amber::ActiveSequence->clips.at(i);
-            panel_timeline->deselect_area(link->timeline_in(), link->timeline_out(), link->track());
-          }
-
-          Selection s;
-          s.track = clip->track();
-
-          // select the transition only
-          if (panel_timeline->transition_select == kTransitionOpening && clip->opening_transition != nullptr) {
-            s.in = clip->timeline_in();
-
-            if (clip->opening_transition->secondary_clip != nullptr) {
-              s.in -= clip->opening_transition->get_true_length();
-            }
-
-            s.out = clip->timeline_in() + clip->opening_transition->get_true_length();
-          } else if (panel_timeline->transition_select == kTransitionClosing && clip->closing_transition != nullptr) {
-            s.in = clip->timeline_out() - clip->closing_transition->get_true_length();
-            s.out = clip->timeline_out();
-
-            if (clip->closing_transition->secondary_clip != nullptr) {
-              s.out += clip->closing_transition->get_true_length();
-            }
-          }
-          amber::ActiveSequence->selections.append(s);
-        }
-
-        if (amber::CurrentConfig.select_also_seeks) {
-          panel_sequence_viewer->seek(panel_timeline->drag_frame_start);
-        }
-      } else {
-
-        // if the clip is not already selected
-
-        // if shift is NOT down, we change clear all current selections
-        if (!shift) {
-          amber::ActiveSequence->selections.clear();
-        }
-
-        Selection s;
-
-        s.in = clip->timeline_in();
-        s.out = clip->timeline_out();
-        s.track = clip->track();
-
-        // if user is using the pointer tool, they may be trying to select a transition
-        // check if the use is hovering over a transition
-        if (panel_timeline->tool == TIMELINE_TOOL_POINTER) {
-          if (panel_timeline->transition_select == kTransitionOpening && clip->opening_transition != nullptr) {
-            // move the selection to only select the transitoin
-            s.out = clip->timeline_in() + clip->opening_transition->get_true_length();
-
-            // if the transition is a "shared" transition, adjust the selection to select both sides
-            if (clip->opening_transition->secondary_clip != nullptr) {
-              s.in -= clip->opening_transition->get_true_length();
-            }
-          } else if (panel_timeline->transition_select == kTransitionClosing && clip->closing_transition != nullptr) {
-            // move the selection to only select the transitoin
-            s.in = clip->timeline_out() - clip->closing_transition->get_true_length();
-
-            // if the transition is a "shared" transition, adjust the selection to select both sides
-            if (clip->closing_transition->secondary_clip != nullptr) {
-              s.out += clip->closing_transition->get_true_length();
-            }
-          }
-        }
-
-        // add the selection to the array
-        amber::ActiveSequence->selections.append(s);
-
-        // if the config is set to also seek with selections, do so now
-        if (amber::CurrentConfig.select_also_seeks) {
-          panel_sequence_viewer->seek(panel_timeline->drag_frame_start);
-        }
-
-        // if alt is not down, select links (provided we're not selecting transitions)
-        if (!alt && panel_timeline->transition_select == kTransitionNone) {
-
-          for (int i : clip->linked) {
-
-            Clip* link = amber::ActiveSequence->clips.at(i).get();
-
-            // check if the clip is already selected
-            if (!link->IsSelected()) {
-              Selection ss;
-              ss.in = link->timeline_in();
-              ss.out = link->timeline_out();
-              ss.track = link->track();
-              amber::ActiveSequence->selections.append(ss);
-            }
-
-          }
-
-        }
+// Helper: handle pointer click on an already-selected clip
+static void mousePressPointerSelectedClip(Clip* clip, bool shift, bool alt) {
+  if (shift) {
+    panel_timeline->deselect_area(clip->timeline_in(), clip->timeline_out(), clip->track());
+    if (!alt) {
+      for (int i : clip->linked) {
+        ClipPtr link = amber::ActiveSequence->clips.at(i);
+        panel_timeline->deselect_area(link->timeline_in(), link->timeline_out(), link->track());
       }
-
-      // authorize the starting of a move action if the mouse moves after this
-      if (effective_tool != TIMELINE_TOOL_MENU) {
-        panel_timeline->moving_init = true;
-      }
-
-    } else {
-
-      // if the user did not click a clip at all, we start a rectangle selection
-
-      if (!shift) {
-        amber::ActiveSequence->selections.clear();
-      }
-
-      panel_timeline->rect_select_init = true;
     }
-
-    // update everything
-    update_ui(false);
+  } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER && panel_timeline->transition_select != kTransitionNone) {
+    // deselect clip + links, then select only the transition
+    panel_timeline->deselect_area(clip->timeline_in(), clip->timeline_out(), clip->track());
+    for (int i : clip->linked) {
+      ClipPtr link = amber::ActiveSequence->clips.at(i);
+      panel_timeline->deselect_area(link->timeline_in(), link->timeline_out(), link->track());
+    }
+    Selection s;
+    s.track = clip->track();
+    if (panel_timeline->transition_select == kTransitionOpening && clip->opening_transition != nullptr) {
+      s.in = clip->timeline_in();
+      if (clip->opening_transition->secondary_clip != nullptr) s.in -= clip->opening_transition->get_true_length();
+      s.out = clip->timeline_in() + clip->opening_transition->get_true_length();
+    } else if (panel_timeline->transition_select == kTransitionClosing && clip->closing_transition != nullptr) {
+      s.in = clip->timeline_out() - clip->closing_transition->get_true_length();
+      s.out = clip->timeline_out();
+      if (clip->closing_transition->secondary_clip != nullptr) s.out += clip->closing_transition->get_true_length();
+    }
+    amber::ActiveSequence->selections.append(s);
+  }
+  if (amber::CurrentConfig.select_also_seeks) {
+    panel_sequence_viewer->seek(panel_timeline->drag_frame_start);
   }
 }
 
-void TimelineWidget::mousePressEvent(QMouseEvent *event) {
-  if (amber::ActiveSequence != nullptr) {
+// Helper: handle pointer click on a clip that is not yet selected
+static void mousePressPointerUnselectedClip(Clip* clip, bool shift, bool alt) {
+  if (!shift) amber::ActiveSequence->selections.clear();
 
-    int effective_tool = panel_timeline->tool;
+  Selection s;
+  s.in = clip->timeline_in();
+  s.out = clip->timeline_out();
+  s.track = clip->track();
 
-    // some user actions will override which tool we'll be using
-    if (event->button() == Qt::MiddleButton) {
-      effective_tool = TIMELINE_TOOL_HAND;
-      panel_timeline->creating = false;
-    } else if (event->button() == Qt::RightButton) {
-      effective_tool = TIMELINE_TOOL_MENU;
-      panel_timeline->creating = false;
+  if (panel_timeline->tool == TIMELINE_TOOL_POINTER) {
+    if (panel_timeline->transition_select == kTransitionOpening && clip->opening_transition != nullptr) {
+      s.out = clip->timeline_in() + clip->opening_transition->get_true_length();
+      if (clip->opening_transition->secondary_clip != nullptr) s.in -= clip->opening_transition->get_true_length();
+    } else if (panel_timeline->transition_select == kTransitionClosing && clip->closing_transition != nullptr) {
+      s.in = clip->timeline_out() - clip->closing_transition->get_true_length();
+      if (clip->closing_transition->secondary_clip != nullptr) s.out += clip->closing_transition->get_true_length();
     }
+  }
 
-    // ensure cursor_frame and cursor_track are up to date
-    mouseMoveEvent(event);
+  amber::ActiveSequence->selections.append(s);
+  if (amber::CurrentConfig.select_also_seeks) {
+    panel_sequence_viewer->seek(panel_timeline->drag_frame_start);
+  }
 
-    // store current cursor positions
-    panel_timeline->drag_x_start = event->position().toPoint().x();
-    panel_timeline->drag_y_start = event->position().toPoint().y();
+  if (!alt && panel_timeline->transition_select == kTransitionNone) {
+    for (int i : clip->linked) {
+      Clip* link = amber::ActiveSequence->clips.at(i).get();
+      if (!link->IsSelected()) {
+        Selection ss;
+        ss.in = link->timeline_in();
+        ss.out = link->timeline_out();
+        ss.track = link->track();
+        amber::ActiveSequence->selections.append(ss);
+      }
+    }
+  }
+}
 
-    // store current frame/tracks as the values to start dragging from
-    panel_timeline->drag_frame_start = panel_timeline->cursor_frame;
-    panel_timeline->drag_track_start = panel_timeline->cursor_track;
+void TimelineWidget::mousePressPointer(int hovered_clip, bool shift, bool alt, int effective_tool) {
+  if (track_resizing && effective_tool != TIMELINE_TOOL_MENU) {
+    panel_timeline->moving_init = true;
+    return;
+  }
 
-    // get the clip the user is currently hovering over, priority to trim_target set from mouseMoveEvent
-    int hovered_clip = panel_timeline->trim_target == -1 ?
-          getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track)
-        : panel_timeline->trim_target;
-
-    bool shift = (event->modifiers() & Qt::ShiftModifier);
-    bool alt = (event->modifiers() & Qt::AltModifier);
-
-    // Normal behavior is to reset selections to zero when clicking, but if Shift is held, we add selections
-    // to the existing selections. `selection_offset` is the index to change selections from (and we don't touch
-    // any prior to that)
-    if (shift) {
-      panel_timeline->selection_offset = amber::ActiveSequence->selections.size();
+  if (hovered_clip >= 0) {
+    Clip* clip = amber::ActiveSequence->clips.at(hovered_clip).get();
+    if (clip->IsSelected()) {
+      mousePressPointerSelectedClip(clip, shift, alt);
     } else {
-      panel_timeline->selection_offset = 0;
+      mousePressPointerUnselectedClip(clip, shift, alt);
     }
-
-    // if the user is creating an object
-    if (panel_timeline->creating) {
-      mousePressCreating();
-    } else {
-
-      // pass through tools to determine what action we'll be starting
-      switch (effective_tool) {
-
-      // many tools share pointer-esque behavior
-      case TIMELINE_TOOL_POINTER:
-      case TIMELINE_TOOL_RIPPLE:
-      case TIMELINE_TOOL_SLIP:
-      case TIMELINE_TOOL_ROLLING:
-      case TIMELINE_TOOL_SLIDE:
-      case TIMELINE_TOOL_MENU:
-        mousePressPointer(hovered_clip, shift, alt, effective_tool);
-        break;
-      case TIMELINE_TOOL_HAND:
-
-        // initiate moving with the hand tool
-        panel_timeline->hand_moving = true;
-
-        break;
-      case TIMELINE_TOOL_EDIT:
-
-        // if the config is set to seek with the edit tool, do so now
-        if (amber::CurrentConfig.edit_tool_also_seeks) {
-          panel_sequence_viewer->seek(panel_timeline->drag_frame_start);
-        }
-
-        // initiate selecting
-        panel_timeline->selecting = true;
-
-        break;
-      case TIMELINE_TOOL_RAZOR:
-      {
-
-        // initiate razor tool
-        panel_timeline->splitting = true;
-
-        // add this track as a track being split by the razor
-        panel_timeline->split_tracks.append(panel_timeline->drag_track_start);
-
-        update_ui(false);
-      }
-        break;
-      case TIMELINE_TOOL_TRANSITION:
-      {
-
-        // if there is a clip to run the transition tool on, initiate the transition tool
-        if (panel_timeline->transition_tool_open_clip > -1
-              || panel_timeline->transition_tool_close_clip > -1) {
-          panel_timeline->transition_tool_init = true;
-        }
-
-      }
-        break;
-      }
+    if (effective_tool != TIMELINE_TOOL_MENU) {
+      panel_timeline->moving_init = true;
     }
+  } else {
+    if (!shift) amber::ActiveSequence->selections.clear();
+    panel_timeline->rect_select_init = true;
+  }
+
+  update_ui(false);
+}
+
+// Helper: dispatch press action for a given tool
+void TimelineWidget::mousePressDispatchTool(int effective_tool, int hovered_clip, bool shift, bool alt) {
+  switch (effective_tool) {
+    case TIMELINE_TOOL_POINTER:
+    case TIMELINE_TOOL_RIPPLE:
+    case TIMELINE_TOOL_SLIP:
+    case TIMELINE_TOOL_ROLLING:
+    case TIMELINE_TOOL_SLIDE:
+    case TIMELINE_TOOL_MENU:
+      mousePressPointer(hovered_clip, shift, alt, effective_tool);
+      break;
+    case TIMELINE_TOOL_HAND:
+      panel_timeline->hand_moving = true;
+      break;
+    case TIMELINE_TOOL_EDIT:
+      if (amber::CurrentConfig.edit_tool_also_seeks) {
+        panel_sequence_viewer->seek(panel_timeline->drag_frame_start);
+      }
+      panel_timeline->selecting = true;
+      break;
+    case TIMELINE_TOOL_RAZOR:
+      panel_timeline->splitting = true;
+      panel_timeline->split_tracks.append(panel_timeline->drag_track_start);
+      update_ui(false);
+      break;
+    case TIMELINE_TOOL_TRANSITION:
+      if (panel_timeline->transition_tool_open_clip > -1 || panel_timeline->transition_tool_close_clip > -1) {
+        panel_timeline->transition_tool_init = true;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+void TimelineWidget::mousePressEvent(QMouseEvent* event) {
+  if (amber::ActiveSequence == nullptr) return;
+
+  int effective_tool = panel_timeline->tool;
+
+  if (event->button() == Qt::MiddleButton) {
+    effective_tool = TIMELINE_TOOL_HAND;
+    panel_timeline->creating = false;
+  } else if (event->button() == Qt::RightButton) {
+    effective_tool = TIMELINE_TOOL_MENU;
+    panel_timeline->creating = false;
+  }
+
+  mouseMoveEvent(event);
+
+  panel_timeline->drag_x_start = event->position().toPoint().x();
+  panel_timeline->drag_y_start = event->position().toPoint().y();
+  panel_timeline->drag_frame_start = panel_timeline->cursor_frame;
+  panel_timeline->drag_track_start = panel_timeline->cursor_track;
+
+  int hovered_clip = panel_timeline->trim_target == -1
+                         ? getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track)
+                         : panel_timeline->trim_target;
+
+  bool shift = (event->modifiers() & Qt::ShiftModifier);
+  bool alt = (event->modifiers() & Qt::AltModifier);
+
+  panel_timeline->selection_offset = shift ? amber::ActiveSequence->selections.size() : 0;
+
+  if (panel_timeline->creating) {
+    mousePressCreating();
+  } else {
+    mousePressDispatchTool(effective_tool, hovered_clip, shift, alt);
   }
 }
 bool TimelineWidget::mouseReleaseCreating(ComboAction* ca, bool shift) {
@@ -804,34 +708,32 @@ bool TimelineWidget::mouseReleaseCreating(ComboAction* ca, bool shift) {
   }
 
   switch (panel_timeline->creating_object) {
-  case ADD_OBJ_TITLE:
-    c->set_name(tr("Title"));
-    c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_RICHTEXT, EFFECT_TYPE_EFFECT)));
-    break;
-  case ADD_OBJ_SOLID:
-    c->set_name(tr("Solid Color"));
-    c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SOLID, EFFECT_TYPE_EFFECT)));
-    break;
-  case ADD_OBJ_BARS:
-  {
-    c->set_name(tr("Bars"));
-    EffectPtr e = Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SOLID, EFFECT_TYPE_EFFECT));
+    case ADD_OBJ_TITLE:
+      c->set_name(tr("Title"));
+      c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_RICHTEXT, EFFECT_TYPE_EFFECT)));
+      break;
+    case ADD_OBJ_SOLID:
+      c->set_name(tr("Solid Color"));
+      c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SOLID, EFFECT_TYPE_EFFECT)));
+      break;
+    case ADD_OBJ_BARS: {
+      c->set_name(tr("Bars"));
+      EffectPtr e = Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SOLID, EFFECT_TYPE_EFFECT));
 
-    // Auto-select bars
-    SolidEffect* solid_effect = static_cast<SolidEffect*>(e.get());
-    solid_effect->SetType(SolidEffect::SOLID_TYPE_BARS);
+      // Auto-select bars
+      SolidEffect* solid_effect = static_cast<SolidEffect*>(e.get());
+      solid_effect->SetType(SolidEffect::SOLID_TYPE_BARS);
 
-    c->effects.append(e);
-  }
-    break;
-  case ADD_OBJ_TONE:
-    c->set_name(tr("Tone"));
-    c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TONE, EFFECT_TYPE_EFFECT)));
-    break;
-  case ADD_OBJ_NOISE:
-    c->set_name(tr("Noise"));
-    c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_NOISE, EFFECT_TYPE_EFFECT)));
-    break;
+      c->effects.append(e);
+    } break;
+    case ADD_OBJ_TONE:
+      c->set_name(tr("Tone"));
+      c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TONE, EFFECT_TYPE_EFFECT)));
+      break;
+    case ADD_OBJ_NOISE:
+      c->set_name(tr("Noise"));
+      c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_NOISE, EFFECT_TYPE_EFFECT)));
+      break;
   }
 
   if (c->track() >= 0 && amber::CurrentConfig.add_default_effects_to_clips) {
@@ -847,372 +749,214 @@ bool TimelineWidget::mouseReleaseCreating(ComboAction* ca, bool shift) {
   return true;
 }
 
-bool TimelineWidget::mouseReleaseMoving(ComboAction* ca, bool alt, bool ctrl) {
-  // see if any clips actually moved, otherwise we don't need to do any processing
-  bool process_moving = false;
+// Helper: apply ripple tool adjustment when trimming
+static void mouseReleaseMoveRipple(ComboAction* ca) {
+  const Ghost& first_ghost = panel_timeline->ghosts.at(0);
+  long ripple_length;
+  long ripple_point = LONG_MAX;
 
-  for (const auto & g : panel_timeline->ghosts) {
-    if (g.in != g.old_in
-        || g.out != g.old_out
-        || g.clip_in != g.old_clip_in
-        || g.track != g.old_track) {
+  if (panel_timeline->trim_type == TRIM_IN) {
+    ripple_length = first_ghost.old_in - first_ghost.in;
+    for (auto& selection : amber::ActiveSequence->selections) {
+      selection.in += ripple_length;
+      selection.out += ripple_length;
+    }
+  } else {
+    ripple_length = first_ghost.old_out - panel_timeline->ghosts.at(0).out;
+  }
+
+  QVector<int> ignore_clips;
+  for (int i = 0; i < panel_timeline->ghosts.size(); i++) {
+    const Ghost& g = panel_timeline->ghosts.at(i);
+    if (panel_timeline->trim_type == TRIM_IN) {
+      ignore_clips.append(g.clip);
+      panel_timeline->ghosts[i].in += ripple_length;
+      panel_timeline->ghosts[i].out += ripple_length;
+    }
+    long comp_point = (panel_timeline->trim_type == TRIM_IN) ? g.old_in : g.old_out;
+    ripple_point = qMin(ripple_point, comp_point);
+  }
+
+  if (panel_timeline->trim_type == TRIM_OUT) ripple_length = -ripple_length;
+  ripple_clips(ca, amber::ActiveSequence.get(), ripple_point, ripple_length, ignore_clips);
+}
+
+// Helper: alt+drag — duplicate clips to their new positions
+static void mouseReleaseMoveAltDuplicate(ComboAction* ca) {
+  QVector<int> old_clips;
+  QVector<ClipPtr> new_clips;
+  QVector<Selection> delete_areas;
+
+  for (const auto& g : panel_timeline->ghosts) {
+    if (g.old_in == g.in && g.old_out == g.out && g.track == g.old_track && g.clip_in == g.old_clip_in) continue;
+    ClipPtr c = amber::ActiveSequence->clips.at(g.clip)->copy(amber::ActiveSequence.get());
+    c->set_timeline_in(g.in);
+    c->set_timeline_out(g.out);
+    c->set_track(g.track);
+    Selection s;
+    s.in = g.in;
+    s.out = g.out;
+    s.track = g.track;
+    delete_areas.append(s);
+    old_clips.append(g.clip);
+    new_clips.append(c);
+  }
+
+  if (!new_clips.isEmpty()) {
+    panel_timeline->delete_areas_and_relink(ca, delete_areas, false);
+    panel_timeline->relink_clips_using_ids(old_clips, new_clips);
+    ca->append(new AddClipCommand(amber::ActiveSequence.get(), new_clips));
+  }
+}
+
+// Helper: overwrite move — mark ghosts undeletable, delete underlying area, then restore
+static void mouseReleaseMoveDeleteUnder(ComboAction* ca) {
+  QVector<Selection> delete_areas;
+  for (const auto& g : panel_timeline->ghosts) {
+    amber::ActiveSequence->clips.at(g.clip)->undeletable = true;
+    if (g.transition != nullptr) {
+      g.transition->parent_clip->undeletable = true;
+      if (g.transition->secondary_clip != nullptr) g.transition->secondary_clip->undeletable = true;
+    }
+    Selection s;
+    s.in = g.in;
+    s.out = g.out;
+    s.track = g.track;
+    delete_areas.append(s);
+  }
+  panel_timeline->delete_areas_and_relink(ca, delete_areas, false);
+  for (const auto& g : panel_timeline->ghosts) {
+    amber::ActiveSequence->clips.at(g.clip)->undeletable = false;
+    if (g.transition != nullptr) {
+      g.transition->parent_clip->undeletable = false;
+      if (g.transition->secondary_clip != nullptr) g.transition->secondary_clip->undeletable = false;
+    }
+  }
+}
+
+// Helper: apply actual clip/transition movement for one ghost
+static void mouseReleaseMoveApplyOneGhost(ComboAction* ca, const Ghost& g, Clip* c) {
+  if (g.transition == nullptr) {
+    c->move(ca, (g.in - g.old_in), (g.out - g.old_out), (g.clip_in - g.old_clip_in), (g.track - g.old_track), false,
+            true);
+    return;
+  }
+
+  bool is_opening_transition = (g.transition == c->opening_transition);
+  long new_transition_length = g.out - g.in;
+  if (g.transition->secondary_clip != nullptr) new_transition_length >>= 1;
+  ca->append(new ModifyTransitionCommand(is_opening_transition ? c->opening_transition : c->closing_transition,
+                                         new_transition_length));
+
+  long clip_length = c->length();
+
+  if (g.transition->secondary_clip != nullptr) {
+    if (g.in != g.old_in && g.trim_type == TRIM_NONE) {
+      long movement = g.in - g.old_in;
+      long timeline_out_movement = 0;
+      if (g.out > g.transition->parent_clip->timeline_out())
+        timeline_out_movement = g.out - g.transition->parent_clip->timeline_out();
+      long timeline_in_movement = 0;
+      if (g.in < g.transition->secondary_clip->timeline_in())
+        timeline_in_movement = g.in - g.transition->secondary_clip->timeline_in();
+      g.transition->parent_clip->move(ca, movement, timeline_out_movement, movement, 0, false, true);
+      g.transition->secondary_clip->move(ca, timeline_in_movement, movement, timeline_in_movement, 0, false, true);
+      make_room_for_transition(ca, g.transition->parent_clip, kTransitionOpening, g.in, g.out, false);
+      make_room_for_transition(ca, g.transition->secondary_clip, kTransitionClosing, g.in, g.out, false);
+    }
+  } else if (is_opening_transition) {
+    if (g.in != g.old_in) {
+      long timeline_out_movement = 0;
+      if (g.out > g.transition->parent_clip->timeline_out())
+        timeline_out_movement = g.out - g.transition->parent_clip->timeline_out();
+      c->move(ca, (g.in - g.old_in), timeline_out_movement, (g.clip_in - g.old_clip_in), 0, false, true);
+      clip_length -= (g.in - g.old_in);
+    }
+    make_room_for_transition(ca, c, kTransitionOpening, g.in, g.out, false);
+  } else {
+    if (g.out != g.old_out) {
+      long timeline_in_movement = 0;
+      if (g.in < g.transition->parent_clip->timeline_in())
+        timeline_in_movement = g.in - g.transition->parent_clip->timeline_in();
+      c->move(ca, timeline_in_movement, (g.out - g.old_out), timeline_in_movement, 0, false, true);
+      clip_length += (g.out - g.old_out);
+    }
+    make_room_for_transition(ca, c, kTransitionClosing, g.in, g.out, false);
+  }
+}
+
+// Helper: verify/split shared transitions after clips have been moved
+static void mouseReleaseMoveVerifyTransitions(ComboAction* ca) {
+  for (int i = 0; i < panel_timeline->ghosts.size(); i++) {
+    const Ghost& g = panel_timeline->ghosts.at(i);
+    if (g.transition != nullptr) continue;
+
+    ClipPtr c = amber::ActiveSequence->clips.at(g.clip);
+    long new_clip_length = g.out - g.in;
+
+    for (int t = kTransitionOpening; t <= kTransitionClosing; t++) {
+      TransitionPtr transition = (t == kTransitionOpening) ? c->opening_transition : c->closing_transition;
+      if (transition == nullptr) continue;
+
+      if (new_clip_length < transition->get_true_length())
+        ca->append(new ModifyTransitionCommand(transition, new_clip_length));
+
+      if (transition->secondary_clip == nullptr) continue;
+
+      bool edge_moved =
+          (t == kTransitionOpening && g.in != g.old_in) || (t == kTransitionClosing && g.out != g.old_out);
+      if (!edge_moved) continue;
+
+      Clip* search_clip = (t == kTransitionOpening) ? transition->secondary_clip : transition->parent_clip;
+
+      bool split = true;
+      for (int j = 0; j < panel_timeline->ghosts.size(); j++) {
+        const Ghost& other = panel_timeline->ghosts.at(j);
+        if (amber::ActiveSequence->clips.at(other.clip).get() != search_clip) continue;
+        bool edges_still_touch = (t == kTransitionOpening) ? (other.out == g.in) : (other.in == g.out);
+        if (edges_still_touch || j < i) split = false;
+        break;
+      }
+
+      if (split) {
+        ca->append(new SetPointer(reinterpret_cast<void**>(&transition->secondary_clip), nullptr));
+        ca->append(new AddTransitionCommand(nullptr, transition->secondary_clip, transition, nullptr, 0));
+      }
+    }
+  }
+}
+
+bool TimelineWidget::mouseReleaseMoving(ComboAction* ca, bool alt, bool ctrl) {
+  bool process_moving = false;
+  for (const auto& g : panel_timeline->ghosts) {
+    if (g.in != g.old_in || g.out != g.old_out || g.clip_in != g.old_clip_in || g.track != g.old_track) {
       process_moving = true;
       break;
     }
   }
-
   if (!process_moving) return false;
 
-  const Ghost& first_ghost = panel_timeline->ghosts.at(0);
-
-  // start a ripple movement
   if (panel_timeline->tool == TIMELINE_TOOL_RIPPLE) {
-
-    // ripple_length becomes the length/number of frames we trimmed
-    // ripple_point is the "axis" around which we move all the clips, any clips after it get moved
-    long ripple_length;
-    long ripple_point = LONG_MAX;
-
-    if (panel_timeline->trim_type == TRIM_IN) {
-
-      // it's assumed that all the ghosts rippled by the same length, so we just take the difference of the
-      // first ghost here
-      ripple_length = first_ghost.old_in - first_ghost.in;
-
-      // for in trimming movements we also move the selections forward (unnecessary for out trimming since
-      // the selected clips more or less stay in the same place)
-      for (auto & selection : amber::ActiveSequence->selections) {
-        selection.in += ripple_length;
-        selection.out += ripple_length;
-      }
-    } else {
-
-      // use the out points for length if the user trimmed the out point
-      ripple_length = first_ghost.old_out - panel_timeline->ghosts.at(0).out;
-
-    }
-
-    // build a list of "ignore clips" that won't get affected by ripple_clips() below
-    QVector<int> ignore_clips;
-    for (int i=0;i<panel_timeline->ghosts.size();i++) {
-      const Ghost& g = panel_timeline->ghosts.at(i);
-
-      // for the same reason that we pushed selections forward above, for in trimming,
-      // we push the ghosts forward here
-      if (panel_timeline->trim_type == TRIM_IN) {
-        ignore_clips.append(g.clip);
-        panel_timeline->ghosts[i].in += ripple_length;
-        panel_timeline->ghosts[i].out += ripple_length;
-      }
-
-      // find the earliest ripple point
-      long comp_point = (panel_timeline->trim_type == TRIM_IN) ? g.old_in : g.old_out;
-      ripple_point = qMin(ripple_point, comp_point);
-    }
-
-    // if this was out trimming, flip the direction of the ripple
-    if (panel_timeline->trim_type == TRIM_OUT) ripple_length = -ripple_length;
-
-    // finally, ripple everything
-    ripple_clips(ca, amber::ActiveSequence.get(), ripple_point, ripple_length, ignore_clips);
+    mouseReleaseMoveRipple(ca);
   }
 
-  if (panel_timeline->tool == TIMELINE_TOOL_POINTER
-      && alt
-      && panel_timeline->trim_target == -1) {
-
-    // if the user was holding alt (and not trimming), we duplicate clips rather than move them
-    QVector<int> old_clips;
-    QVector<ClipPtr> new_clips;
-    QVector<Selection> delete_areas;
-    for (const auto & g : panel_timeline->ghosts) {
-      if (g.old_in != g.in || g.old_out != g.out || g.track != g.old_track || g.clip_in != g.old_clip_in) {
-
-        // create copy of clip
-        ClipPtr c = amber::ActiveSequence->clips.at(g.clip)->copy(amber::ActiveSequence.get());
-
-        c->set_timeline_in(g.in);
-        c->set_timeline_out(g.out);
-        c->set_track(g.track);
-
-        Selection s;
-        s.in = g.in;
-        s.out = g.out;
-        s.track = g.track;
-        delete_areas.append(s);
-
-        old_clips.append(g.clip);
-        new_clips.append(c);
-
-      }
-    }
-
-    if (new_clips.size() > 0) {
-
-      // delete anything under the new clips
-      panel_timeline->delete_areas_and_relink(ca, delete_areas, false);
-
-      // relink duplicated clips
-      panel_timeline->relink_clips_using_ids(old_clips, new_clips);
-
-      // add them
-      ca->append(new AddClipCommand(amber::ActiveSequence.get(), new_clips));
-
-    }
-
-  } else {
-
-    // if we're not holding alt, this will just be a move
-
-    // if the user is holding ctrl, perform an insert rather than an overwrite
-    if (panel_timeline->tool == TIMELINE_TOOL_POINTER && ctrl) {
-
-      insert_clips(ca);
-
-    } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_SLIDE) {
-
-      // if the user is not holding ctrl, we start standard clip movement
-
-      // delete everything under the new clips
-      QVector<Selection> delete_areas;
-      for (const auto & g : panel_timeline->ghosts) {
-        // step 1 - set clips that are moving to "undeletable" (to avoid step 2 deleting any part of them)
-        // set clip to undeletable so it's unaffected by delete_areas_and_relink() below
-        amber::ActiveSequence->clips.at(g.clip)->undeletable = true;
-
-        // if the user was moving a transition make sure they're undeletable too
-        if (g.transition != nullptr) {
-          g.transition->parent_clip->undeletable = true;
-          if (g.transition->secondary_clip != nullptr) {
-            g.transition->secondary_clip->undeletable = true;
-          }
-        }
-
-        // set area to delete
-        Selection s;
-        s.in = g.in;
-        s.out = g.out;
-        s.track = g.track;
-        delete_areas.append(s);
-      }
-
-      panel_timeline->delete_areas_and_relink(ca, delete_areas, false);
-
-      // clean up, i.e. make everything not undeletable again
-      for (const auto & g : panel_timeline->ghosts) {
-        amber::ActiveSequence->clips.at(g.clip)->undeletable = false;
-
-        if (g.transition != nullptr) {
-          g.transition->parent_clip->undeletable = false;
-          if (g.transition->secondary_clip != nullptr) {
-            g.transition->secondary_clip->undeletable = false;
-          }
-        }
-      }
-    }
-
-    // finally, perform actual movement of clips
-    for (auto & g : panel_timeline->ghosts) {
-      Clip* c = amber::ActiveSequence->clips.at(g.clip).get();
-
-      if (g.transition == nullptr) {
-
-        // if this was a clip rather than a transition
-
-        c->move(ca, (g.in - g.old_in), (g.out - g.old_out), (g.clip_in - g.old_clip_in), (g.track - g.old_track), false, true);
-
-      } else {
-
-        // if the user was moving a transition
-
-        bool is_opening_transition = (g.transition == c->opening_transition);
-        long new_transition_length = g.out - g.in;
-        if (g.transition->secondary_clip != nullptr) new_transition_length >>= 1;
-        ca->append(
-              new ModifyTransitionCommand(is_opening_transition ? c->opening_transition : c->closing_transition,
-                                               new_transition_length)
-              );
-
-        long clip_length = c->length();
-
-        if (g.transition->secondary_clip != nullptr) {
-
-          // if this is a shared transition
-          if (g.in != g.old_in && g.trim_type == TRIM_NONE) {
-            long movement = g.in - g.old_in;
-
-            // check if the transition is going to extend the out point (opening clip)
-            long timeline_out_movement = 0;
-            if (g.out > g.transition->parent_clip->timeline_out()) {
-              timeline_out_movement = g.out - g.transition->parent_clip->timeline_out();
-            }
-
-            // check if the transition is going to extend the in point (closing clip)
-            long timeline_in_movement = 0;
-            if (g.in < g.transition->secondary_clip->timeline_in()) {
-              timeline_in_movement = g.in - g.transition->secondary_clip->timeline_in();
-            }
-
-            g.transition->parent_clip->move(ca, movement, timeline_out_movement, movement, 0, false, true);
-            g.transition->secondary_clip->move(ca, timeline_in_movement, movement, timeline_in_movement, 0, false, true);
-
-            make_room_for_transition(ca, g.transition->parent_clip, kTransitionOpening, g.in, g.out, false);
-            make_room_for_transition(ca, g.transition->secondary_clip, kTransitionClosing, g.in, g.out, false);
-
-          }
-
-        } else if (is_opening_transition) {
-
-          if (g.in != g.old_in) {
-            // if transition is going to make the clip bigger, make the clip bigger
-
-            // check if the transition is going to extend the out point
-            long timeline_out_movement = 0;
-            if (g.out > g.transition->parent_clip->timeline_out()) {
-              timeline_out_movement = g.out - g.transition->parent_clip->timeline_out();
-            }
-
-            c->move(ca, (g.in - g.old_in), timeline_out_movement, (g.clip_in - g.old_clip_in), 0, false, true);
-            clip_length -= (g.in - g.old_in);
-          }
-
-          make_room_for_transition(ca, c, kTransitionOpening, g.in, g.out, false);
-
-        } else {
-
-          if (g.out != g.old_out) {
-
-            // check if the transition is going to extend the in point
-            long timeline_in_movement = 0;
-            if (g.in < g.transition->parent_clip->timeline_in()) {
-              timeline_in_movement = g.in - g.transition->parent_clip->timeline_in();
-            }
-
-            // if transition is going to make the clip bigger, make the clip bigger
-            c->move(ca, timeline_in_movement, (g.out - g.old_out), timeline_in_movement, 0, false, true);
-            clip_length += (g.out - g.old_out);
-          }
-
-          make_room_for_transition(ca, c, kTransitionClosing, g.in, g.out, false);
-
-        }
-      }
-    }
-
-    // time to verify the transitions of moved clips
-    for (int i=0;i<panel_timeline->ghosts.size();i++) {
-      const Ghost& g = panel_timeline->ghosts.at(i);
-
-      // only applies to moving clips, transitions are verified above instead
-      if (g.transition == nullptr) {
-        ClipPtr c = amber::ActiveSequence->clips.at(g.clip);
-
-        long new_clip_length = g.out - g.in;
-
-        // using a for loop between constants to repeat the same steps for the opening and closing transitions
-        for (int t=kTransitionOpening;t<=kTransitionClosing;t++) {
-
-          TransitionPtr transition = (t == kTransitionOpening) ? c->opening_transition : c->closing_transition;
-
-          // check the whether the clip has a transition here
-          if (transition != nullptr) {
-
-            // if the new clip size exceeds the opening transition's length, resize the transition
-            if (new_clip_length < transition->get_true_length()) {
-              ca->append(new ModifyTransitionCommand(transition, new_clip_length));
-            }
-
-            // check if the transition is a shared transition (it'll never have a secondary clip if it isn't)
-            if (transition->secondary_clip != nullptr) {
-
-              // check if the transition's "edge" is going to move
-              if ((t == kTransitionOpening && g.in != g.old_in)
-                  || (t == kTransitionClosing && g.out != g.old_out)) {
-
-                // if we're here, this clip shares its opening transition as the closing transition of another
-                // clip (or vice versa), and the in point is moving, so we may have to account for this
-
-                // the other clip sharing this transition may be moving as well, meaning we don't have to do
-                // anything
-
-                bool split = true;
-
-                // loop through ghosts to find out
-
-                // for a shared transition, the secondary_clip will always be the closing transition side and
-                // the parent_clip will always be the opening transition side
-                Clip* search_clip = (t == kTransitionOpening)
-                                              ? transition->secondary_clip : transition->parent_clip;
-
-                for (int j=0;j<panel_timeline->ghosts.size();j++) {
-                  const Ghost& other_clip_ghost = panel_timeline->ghosts.at(j);
-
-                  if (amber::ActiveSequence->clips.at(other_clip_ghost.clip).get() == search_clip) {
-
-                    // we found the other clip in the current ghosts/selections
-
-                    // see if it's destination edge will be equal to this ghost's edge (in which case the
-                    // transition doesn't need to change)
-                    //
-                    // also only do this if j is less than i, because it only needs to happen once and chances are
-                    // the other clip already
-
-                    bool edges_still_touch;
-                    if (t == kTransitionOpening) {
-                      edges_still_touch = (other_clip_ghost.out == g.in);
-                    } else {
-                      edges_still_touch = (other_clip_ghost.in == g.out);
-                    }
-
-                    if (edges_still_touch || j < i) {
-                      split = false;
-                    }
-
-                    break;
-                  }
-                }
-
-                if (split) {
-                  // separate shared transition into one transition for each clip
-
-                  if (t == kTransitionOpening) {
-
-                    // set transition to single-clip mode
-                    ca->append(new SetPointer(reinterpret_cast<void**>(&transition->secondary_clip),
-                                              nullptr));
-
-                    // create duplicate transition for other clip
-                    ca->append(new AddTransitionCommand(nullptr,
-                                                        transition->secondary_clip,
-                                                        transition,
-                                                        nullptr,
-                                                        0));
-
-                  } else {
-
-                    // set transition to single-clip mode
-                    ca->append(new SetPointer(reinterpret_cast<void**>(&transition->secondary_clip),
-                                              nullptr));
-
-                    // that transition will now attach to the other clip, so we duplicate it for this one
-
-                    // create duplicate transition for this clip
-                    ca->append(new AddTransitionCommand(nullptr,
-                                                        transition->secondary_clip,
-                                                        transition,
-                                                        nullptr,
-                                                        0));
-
-                  }
-                }
-
-              }
-            }
-          }
-        }
-      }
-    }
+  if (panel_timeline->tool == TIMELINE_TOOL_POINTER && alt && panel_timeline->trim_target == -1) {
+    mouseReleaseMoveAltDuplicate(ca);
+    return true;
   }
+
+  // overwrite or insert move
+  if (panel_timeline->tool == TIMELINE_TOOL_POINTER && ctrl) {
+    insert_clips(ca);
+  } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_SLIDE) {
+    mouseReleaseMoveDeleteUnder(ca);
+  }
+
+  for (auto& g : panel_timeline->ghosts) {
+    mouseReleaseMoveApplyOneGhost(ca, g, amber::ActiveSequence->clips.at(g.clip).get());
+  }
+
+  mouseReleaseMoveVerifyTransitions(ca);
   return true;
 }
 
@@ -1228,12 +972,12 @@ bool TimelineWidget::mouseReleaseTransition(ComboAction* ca) {
 
   // get clip references from tool's cached data
   Clip* open = (panel_timeline->transition_tool_open_clip > -1)
-      ? amber::ActiveSequence->clips.at(panel_timeline->transition_tool_open_clip).get()
-      : nullptr;
+                   ? amber::ActiveSequence->clips.at(panel_timeline->transition_tool_open_clip).get()
+                   : nullptr;
 
   Clip* close = (panel_timeline->transition_tool_close_clip > -1)
-      ? amber::ActiveSequence->clips.at(panel_timeline->transition_tool_close_clip).get()
-      : nullptr;
+                    ? amber::ActiveSequence->clips.at(panel_timeline->transition_tool_close_clip).get()
+                    : nullptr;
 
   // if it's shared, the transition length is halved (one half for each clip will result in the full length)
   long transition_length = transition_end - transition_start;
@@ -1244,20 +988,17 @@ bool TimelineWidget::mouseReleaseTransition(ComboAction* ca) {
   VerifyTransitionsAfterCreating(ca, open, close, transition_start, transition_end);
 
   // finally, add the transition to these clips
-  ca->append(new AddTransitionCommand(open,
-                                      close,
-                                      nullptr,
-                                      panel_timeline->transition_tool_meta,
-                                      transition_length));
+  ca->append(new AddTransitionCommand(open, close, nullptr, panel_timeline->transition_tool_meta, transition_length));
 
   return true;
 }
 
 bool TimelineWidget::mouseReleaseSplitting(ComboAction* ca, bool alt) {
   bool split = false;
-  for (int i=0;i<panel_timeline->split_tracks.size();i++) {
+  for (int i = 0; i < panel_timeline->split_tracks.size(); i++) {
     int split_index = getClipIndexFromCoords(panel_timeline->drag_frame_start, panel_timeline->split_tracks.at(i));
-    if (split_index > -1 && panel_timeline->split_clip_and_relink(ca, split_index, panel_timeline->drag_frame_start, !alt)) {
+    if (split_index > -1 &&
+        panel_timeline->split_clip_and_relink(ca, split_index, panel_timeline->drag_frame_start, !alt)) {
       split = true;
     }
   }
@@ -1265,71 +1006,71 @@ bool TimelineWidget::mouseReleaseSplitting(ComboAction* ca, bool alt) {
   return split;
 }
 
-void TimelineWidget::mouseReleaseEvent(QMouseEvent *event) {
+// Helper: reset all drag/action state after a mouse release
+void TimelineWidget::mouseReleaseResetState() {
+  panel_timeline->ghosts.clear();
+  panel_timeline->split_tracks.clear();
+  panel_timeline->selecting = false;
+  panel_timeline->moving_proc = false;
+  panel_timeline->moving_init = false;
+  panel_timeline->splitting = false;
+  panel_timeline->snapped = false;
+  panel_timeline->rect_select_init = false;
+  panel_timeline->rect_select_proc = false;
+  panel_timeline->transition_tool_init = false;
+  panel_timeline->transition_tool_proc = false;
+  pre_clips.clear();
+  post_clips.clear();
+}
+
+void TimelineWidget::mouseReleaseEvent(QMouseEvent* event) {
   QToolTip::hideText();
-  if (amber::ActiveSequence != nullptr) {
-    bool alt = (event->modifiers() & Qt::AltModifier);
-    bool shift = (event->modifiers() & Qt::ShiftModifier);
-    bool ctrl = (event->modifiers() & Qt::ControlModifier);
+  if (amber::ActiveSequence == nullptr) return;
 
-    if (event->button() == Qt::LeftButton) {
-      ComboAction* ca = new ComboAction();
-      bool push_undo = false;
+  bool alt = (event->modifiers() & Qt::AltModifier);
+  bool shift = (event->modifiers() & Qt::ShiftModifier);
+  bool ctrl = (event->modifiers() & Qt::ControlModifier);
 
-      if (panel_timeline->creating) {
-        push_undo = mouseReleaseCreating(ca, shift);
-        if (push_undo) ca->setText(tr("Create Clip"));
-      } else if (panel_timeline->moving_proc) {
-        push_undo = mouseReleaseMoving(ca, alt, ctrl);
-        if (push_undo) ca->setText(tr("Move Clip(s)"));
-      } else if (panel_timeline->selecting || panel_timeline->rect_select_proc) {
-      } else if (panel_timeline->transition_tool_proc) {
-        push_undo = mouseReleaseTransition(ca);
-        if (push_undo) ca->setText(tr("Add Transition"));
-      } else if (panel_timeline->splitting) {
-        push_undo = mouseReleaseSplitting(ca, alt);
-        if (push_undo) ca->setText(tr("Split Clip(s)"));
-      }
+  if (event->button() == Qt::LeftButton) {
+    ComboAction* ca = new ComboAction();
+    bool push_undo = false;
 
-      // remove duplicate selections
-      panel_timeline->clean_up_selections(amber::ActiveSequence->selections);
-
-      if (selection_command != nullptr) {
-        selection_command->new_data = amber::ActiveSequence->selections;
-        ca->append(selection_command);
-        selection_command = nullptr;
-        push_undo = true;
-      }
-
-      if (push_undo) {
-        if (ca->text().isEmpty()) ca->setText(tr("Select"));
-        amber::UndoStack.push(ca);
-      } else {
-        delete ca;
-      }
-
-      // destroy all ghosts
-      panel_timeline->ghosts.clear();
-
-      // clear split tracks
-      panel_timeline->split_tracks.clear();
-
-      panel_timeline->selecting = false;
-      panel_timeline->moving_proc = false;
-      panel_timeline->moving_init = false;
-      panel_timeline->splitting = false;
-      panel_timeline->snapped = false;
-      panel_timeline->rect_select_init = false;
-      panel_timeline->rect_select_proc = false;
-      panel_timeline->transition_tool_init = false;
-      panel_timeline->transition_tool_proc = false;
-      pre_clips.clear();
-      post_clips.clear();
-
-      update_ui(true);
+    if (panel_timeline->creating) {
+      push_undo = mouseReleaseCreating(ca, shift);
+      if (push_undo) ca->setText(tr("Create Clip"));
+    } else if (panel_timeline->moving_proc) {
+      push_undo = mouseReleaseMoving(ca, alt, ctrl);
+      if (push_undo) ca->setText(tr("Move Clip(s)"));
+    } else if (panel_timeline->transition_tool_proc) {
+      push_undo = mouseReleaseTransition(ca);
+      if (push_undo) ca->setText(tr("Add Transition"));
+    } else if (panel_timeline->splitting) {
+      push_undo = mouseReleaseSplitting(ca, alt);
+      if (push_undo) ca->setText(tr("Split Clip(s)"));
     }
-    panel_timeline->hand_moving = false;
+    // selecting/rect_select_proc: no undo action, just fall through
+
+    panel_timeline->clean_up_selections(amber::ActiveSequence->selections);
+
+    if (selection_command != nullptr) {
+      selection_command->new_data = amber::ActiveSequence->selections;
+      ca->append(selection_command);
+      selection_command = nullptr;
+      push_undo = true;
+    }
+
+    if (push_undo) {
+      if (ca->text().isEmpty()) ca->setText(tr("Select"));
+      amber::UndoStack.push(ca);
+    } else {
+      delete ca;
+    }
+
+    mouseReleaseResetState();
+    update_ui(true);
   }
+
+  panel_timeline->hand_moving = false;
 }
 void TimelineWidget::mouseMoveSelecting(bool alt) {
   // get number of selections based on tracks in selection area
@@ -1359,22 +1100,17 @@ void TimelineWidget::mouseMoveSelecting(bool alt) {
 
   // If the config is set to select links as well with the edit tool
   if (amber::CurrentConfig.edit_tool_selects_links) {
-
     // find which clips are selected
     for (int j = 0; j < amber::ActiveSequence->clips.size(); j++) {
-
       Clip* c = amber::ActiveSequence->clips.at(j).get();
 
       if (c != nullptr && c->IsSelected(false)) {
-
         // loop through linked clips
         for (int k : c->linked) {
-
           ClipPtr link = amber::ActiveSequence->clips.at(k);
 
           // see if one of the selections is already covering this track
           if (!(link->track() >= minimum_selection_track && link->track() <= maximum_selection_track)) {
-
             // clip is not in selection area, time to select it
             Selection link_sel;
             link_sel.in = selection_in;
@@ -1418,222 +1154,141 @@ void TimelineWidget::mouseMoveHandMoving(QMouseEvent* event) {
   panel_timeline->drag_y_start = event->position().toPoint().y();
 }
 
+// Helper: build ghost list from current clip selection (pointer/ripple/etc. tools)
+void TimelineWidget::mouseMoveMovingInitBuildGhosts() {
+  for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
+    Clip* c = amber::ActiveSequence->clips.at(i).get();
+    if (c == nullptr) continue;
+
+    Ghost g;
+    g.transition = nullptr;
+    bool add = false;
+
+    // pointer tool: check if a transition is selected (takes priority over clip selection)
+    if (panel_timeline->tool == TIMELINE_TOOL_POINTER &&
+        (c->opening_transition != nullptr || c->closing_transition != nullptr)) {
+      for (const auto& s : amber::ActiveSequence->selections) {
+        if (s.track != c->track()) continue;
+        if (selection_contains_transition(s, c, kTransitionOpening)) {
+          g.transition = c->opening_transition;
+          add = true;
+          break;
+        } else if (selection_contains_transition(s, c, kTransitionClosing)) {
+          g.transition = c->closing_transition;
+          add = true;
+          break;
+        }
+      }
+    }
+
+    if (!add) add = c->IsSelected();
+    if (!add) continue;
+
+    // avoid adding dual transitions twice
+    if (g.transition != nullptr) {
+      for (const auto& ghost : panel_timeline->ghosts) {
+        if (ghost.transition == g.transition) {
+          add = false;
+          break;
+        }
+      }
+    }
+
+    if (add) {
+      g.clip = i;
+      g.trim_type = panel_timeline->trim_type;
+      panel_timeline->ghosts.append(g);
+    }
+  }
+
+  // slide tool: add adjacent clips as trimming ghosts
+  if (panel_timeline->tool == TIMELINE_TOOL_SLIDE) {
+    int ghost_arr_size = panel_timeline->ghosts.size();
+    for (int j = 0; j < amber::ActiveSequence->clips.size(); j++) {
+      ClipPtr c = amber::ActiveSequence->clips.at(j);
+      if (c == nullptr) continue;
+      for (int i = 0; i < ghost_arr_size; i++) {
+        Ghost& g = panel_timeline->ghosts[i];
+        g.trim_type = TRIM_NONE;
+        ClipPtr ghost_clip = amber::ActiveSequence->clips.at(g.clip);
+        if (c->track() != ghost_clip->track()) continue;
+        bool found = false;
+        for (int k = 0; k < ghost_arr_size; k++) {
+          if (panel_timeline->ghosts.at(k).clip == j) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          bool is_in = (c->timeline_in() == ghost_clip->timeline_out());
+          if (is_in || c->timeline_out() == ghost_clip->timeline_in()) {
+            Ghost gh;
+            gh.transition = nullptr;
+            gh.clip = j;
+            gh.trim_type = is_in ? TRIM_IN : TRIM_OUT;
+            panel_timeline->ghosts.append(gh);
+          }
+        }
+      }
+    }
+  }
+}
+
+// Helper: cache pre/post clip lists for ripple tool validation
+void TimelineWidget::mouseMoveMovingInitRipplePrep() {
+  long axis = LONG_MAX;
+  QVector<ClipPtr> ghost_clips;
+  ghost_clips.resize(panel_timeline->ghosts.size());
+
+  for (int i = 0; i < panel_timeline->ghosts.size(); i++) {
+    ClipPtr c = amber::ActiveSequence->clips.at(panel_timeline->ghosts.at(i).clip);
+    axis = qMin(axis, (panel_timeline->trim_type == TRIM_IN) ? c->timeline_in() : c->timeline_out());
+    ghost_clips[i] = c;
+  }
+
+  for (auto c : amber::ActiveSequence->clips) {
+    if (c == nullptr || ghost_clips.contains(c)) continue;
+    bool clip_is_post = (c->timeline_in() >= axis);
+    QVector<ClipPtr>& clip_list = clip_is_post ? post_clips : pre_clips;
+    bool found = false;
+    for (auto& j : clip_list) {
+      if (j->track() == c->track()) {
+        if ((!clip_is_post && j->timeline_out() < c->timeline_out()) ||
+            (clip_is_post && j->timeline_in() > c->timeline_in())) {
+          j = c;
+        }
+        found = true;
+        break;
+      }
+    }
+    if (!found) clip_list.append(c);
+  }
+}
+
 void TimelineWidget::mouseMoveMovingInit(QMouseEvent* event) {
   if (!event) {
     qWarning() << "mouseMoveMovingInit: event is null";
     return;
   }
+
   if (track_resizing) {
-
-    // get cursor movement
-    int diff = (event->position().toPoint().y() - panel_timeline->drag_y_start);
-
-    // add it to the current track height
+    int diff = event->position().toPoint().y() - panel_timeline->drag_y_start;
     int new_height = panel_timeline->GetTrackHeight(track_target);
-    if (bottom_align) {
-      new_height -= diff;
-    } else {
-      new_height += diff;
-    }
-
-    // limit track height to track minimum height constant
+    new_height = bottom_align ? new_height - diff : new_height + diff;
     new_height = qMax(new_height, amber::timeline::kTrackMinHeight);
-
-    // set the track height
     panel_timeline->SetTrackHeight(track_target, new_height);
-
-    // store current cursor position for next track resize event
     panel_timeline->drag_y_start = event->position().toPoint().y();
-
     update();
   } else if (panel_timeline->moving_proc) {
-
-    // we're currently dragging ghosts
     update_ghosts(event->position().toPoint(), event->modifiers() & Qt::ShiftModifier);
-
   } else {
-
-    // Prepare to start moving clips in some capacity. We create Ghost objects to store movement data before we
-    // actually apply it to the clips (in mouseReleaseEvent)
-
-    // loop through clips for any currently selected
-    for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
-
-      Clip* c = amber::ActiveSequence->clips.at(i).get();
-
-      if (c != nullptr) {
-        Ghost g;
-        g.transition = nullptr;
-
-        // check if whole clip is added
-        bool add = false;
-
-        // check if a transition is selected (prioritize transition selection)
-        // (only the pointer tool supports moving transitions)
-        if (panel_timeline->tool == TIMELINE_TOOL_POINTER &&
-            (c->opening_transition != nullptr || c->closing_transition != nullptr)) {
-
-          // check if any selections contain a whole transition
-          for (const auto& s : amber::ActiveSequence->selections) {
-
-            if (s.track == c->track()) {
-              if (selection_contains_transition(s, c, kTransitionOpening)) {
-
-                g.transition = c->opening_transition;
-                add = true;
-                break;
-
-              } else if (selection_contains_transition(s, c, kTransitionClosing)) {
-
-                g.transition = c->closing_transition;
-                add = true;
-                break;
-              }
-            }
-          }
-        }
-
-        // if a transition isn't selected, check if the whole clip is
-        if (!add) {
-          add = c->IsSelected();
-        }
-
-        if (add) {
-
-          if (g.transition != nullptr) {
-
-            // transition may be a dual transition, check if it's already been added elsewhere
-            for (const auto& ghost : panel_timeline->ghosts) {
-              if (ghost.transition == g.transition) {
-                add = false;
-                break;
-              }
-            }
-          }
-
-          if (add) {
-            g.clip = i;
-            g.trim_type = panel_timeline->trim_type;
-            panel_timeline->ghosts.append(g);
-          }
-        }
-      }
-    }
-
-    if (panel_timeline->tool == TIMELINE_TOOL_SLIDE) {
-
-      // for the slide tool, we add the surrounding clips as ghosts that are getting trimmed the opposite way
-
-      // store original array size since we'll be adding to it
-      int ghost_arr_size = panel_timeline->ghosts.size();
-
-      // loop through clips for any that are "touching" the selected clips
-      for (int j = 0; j < amber::ActiveSequence->clips.size(); j++) {
-
-        ClipPtr c = amber::ActiveSequence->clips.at(j);
-        if (c != nullptr) {
-
-          for (int i = 0; i < ghost_arr_size; i++) {
-
-            Ghost& g = panel_timeline->ghosts[i];
-            g.trim_type = TRIM_NONE;  // the selected clips will be moving, not trimming
-
-            ClipPtr ghost_clip = amber::ActiveSequence->clips.at(g.clip);
-
-            if (c->track() == ghost_clip->track()) {
-
-              // see if this clip is currently selected, if so we won't add it as a "touching" clip
-              bool found = false;
-              for (int k = 0; k < ghost_arr_size; k++) {
-                if (panel_timeline->ghosts.at(k).clip == j) {
-                  found = true;
-                  break;
-                }
-              }
-
-              if (!found) {  // the clip is not currently selected
-
-                // check if this clip is indeed touching
-                bool is_in = (c->timeline_in() == ghost_clip->timeline_out());
-                if (is_in || c->timeline_out() == ghost_clip->timeline_in()) {
-                  Ghost gh;
-                  gh.transition = nullptr;
-                  gh.clip = j;
-                  gh.trim_type = is_in ? TRIM_IN : TRIM_OUT;
-                  panel_timeline->ghosts.append(gh);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // set up ghost defaults
+    mouseMoveMovingInitBuildGhosts();
     init_ghosts();
-
-    // if the ripple tool is selected, prepare to ripple
     if (panel_timeline->tool == TIMELINE_TOOL_RIPPLE) {
-
-      long axis = LONG_MAX;
-
-      // find the earliest point within the selected clips which is the point we'll ripple around
-      // also store the currently selected clips so we don't have to do it later
-      QVector<ClipPtr> ghost_clips;
-      ghost_clips.resize(panel_timeline->ghosts.size());
-
-      for (int i = 0; i < panel_timeline->ghosts.size(); i++) {
-        ClipPtr c = amber::ActiveSequence->clips.at(panel_timeline->ghosts.at(i).clip);
-        if (panel_timeline->trim_type == TRIM_IN) {
-          axis = qMin(axis, c->timeline_in());
-        } else {
-          axis = qMin(axis, c->timeline_out());
-        }
-
-        // store clip reference
-        ghost_clips[i] = c;
-      }
-
-      // loop through clips and cache which are earlier than the axis and which after after
-      for (auto c : amber::ActiveSequence->clips) {
-        if (c != nullptr && !ghost_clips.contains(c)) {
-          bool clip_is_post = (c->timeline_in() >= axis);
-
-          // construct the list of pre and post clips
-          QVector<ClipPtr>& clip_list = (clip_is_post) ? post_clips : pre_clips;
-
-          // check if there's already a clip in this list on this track, and if this clip is closer or not
-          bool found = false;
-          for (auto& j : clip_list) {
-
-            ClipPtr compare = j;
-
-            if (compare->track() == c->track()) {
-
-              // if the clip is closer, use this one instead of the current one in the list
-              if ((!clip_is_post && compare->timeline_out() < c->timeline_out()) ||
-                  (clip_is_post && compare->timeline_in() > c->timeline_in())) {
-                j = c;
-              }
-
-              found = true;
-              break;
-            }
-          }
-
-          // if there is no clip on this track in the list, add it
-          if (!found) {
-            clip_list.append(c);
-          }
-        }
-      }
+      mouseMoveMovingInitRipplePrep();
     }
-
-    // store selections
     selection_command = new SetSelectionsCommand(amber::ActiveSequence.get());
     selection_command->old_data = amber::ActiveSequence->selections;
-
-    // ready to start moving clips
     panel_timeline->moving_proc = true;
   }
 
@@ -1655,14 +1310,12 @@ void TimelineWidget::mouseMoveSplitting(bool alt) {
   // if alt isn't being held, also add the tracks of the clip's links
   if (!alt) {
     for (int i = 0; i < track_size; i++) {
-
       // make sure there's a clip in this track
       int clip_index = getClipIndexFromCoords(panel_timeline->drag_frame_start, panel_timeline->split_tracks[i]);
 
       if (clip_index > -1) {
         ClipPtr clip = amber::ActiveSequence->clips.at(clip_index);
         for (int j = 0; j < clip->linked.size(); j++) {
-
           ClipPtr link = amber::ActiveSequence->clips.at(clip->linked.at(j));
 
           // if this clip isn't already in the list of tracks to split
@@ -1677,98 +1330,121 @@ void TimelineWidget::mouseMoveSplitting(bool alt) {
   update_ui(false);
 }
 
+// Helper: collect clips inside the rectangle selection area, including linked clips unless alt is held
+static QVector<ClipPtr> rectSelectCollectClips(long frame_min, long frame_max, int track_min, int track_max, bool alt) {
+  QVector<ClipPtr> selected_clips;
+  for (const auto& clip : amber::ActiveSequence->clips) {
+    if (clip == nullptr) continue;
+    if (clip->track() < track_min || clip->track() > track_max) continue;
+    if (clip->timeline_in() < frame_min && clip->timeline_out() < frame_min) continue;
+    if (clip->timeline_in() > frame_max && clip->timeline_out() > frame_max) continue;
+
+    QVector<ClipPtr> session_clips;
+    session_clips.append(clip);
+    if (!alt) {
+      for (int j : clip->linked) session_clips.append(amber::ActiveSequence->clips.at(j));
+    }
+
+    for (auto c : session_clips) {
+      if (!selected_clips.contains(c)) selected_clips.append(c);
+    }
+  }
+  return selected_clips;
+}
+
 void TimelineWidget::mouseMoveRectSelect(QMouseEvent* event, bool alt) {
   if (!event) {
     qWarning() << "mouseMoveRectSelect: event is null";
     return;
   }
-  // set if the user started dragging at point where there was no clip
 
-  if (panel_timeline->rect_select_proc) {
-
-    // we're currently rectangle selecting
-
-    // set the right/bottom coords to the current mouse position
-    // (left/top were set to the starting drag position earlier)
-    panel_timeline->rect_select_rect.setRight(event->position().toPoint().x());
-
-    if (bottom_align) {
-      panel_timeline->rect_select_rect.setBottom(event->position().toPoint().y() - height());
-    } else {
-      panel_timeline->rect_select_rect.setBottom(event->position().toPoint().y());
-    }
-
-    long frame_min = qMin(panel_timeline->drag_frame_start, panel_timeline->cursor_frame);
-    long frame_max = qMax(panel_timeline->drag_frame_start, panel_timeline->cursor_frame);
-
-    int track_min = qMin(panel_timeline->drag_track_start, panel_timeline->cursor_track);
-    int track_max = qMax(panel_timeline->drag_track_start, panel_timeline->cursor_track);
-
-    // determine which clips are in this rectangular selection
-    QVector<ClipPtr> selected_clips;
-    for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
-      ClipPtr clip = amber::ActiveSequence->clips.at(i);
-      if (clip != nullptr && clip->track() >= track_min && clip->track() <= track_max &&
-          !(clip->timeline_in() < frame_min && clip->timeline_out() < frame_min) &&
-          !(clip->timeline_in() > frame_max && clip->timeline_out() > frame_max)) {
-
-        // create a group of the clip (and its links if alt is not pressed)
-        QVector<ClipPtr> session_clips;
-        session_clips.append(clip);
-
-        if (!alt) {
-          for (int j : clip->linked) {
-            session_clips.append(amber::ActiveSequence->clips.at(j));
-          }
-        }
-
-        // for each of these clips, see if clip has already been added -
-        // this can easily happen due to adding linked clips
-        for (auto c : session_clips) {
-          bool found = false;
-
-          for (const auto& selected_clip : selected_clips) {
-            if (selected_clip == c) {
-              found = true;
-              break;
-            }
-          }
-
-          // if the clip isn't already in the selection add it
-          if (!found) {
-            selected_clips.append(c);
-          }
-        }
-      }
-    }
-
-    // add each of the selected clips to the main sequence's selections
-    amber::ActiveSequence->selections.resize(selected_clips.size() + panel_timeline->selection_offset);
-    for (int i = 0; i < selected_clips.size(); i++) {
-      Selection& s = amber::ActiveSequence->selections[i + panel_timeline->selection_offset];
-      ClipPtr clip = selected_clips.at(i);
-      s.old_in = s.in = clip->timeline_in();
-      s.old_out = s.out = clip->timeline_out();
-      s.old_track = s.track = clip->track();
-    }
-
-    panel_timeline->repaint_timeline();
-  } else {
-
-    // set up rectangle selecting
+  if (!panel_timeline->rect_select_proc) {
+    // initialise rectangle selection
+    int y = event->position().toPoint().y();
     panel_timeline->rect_select_rect.setX(event->position().toPoint().x());
-
-    if (bottom_align) {
-      // bottom aligned widgets start with 0 at the bottom and go down to a negative number
-      panel_timeline->rect_select_rect.setY(event->position().toPoint().y() - height());
-    } else {
-      panel_timeline->rect_select_rect.setY(event->position().toPoint().y());
-    }
-
+    panel_timeline->rect_select_rect.setY(bottom_align ? y - height() : y);
     panel_timeline->rect_select_rect.setWidth(0);
     panel_timeline->rect_select_rect.setHeight(0);
-
     panel_timeline->rect_select_proc = true;
+    return;
+  }
+
+  // update rectangle bounds
+  int y = event->position().toPoint().y();
+  panel_timeline->rect_select_rect.setRight(event->position().toPoint().x());
+  panel_timeline->rect_select_rect.setBottom(bottom_align ? y - height() : y);
+
+  long frame_min = qMin(panel_timeline->drag_frame_start, panel_timeline->cursor_frame);
+  long frame_max = qMax(panel_timeline->drag_frame_start, panel_timeline->cursor_frame);
+  int track_min = qMin(panel_timeline->drag_track_start, panel_timeline->cursor_track);
+  int track_max = qMax(panel_timeline->drag_track_start, panel_timeline->cursor_track);
+
+  QVector<ClipPtr> selected_clips = rectSelectCollectClips(frame_min, frame_max, track_min, track_max, alt);
+
+  amber::ActiveSequence->selections.resize(selected_clips.size() + panel_timeline->selection_offset);
+  for (int i = 0; i < selected_clips.size(); i++) {
+    Selection& s = amber::ActiveSequence->selections[i + panel_timeline->selection_offset];
+    ClipPtr clip = selected_clips.at(i);
+    s.old_in = s.in = clip->timeline_in();
+    s.old_out = s.out = clip->timeline_out();
+    s.old_track = s.track = clip->track();
+  }
+
+  panel_timeline->repaint_timeline();
+}
+
+// Helper: check if cursor is near a transition trim edge (pointer tool only); updates
+// trim_target/type/transition_select
+static void hoverCheckTransitionTrimPoints(int clip_index, ClipPtr c, int mouse_frame_lower, int mouse_frame_upper,
+                                           const QPoint& pos, int& closeness, bool& found) {
+  if (c->opening_transition != nullptr) {
+    int tp =
+        panel_timeline->getTimelineScreenPointFromFrame(c->timeline_in() + c->opening_transition->get_true_length());
+    if (tp > mouse_frame_lower && tp < mouse_frame_upper) {
+      int nc = qAbs(tp - 1 - pos.x());
+      if (nc < closeness) {
+        panel_timeline->trim_target = clip_index;
+        panel_timeline->trim_type = TRIM_OUT;
+        panel_timeline->transition_select = kTransitionOpening;
+        closeness = nc;
+        found = true;
+      }
+    }
+  }
+  if (c->closing_transition != nullptr) {
+    int tp =
+        panel_timeline->getTimelineScreenPointFromFrame(c->timeline_out() - c->closing_transition->get_true_length());
+    if (tp > mouse_frame_lower && tp < mouse_frame_upper) {
+      int nc = qAbs(tp + 1 - pos.x());
+      if (nc < closeness) {
+        panel_timeline->trim_target = clip_index;
+        panel_timeline->trim_type = TRIM_IN;
+        panel_timeline->transition_select = kTransitionClosing;
+        closeness = nc;
+        found = true;
+      }
+    }
+  }
+}
+
+// Helper: detect and set track-resize cursor when no trim target was found
+void TimelineWidget::hoverCheckTrackResize(const QMouseEvent* event, bool cursor_contains_clip, int min_track,
+                                           int max_track) {
+  unsetCursor();
+  int test_range = 5;
+  int mouse_pos = event->position().toPoint().y();
+  int hover_track = getTrackFromScreenPoint(mouse_pos);
+  int track_y_edge = getScreenPointFromTrack(hover_track);
+  if (!bottom_align) track_y_edge += panel_timeline->GetTrackHeight(hover_track);
+  if (mouse_pos > track_y_edge - test_range && mouse_pos < track_y_edge + test_range) {
+    bool in_range =
+        cursor_contains_clip || (amber::CurrentConfig.show_track_lines && panel_timeline->cursor_track >= min_track &&
+                                 panel_timeline->cursor_track <= max_track);
+    if (in_range) {
+      track_resizing = true;
+      track_target = hover_track;
+      setCursor(Qt::SizeVerCursor);
+    }
   }
 }
 
@@ -1777,203 +1453,81 @@ void TimelineWidget::mouseMoveHoverTrimDetection(QMouseEvent* event) {
     qWarning() << "mouseMoveHoverTrimDetection: event is null";
     return;
   }
-  // hide any tooltip that may be currently showing
   QToolTip::hideText();
-
-  // cache cursor position
   QPoint pos = event->position().toPoint();
 
-  //
-  // check to see if the cursor is on a clip edge
-  //
-
-  // threshold around a trim point that the cursor can be within and still considered "trimming"
   int lim = 5;
   int mouse_frame_lower = pos.x() - lim;
   int mouse_frame_upper = pos.x() + lim;
 
-  // used to determine whether we the cursor found a trim point or not
   bool found = false;
-
-  // used to determine whether the cursor is within the rect of a clip
   bool cursor_contains_clip = false;
-
-  // used to determine how close the cursor is to a trim point
-  // (and more specifically, whether another point is closer or not)
   int closeness = INT_MAX;
-
-  // while we loop through the clips, we cache the maximum/minimum tracks in this sequence
   int min_track = INT_MAX;
   int max_track = INT_MIN;
 
-  // we default to selecting no transition, but set this accordingly if the cursor is on a transition
   panel_timeline->transition_select = kTransitionNone;
-
-  // we also default to no trimming which may be changed later in this function
   panel_timeline->trim_type = TRIM_NONE;
-
-  // set currently trimming clip to -1 (aka null)
   panel_timeline->trim_target = -1;
 
-  // loop through current clips in the sequence
   for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     ClipPtr c = amber::ActiveSequence->clips.at(i);
-    if (c != nullptr) {
+    if (c == nullptr) continue;
 
-      // cache track range
-      min_track = qMin(min_track, c->track());
-      max_track = qMax(max_track, c->track());
+    min_track = qMin(min_track, c->track());
+    max_track = qMax(max_track, c->track());
 
-      // if this clip is on the same track the mouse is
-      if (c->track() == panel_timeline->cursor_track) {
+    if (c->track() != panel_timeline->cursor_track) continue;
 
-        // if this cursor is inside the boundaries of this clip (hovering over the clip)
-        if (panel_timeline->cursor_frame >= c->timeline_in() && panel_timeline->cursor_frame <= c->timeline_out()) {
-
-          // acknowledge that we are hovering over a clip
-          cursor_contains_clip = true;
-
-          // start a timer to show a tooltip about this clip
-          tooltip_timer.start();
-          tooltip_clip = i;
-
-          // check if the cursor is specifically hovering over one of the clip's transitions
-          if (c->opening_transition != nullptr &&
-              panel_timeline->cursor_frame <= c->timeline_in() + c->opening_transition->get_true_length()) {
-
-            panel_timeline->transition_select = kTransitionOpening;
-
-          } else if (c->closing_transition != nullptr &&
-                     panel_timeline->cursor_frame >=
-                         c->timeline_out() - c->closing_transition->get_true_length()) {
-
-            panel_timeline->transition_select = kTransitionClosing;
-          }
-        }
-
-        int visual_in_point = panel_timeline->getTimelineScreenPointFromFrame(c->timeline_in());
-        int visual_out_point = panel_timeline->getTimelineScreenPointFromFrame(c->timeline_out());
-
-        // is the cursor hovering around the clip's IN point?
-        if (visual_in_point > mouse_frame_lower && visual_in_point < mouse_frame_upper) {
-
-          // test how close this IN point is to the cursor
-          int nc = qAbs(visual_in_point + 1 - pos.x());
-
-          // and test whether it's closer than the last in/out point we found
-          if (nc < closeness) {
-
-            // if so, this is the point we'll make active for now (unless we find a closer one later)
-            panel_timeline->trim_target = i;
-            panel_timeline->trim_type = TRIM_IN;
-            closeness = nc;
-            found = true;
-          }
-        }
-
-        // is the cursor hovering around the clip's OUT point?
-        if (visual_out_point > mouse_frame_lower && visual_out_point < mouse_frame_upper) {
-
-          // test how close this OUT point is to the cursor
-          int nc = qAbs(visual_out_point - 1 - pos.x());
-
-          // and test whether it's closer than the last in/out point we found
-          if (nc < closeness) {
-
-            // if so, this is the point we'll make active for now (unless we find a closer one later)
-            panel_timeline->trim_target = i;
-            panel_timeline->trim_type = TRIM_OUT;
-            closeness = nc;
-            found = true;
-          }
-        }
-
-        // the pointer can be used to resize/trim transitions, here we test if the
-        // cursor is within the trim point of one of the clip's transitions
-        if (panel_timeline->tool == TIMELINE_TOOL_POINTER) {
-
-          // if the clip has an opening transition
-          if (c->opening_transition != nullptr) {
-
-            // cache the timeline frame where the transition ends
-            int transition_point = panel_timeline->getTimelineScreenPointFromFrame(
-                c->timeline_in() + c->opening_transition->get_true_length());
-
-            // check if the cursor is hovering around it (within the threshold)
-            if (transition_point > mouse_frame_lower && transition_point < mouse_frame_upper) {
-
-              // similar to above, test how close it is and if it's closer, make this active
-              int nc = qAbs(transition_point - 1 - pos.x());
-              if (nc < closeness) {
-                panel_timeline->trim_target = i;
-                panel_timeline->trim_type = TRIM_OUT;
-                panel_timeline->transition_select = kTransitionOpening;
-                closeness = nc;
-                found = true;
-              }
-            }
-          }
-
-          // if the clip has a closing transition
-          if (c->closing_transition != nullptr) {
-
-            // cache the timeline frame where the transition starts
-            int transition_point = panel_timeline->getTimelineScreenPointFromFrame(
-                c->timeline_out() - c->closing_transition->get_true_length());
-
-            // check if the cursor is hovering around it (within the threshold)
-            if (transition_point > mouse_frame_lower && transition_point < mouse_frame_upper) {
-
-              // similar to above, test how close it is and if it's closer, make this active
-              int nc = qAbs(transition_point + 1 - pos.x());
-              if (nc < closeness) {
-                panel_timeline->trim_target = i;
-                panel_timeline->trim_type = TRIM_IN;
-                panel_timeline->transition_select = kTransitionClosing;
-                closeness = nc;
-                found = true;
-              }
-            }
-          }
-        }
+    if (panel_timeline->cursor_frame >= c->timeline_in() && panel_timeline->cursor_frame <= c->timeline_out()) {
+      cursor_contains_clip = true;
+      tooltip_timer.start();
+      tooltip_clip = i;
+      if (c->opening_transition != nullptr &&
+          panel_timeline->cursor_frame <= c->timeline_in() + c->opening_transition->get_true_length()) {
+        panel_timeline->transition_select = kTransitionOpening;
+      } else if (c->closing_transition != nullptr &&
+                 panel_timeline->cursor_frame >= c->timeline_out() - c->closing_transition->get_true_length()) {
+        panel_timeline->transition_select = kTransitionClosing;
       }
+    }
+
+    int visual_in = panel_timeline->getTimelineScreenPointFromFrame(c->timeline_in());
+    int visual_out = panel_timeline->getTimelineScreenPointFromFrame(c->timeline_out());
+
+    if (visual_in > mouse_frame_lower && visual_in < mouse_frame_upper) {
+      int nc = qAbs(visual_in + 1 - pos.x());
+      if (nc < closeness) {
+        panel_timeline->trim_target = i;
+        panel_timeline->trim_type = TRIM_IN;
+        closeness = nc;
+        found = true;
+      }
+    }
+
+    if (visual_out > mouse_frame_lower && visual_out < mouse_frame_upper) {
+      int nc = qAbs(visual_out - 1 - pos.x());
+      if (nc < closeness) {
+        panel_timeline->trim_target = i;
+        panel_timeline->trim_type = TRIM_OUT;
+        closeness = nc;
+        found = true;
+      }
+    }
+
+    if (panel_timeline->tool == TIMELINE_TOOL_POINTER) {
+      hoverCheckTransitionTrimPoints(i, c, mouse_frame_lower, mouse_frame_upper, pos, closeness, found);
     }
   }
 
-  // if the cursor is indeed on a clip edge, we set the cursor accordingly
   if (found) {
-
-    if (panel_timeline->trim_type == TRIM_IN) {  // if we're trimming an IN point
+    if (panel_timeline->trim_type == TRIM_IN) {
       setCursor(panel_timeline->tool == TIMELINE_TOOL_RIPPLE ? amber::cursor::LeftRipple : amber::cursor::LeftTrim);
-    } else {  // if we're trimming an OUT point
+    } else {
       setCursor(panel_timeline->tool == TIMELINE_TOOL_RIPPLE ? amber::cursor::RightRipple : amber::cursor::RightTrim);
     }
-
   } else {
-    // we didn't find a trim target, so we must be doing something else
-    // (e.g. dragging a clip or resizing the track heights)
-
-    unsetCursor();
-
-    // check to see if we're resizing a track height
-    int test_range = 5;
-    int mouse_pos = event->position().toPoint().y();
-    int hover_track = getTrackFromScreenPoint(mouse_pos);
-    int track_y_edge = getScreenPointFromTrack(hover_track);
-
-    if (!bottom_align) {
-      track_y_edge += panel_timeline->GetTrackHeight(hover_track);
-    }
-
-    if (mouse_pos > track_y_edge - test_range && mouse_pos < track_y_edge + test_range) {
-      if (cursor_contains_clip || (amber::CurrentConfig.show_track_lines &&
-                                   panel_timeline->cursor_track >= min_track &&
-                                   panel_timeline->cursor_track <= max_track)) {
-        track_resizing = true;
-        track_target = hover_track;
-        setCursor(Qt::SizeVerCursor);
-      }
-    }
+    hoverCheckTrackResize(event, cursor_contains_clip, min_track, max_track);
   }
 }
 
@@ -1983,16 +1537,13 @@ void TimelineWidget::mouseMoveHoverTransition(QMouseEvent* event) {
     return;
   }
   if (panel_timeline->transition_tool_init) {
-
     // the transition tool has started
 
     if (panel_timeline->transition_tool_proc) {
-
       // ghosts have been set up, so just run update
       update_ghosts(event->position().toPoint(), event->modifiers() & Qt::ShiftModifier);
 
     } else {
-
       // transition tool is being used but ghosts haven't been set up yet, set them up now
       int primary_type = kTransitionOpening;
       int primary = panel_timeline->transition_tool_open_clip;
@@ -2005,8 +1556,7 @@ void TimelineWidget::mouseMoveHoverTransition(QMouseEvent* event) {
 
       Ghost g;
 
-      g.in = g.old_in = g.out = g.old_out =
-          (primary_type == kTransitionOpening) ? c->timeline_in() : c->timeline_out();
+      g.in = g.old_in = g.out = g.old_out = (primary_type == kTransitionOpening) ? c->timeline_in() : c->timeline_out();
 
       g.track = c->track();
       g.clip = primary;
@@ -2019,7 +1569,6 @@ void TimelineWidget::mouseMoveHoverTransition(QMouseEvent* event) {
     }
 
   } else {
-
     // transition tool has been selected but is not yet active, so we show screen feedback to the user on
     // possible transitions
 
@@ -2030,14 +1579,12 @@ void TimelineWidget::mouseMoveHoverTransition(QMouseEvent* event) {
     panel_timeline->transition_tool_close_clip = -1;
 
     if (mouse_clip > -1) {
-
       // cursor is hovering over a clip
 
       ClipPtr c = amber::ActiveSequence->clips.at(mouse_clip);
 
       // check if the clip and transition are both the same sign (meaning video/audio are the same)
       if (same_sign(c->track(), panel_timeline->transition_tool_side)) {
-
         // the range within which the transition tool will assume the user wants to make a shared transition
         // between two clips rather than just one transition on one clip
         long between_range = getFrameFromScreenPoint(panel_timeline->zoom, TRANSITION_BETWEEN_RANGE) + 1;
@@ -2076,8 +1623,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event) {
     bool alt = (event->modifiers() & Qt::AltModifier);
 
     // store current frame/track corresponding to the cursor
-    panel_timeline->cursor_frame =
-        panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
+    panel_timeline->cursor_frame = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
     panel_timeline->cursor_track = getTrackFromScreenPoint(event->position().toPoint().y());
 
     // if holding the mouse button down, let's scroll to that location
@@ -2088,9 +1634,9 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event) {
     // determine if the action should be "inserting" rather than "overwriting"
     // Default behavior is to replace/overwrite clips under any clips we're dropping over them. Inserting will
     // split and move existing clips at the drop point to make space for the drop
-    panel_timeline->move_insert = ((event->modifiers() & Qt::ControlModifier) &&
-                                   (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing ||
-                                    panel_timeline->creating));
+    panel_timeline->move_insert =
+        ((event->modifiers() & Qt::ControlModifier) &&
+         (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing || panel_timeline->creating));
 
     // if we're not currently resizing already, default track resizing to false (we'll set it to true later if
     // the user is still hovering over a track line)
@@ -2100,15 +1646,14 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event) {
 
     // if the current tool uses an on-screen visible cursor, we snap the cursor to the timeline
     if (current_tool_shows_cursor()) {
-      panel_timeline->snap_to_timeline(
-          &panel_timeline->cursor_frame,
+      panel_timeline->snap_to_timeline(&panel_timeline->cursor_frame,
 
-          // only snap to the playhead if the edit tool doesn't force the playhead to
-          // follow it (or if we're not selecting since that means the playhead is
-          // static at the moment)
-          !amber::CurrentConfig.edit_tool_also_seeks || !panel_timeline->selecting,
+                                       // only snap to the playhead if the edit tool doesn't force the playhead to
+                                       // follow it (or if we're not selecting since that means the playhead is
+                                       // static at the moment)
+                                       !amber::CurrentConfig.edit_tool_also_seeks || !panel_timeline->selecting,
 
-          true, true);
+                                       true, true);
     }
 
     if (panel_timeline->selecting) {
@@ -2122,37 +1667,35 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event) {
     } else if (panel_timeline->rect_select_init) {
       mouseMoveRectSelect(event, alt);
     } else if (current_tool_shows_cursor()) {
-      // we're not currently performing an action (click is not pressed), but redraw because we have an
-      // on-screen cursor
       panel_timeline->repaint_timeline();
-    } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER ||
-               panel_timeline->tool == TIMELINE_TOOL_RIPPLE ||
-               panel_timeline->tool == TIMELINE_TOOL_ROLLING) {
-      mouseMoveHoverTrimDetection(event);
-    } else if (panel_timeline->tool == TIMELINE_TOOL_SLIP) {
-      // we're not currently performing any slipping, all we do here is set the cursor if mouse is hovering
-      // over a clip
-      if (getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track) > -1) {
-        setCursor(amber::cursor::Slip);
-      } else {
-        unsetCursor();
+    } else {
+      switch (panel_timeline->tool) {
+        case TIMELINE_TOOL_POINTER:
+        case TIMELINE_TOOL_RIPPLE:
+        case TIMELINE_TOOL_ROLLING:
+          mouseMoveHoverTrimDetection(event);
+          break;
+        case TIMELINE_TOOL_SLIP:
+          if (getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track) > -1) {
+            setCursor(amber::cursor::Slip);
+          } else {
+            unsetCursor();
+          }
+          break;
+        case TIMELINE_TOOL_TRANSITION:
+          mouseMoveHoverTransition(event);
+          break;
+        default:
+          break;
       }
-    } else if (panel_timeline->tool == TIMELINE_TOOL_TRANSITION) {
-      mouseMoveHoverTransition(event);
     }
   }
 }
 
-void TimelineWidget::leaveEvent(QEvent*) {
-  tooltip_timer.stop();
-}
-void TimelineWidget::resizeEvent(QResizeEvent *) {
-  scrollBar->setPageStep(height());
-}
+void TimelineWidget::leaveEvent(QEvent*) { tooltip_timer.stop(); }
+void TimelineWidget::resizeEvent(QResizeEvent*) { scrollBar->setPageStep(height()); }
 
-bool TimelineWidget::is_track_visible(int track) {
-  return (bottom_align == (track < 0));
-}
+bool TimelineWidget::is_track_visible(int track) { return (bottom_align == (track < 0)); }
 
 // **************************************
 // screen point <-> frame/track functions
@@ -2182,7 +1725,6 @@ int TimelineWidget::getTrackFromScreenPoint(int y) {
 
     int next_compounded_height = compounded_heights + track_height;
 
-
     if (y >= qMin(next_compounded_height, compounded_heights) && y < qMax(next_compounded_height, compounded_heights)) {
       return track_candidate;
     }
@@ -2205,7 +1747,7 @@ int TimelineWidget::getScreenPointFromTrack(int track) {
 
   if (track < 0) track--;
 
-  for (int i=start;i!=track;i+=interval) {
+  for (int i = start; i != track; i += interval) {
     point += panel_timeline->GetTrackHeight(i);
     if (amber::CurrentConfig.show_track_lines) point++;
   }
@@ -2218,7 +1760,7 @@ int TimelineWidget::getScreenPointFromTrack(int track) {
 }
 
 int TimelineWidget::getClipIndexFromCoords(long frame, int track) {
-  for (int i=0;i<amber::ActiveSequence->clips.size();i++) {
+  for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     ClipPtr c = amber::ActiveSequence->clips.at(i);
     if (c != nullptr && c->track() == track && frame >= c->timeline_in() && frame < c->timeline_out()) {
       return i;
