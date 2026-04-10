@@ -52,3 +52,9 @@ add_executable(amber-test-rhi-smoke test_rhi_smoke.cpp ${AMBER_TEST_STUBS})
 target_include_directories(amber-test-rhi-smoke PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-rhi-smoke PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-rhi-smoke COMMAND amber-test-rhi-smoke)
+
+# Rendering integration test — exercises QRhi pipeline with real engine types
+add_executable(amber-test-rendering test_rendering.cpp ${AMBER_TEST_STUBS})
+target_include_directories(amber-test-rendering PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-rendering PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-rendering COMMAND amber-test-rendering)
