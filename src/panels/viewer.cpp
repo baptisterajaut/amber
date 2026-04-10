@@ -432,6 +432,7 @@ void Viewer::play(bool in_to_out) {
   SetAudioWakeObject(this);
   set_playpause_icon(false);
   start_msecs = QDateTime::currentMSecsSinceEpoch();
+  audio_start_usecs = (audio_output != nullptr) ? audio_output->processedUSecs() : 0;
 
   timer_update();
 }
@@ -930,8 +931,14 @@ void Viewer::check_playback_end() {
 
 void Viewer::timer_update() {
   previous_playhead = seq->playhead;
-  seq->playhead = qMax(0, qRound(playhead_start + ((QDateTime::currentMSecsSinceEpoch() - start_msecs) * 0.001 *
-                                                   seq->frame_rate * playback_speed)));
+
+  double elapsed_sec;
+  if (audio_output != nullptr && is_audio_device_set()) {
+    elapsed_sec = (audio_output->processedUSecs() - audio_start_usecs) * 1e-6;
+  } else {
+    elapsed_sec = (QDateTime::currentMSecsSinceEpoch() - start_msecs) * 0.001;
+  }
+  seq->playhead = qMax(0, qRound(playhead_start + (elapsed_sec * seq->frame_rate * playback_speed)));
 
   if (amber::CurrentConfig.seek_also_selects) panel_timeline->select_from_playhead();
 

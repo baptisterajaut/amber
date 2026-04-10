@@ -117,6 +117,11 @@ class Cacher : public QThread {
   Cacher(Clip* c);
 
   /**
+   * @brief Compute the effective playback speed (clip speed × footage speed).
+   */
+  static double getEffectivePlaybackSpeed(Clip* clip);
+
+  /**
    * @brief The main QThread loop
    *
    * Once the thread has started, all Cacher functions will be called from here until the Cacher closes at which point

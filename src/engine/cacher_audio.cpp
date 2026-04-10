@@ -30,6 +30,10 @@
 // Enable verbose audio messages - good for debugging reversed audio
 // #define AUDIOWARNINGS
 
+static int frame_byte_size(const AVFrame* f) {
+  return f->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(f->format)) * f->ch_layout.nb_channels;
+}
+
 double bytes_to_seconds(qint64 nb_bytes, int nb_channels, int sample_rate) {
   return (double(nb_bytes >> 1) / nb_channels / sample_rate);
 }
@@ -186,11 +190,8 @@ int Cacher::cacheAudioPullFiltered(AVFrame* frame, bool reverse_audio) {
 static void accumulateReverseBuffer(AVFrame* rev_frame, AVFrame* frame, int ret) {
   if (ret == AVERROR_EOF) return;
 
-  int sample_size =
-      av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format)) * rev_frame->ch_layout.nb_channels;
-  int offset = rev_frame->nb_samples * sample_size;
-  int copy_size = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
-                  frame->ch_layout.nb_channels;
+  int offset = frame_byte_size(rev_frame);
+  int copy_size = frame_byte_size(frame);
 
   if (offset + copy_size > rev_frame->linesize[0]) {
     qWarning() << "cacheAudioAccumulateReverse: buffer overflow prevented, offset:" << offset << "copy:" << copy_size
@@ -206,20 +207,6 @@ static void accumulateReverseBuffer(AVFrame* rev_frame, AVFrame* frame, int ret)
   if (copy_size > 0) {
     memcpy(rev_frame->data[0] + offset, frame->data[0], copy_size);
   }
-}
-
-// Compute the effective playback speed (clip speed × footage speed).
-static double getEffectivePlaybackSpeed(Clip* clip) {
-  double speed = clip->speed().value;
-  if (clip->media() != nullptr) {
-    Footage* footage = clip->media()->to_footage();
-    if (footage) {
-      speed *= footage->speed;
-    } else {
-      qWarning() << "Cacher::cacheAudioAccumulateReverse: to_footage() is null";
-    }
-  }
-  return speed;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,15 +235,14 @@ bool Cacher::cacheAudioAccumulateReverse(AVFrame* frame, AVFrame*& out_frame, in
 
 #ifdef AUDIOWARNINGS
   dout << "pts:" << frame_->pts << "dur:" << frame_->pkt_duration << "rev_target:" << reverse_target_ << "offset:"
-       << (rev_frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format)) *
-           rev_frame->ch_layout.nb_channels)
+       << frame_byte_size(rev_frame)
        << "limit:" << rev_frame->linesize[0];
 #endif
 
   rev_frame->nb_samples += frame->nb_samples;
 
   if ((frame_->pts >= reverse_target_) || (ret == AVERROR_EOF)) {
-    double playback_speed_ = getEffectivePlaybackSpeed(clip);
+    double playback_speed_ = Cacher::getEffectivePlaybackSpeed(clip);
 
 #ifdef AUDIOWARNINGS
     dout << "pre cutoff deets::: rev_frame.pts:" << rev_frame->pts << "rev_frame.nb_samples" << rev_frame->nb_samples
@@ -290,8 +276,7 @@ bool Cacher::cacheAudioPostDecode(AVFrame* frame, int& nb_bytes, bool reverse_au
     frame_sample_index_ -= nb_bytes;
   }
 
-  nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
-             frame->ch_layout.nb_channels;
+  nb_bytes = frame_byte_size(frame);
 
   if (audio_just_reset) {
     // get precise sample offset for the elected clip_in from this audio frame
@@ -432,9 +417,7 @@ bool Cacher::cacheAudioFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_a
 #endif
 
   // apply any audio effects to the data
-  if (nb_bytes == INT_MAX)
-    nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
-               frame->ch_layout.nb_channels;
+  if (nb_bytes == INT_MAX) nb_bytes = frame_byte_size(frame);
   if (new_frame) {
     apply_audio_effects(clip,
                         bytes_to_seconds(audio_buffer_write, 2, current_audio_freq()) +
@@ -567,8 +550,7 @@ static void flipForReversePlayback(long seq_end, long& timeline_in, long& timeli
 // Returns false if the outer loop should break.
 static bool processNullMediaAudio(Clip* clip, AVFrame* frame_, int& frame_sample_index_, qint64& audio_buffer_write,
                                   QVector<Clip*>& nests_, double last_fr, long timeline_in, long target_frame) {
-  int nb_bytes = frame_->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame_->format)) *
-                 frame_->ch_layout.nb_channels;
+  int nb_bytes = frame_byte_size(frame_);
   while ((frame_sample_index_ == -1 || frame_sample_index_ >= nb_bytes) && nb_bytes > 0) {
     memset(frame_->data[0], 0, nb_bytes);
     apply_audio_effects(clip, bytes_to_seconds(frame_->pts, frame_->ch_layout.nb_channels, frame_->sample_rate), frame_,
@@ -602,8 +584,7 @@ bool Cacher::cacheAudioWorkerFetchFrame(AVFrame*& frame, int& nb_bytes, bool rev
       return false;
     }
     frame = frame_;
-    nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
-               frame->ch_layout.nb_channels;
+    nb_bytes = frame_byte_size(frame);
     return true;
   }
 

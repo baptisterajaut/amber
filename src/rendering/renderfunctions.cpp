@@ -345,6 +345,7 @@ static void apply_superimpose_effect(Clip* c, Effect* e, double timecode, QRhiTe
     qWarning() << "Superimpose texture was nullptr, retrying...";
     texture_failed = true;
     upload->release();
+    e->endEffect();
     return;
   }
   QColor clearColor(0, 0, 0, 0);
@@ -354,6 +355,7 @@ static void apply_superimpose_effect(Clip* c, Effect* e, double timecode, QRhiTe
   if (composite_texture == nullptr) {
     // No existing composite — use superimpose directly
     composite_texture = superimpose_texture;
+    e->endEffect();
     return;
   }
   // Copy composite to fbo if not already there
@@ -362,6 +364,7 @@ static void apply_superimpose_effect(Clip* c, Effect* e, double timecode, QRhiTe
   }
   rhi_blit_srcover(params, res->rt[!fbo_switcher], res->rpd, superimpose_texture, 1.0f, /*skipClipSpaceCorr=*/true);
   composite_texture = res->tex[!fbo_switcher];
+  e->endEffect();
 }
 
 static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords& coords,
@@ -405,9 +408,8 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
 
   if (e->Flags() & Effect::SuperimposeFlag) {
     apply_superimpose_effect(c, e, timecode, composite_texture, fbo_switcher, texture_failed, params);
-    return;  // apply_superimpose_effect calls e->endEffect() on early-exit paths
+    return;  // apply_superimpose_effect calls e->endEffect() on all paths
   }
-  e->endEffect();
 }
 
 // Determine if a footage clip should be active and open/close accordingly.

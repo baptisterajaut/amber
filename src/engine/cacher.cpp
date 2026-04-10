@@ -43,6 +43,17 @@
 const AVPixelFormat kDestPixFmt = AV_PIX_FMT_RGBA;
 const AVSampleFormat kDestSampleFmt = AV_SAMPLE_FMT_S16;
 
+double Cacher::getEffectivePlaybackSpeed(Clip* clip) {
+  double speed = clip->speed().value;
+  if (clip->media() != nullptr) {
+    Footage* footage = clip->media()->to_footage();
+    if (footage) {
+      speed *= footage->speed;
+    }
+  }
+  return speed;
+}
+
 void Cacher::SetRetrievedFrame(AVFrame* f) {
   retrieve_lock_.lock();
   if (retrieved_frame == nullptr) {
@@ -375,7 +386,7 @@ void Cacher::openWorkerAudioFilter(Footage* m) {
     queue_.append(reverse_frame);
   }
 
-  double playback_speed = clip->speed().value * m->speed;
+  double playback_speed = getEffectivePlaybackSpeed(clip);
   int target_sample_rate = current_audio_freq();
   if (!qFuzzyIsNull(playback_speed) && !qFuzzyCompare(playback_speed, 1.0) && !clip->speed().maintain_audio_pitch) {
     target_sample_rate = qRound64(target_sample_rate / playback_speed);

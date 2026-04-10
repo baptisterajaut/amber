@@ -74,6 +74,7 @@ class Viewer : public Panel {
   bool playing{false};
   long playhead_start;
   qint64 start_msecs;
+  qint64 audio_start_usecs{0};
   QTimer playback_updater;
 
   void cue_recording(long start, long end, int track);
