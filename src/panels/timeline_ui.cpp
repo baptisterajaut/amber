@@ -97,6 +97,13 @@ void Timeline::setup_ui() {
   connect(toolSlideButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
   tool_buttons_layout->addWidget(toolSlideButton);
 
+  toolTrackSelectButton = new QPushButton();
+  toolTrackSelectButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/track-select.svg")));
+  toolTrackSelectButton->setCheckable(true);
+  toolTrackSelectButton->setProperty("tool", TIMELINE_TOOL_TRACK_SELECT);
+  connect(toolTrackSelectButton, &QPushButton::clicked, this, qOverload<>(&Timeline::set_tool));
+  tool_buttons_layout->addWidget(toolTrackSelectButton);
+
   toolHandButton = new QPushButton();
   toolHandButton->setIcon(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/hand.svg")));
   toolHandButton->setCheckable(true);
@@ -232,6 +239,7 @@ void Timeline::Retranslate() {
   toolRazorButton->setToolTip(tr("Razor Tool") + " (C)");
   toolSlipButton->setToolTip(tr("Slip Tool") + " (Y)");
   toolSlideButton->setToolTip(tr("Slide Tool") + " (U)");
+  toolTrackSelectButton->setToolTip(tr("Track Select Tool") + " (A)");
   toolHandButton->setToolTip(tr("Hand Tool") + " (H)");
   toolTransitionButton->setToolTip(tr("Transition Tool") + " (T)");
   snappingButton->setToolTip(tr("Snapping") + " (S)");

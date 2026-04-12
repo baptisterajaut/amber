@@ -178,7 +178,7 @@ void TimelineWidget::dragMoveEvent(QDragMoveEvent *event) {
       QPoint pos = event->position().toPoint();
       panel_timeline->scroll_to_frame(panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x()));
       update_ghosts(pos, event->modifiers() & Qt::ShiftModifier);
-      panel_timeline->move_insert = ((event->modifiers() & Qt::ControlModifier) && (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing));
+      panel_timeline->move_insert = ((event->modifiers() & Qt::ControlModifier) && (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_TRACK_SELECT || panel_timeline->importing));
       update_ui(false);
     }
   }
@@ -714,6 +714,66 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event) {
       case TIMELINE_TOOL_MENU:
         mousePressPointer(hovered_clip, shift, alt, effective_tool);
         break;
+      case TIMELINE_TOOL_TRACK_SELECT:
+      {
+        // Clear previous selections unless Shift is held
+        if (!shift) {
+          amber::ActiveSequence->selections.clear();
+        }
+
+        long click_frame = panel_timeline->drag_frame_start;
+
+        // Find the end of the sequence (rightmost clip end)
+        long sequence_end = 0;
+        for (const auto& c : amber::ActiveSequence->clips) {
+          if (c != nullptr && c->timeline_out() > sequence_end) {
+            sequence_end = c->timeline_out();
+          }
+        }
+
+        // Only create selections if there's content to the right
+        if (sequence_end > click_frame) {
+          if (event->modifiers() & Qt::ShiftModifier) {
+            // Shift+click: single track only
+            Selection s;
+            s.in = click_frame;
+            s.out = sequence_end;
+            s.track = panel_timeline->drag_track_start;
+            amber::ActiveSequence->selections.append(s);
+          } else {
+            // Click: all tracks
+            int video_tracks, audio_tracks;
+            amber::ActiveSequence->getTrackLimits(&video_tracks, &audio_tracks);
+
+            // Video tracks are negative: -1, -2, ... down to video_tracks
+            for (int t = video_tracks; t < 0; t++) {
+              Selection s;
+              s.in = click_frame;
+              s.out = sequence_end;
+              s.track = t;
+              amber::ActiveSequence->selections.append(s);
+            }
+            // Audio tracks are positive: 0, 1, ... up to audio_tracks
+            for (int t = 0; t <= audio_tracks; t++) {
+              Selection s;
+              s.in = click_frame;
+              s.out = sequence_end;
+              s.track = t;
+              amber::ActiveSequence->selections.append(s);
+            }
+          }
+
+          // Enable drag movement (same flow as pointer tool)
+          panel_timeline->moving_init = true;
+        }
+
+        if (amber::CurrentConfig.select_also_seeks) {
+          panel_sequence_viewer->seek(click_frame);
+        }
+
+        update_ui(false);
+      }
+        break;
       case TIMELINE_TOOL_HAND:
 
         // initiate moving with the hand tool
@@ -917,7 +977,7 @@ bool TimelineWidget::mouseReleaseMoving(ComboAction* ca, bool alt, bool ctrl) {
     ripple_clips(ca, amber::ActiveSequence.get(), ripple_point, ripple_length, ignore_clips);
   }
 
-  if (panel_timeline->tool == TIMELINE_TOOL_POINTER
+  if ((panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_TRACK_SELECT)
       && alt
       && panel_timeline->trim_target == -1) {
 
@@ -965,11 +1025,11 @@ bool TimelineWidget::mouseReleaseMoving(ComboAction* ca, bool alt, bool ctrl) {
     // if we're not holding alt, this will just be a move
 
     // if the user is holding ctrl, perform an insert rather than an overwrite
-    if (panel_timeline->tool == TIMELINE_TOOL_POINTER && ctrl) {
+    if ((panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_TRACK_SELECT) && ctrl) {
 
       insert_clips(ca);
 
-    } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_SLIDE) {
+    } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_SLIDE || panel_timeline->tool == TIMELINE_TOOL_TRACK_SELECT) {
 
       // if the user is not holding ctrl, we start standard clip movement
 
@@ -2089,7 +2149,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event) {
     // Default behavior is to replace/overwrite clips under any clips we're dropping over them. Inserting will
     // split and move existing clips at the drop point to make space for the drop
     panel_timeline->move_insert = ((event->modifiers() & Qt::ControlModifier) &&
-                                   (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->importing ||
+                                   (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_TRACK_SELECT || panel_timeline->importing ||
                                     panel_timeline->creating));
 
     // if we're not currently resizing already, default track resizing to false (we'll set it to true later if

@@ -348,6 +348,7 @@ class MainWindow : public QMainWindow {
   QAction* razor_tool_action;
   QAction* slip_tool_action;
   QAction* slide_tool_action;
+  QAction* track_select_tool_action;
   QAction* hand_tool_action;
   QAction* transition_tool_action;
   QAction* snap_toggle;

@@ -77,6 +77,7 @@ Timeline::Timeline(QWidget *parent) :
   tool_buttons.append(toolRazorButton);
   tool_buttons.append(toolSlipButton);
   tool_buttons.append(toolSlideButton);
+  tool_buttons.append(toolTrackSelectButton);
   tool_buttons.append(toolTransitionButton);
   tool_buttons.append(toolHandButton);
 

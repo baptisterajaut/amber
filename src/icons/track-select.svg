@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Vertical bar on the left -->
+  <rect x="12" y="8" width="6" height="48" rx="2" fill="#ffffff" fill-opacity="0.86"/>
+  <!-- Right-pointing arrow -->
+  <path d="M 28,14 L 52,32 L 28,50 L 28,38 L 36,38 L 36,26 L 28,26 Z" fill="#ffffff" fill-opacity="0.86"/>
+</svg>
