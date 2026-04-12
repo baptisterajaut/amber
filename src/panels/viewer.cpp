@@ -705,6 +705,9 @@ void Viewer::setup_ui() {
   current_timecode_container_layout->setSpacing(0);
   current_timecode_container_layout->setContentsMargins(0, 0, 0, 0);
   current_timecode_slider = new LabelSlider();
+  QFont timecode_font = current_timecode_slider->font();
+  timecode_font.setBold(true);
+  current_timecode_slider->setFont(timecode_font);
   current_timecode_container_layout->addWidget(current_timecode_slider);
   lower_control_layout->addWidget(current_timecode_container);
 
@@ -814,6 +817,7 @@ void Viewer::setup_ui() {
   end_timecode_layout->setContentsMargins(0, 0, 0, 0);
 
   end_timecode = new QLabel();
+  end_timecode->setFont(timecode_font);
   end_timecode->setAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
   end_timecode_layout->addWidget(end_timecode);
 
