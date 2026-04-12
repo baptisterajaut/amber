@@ -77,6 +77,7 @@ Timeline::Timeline(QWidget* parent)
   tool_buttons.append(toolRazorButton);
   tool_buttons.append(toolSlipButton);
   tool_buttons.append(toolSlideButton);
+  tool_buttons.append(toolTrackSelectButton);
   tool_buttons.append(toolTransitionButton);
   tool_buttons.append(toolHandButton);
 
@@ -1124,7 +1125,7 @@ static bool resolve_outgoing_pref() {
   return pref;
 }
 
-bool Timeline::toolSupportsInsert() const { return tool == TIMELINE_TOOL_POINTER || importing || creating; }
+bool Timeline::toolSupportsInsert() const { return tool == TIMELINE_TOOL_POINTER || tool == TIMELINE_TOOL_TRACK_SELECT || importing || creating; }
 
 bool Timeline::snap_to_markers(long* l) {
   for (const auto& marker : amber::ActiveSequence->markers) {

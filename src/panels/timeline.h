@@ -224,6 +224,7 @@ public:
   QPushButton* toolRazorButton;
   QPushButton* toolSlipButton;
   QPushButton* toolSlideButton;
+  QPushButton* toolTrackSelectButton;
   QPushButton* toolHandButton;
   QPushButton* toolTransitionButton;
   QPushButton* snappingButton;

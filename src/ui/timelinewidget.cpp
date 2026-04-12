@@ -587,6 +587,66 @@ void TimelineWidget::mousePressDispatchTool(int effective_tool, int hovered_clip
     case TIMELINE_TOOL_MENU:
       mousePressPointer(hovered_clip, shift, alt, effective_tool);
       break;
+    case TIMELINE_TOOL_TRACK_SELECT:
+    {
+      // Clear previous selections unless Shift is held
+      if (!shift) {
+        amber::ActiveSequence->selections.clear();
+      }
+
+      long click_frame = panel_timeline->drag_frame_start;
+
+      // Find the end of the sequence (rightmost clip end)
+      long sequence_end = 0;
+      for (const auto& c : amber::ActiveSequence->clips) {
+        if (c != nullptr && c->timeline_out() > sequence_end) {
+          sequence_end = c->timeline_out();
+        }
+      }
+
+      // Only create selections if there's content to the right
+      if (sequence_end > click_frame) {
+        if (shift) {
+          // Shift+click: single track only
+          Selection s;
+          s.in = click_frame;
+          s.out = sequence_end;
+          s.track = panel_timeline->drag_track_start;
+          amber::ActiveSequence->selections.append(s);
+        } else {
+          // Click: all tracks
+          int video_tracks, audio_tracks;
+          amber::ActiveSequence->getTrackLimits(&video_tracks, &audio_tracks);
+
+          // Video tracks are negative: -1, -2, ... down to video_tracks
+          for (int t = video_tracks; t < 0; t++) {
+            Selection s;
+            s.in = click_frame;
+            s.out = sequence_end;
+            s.track = t;
+            amber::ActiveSequence->selections.append(s);
+          }
+          // Audio tracks are positive: 0, 1, ... up to audio_tracks
+          for (int t = 0; t <= audio_tracks; t++) {
+            Selection s;
+            s.in = click_frame;
+            s.out = sequence_end;
+            s.track = t;
+            amber::ActiveSequence->selections.append(s);
+          }
+        }
+
+        // Enable drag movement (same flow as pointer tool)
+        panel_timeline->moving_init = true;
+      }
+
+      if (amber::CurrentConfig.select_also_seeks) {
+        panel_sequence_viewer->seek(click_frame);
+      }
+
+      update_ui(false);
+    }
+      break;
     case TIMELINE_TOOL_HAND:
       panel_timeline->hand_moving = true;
       break;
@@ -923,7 +983,7 @@ bool TimelineWidget::mouseReleaseMoving(ComboAction* ca, bool alt, bool ctrl) {
 
   if (panel_timeline->tool == TIMELINE_TOOL_RIPPLE) {
     mouseReleaseMoveRipple(ca);
-  } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER) {
+  } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_TRACK_SELECT) {
     if (alt && panel_timeline->trim_target == -1) {
       mouseReleaseMoveAltDuplicate(ca);
       return true;

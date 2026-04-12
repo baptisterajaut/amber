@@ -846,6 +846,12 @@ void MainWindow::setup_menus() {
   slide_tool_action->setData(reinterpret_cast<quintptr>(panel_timeline->toolSlideButton));
   tools_group->addAction(slide_tool_action);
 
+  track_select_tool_action = MenuHelper::create_menu_action(tools_menu, "trackselecttool", &amber::MenuHelper,
+                                                            SLOT(menu_click_button()), QKeySequence("A"));
+  track_select_tool_action->setCheckable(true);
+  track_select_tool_action->setData(reinterpret_cast<quintptr>(panel_timeline->toolTrackSelectButton));
+  tools_group->addAction(track_select_tool_action);
+
   hand_tool_action = MenuHelper::create_menu_action(tools_menu, "handtool", &amber::MenuHelper,
                                                     SLOT(menu_click_button()), QKeySequence("H"));
   hand_tool_action->setCheckable(true);
@@ -1027,6 +1033,7 @@ void MainWindow::Retranslate() {
   razor_tool_action->setText(tr("Razor Tool"));
   slip_tool_action->setText(tr("Slip Tool"));
   slide_tool_action->setText(tr("Slide Tool"));
+  track_select_tool_action->setText(tr("Track Select Tool"));
   hand_tool_action->setText(tr("Hand Tool"));
   transition_tool_action->setText(tr("Transition Tool"));
   snap_toggle->setText(tr("Enable Snapping"));
@@ -1283,6 +1290,7 @@ void MainWindow::toolMenu_About_To_Be_Shown() {
   amber::MenuHelper.set_button_action_checked(razor_tool_action);
   amber::MenuHelper.set_button_action_checked(slip_tool_action);
   amber::MenuHelper.set_button_action_checked(slide_tool_action);
+  amber::MenuHelper.set_button_action_checked(track_select_tool_action);
   amber::MenuHelper.set_button_action_checked(hand_tool_action);
   amber::MenuHelper.set_button_action_checked(transition_tool_action);
   amber::MenuHelper.set_button_action_checked(snap_toggle);
