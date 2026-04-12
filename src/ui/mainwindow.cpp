@@ -720,8 +720,10 @@ void MainWindow::setup_menus() {
 
   previous_frames_ = MenuHelper::create_menu_action(playback_menu, "prevframes", &amber::FocusFilter,
                                                     SLOT(prev_frames()), QKeySequence("Ctrl+["));
+  previous_frames_->setShortcuts({QKeySequence("Ctrl+["), QKeySequence("Shift+Left")});
   next_frames_ = MenuHelper::create_menu_action(playback_menu, "nextframes", &amber::FocusFilter, SLOT(next_frames()),
                                                 QKeySequence("Ctrl+]"));
+  next_frames_->setShortcuts({QKeySequence("Ctrl+]"), QKeySequence("Shift+Right")});
 
   playback_menu->addSeparator();
 
