@@ -564,6 +564,10 @@ void ExportDialog::StartExport() {
       panel_sequence_viewer->seek(params.start_frame);
     }
 
+    // Align the audio ring buffer origin with the export start frame so EncodeAudioFrames reads real samples
+    // from offset 0 instead of silence (fixes silent audio on In/Out range exports — GitHub issue #25).
+    if (params.audio_enabled) clear_audio_ibuffer(params.start_frame);
+
     // Close all currently open clips
     close_active_clips(amber::ActiveSequence.get());
 
