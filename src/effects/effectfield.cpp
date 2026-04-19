@@ -255,9 +255,14 @@ void EffectField::SetValueAt(double time, const QVariant &value)
 
 double EffectField::Now()
 {
+  // Keyframes are stored as clip-local frame indices, not media/source-time frames.
+  // Must match the convention used by the renderer (get_timecode) and by NowInFrames()
+  // so that UI reads/writes land at the same keyframe.time that the renderer evaluates.
+  // Using playhead_to_clip_seconds() here would apply the clip's speed multiplier and
+  // break keyframe alignment on any clip with speed != 1.0 (bug #27).
   Clip* c = GetParentRow()->GetParentEffect()->parent_clip;
   if (c->sequence == nullptr) return 0.0;
-  return playhead_to_clip_seconds(c, c->sequence->playhead);
+  return double(playhead_to_clip_frame(c, c->sequence->playhead)) / c->sequence->frame_rate;
 }
 
 long EffectField::NowInFrames()
