@@ -30,10 +30,21 @@
 
 // Per-clip QRhi FBO resources (ping-pong textures for effect processing).
 // Stored as void* in Clip::fbo_rhi to avoid circular includes.
+//
+// rt[j] are PreserveColorContents render targets (LoadOp::Load) used for
+// accumulating composites via srcover. rt_clear[j] are non-preserve
+// (LoadOp::Clear) aliases wrapping the same tex[j] — needed because a
+// beginPass(clearColor) on a PreserveColorContents target is a no-op.
+// rt_clear entries are only allocated for nested-sequence clips (count==3),
+// where rt[0] is the nested accumulator and rt[1] is the per-inner-clip
+// scratch back-buffer — both need to be explicitly cleared between uses
+// to prevent transparency leaks (closes #24).
 struct ClipRhiResources {
   QRhiTexture* tex[3] = {};
   QRhiTextureRenderTarget* rt[3] = {};
+  QRhiTextureRenderTarget* rt_clear[3] = {};
   QRhiRenderPassDescriptor* rpd = nullptr;
+  QRhiRenderPassDescriptor* clear_rpd = nullptr;
   int count = 0;
 };
 

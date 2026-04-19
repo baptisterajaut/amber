@@ -311,7 +311,8 @@ static ClipRhiResources* get_or_create_clip_resources(Clip* c, QRhi* rhi, int wi
   }
   // We store the ClipRhiResources in c->fbo_rhi (a void* field we'll add to Clip)
   if (c->fbo_rhi == nullptr) {
-    int fbo_count = (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) ? 3 : 2;
+    bool is_nested_seq = (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE);
+    int fbo_count = is_nested_seq ? 3 : 2;
     ClipRhiResources* res = new ClipRhiResources();
     res->count = fbo_count;
     for (int j = 0; j < fbo_count; j++) {
@@ -323,6 +324,21 @@ static ClipRhiResources* get_or_create_clip_resources(Clip* c, QRhi* rhi, int wi
       }
       res->rt[j]->setRenderPassDescriptor(res->rpd);
       res->rt[j]->create();
+    }
+    // Non-preserve aliases so beginPass(clearColor) actually clears — required for
+    // nested sequences where rt[0] is the accumulator (cleared once per frame) and
+    // rt[1] is the inner-clip scratch back-buffer (cleared before each inner clip).
+    // Without these, PreserveColorContents causes previous data to leak through the
+    // transparent regions of nested sequence composites (#24).
+    if (is_nested_seq) {
+      for (int j = 0; j < 2; j++) {
+        res->rt_clear[j] = rhi->newTextureRenderTarget({res->tex[j]});
+        if (j == 0) {
+          res->clear_rpd = res->rt_clear[j]->newCompatibleRenderPassDescriptor();
+        }
+        res->rt_clear[j]->setRenderPassDescriptor(res->clear_rpd);
+        res->rt_clear[j]->create();
+      }
     }
     c->fbo_rhi = res;
   }
@@ -587,6 +603,10 @@ static void ensure_clip_fbo(Clip* c, QRhi* rhi, const QSize& comp_size) {
         to_delete.append(existing->rt[j]);
         to_delete.append(existing->tex[j]);
       }
+      for (int j = 0; j < 3; j++) {
+        if (existing->rt_clear[j]) to_delete.append(existing->rt_clear[j]);
+      }
+      if (existing->clear_rpd) to_delete.append(existing->clear_rpd);
       if (existing->rpd) to_delete.append(existing->rpd);
       RenderThread::DeferRhiResourceDeletion(to_delete);
       delete existing;
@@ -679,6 +699,16 @@ static void render_and_blend_clip(Clip* c, ComposeSequenceParams& params, QRhiTe
   QRhiRenderPassDescriptor* back_rpd;
   if (!params.nests.isEmpty() && params.nests.last()->fbo_rhi != nullptr) {
     ClipRhiResources* nestRes = static_cast<ClipRhiResources*>(params.nests.last()->fbo_rhi);
+    // Explicitly clear the nested back-buffer before drawing this inner clip.
+    // nestRes->rt[1] is PreserveColorContents (needed for the effect ping-pong path on
+    // footage clips) so a beginPass(clearColor) on it would be a no-op. The inner clip's
+    // quad only covers its video dimensions — without an explicit clear, stale pixels
+    // from previous inner clips (or previous frames) leak into the srcover below (#24).
+    if (nestRes->rt_clear[1]) {
+      QColor clearColor(0, 0, 0, 0);
+      params.cb->beginPass(nestRes->rt_clear[1], clearColor, {1.0f, 0});
+      params.cb->endPass();
+    }
     back_target1 = nestRes->rt[1];
     back_tex1 = nestRes->tex[1];
     back_rpd = nestRes->rpd;
@@ -821,7 +851,11 @@ static void resolve_nested_sequence(ComposeSequenceParams& params, Sequence*& s,
   if (params.video && params.nests.last()->fbo_rhi != nullptr) {
     ClipRhiResources* nestRes = static_cast<ClipRhiResources*>(params.nests.last()->fbo_rhi);
     QColor clearColor(0, 0, 0, 0);
-    params.cb->beginPass(nestRes->rt[0], clearColor, {1.0f, 0});
+    // Clear via the non-preserve alias — a beginPass on rt[0] itself would be a no-op
+    // because rt[0] is PreserveColorContents (LoadOp::Load). Without this, the previous
+    // frame's composite persists and leaks through transparent regions (#24).
+    QRhiTextureRenderTarget* clear_rt = nestRes->rt_clear[0] ? nestRes->rt_clear[0] : nestRes->rt[0];
+    params.cb->beginPass(clear_rt, clearColor, {1.0f, 0});
     params.cb->endPass();
     final_target = nestRes->rt[0];
     final_tex = nestRes->tex[0];
