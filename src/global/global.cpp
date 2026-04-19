@@ -369,6 +369,7 @@ void AmberGlobal::set_sequence(SequencePtr s, bool record_history) {
   panel_graph_editor->set_row(nullptr);
   panel_effect_controls->Clear(true);
   panel_sequence_viewer->set_main_sequence();
+  panel_sequence_viewer->update_preview_res_label();
   panel_timeline->update_sequence();
   panel_timeline->setFocus();
 }
