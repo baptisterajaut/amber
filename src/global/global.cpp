@@ -403,6 +403,7 @@ void OliveGlobal::set_sequence(SequencePtr s, bool record_history)
 
   amber::ActiveSequence = s;
   panel_sequence_viewer->set_main_sequence();
+  panel_sequence_viewer->update_preview_res_label();
   panel_timeline->update_sequence();
   panel_timeline->setFocus();
 }
