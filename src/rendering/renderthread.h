@@ -78,6 +78,8 @@ public slots:
   void delete_ctx();
 signals:
   void ready();
+  void frame_save_failed(const QString& path);
+
 private:
   static QMutex deferred_delete_mutex_;
   static QVector<QRhiResource*> deferred_delete_queue_;
