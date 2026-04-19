@@ -100,6 +100,9 @@ ViewerWidget::ViewerWidget(QWidget* parent)
   renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ViewerWidget::queue_repaint);
   connect(renderer, &RenderThread::finished, renderer, &RenderThread::deleteLater);
+  connect(renderer, &RenderThread::frame_save_failed, this, [this](const QString& p) {
+    QMessageBox::warning(this, tr("Save Frame"), tr("Failed to save frame as \"%1\".").arg(p));
+  });
 
   // Guide shortcut actions — shortcuts stored on QAction for display + preferences editability.
   // WidgetShortcut context without addAction() prevents Qt from registering them in QShortcutMap,

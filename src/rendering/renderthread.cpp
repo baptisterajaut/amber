@@ -353,8 +353,18 @@ void RenderThread::paint() {
     } else {
       QByteArray& data = cpu_frame_[active_idx];
       if (!data.isEmpty()) {
-        QImage img(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height, QImage::Format_RGBA8888);
-        img.save(save_fn);
+        // Copy the QImage so it owns its pixels — save_fn is cleared below and
+        // cpu_frame_ may be overwritten before the PNG/JPEG encoder finishes.
+        QImage img =
+            QImage(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height, QImage::Format_RGBA8888)
+                .copy();
+        if (!img.save(save_fn)) {
+          qWarning() << "Failed to save frame to" << save_fn;
+          emit frame_save_failed(save_fn);
+        }
+      } else {
+        qWarning() << "Failed to save frame to" << save_fn << "- frame buffer empty";
+        emit frame_save_failed(save_fn);
       }
       save_fn = "";
     }

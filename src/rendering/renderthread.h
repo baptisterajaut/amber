@@ -73,6 +73,7 @@ class RenderThread : public QThread {
   void delete_ctx();
  signals:
   void ready();
+  void frame_save_failed(const QString& path);
 
  private:
   static QMutex deferred_delete_mutex_;
