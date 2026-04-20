@@ -23,7 +23,9 @@
 #ifndef NOFREI0R
 
 #include <QDir>
+#include <QHash>
 #include <QMessageBox>
+#include <QMutex>
 
 #include "engine/clip.h"
 
@@ -31,6 +33,12 @@ using f0rConstructFunc = f0r_instance_t (*)(unsigned int width, unsigned int hei
 using f0rInitFunc = int (*)();
 using f0rDeinitFunc = void (*)();
 using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
+
+// Frei0r spec: f0r_init / f0r_deinit must be called exactly once per plugin library.
+// Instances sharing a library must not re-init or double-deinit.
+// Heap-allocated and never freed to survive static destruction order during app exit.
+static QMutex& frei0r_refcount_mutex() { static auto* m = new QMutex(); return *m; }
+static QHash<QString, int>& frei0r_refcount() { static auto* h = new QHash<QString, int>(); return *h; }
 
 Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta* em)
     : Effect(c, em)
@@ -57,7 +65,12 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta* em)
                           tr("Symbol f0r_init not found in \"%1\"").arg(dll_fn));
     return;
   }
-  init();
+  {
+    QMutexLocker lock(&frei0r_refcount_mutex());
+    auto& map = frei0r_refcount();
+    if (map.value(dll_fn, 0) == 0) init();
+    map[dll_fn] = map.value(dll_fn, 0) + 1;
+  }
 
   update_func_ = reinterpret_cast<f0rUpdateFunc>(handle.resolve("f0r_update"));
   set_param_func_ = reinterpret_cast<f0rSetParamValue>(handle.resolve("f0r_set_param_value"));
@@ -115,8 +128,20 @@ Frei0rEffect::~Frei0rEffect() {
   destruct_module();
 
   if (handle.isLoaded()) {
-    f0rDeinitFunc deinit = reinterpret_cast<f0rDeinitFunc>(handle.resolve("f0r_deinit"));
-    if (deinit != nullptr) deinit();
+    QString path = handle.fileName();
+    bool last;
+    {
+      QMutexLocker lock(&frei0r_refcount_mutex());
+      auto& map = frei0r_refcount();
+      int& cnt = map[path];
+      if (cnt > 0) cnt--;
+      last = (cnt == 0);
+      if (last) map.remove(path);
+    }
+    if (last) {
+      f0rDeinitFunc deinit = reinterpret_cast<f0rDeinitFunc>(handle.resolve("f0r_deinit"));
+      if (deinit != nullptr) deinit();
+    }
 
     handle.unload();
   }
