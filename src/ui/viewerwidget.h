@@ -144,6 +144,7 @@ class ViewerWidget : public QRhiWidget {
   ViewerWindow* window;
   double x_scroll{0};
   double y_scroll{0};
+  QString save_frame_last_dir_;
  public slots:
   void queue_repaint();
 
