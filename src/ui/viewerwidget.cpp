@@ -29,6 +29,7 @@ extern "C" {
 #include <QDrag>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QMenu>
 #include <QMessageBox>
@@ -38,6 +39,7 @@ extern "C" {
 #include <QPolygon>
 #include <QRegularExpression>
 #include <QScreen>
+#include <QStandardPaths>
 #include <QtMath>
 
 #include "core/math.h"
@@ -200,15 +202,23 @@ void ViewerWidget::save_frame() {
   fd.setNameFilter(
       "Portable Network Graphic (*.png);;JPEG (*.jpg);;Windows Bitmap (*.bmp);;Portable Pixmap (*.ppm);;X11 Bitmap "
       "(*.xbm);;X11 Pixmap (*.xpm)");
+  // Anchor the dialog to a stable absolute directory. Without this, native
+  // pickers (notably XFCE/GTK with sidebar shortcuts like "Desktop") can
+  // return a relative path, which then resolves against the app cwd
+  // (= project directory after a project load) instead of the user's choice.
+  fd.setDirectory(save_frame_last_dir_.isEmpty()
+                      ? QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)
+                      : save_frame_last_dir_);
 
   if (fd.exec()) {
-    QString fn = fd.selectedFiles().at(0);
+    QString fn = QFileInfo(fd.selectedFiles().at(0)).absoluteFilePath();
     QString selected_ext = fd.selectedNameFilter().mid(
         fd.selectedNameFilter().indexOf(QRegularExpression("\\*\\.[a-z][a-z][a-z]")) + 1, 4);
     if (!fn.endsWith(selected_ext, Qt::CaseInsensitive)) {
       fn += selected_ext;
     }
 
+    save_frame_last_dir_ = QFileInfo(fn).absolutePath();
     renderer->start_render(viewer->seq.get(), 1, fn);
   }
 }
