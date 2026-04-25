@@ -365,7 +365,10 @@ void ViewerWidget::frame_update() {
     if (waveform) {
       update();
     } else {
-      bool scrubbing = !viewer->playing;
+      // Single-step actions (prev/next frame) request precise retrieval so the
+      // cacher uses the long-wait path and we don't show a stale closest-frame.
+      bool scrubbing = !viewer->playing && !viewer->precise_next_render_;
+      viewer->precise_next_render_ = false;
       renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(),
                              nullptr, nullptr, 0, amber::CurrentConfig.preview_resolution_divider, scrubbing);
     }

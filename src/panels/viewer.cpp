@@ -330,19 +330,31 @@ void Viewer::go_to_in() {
 }
 
 void Viewer::previous_frame() {
-  if (seq != nullptr && seq->playhead > 0) seek(seq->playhead - 1);
+  if (seq != nullptr && seq->playhead > 0) {
+    precise_next_render_ = true;
+    seek(seq->playhead - 1);
+  }
 }
 
 void Viewer::next_frame() {
-  if (seq != nullptr) seek(seq->playhead + 1);
+  if (seq != nullptr) {
+    precise_next_render_ = true;
+    seek(seq->playhead + 1);
+  }
 }
 
 void Viewer::previous_frames() {
-  if (seq != nullptr) seek(qMax(0L, seq->playhead - amber::CurrentConfig.frame_skip_step));
+  if (seq != nullptr) {
+    precise_next_render_ = true;
+    seek(qMax(0L, seq->playhead - amber::CurrentConfig.frame_skip_step));
+  }
 }
 
 void Viewer::next_frames() {
-  if (seq != nullptr) seek(seq->playhead + amber::CurrentConfig.frame_skip_step);
+  if (seq != nullptr) {
+    precise_next_render_ = true;
+    seek(seq->playhead + amber::CurrentConfig.frame_skip_step);
+  }
 }
 
 void Viewer::go_to_out() {

@@ -74,6 +74,10 @@ class Viewer : public Panel {
   void play(bool in_to_out = false);
   void pause(bool clear_buffer = true);
   bool playing{false};
+  // One-shot hint set by single-step actions (arrow keys, prev/next frame buttons)
+  // so the next render fetches the exact frame instead of falling back to the
+  // scrubbing fast-bail path. Consumed (cleared) by ViewerWidget::frame_update().
+  bool precise_next_render_{false};
   long playhead_start;
   qint64 start_msecs;
   QTimer playback_updater;
