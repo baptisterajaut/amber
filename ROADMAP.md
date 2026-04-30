@@ -21,6 +21,7 @@ Amber inherits Olive 0.1's greatest strength: everything is where you expect it.
 - **Canvas Painter for viewer overlays (Qt 6.11)** — replace QPainter with Qt Canvas Painter (GPU-accelerated 2D on QRhi, 2-10x faster) for title-safe, guides, gizmos. Drop-in API swap, same drawing logic. Tech preview — API may shift in 6.12.
 - **Callback-based audio I/O (Qt 6.11)** — `QAudioSink::start()` now accepts a callback for real-time audio processing, replacing QIODevice push/pull. Adopt for audio monitoring and scrub playback — cleaner, lower latency.
 - **PipeWire Bluetooth audio** — Qt 6.11 ships a new PipeWire backend. Test if Bluetooth sink enumeration works; if so, remove the `QT_AUDIO_BACKEND=pulseaudio` workaround in `main.cpp`.
+- **Flatpak / Flathub release** — provide an official Flatpak manifest and publish to Flathub for tighter desktop integration on Linux (file portals, permissions). Complements the existing AppImage. Requires a Flathub account + ongoing manifest maintenance — likely a community contribution. (#41)
 
 ## 2.0
 
@@ -68,6 +69,8 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Subtitle editor — dedicated floating window for bulk subtitle editing (import is shipped in 1.5.0, this is the full editing UI)
 - **Text stroke** — QPainterPath outline on rich text effect (#12)
 - **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
+- **Turbulent displacement** — noise-driven UV warp for stop-motion / glitch / heat-haze looks. Single-pass fragment shader (Perlin/simplex noise → displacement vector → texture lookup), fits the existing XML+GLSL shader effect infrastructure. Also reachable via ShaderToy import once that lands. (#35)
+- **Motion blur** — shutter-angle integration on animated transforms: at render time, sample the Transform effect's keyframes at N sub-frame positions within the shutter window and accumulate. Per-clip toggle + global default. Scope: animation-driven motion blur only — true per-pixel motion vectors (camera/object motion in source footage) is post-2.0, requires optical flow. (#36)
 
 ### Scopes & monitoring
 
@@ -86,6 +89,8 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 - Markers with duration — range markers with in/out points, Premiere-style section marking (#15)
 - Effect presets save/load — serialize effect parameters, apply saved presets to clips (#15)
 - **Adjustment Layer** — non-destructive overlay clip on a video track; effects on it apply to all tracks visually beneath within its time range. Unlike nested sequences, it doesn't reorganize the timeline. Implementation: new medialess clip kind, branch in `compose_sequence()` feeding the running framebuffer as input texture (ping-pong buffer to avoid read/write hazard), "New > Adjustment Layer" UI, `.ove` serialization. ~2-4 days. (#32)
+- **Voice-over recording UX polish** — recording itself already works: dedicated record button on the timeline toolbar arms the Add Audio mode, then click on the timeline to choose a track / drag a region, Play starts recording, Stop saves a WAV next to the project and inserts a clip. Input device + mono/stereo configurable in Preferences. What's missing: a live input VU meter while armed/recording, optional pre-roll countdown. (#39)
+- **Audio waveform sync** — auto-align two or more audio clips by cross-correlation (FFT-based) to sync external mic with camera audio across multi-cam takes. Manual sync-by-marker as a fallback. Locks aligned clips together as a linked group. (#40)
 
 ### Rendering pipeline optimizations
 
@@ -119,6 +124,7 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 - **Effect controls alignment** — align labels and values in a grid layout (labels left-aligned, values right-aligned with consistent weight). Touches `CollapsibleWidget` + `EffectRow` layout. (#12)
 - **Audio plugin parameters in EffectControls** — expose VST2 parameters as native EffectField rows instead of "open GUI" button only. Depends on plugin API exposing param metadata. (#12)
 - **Graph Editor improvements** — better curve editing UX, currently minimal on 0.1.x (#15)
+- **Compact timeline mode for small screens** — finer minimum on audio track height, optional collapsed-track display, denser timeline ruler. Useful on low-vertical-resolution laptops where the timeline currently eats too much screen space. (#38)
 
 ### .ove → .amb project format
 
