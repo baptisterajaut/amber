@@ -106,9 +106,14 @@ void init_audio() {
     // start sender thread
     audio_thread = new AudioSenderThread();
 
-    // QAudioSink has no notify() signal, use a QTimer instead
+    // QAudioSink has no notify() signal, use a QTimer instead.
+    // PreciseTimer is required on Windows — the default CoarseTimer rounds to the
+    // OS scheduler tick (~15.6ms), so a 5ms interval would actually fire every
+    // 15ms and starve the audio sink (underruns / stutter). On Linux/macOS this
+    // is a no-op since timers are already high-resolution.
     audio_notify_timer = new QTimer();
     audio_notify_timer->setInterval(5);
+    audio_notify_timer->setTimerType(Qt::PreciseTimer);
     QObject::connect(audio_notify_timer, &QTimer::timeout, audio_thread, &AudioSenderThread::notifyReceiver);
     audio_notify_timer->start();
 
