@@ -89,6 +89,13 @@ Viewer::Viewer(QWidget* parent)
 
   recording_flasher.setInterval(500);
 
+  // PreciseTimer is required on Windows for video pacing — the default
+  // CoarseTimer rounds to the OS scheduler tick (~15.6ms), so a 30fps timeline
+  // (interval 33ms) actually fires at 31ms or 47ms, producing visible periodic
+  // stutter. timeBeginPeriod(1) is only active while the timer runs (during
+  // playback). No-op on Linux/macOS.
+  playback_updater.setTimerType(Qt::PreciseTimer);
+
   connect(&playback_updater, &QTimer::timeout, this, &Viewer::timer_update);
   connect(&recording_flasher, &QTimer::timeout, this, &Viewer::recording_flasher_update);
   connect(horizontal_bar, &ResizableScrollBar::valueChanged, headers, &TimelineHeader::set_scroll);
