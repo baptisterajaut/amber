@@ -404,12 +404,12 @@ void RenderThread::start_render(Sequence* s, int playback_speed, const QString& 
     divider_ = 1;  // Always export at full resolution
   }
 
-  // Export path (pixel_buffer != nullptr) needs the lock to prevent a lost-wakeup
-  // deadlock — there's only one start_render per frame and the export thread blocks
-  // waiting for completion. Viewer/scrubbing path must NOT lock — the render thread
-  // holds wait_lock_ during the entire paint() operation, so locking here would make
+  // Export path (pixel_buffer != nullptr) and Save Frame path (save non-empty) need
+  // the lock to prevent a lost-wakeup deadlock and to avoid racing paint() on save_fn.
+  // Viewer/scrubbing refresh (both null) must NOT lock — the render thread holds
+  // wait_lock_ during the entire paint() operation, so locking here would make
   // scrubbing synchronous (UI blocks until previous frame finishes rendering).
-  bool needs_lock = (pixels != nullptr);
+  bool needs_lock = (pixels != nullptr) || !save.isEmpty();
   if (needs_lock) {
     wait_lock_.lock();
   }
@@ -422,9 +422,17 @@ void RenderThread::start_render(Sequence* s, int playback_speed, const QString& 
   // stall any dependent actions
   texture_failed = true;
 
-  save_fn = save;
-  pixel_buffer = pixels;
-  pixel_buffer_linesize = pixel_linesize;
+  // Refresh/retry calls (frame_update, paintGL did_texture_fail retry) pass save=""
+  // and pixels=null — they must NOT clobber a pending Save Frame request that is
+  // still waiting for a successful render, nor an in-flight export pixel buffer.
+  // paint() clears save_fn / pixel_buffer itself once it has consumed them.
+  if (!save.isEmpty()) {
+    save_fn = save;
+  }
+  if (pixels != nullptr) {
+    pixel_buffer = pixels;
+    pixel_buffer_linesize = pixel_linesize;
+  }
 
   queued = true;
 
