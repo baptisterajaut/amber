@@ -453,7 +453,7 @@ void TimelineWidget::drawTrackLines(QPainter& p, int video_track_limit, int audi
   if (amber::CurrentConfig.show_track_lines) {
     p.setPen(QColor(0, 0, 0, 96));
     audio_track_limit++;
-    if (video_track_limit == 0) video_track_limit--;
+    video_track_limit--;
 
     // draw lines for video tracks
     for (int i=video_track_limit;i<0;i++) {
@@ -578,8 +578,8 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
       }
     }
 
-    // start by adding a track height worth of padding
-    int panel_height = amber::timeline::kTrackDefaultHeight;
+    // padding: one default-height empty track above video and below audio (drop zones)
+    int panel_height = amber::timeline::kTrackDefaultHeight * 2;
     for (int i=-1;i>=video_track_limit;i--) panel_height += panel_timeline->GetTrackHeight(i);
     for (int i=0;i<=audio_track_limit;i++)  panel_height += panel_timeline->GetTrackHeight(i);
     scrollBar->setMaximum(qMax(0, panel_height - height()));
