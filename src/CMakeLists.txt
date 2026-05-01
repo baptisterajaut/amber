@@ -145,6 +145,7 @@ add_library(amber-engine OBJECT
   rendering/audio.cpp rendering/audio.h
   rendering/clipqueue.cpp rendering/clipqueue.h
   rendering/exportthread.cpp rendering/exportthread.h
+  rendering/recordingtap.cpp rendering/recordingtap.h
   rendering/renderfunctions.cpp rendering/renderfunctions.h
   rendering/renderthread.cpp rendering/renderthread.h
   # project/ (data model only)

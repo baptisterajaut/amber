@@ -67,3 +67,12 @@ add_executable(amber-test-timeline-layout
 target_include_directories(amber-test-timeline-layout PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-timeline-layout PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-timeline-layout COMMAND amber-test-timeline-layout)
+
+add_executable(amber-test-recordingtap
+  test_recordingtap.cpp
+  ${CMAKE_SOURCE_DIR}/rendering/recordingtap.cpp
+  ${CMAKE_SOURCE_DIR}/rendering/recordingtap.h
+)
+target_include_directories(amber-test-recordingtap PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-recordingtap PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-recordingtap COMMAND amber-test-recordingtap)
