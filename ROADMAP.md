@@ -16,19 +16,19 @@ Amber inherits Olive 0.1's greatest strength: everything is where you expect it.
 - ~~Shift+Arrow multi-frame skip — alias for Jump Backward/Forward, configurable step in preferences~~ (shipped in v1.6.0, #15)
 - ~~Bold timecodes on viewer~~ (shipped in v1.6.0, #12)
 
-### 1.7 — Quality-of-life (in progress)
+### 1.7 — Shipped
 
-Visible features and small effects, no architectural change, no `.ove` format change.
+- ~~Color labels on media — right-click in project panel → label color, tints the row + adds a swatch on the icon; applies to footage, sequences, and folders. View → Color Labels toggles visibility.~~ (shipped in v1.7.0)
+- ~~Text stroke on rich text effect — outline color + width, applies to the whole text via `QTextCharFormat::setTextOutline`.~~ (shipped in v1.7.0, #12)
+- ~~Effect controls alignment — label columns line up across all open effects in the Effect Controls panel.~~ (shipped in v1.7.0, #12)
+- ~~Gradient generator — 2-stop linear/radial, QPainter-based. Angle for linear; center X/Y + radius for radial.~~ (shipped in v1.7.0, #21)
+- ~~Turbulent displacement — single-octave simplex-noise UV warp shader effect. Amplitude X/Y + scale + evolution.~~ (shipped in v1.7.0, #35)
+- ~~Unified timeline (no video/audio split) — merged the `video_area` + `audio_area` widgets into a single `TimelineWidget` with one scrollbar. Track-id semantics (`<0` video, `>=0` audio) and `.ove` format unchanged. Drag-select now spans both sides naturally.~~ (shipped in v1.7.0, #38)
+- ~~Voice-over UX polish — live input VU meter while recording (`RecordingTap` `QIODevice` taps the audio stream and posts peaks to the existing AudioMonitor on the GUI thread). 3-second pre-roll countdown overlay before recording starts.~~ (shipped in v1.7.0, #39)
 
-- **Color labels on media** — surface the existing `Clip` color label field on `Media` items in the project panel; right-click → label color, optional column tint.
-- **Text stroke** — QPainterPath outline on the rich text effect (color + width fields). (#12)
-- **Effect controls alignment** — labels and values laid out in a consistent grid in `CollapsibleWidget` / `EffectRow` (labels left-aligned, values right-aligned). (#12)
-- **Gradient generator** — linear/radial generator effect with multi-stop color ramp, applicable to solids and text. New XML+GLSL shader effect, fits existing infrastructure. (#21)
-- **Turbulent displacement** — single-pass fragment shader (Perlin/simplex noise → UV warp → texture lookup) for stop-motion / glitch / heat-haze looks. Fits existing XML+GLSL shader effect infrastructure. (#35)
-- **Unified timeline (no video/audio split)** — merge the `video_area` / `audio_area` widgets into a single continuous track stack. Removes the splitter handle inherited from Olive 0.1. Track-id semantics (`<0` video, `>=0` audio) and `.ove` format unchanged. Replaces the previously-planned compact timeline mode. (#38)
-- **Voice-over UX polish** — recording itself already works (record button arms Add Audio, click to choose track, Play/Stop saves WAV + inserts clip). Adds a live input VU meter while armed/recording and an optional pre-roll countdown. (#39)
+### 1.8+ — Stretch goals (pending)
 
-Stretch goals — pulled in if the above ship cleanly:
+Pulled out of 1.7.0 to ship cleanly; revisit for 1.8 or as the next milestone defines.
 
 - **Linked clip vertical drag** — V+A clips move together across tracks when dragging a linked pair, standard NLE behavior. (#12)
 - **Motion blur** — shutter-angle integration on animated transforms via keyframe sub-sampling at render time. Per-clip toggle + global default. Animation-driven only — true per-pixel motion vectors stays post-2.0. (#36)
