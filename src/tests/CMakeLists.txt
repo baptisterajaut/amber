@@ -69,3 +69,12 @@ add_executable(amber-test-srt
 target_include_directories(amber-test-srt PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-srt PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-srt COMMAND amber-test-srt)
+
+add_executable(amber-test-recordingtap
+  test_recordingtap.cpp
+  ${CMAKE_SOURCE_DIR}/rendering/recordingtap.cpp
+  ${CMAKE_SOURCE_DIR}/rendering/recordingtap.h
+)
+target_include_directories(amber-test-recordingtap PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-recordingtap PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-recordingtap COMMAND amber-test-recordingtap)

@@ -27,6 +27,7 @@
 
 #include "global/config.h"
 #include "global/debug.h"
+#include "rendering/recordingtap.h"
 #include "rendering/renderfunctions.h"
 
 #include <QApplication>
@@ -47,6 +48,7 @@ QAudioSink* audio_output;
 QIODevice* audio_io_device;
 bool audio_device_set = false;
 QAudioSource* audio_input = nullptr;
+RecordingTap* recording_tap = nullptr;
 QTimer* audio_notify_timer = nullptr;
 QFile output_recording;
 bool recording = false;
@@ -295,7 +297,7 @@ int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
     for (int i = 0; i < channels; i++) {
       averages[i] = log_volume(1.0 - (averages[i]));
     }
-    amber::app_ctx->setAudioMonitorValues(averages);
+    if (!recording) amber::app_ctx->setAudioMonitorValues(averages);
   }
 
   memset(audio_ibuffer + offset, 0, consumed);
@@ -412,6 +414,7 @@ bool start_recording() {
   }
 
   QAudioFormat audio_format = audio_output->format();
+  audio_format.setSampleFormat(QAudioFormat::Int16);
   if (amber::CurrentConfig.recording_mode != audio_format.channelCount()) {
     audio_format.setChannelCount(amber::CurrentConfig.recording_mode);
   }
@@ -420,7 +423,21 @@ bool start_recording() {
 
   write_wave_header(output_recording, audio_format);
   audio_input = new QAudioSource(info, audio_format);
-  audio_input->start(&output_recording);
+
+  if (recording_tap) {
+    recording_tap->close();
+    delete recording_tap;
+    recording_tap = nullptr;
+  }
+  recording_tap = new RecordingTap(&output_recording, audio_format.channelCount(),
+                                   audio_format.bytesPerSample() * 8);
+  recording_tap->open(QIODevice::WriteOnly);
+  QObject::connect(recording_tap, &RecordingTap::peaksAvailable, qApp,
+                   [](const QVector<double>& peaks) {
+                     if (amber::app_ctx) amber::app_ctx->setAudioMonitorValues(peaks);
+                   },
+                   Qt::QueuedConnection);
+  audio_input->start(recording_tap);
   recording = true;
 
   return true;
@@ -429,6 +446,12 @@ bool start_recording() {
 void stop_recording() {
   if (recording) {
     audio_input->stop();
+
+    if (recording_tap) {
+      recording_tap->close();
+      delete recording_tap;
+      recording_tap = nullptr;
+    }
 
     write_wave_trailer(output_recording);
 

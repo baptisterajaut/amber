@@ -270,6 +270,8 @@ set(OLIVE_SOURCES
   rendering/audio_ui.h
   rendering/clipqueue.cpp
   rendering/clipqueue.h
+  rendering/recordingtap.cpp
+  rendering/recordingtap.h
   rendering/exportthread.cpp
   rendering/exportthread.h
   rendering/renderfunctions.cpp
