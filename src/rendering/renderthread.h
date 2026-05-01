@@ -133,8 +133,8 @@ private:
   bool scrubbing_{false};
   bool running{true};
   QString save_fn;
-  void* pixel_buffer;
-  int pixel_buffer_linesize;
+  void* pixel_buffer{nullptr};
+  int pixel_buffer_linesize{0};
 
   // CPU bridge: double-buffered pixel readback
   QByteArray cpu_frame_[2];
