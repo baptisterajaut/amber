@@ -24,6 +24,10 @@ private:
   ColorField* shadow_color;
   DoubleField* shadow_softness;
   DoubleField* shadow_opacity;
+
+  BoolField* stroke_bool;
+  ColorField* stroke_color;
+  DoubleField* stroke_width;
 };
 
 #endif // RICHTEXTEFFECT_H

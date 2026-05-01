@@ -1,5 +1,7 @@
 #include "richtexteffect.h"
 
+#include <QTextCharFormat>
+#include <QTextCursor>
 #include <QTextDocument>
 #include <QtMath>
 
@@ -76,6 +78,20 @@ RichTextEffect::RichTextEffect(Clip *c, const EffectMeta *em) :
   shadow_opacity->SetMinimum(0);
   shadow_opacity->SetMaximum(100);
 
+  EffectRow* stroke_enabled_row = new EffectRow(this, tr("Stroke"));
+  stroke_bool = new BoolField(stroke_enabled_row, "stroke");
+  stroke_bool->SetValueAt(0, false);
+
+  EffectRow* stroke_color_row = new EffectRow(this, tr("Stroke Color"));
+  stroke_color = new ColorField(stroke_color_row, "stroke_color");
+  stroke_color->SetValueAt(0, QColor(Qt::black));
+
+  EffectRow* stroke_width_row = new EffectRow(this, tr("Stroke Width"));
+  stroke_width = new DoubleField(stroke_width_row, "stroke_width");
+  stroke_width->SetMinimum(0);
+  stroke_width->SetDefault(2.0);
+  stroke_width->SetMaximum(20);
+
   // Create default text
   text_val->SetValueAt(0, "<html>"
                             "<body style=\"color: #ffffff; font-size: 36pt;\">"
@@ -99,6 +115,20 @@ void RichTextEffect::redraw(double timecode)
   QTextDocument td;
   td.setHtml(text_val->GetStringAt(timecode));
   td.setTextWidth(width);
+
+  if (stroke_bool->GetBoolAt(timecode)) {
+    QTextCursor cursor(&td);
+    cursor.select(QTextCursor::Document);
+    QTextCharFormat fmt;
+    // Only set the outline pen on `fmt` — `mergeCharFormat` merges every set
+    // field into existing runs, so adding any other property here would clobber
+    // user HTML formatting (font, color, size).
+    QPen pen(stroke_color->GetColorAt(timecode));
+    pen.setWidthF(stroke_width->GetDoubleAt(timecode));
+    pen.setJoinStyle(Qt::RoundJoin);
+    fmt.setTextOutline(pen);
+    cursor.mergeCharFormat(fmt);
+  }
 
   int translate_x = qRound(position_x->GetDoubleAt(timecode) + padding);
   int translate_y = qRound(position_y->GetDoubleAt(timecode) + padding);
