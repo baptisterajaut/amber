@@ -215,7 +215,7 @@ set(UI_SOURCES
   panels/panels.cpp panels/panels.h
   panels/project.cpp panels/project.h
   panels/undohistorypanel.cpp panels/undohistorypanel.h
-  panels/timeline.cpp panels/timeline_clipboard.cpp panels/timeline_splitting.cpp panels/timeline_ui.cpp panels/timeline.h
+  panels/timeline.cpp panels/timeline_clipboard.cpp panels/timeline_layout.cpp panels/timeline_layout.h panels/timeline_splitting.cpp panels/timeline_ui.cpp panels/timeline.h
   panels/viewer.cpp panels/viewer.h
   project/previewgenerator.cpp project/previewgenerator.h
   project/projectfilter.cpp project/projectfilter.h

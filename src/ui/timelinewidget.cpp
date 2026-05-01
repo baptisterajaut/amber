@@ -66,7 +66,6 @@ TimelineWidget::TimelineWidget(QWidget* parent) : QWidget(parent) {
   self_created_sequence = nullptr;
   scroll = 0;
 
-  bottom_align = false;
   track_resizing = false;
   setMouseTracking(true);
 
@@ -157,7 +156,9 @@ void TimelineWidget::dragEnterEvent(QDragEnterEvent* event) {
   } else {
     entry_point = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
     panel_timeline->drag_frame_start = entry_point + getFrameFromScreenPoint(panel_timeline->zoom, 50);
-    panel_timeline->drag_track_start = (bottom_align) ? -1 : 0;
+    // Use the scroll-aware lookup; collapse to V1 (-1) or A1 (0) based on which side the cursor lies on.
+    const int t = getTrackFromScreenPoint(event->position().toPoint().y());
+    panel_timeline->drag_track_start = (t < 0) ? -1 : 0;
   }
 
   panel_timeline->create_ghosts_from_media(seq, entry_point, media_list);
@@ -1321,7 +1322,7 @@ void TimelineWidget::mouseMoveMovingInit(QMouseEvent* event) {
   if (track_resizing) {
     int diff = event->position().toPoint().y() - panel_timeline->drag_y_start;
     int new_height = panel_timeline->GetTrackHeight(track_target);
-    new_height = bottom_align ? new_height - diff : new_height + diff;
+    new_height = (track_target < 0) ? new_height - diff : new_height + diff;
     new_height = qMax(new_height, amber::timeline::kTrackMinHeight);
     panel_timeline->SetTrackHeight(track_target, new_height);
     panel_timeline->drag_y_start = event->position().toPoint().y();
@@ -1409,7 +1410,7 @@ void TimelineWidget::mouseMoveRectSelect(QMouseEvent* event, bool alt) {
     // initialise rectangle selection
     int y = event->position().toPoint().y();
     panel_timeline->rect_select_rect.setX(event->position().toPoint().x());
-    panel_timeline->rect_select_rect.setY(bottom_align ? y - height() : y);
+    panel_timeline->rect_select_rect.setY(y);
     panel_timeline->rect_select_rect.setWidth(0);
     panel_timeline->rect_select_rect.setHeight(0);
     panel_timeline->rect_select_proc = true;
@@ -1419,7 +1420,7 @@ void TimelineWidget::mouseMoveRectSelect(QMouseEvent* event, bool alt) {
   // update rectangle bounds
   int y = event->position().toPoint().y();
   panel_timeline->rect_select_rect.setRight(event->position().toPoint().x());
-  panel_timeline->rect_select_rect.setBottom(bottom_align ? y - height() : y);
+  panel_timeline->rect_select_rect.setBottom(y);
 
   long frame_min = qMin(panel_timeline->drag_frame_start, panel_timeline->cursor_frame);
   long frame_max = qMax(panel_timeline->drag_frame_start, panel_timeline->cursor_frame);
@@ -1482,7 +1483,7 @@ void TimelineWidget::hoverCheckTrackResize(const QMouseEvent* event, bool cursor
   int mouse_pos = event->position().toPoint().y();
   int hover_track = getTrackFromScreenPoint(mouse_pos);
   int track_y_edge = getScreenPointFromTrack(hover_track);
-  if (!bottom_align) track_y_edge += panel_timeline->GetTrackHeight(hover_track);
+  if (hover_track >= 0) track_y_edge += panel_timeline->GetTrackHeight(hover_track);
   if (mouse_pos > track_y_edge - test_range && mouse_pos < track_y_edge + test_range) {
     bool in_range =
         cursor_contains_clip || (amber::CurrentConfig.show_track_lines && panel_timeline->cursor_track >= min_track &&
@@ -1735,7 +1736,7 @@ void TimelineWidget::mouseMoveHoverDispatch(QMouseEvent* event) {
 void TimelineWidget::leaveEvent(QEvent*) { tooltip_timer.stop(); }
 void TimelineWidget::resizeEvent(QResizeEvent*) { scrollBar->setPageStep(height()); }
 
-bool TimelineWidget::is_track_visible(int track) { return (bottom_align == (track < 0)); }
+bool TimelineWidget::is_track_visible(int /*track*/) { return true; }
 
 // **************************************
 // screen point <-> frame/track functions
@@ -1746,9 +1747,7 @@ int TimelineWidget::getTrackFromScreenPoint(int y) {
 
   y += scroll;
 
-  if (bottom_align) {
-    y -= height();
-  }
+  y -= panel_timeline->SeamY();
 
   if (y < 0) {
     track_candidate--;
@@ -1792,11 +1791,8 @@ int TimelineWidget::getScreenPointFromTrack(int track) {
     if (amber::CurrentConfig.show_track_lines) point++;
   }
 
-  if (bottom_align) {
-    return height() - point - scroll;
-  } else {
-    return point - scroll;
-  }
+  const int seam = panel_timeline->SeamY();
+  return (track < 0) ? seam - point - scroll : seam + point - scroll;
 }
 
 int TimelineWidget::getClipIndexFromCoords(long frame, int track) {

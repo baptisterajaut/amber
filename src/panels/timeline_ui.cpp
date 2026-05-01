@@ -146,14 +146,14 @@ void Timeline::setup_ui() {
 
   horizontalLayout->addWidget(tool_button_widget);
 
-  timeline_area = new QWidget();
+  timeline_area_widget = new QWidget();
   QSizePolicy timeline_area_policy(QSizePolicy::Minimum, QSizePolicy::Minimum);
   timeline_area_policy.setHorizontalStretch(1);
   timeline_area_policy.setVerticalStretch(0);
-  timeline_area_policy.setHeightForWidth(timeline_area->sizePolicy().hasHeightForWidth());
-  timeline_area->setSizePolicy(timeline_area_policy);
+  timeline_area_policy.setHeightForWidth(timeline_area_widget->sizePolicy().hasHeightForWidth());
+  timeline_area_widget->setSizePolicy(timeline_area_policy);
 
-  QVBoxLayout* timeline_area_layout = new QVBoxLayout(timeline_area);
+  QVBoxLayout* timeline_area_layout = new QVBoxLayout(timeline_area_widget);
   timeline_area_layout->setSpacing(0);
   timeline_area_layout->setContentsMargins(0, 0, 0, 0);
 
@@ -171,47 +171,22 @@ void Timeline::setup_ui() {
   editAreaLayout->setSpacing(0);
   editAreaLayout->setContentsMargins(0, 0, 0, 0);
 
-  QSplitter* splitter = new QSplitter();
-  splitter->setChildrenCollapsible(false);
-  splitter->setOrientation(Qt::Vertical);
+  QWidget* timelineContainer = new QWidget();
+  QHBoxLayout* timelineContainerLayout = new QHBoxLayout(timelineContainer);
+  timelineContainerLayout->setSpacing(0);
+  timelineContainerLayout->setContentsMargins(0, 0, 0, 0);
 
-  QWidget* videoContainer = new QWidget();
+  timeline_area = new TimelineWidget();
+  timeline_area->setFocusPolicy(Qt::ClickFocus);
+  timelineContainerLayout->addWidget(timeline_area);
 
-  QHBoxLayout* videoContainerLayout = new QHBoxLayout(videoContainer);
-  videoContainerLayout->setSpacing(0);
-  videoContainerLayout->setContentsMargins(0, 0, 0, 0);
+  verticalScrollbar = new QScrollBar();
+  verticalScrollbar->setMaximum(0);
+  verticalScrollbar->setSingleStep(20);
+  verticalScrollbar->setOrientation(Qt::Vertical);
+  timelineContainerLayout->addWidget(verticalScrollbar);
 
-  video_area = new TimelineWidget();
-  video_area->setFocusPolicy(Qt::ClickFocus);
-  videoContainerLayout->addWidget(video_area);
-
-  videoScrollbar = new QScrollBar();
-  videoScrollbar->setMaximum(0);
-  videoScrollbar->setSingleStep(20);
-  videoScrollbar->setOrientation(Qt::Vertical);
-  videoContainerLayout->addWidget(videoScrollbar);
-
-  splitter->addWidget(videoContainer);
-
-  QWidget* audioContainer = new QWidget();
-  QHBoxLayout* audioContainerLayout = new QHBoxLayout(audioContainer);
-  audioContainerLayout->setSpacing(0);
-  audioContainerLayout->setContentsMargins(0, 0, 0, 0);
-
-  audio_area = new TimelineWidget();
-  audio_area->setFocusPolicy(Qt::ClickFocus);
-
-  audioContainerLayout->addWidget(audio_area);
-
-  audioScrollbar = new QScrollBar();
-  audioScrollbar->setMaximum(0);
-  audioScrollbar->setOrientation(Qt::Vertical);
-
-  audioContainerLayout->addWidget(audioScrollbar);
-
-  splitter->addWidget(audioContainer);
-
-  editAreaLayout->addWidget(splitter);
+  editAreaLayout->addWidget(timelineContainer);
 
   timeline_area_layout->addWidget(editAreas);
 
@@ -222,7 +197,7 @@ void Timeline::setup_ui() {
 
   timeline_area_layout->addWidget(horizontalScrollBar);
 
-  horizontalLayout->addWidget(timeline_area);
+  horizontalLayout->addWidget(timeline_area_widget);
 
   audio_monitor = new AudioMonitor();
   audio_monitor->setMinimumSize(QSize(50, 0));
@@ -293,7 +268,7 @@ void Timeline::repaint_timeline() {
       // so the widgets will be updated in that recursive call
       if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_PAGE_SCROLL) {
         int playhead_x = getTimelineScreenPointFromFrame(amber::ActiveSequence->playhead);
-        if (playhead_x < 0 || playhead_x > (editAreas->width() - videoScrollbar->width())) {
+        if (playhead_x < 0 || playhead_x > (editAreas->width() - verticalScrollbar->width())) {
           int old_scroll = horizontalScrollBar->value();
           horizontalScrollBar->setValue(getScreenPointFromFrame(zoom, amber::ActiveSequence->playhead));
           if (horizontalScrollBar->value() != old_scroll) return;
@@ -306,8 +281,7 @@ void Timeline::repaint_timeline() {
     }
 
     headers->update();
-    video_area->update();
-    audio_area->update();
+    timeline_area->update();
 
     if (amber::ActiveSequence != nullptr
         && !zoom_just_changed) {
@@ -409,5 +383,5 @@ void Timeline::toggle_show_all() {
 }
 
 bool Timeline::focused() {
-  return (amber::ActiveSequence != nullptr && (headers->hasFocus() || video_area->hasFocus() || audio_area->hasFocus()));
+  return (amber::ActiveSequence != nullptr && (headers->hasFocus() || timeline_area->hasFocus()));
 }

@@ -158,6 +158,8 @@ public:
   int GetTrackHeight(int track);
   void SetTrackHeight(int track, int height);
 
+  int SeamY();
+
   // snapping
   bool snapping{true};
   bool snapped{false};
@@ -308,12 +310,10 @@ private:
 
   QVector<TimelineTrackHeight> track_heights;
 
-  QWidget* timeline_area;
-  TimelineWidget* video_area;
-  TimelineWidget* audio_area;
+  QWidget* timeline_area_widget;
+  TimelineWidget* timeline_area;
   QWidget* editAreas;
-  QScrollBar* videoScrollbar;
-  QScrollBar* audioScrollbar;
+  QScrollBar* verticalScrollbar;
   QPushButton* zoomInButton;
   QPushButton* zoomOutButton;
   QPushButton* recordButton;
