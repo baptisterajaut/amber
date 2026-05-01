@@ -41,6 +41,7 @@ enum CreateObjects : uint8_t {
   ADD_OBJ_TITLE,
   ADD_OBJ_SOLID,
   ADD_OBJ_BARS,
+  ADD_OBJ_GRADIENT,
   ADD_OBJ_TONE,
   ADD_OBJ_NOISE,
   ADD_OBJ_AUDIO

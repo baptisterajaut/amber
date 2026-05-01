@@ -1249,6 +1249,11 @@ void Timeline::add_btn_click() {
   barsMenuItem->setData(ADD_OBJ_BARS);
   add_menu.addAction(barsMenuItem);
 
+  QAction* gradientMenuItem = new QAction(&add_menu);
+  gradientMenuItem->setText(tr("Gradient..."));
+  gradientMenuItem->setData(ADD_OBJ_GRADIENT);
+  add_menu.addAction(gradientMenuItem);
+
   add_menu.addSeparator();
 
   QAction* toneMenuItem = new QAction(&add_menu);
