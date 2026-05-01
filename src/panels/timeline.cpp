@@ -603,9 +603,19 @@ void Timeline::scroll_to_track(int track) {
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t)  h.audio.append(GetTrackHeight(t));
 
-  int target_top = amber::timeline_layout::track_top_y(h, track);
-  // Only scroll up to make the track visible (matches old behavior of qMin with current value).
-  verticalScrollbar->setValue(qMin(target_top, verticalScrollbar->value()));
+  const int target_top = amber::timeline_layout::track_top_y(h, track);
+  const int target_bot = target_top + GetTrackHeight(track);
+  const int current_scroll = verticalScrollbar->value();
+  const int viewport_h = timeline_area->height();
+
+  if (target_top < current_scroll) {
+    // Track is above the viewport — scroll up so its top edge is visible.
+    verticalScrollbar->setValue(target_top);
+  } else if (target_bot > current_scroll + viewport_h) {
+    // Track is below the viewport — scroll down so its bottom edge is visible.
+    verticalScrollbar->setValue(target_bot - viewport_h);
+  }
+  // Otherwise the track is already fully visible — no-op.
 }
 
 void Timeline::select_from_playhead() {

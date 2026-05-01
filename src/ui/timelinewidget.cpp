@@ -160,7 +160,9 @@ void TimelineWidget::dragEnterEvent(QDragEnterEvent *event) {
     } else {
       entry_point = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
       panel_timeline->drag_frame_start = entry_point + getFrameFromScreenPoint(panel_timeline->zoom, 50);
-      panel_timeline->drag_track_start = (event->position().toPoint().y() < panel_timeline->SeamY()) ? -1 : 0;
+      // Use the scroll-aware lookup; collapse to V1 (-1) or A1 (0) based on which side the cursor lies on.
+      const int t = getTrackFromScreenPoint(event->position().toPoint().y());
+      panel_timeline->drag_track_start = (t < 0) ? -1 : 0;
     }
 
     panel_timeline->create_ghosts_from_media(seq, entry_point, media_list);
