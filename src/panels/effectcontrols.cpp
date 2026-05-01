@@ -315,6 +315,7 @@ void EffectControls::open_effect(QVBoxLayout* layout, Effect* e) {
   connect(container, &EffectUI::CutRequested, this, &EffectControls::cut);
   connect(container, &EffectUI::CopyRequested, this, [this]() { copy(); });
   connect(container, &EffectUI::deselect_others, this, &EffectControls::deselect_all_effects);
+  connect(container, &EffectUI::visibleChanged, this, [this]() { SyncLabelColumnWidth(); });
 
   open_effects_.append(container);
 
@@ -609,6 +610,7 @@ void EffectControls::Reload() {
 void EffectControls::SyncLabelColumnWidth() {
   int max_w = 0;
   for (EffectUI* ui : open_effects_) {
+    if (!ui->IsExpanded()) continue;
     for (QLabel* lbl : ui->labels()) {
       max_w = qMax(max_w, lbl->sizeHint().width());
     }
