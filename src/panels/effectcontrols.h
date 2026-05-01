@@ -108,6 +108,8 @@ class EffectControls : public Panel {
   void Load();
   bool load_one_effect(QVBoxLayout* layout, Clip* c, Effect* e);
 
+  void SyncLabelColumnWidth();
+
   void DeleteEffect(ComboAction* ca, Effect* effect_ref);
 
   void show_effect_menu(int type, int subtype);
