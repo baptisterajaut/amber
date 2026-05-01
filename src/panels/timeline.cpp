@@ -597,7 +597,8 @@ int Timeline::SeamY() {
   amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t) h.audio.append(GetTrackHeight(t));
-  seam_y_cache_ = amber::timeline_layout::seam_y(h);
+  // Add an empty drop-zone at the top, mirroring the existing one at the bottom of audio.
+  seam_y_cache_ = amber::timeline_layout::seam_y(h) + amber::timeline::kTrackDefaultHeight;
   seam_y_dirty_ = false;
   return seam_y_cache_;
 }
