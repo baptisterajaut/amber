@@ -14,7 +14,7 @@ public:
   void UpdateFromEffect();
   bool IsAttachedToClip(Clip* c);
 
-  QVector<QLabel*> labels() const { return labels_; }
+  const QVector<QLabel*>& labels() const { return labels_; }
 
 signals:
   void CutRequested();

@@ -604,29 +604,20 @@ void EffectControls::DeleteSelectedEffects() {
 void EffectControls::Reload() {
   Clear(false);
   Load();
-  SyncLabelColumnWidth();
 }
 
 void EffectControls::SyncLabelColumnWidth() {
   int max_w = 0;
   for (EffectUI* ui : open_effects_) {
-    if (ui == nullptr || !ui->isVisible()) continue;
     for (QLabel* lbl : ui->labels()) {
-      if (lbl == nullptr) continue;
       max_w = qMax(max_w, lbl->sizeHint().width());
     }
   }
   for (EffectUI* ui : open_effects_) {
-    if (ui == nullptr) continue;
     for (QLabel* lbl : ui->labels()) {
-      if (lbl == nullptr) continue;
       lbl->setMinimumWidth(max_w);
     }
   }
-}
-
-void EffectControls::OnEffectListChanged() {
-  SyncLabelColumnWidth();
 }
 
 void EffectControls::SetClips()
