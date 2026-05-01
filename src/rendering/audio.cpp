@@ -384,6 +384,10 @@ void write_wave_trailer(QFile& f) {
 }
 
 bool start_recording() {
+  if (recording) {
+    qWarning() << "start_recording() called while recording is already active";
+    return false;
+  }
   if (amber::ActiveSequence == nullptr) {
     qCritical() << "No active sequence to record into";
     return false;
