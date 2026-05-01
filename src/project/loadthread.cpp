@@ -286,13 +286,15 @@ void LoadThread::parse_folder(QXmlStreamReader& stream) {
       folder->set_name(attr.value().toString());
     } else if (attr.name() == QLatin1String("parent")) {
       folder->temp_id2 = attr.value().toInt();
+    } else if (attr.name() == QLatin1String("label")) {
+      folder->set_color_label(attr.value().toInt());
     }
   }
   loaded_folders.append(folder);
 }
 
 // Parse a single footage attribute into f/folder.
-static void parse_footage_attr(const QXmlStreamAttribute& attr, Footage* f, int& folder,
+static void parse_footage_attr(const QXmlStreamAttribute& attr, Footage* f, int& folder, Media* item,
                                const std::function<QString(const QString&)>& resolve_url) {
   const auto name = attr.name();
   const auto value = attr.value();
@@ -322,6 +324,8 @@ static void parse_footage_attr(const QXmlStreamAttribute& attr, Footage* f, int&
     f->proxy_path = value.toString();
   } else if (name == QLatin1String("startnumber")) {
     f->start_number = value.toInt();
+  } else if (name == QLatin1String("label") && item) {
+    item->set_color_label(value.toInt());
   }
 }
 
@@ -333,7 +337,7 @@ void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& chil
   f->using_inout = false;
 
   for (int j = 0; j < stream.attributes().size(); j++) {
-    parse_footage_attr(stream.attributes().at(j), f.get(), folder,
+    parse_footage_attr(stream.attributes().at(j), f.get(), folder, item.get(),
                        [this](const QString& url) { return resolve_footage_url(url); });
   }
 
@@ -484,7 +488,8 @@ bool LoadThread::parse_clip(QXmlStreamReader& stream, SequencePtr s) {
 }
 
 // Apply a single sequence attribute.
-void LoadThread::apply_sequence_attr(const QXmlStreamAttribute& attr, SequencePtr s, Media*& parent) {
+void LoadThread::apply_sequence_attr(const QXmlStreamAttribute& attr, SequencePtr s, Media*& parent,
+                                     int& color_label) {
   const auto name = attr.name();
   const auto value = attr.value();
   if (name == QLatin1String("name")) {
@@ -512,12 +517,14 @@ void LoadThread::apply_sequence_attr(const QXmlStreamAttribute& attr, SequencePt
     s->workarea_in = value.toLong();
   } else if (name == QLatin1String("workareaOut")) {
     s->workarea_out = value.toLong();
+  } else if (name == QLatin1String("label")) {
+    color_label = value.toInt();
   }
 }
 
-void LoadThread::parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent) {
+void LoadThread::parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent, int& color_label) {
   for (int j = 0; j < stream.attributes().size(); j++) {
-    apply_sequence_attr(stream.attributes().at(j), s, parent);
+    apply_sequence_attr(stream.attributes().at(j), s, parent, color_label);
   }
 
   // Validate sequence dimensions — prevent division-by-zero cascades
@@ -564,9 +571,10 @@ bool LoadThread::correct_clip_links(SequencePtr s) {
 
 bool LoadThread::parse_sequence(QXmlStreamReader& stream, const QStringView& child_search) {
   Media* parent = nullptr;
+  int color_label = 0;
   SequencePtr s = std::make_shared<Sequence>();
 
-  parse_sequence_attributes(stream, s, parent);
+  parse_sequence_attributes(stream, s, parent, color_label);
 
   // load all clips, markers, and guides
   while (!cancelled_ && !(stream.name() == child_search && stream.isEndElement()) && !stream.atEnd()) {
@@ -584,6 +592,9 @@ bool LoadThread::parse_sequence(QXmlStreamReader& stream, const QStringView& chi
   if (!correct_clip_links(s)) return false;
 
   MediaPtr m = panel_project->create_sequence_internal(nullptr, s, false, parent);
+  if (m) {
+    m->set_color_label(color_label);
+  }
 
   loaded_sequences.append(m.get());
   return true;

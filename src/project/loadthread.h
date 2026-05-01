@@ -78,8 +78,8 @@ class LoadThread : public QThread {
   QString resolve_footage_url(const QString& raw_url);
   void parse_clip_links(QXmlStreamReader& stream, Clip* c);
   void parse_clip_attributes(QXmlStreamReader& stream, ClipPtr c, int& media_type, int& media_id, int& stream_id);
-  void parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent);
-  void apply_sequence_attr(const QXmlStreamAttribute& attr, SequencePtr s, Media*& parent);
+  void parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent, int& color_label);
+  void apply_sequence_attr(const QXmlStreamAttribute& attr, SequencePtr s, Media*& parent, int& color_label);
   bool correct_clip_links(SequencePtr s);
 
   void read_next(QXmlStreamReader& stream);

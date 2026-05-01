@@ -1126,6 +1126,9 @@ static void save_footage_item(QXmlStreamWriter& stream, Media* m, int media_id_v
   stream.writeAttribute("startnumber", QString::number(f->start_number));
   stream.writeAttribute("proxy", QString::number(f->proxy));
   stream.writeAttribute("proxypath", f->proxy_path);
+  if (m->color_label() > 0) {
+    stream.writeAttribute("label", QString::number(m->color_label()));
+  }
 
   for (const auto& ms : f->video_tracks) {
     stream.writeStartElement("video");
@@ -1168,6 +1171,9 @@ static void save_sequence_item(QXmlStreamWriter& stream, Media* m, int folder) {
   stream.writeAttribute("workarea", QString::number(s->using_workarea));
   stream.writeAttribute("workareaIn", QString::number(s->workarea_in));
   stream.writeAttribute("workareaOut", QString::number(s->workarea_out));
+  if (m->color_label() > 0) {
+    stream.writeAttribute("label", QString::number(m->color_label()));
+  }
 
   for (const auto& guide : s->guides) {
     stream.writeStartElement("guide");
@@ -1197,6 +1203,9 @@ void Project::save_folder_item(QXmlStreamWriter& stream, Media* m, const QModelI
     stream.writeAttribute("parent", "0");
   } else {
     stream.writeAttribute("parent", QString::number(amber::project_model.getItem(item.parent())->temp_id));
+  }
+  if (m->color_label() > 0) {
+    stream.writeAttribute("label", QString::number(m->color_label()));
   }
   stream.writeEndElement();
 }
@@ -1235,6 +1244,7 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
     }
   }
 }
+
 
 void Project::save_project(bool autorecovery) {
   folder_id = 1;
