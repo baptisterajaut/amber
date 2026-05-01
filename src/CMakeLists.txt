@@ -184,6 +184,8 @@ set(OLIVE_SOURCES
   effects/internal/richtexteffect.h
   effects/internal/shakeeffect.cpp
   effects/internal/shakeeffect.h
+  effects/internal/gradienteffect.cpp
+  effects/internal/gradienteffect.h
   effects/internal/solideffect.cpp
   effects/internal/solideffect.h
   effects/internal/srtparser.cpp
