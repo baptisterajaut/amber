@@ -199,6 +199,14 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   connect(amber::media_icon_service.get(), &MediaIconService::IconChanged, tree_view->viewport(),
           qOverload<>(&QWidget::update));
 
+  // SetInt-based undo actions (e.g. color labels) mutate fields silently with no
+  // dataChanged signal, so the views never re-query Media::data() on push/undo/redo.
+  // Force a viewport repaint whenever the undo stack moves.
+  connect(&amber::UndoStack, &QUndoStack::indexChanged, tree_view->viewport(),
+          qOverload<>(&QWidget::update));
+  connect(&amber::UndoStack, &QUndoStack::indexChanged, icon_view->viewport(),
+          qOverload<>(&QWidget::update));
+
   update_view_type();
 
   Retranslate();
