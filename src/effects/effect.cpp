@@ -50,6 +50,7 @@
 #include "effects/internal/cornerpineffect.h"
 #include "effects/internal/fillleftrighteffect.h"
 #include "effects/internal/frei0reffect.h"
+#include "effects/internal/gradienteffect.h"
 #include "effects/internal/paneffect.h"
 #include "effects/internal/richtexteffect.h"
 #include "effects/internal/shakeeffect.h"
@@ -260,6 +261,8 @@ static EffectPtr CreateInternalEffect(Clip* c, const EffectMeta* em) {
       return std::make_shared<RichTextEffect>(c, em);
     case EFFECT_INTERNAL_SUBTITLE:
       return std::make_shared<SubtitleEffect>(c, em);
+    case EFFECT_INTERNAL_GRADIENT:
+      return std::make_shared<GradientEffect>(c, em);
     default:
       return nullptr;
   }

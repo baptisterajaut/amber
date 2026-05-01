@@ -124,6 +124,7 @@ add_library(amber-engine OBJECT
   effects/internal/exponentialfadetransition.cpp effects/internal/exponentialfadetransition.h
   effects/internal/fillleftrighteffect.cpp effects/internal/fillleftrighteffect.h
   effects/internal/frei0reffect.cpp effects/internal/frei0reffect.h
+  effects/internal/gradienteffect.cpp effects/internal/gradienteffect.h
   effects/internal/linearfadetransition.cpp effects/internal/linearfadetransition.h
   effects/internal/logarithmicfadetransition.cpp effects/internal/logarithmicfadetransition.h
   effects/internal/paneffect.cpp effects/internal/paneffect.h

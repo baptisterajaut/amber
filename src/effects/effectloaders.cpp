@@ -115,6 +115,11 @@ void load_internal_effects() {
   em.internal = EFFECT_INTERNAL_SUBTITLE;
   effects.append(em);
 
+  em.name = "Gradient";
+  em.category = "Render";
+  em.internal = EFFECT_INTERNAL_GRADIENT;
+  effects.append(em);
+
   // internal transitions
   em.type = EFFECT_TYPE_TRANSITION;
   em.category = "";
