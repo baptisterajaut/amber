@@ -286,6 +286,8 @@ void LoadThread::parse_folder(QXmlStreamReader& stream) {
       folder->set_name(attr.value().toString());
     } else if (attr.name() == QLatin1String("parent")) {
       folder->temp_id2 = attr.value().toInt();
+    } else if (attr.name() == QLatin1String("label")) {
+      folder->set_color_label(attr.value().toInt());
     }
   }
   loaded_folders.append(folder);
