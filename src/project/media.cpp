@@ -28,6 +28,8 @@ extern "C" {
 
 #include <QCoreApplication>
 #include <QtMath>
+#include <QPainter>
+#include <QBrush>
 
 #include "footage.h"
 #include "engine/sequence.h"
@@ -37,6 +39,7 @@ extern "C" {
 #include "panels/viewer.h"
 #include "panels/project.h"
 #include "ui/icons.h"
+#include "ui/colorlabel.h"
 #include "projectmodel.h"
 #include "global/debug.h"
 
@@ -326,15 +329,21 @@ QVariant Media::data(int column, int role) {
   switch (role) {
   case Qt::DecorationRole:
     if (column == 0) {
+      QIcon base_icon = icon;
       if (get_type() == MEDIA_TYPE_FOOTAGE) {
         Footage* f = to_footage();
-        if (f->video_tracks.size() > 0
-            && f->video_tracks.at(0).preview_done) {
-          return QIcon(QPixmap::fromImage(f->video_tracks.at(0).video_preview));
+        if (f->video_tracks.size() > 0 && f->video_tracks.at(0).preview_done) {
+          base_icon = QIcon(QPixmap::fromImage(f->video_tracks.at(0).video_preview));
         }
       }
-
-      return icon;
+      if (amber::CurrentConfig.show_color_labels && color_label_ > 0) {
+        QPixmap px = base_icon.pixmap(32, 32);
+        QPainter p(&px);
+        p.fillRect(px.width() - 7, px.height() - 7, 6, 6, amber::GetColorLabel(color_label_));
+        p.end();
+        return QIcon(px);
+      }
+      return base_icon;
     }
     break;
   case Qt::DisplayRole:
@@ -365,6 +374,14 @@ QVariant Media::data(int column, int role) {
   case Qt::UserRole:
     // User role returns the duration
     return GetStringDuration();
+
+  case Qt::BackgroundRole:
+    if (amber::CurrentConfig.show_color_labels && color_label_ > 0) {
+      QColor c = amber::GetColorLabel(color_label_);
+      c.setAlpha(60);  // subtle tint, doesn't drown the text
+      return QBrush(c);
+    }
+    break;
   }
   return QVariant();
 }
