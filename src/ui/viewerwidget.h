@@ -75,6 +75,11 @@ class ViewerWidget : public QRhiWidget {
 
   void startColorPick();
 
+  // Repaints the overlay widget (sibling QWidget over the QRhiWidget).
+  // Use this when overlay-only state changes (e.g. voice-over pre-roll countdown)
+  // so we don't trigger a full RHI re-render.
+  void update_overlay();
+
  signals:
   void colorPicked(const QColor& color);
   void colorPickCancelled();
