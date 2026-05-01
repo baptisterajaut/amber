@@ -477,6 +477,8 @@ void Viewer::preroll_tick() {
     if (!start_recording()) {
       qCritical() << "Failed to record audio";
       uncue_recording();
+      preroll_seconds_left = 0;
+      viewer_widget->update_overlay();
       return;
     }
     playhead_start = seq->playhead;
