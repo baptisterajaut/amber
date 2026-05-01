@@ -99,6 +99,7 @@ private slots:
   void queue_post_update();
 
   void effects_area_context_menu();
+  void OnEffectListChanged();
 protected:
   void resizeEvent(QResizeEvent *event) override;
 private:
@@ -106,6 +107,8 @@ private:
   QVector<EffectUI*> open_effects_;
 
   void Load();
+
+  void SyncLabelColumnWidth();
 
   void DeleteEffect(ComboAction* ca, Effect* effect_ref);
 
