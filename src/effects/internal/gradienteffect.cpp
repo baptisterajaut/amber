@@ -45,9 +45,9 @@ GradientEffect::GradientEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
 
   EffectRow* angle_row = new EffectRow(this, tr("Angle"));
   angle_field = new DoubleField(angle_row, "angle");
-  angle_field->SetMinimum(-360);
+  angle_field->SetMinimum(-180);
   angle_field->SetDefault(0);
-  angle_field->SetMaximum(360);
+  angle_field->SetMaximum(180);
 
   EffectRow* cx_row = new EffectRow(this, tr("Center X"));
   center_x_field = new DoubleField(cx_row, "center_x");
@@ -63,7 +63,7 @@ GradientEffect::GradientEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
 
   EffectRow* radius_row = new EffectRow(this, tr("Radius"));
   radius_field = new DoubleField(radius_row, "radius");
-  radius_field->SetMinimum(1);
+  radius_field->SetMinimum(5);
   radius_field->SetDefault(50);
   radius_field->SetMaximum(150);
 }
@@ -74,7 +74,6 @@ void GradientEffect::redraw(double timecode) {
   img.fill(Qt::transparent);
 
   QPainter p(&img);
-  p.setRenderHint(QPainter::Antialiasing);
 
   const QColor c0 = start_color_field->GetColorAt(timecode);
   const QColor c1 = end_color_field->GetColorAt(timecode);
