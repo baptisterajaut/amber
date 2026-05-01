@@ -85,12 +85,14 @@ RichTextEffect::RichTextEffect(Clip *c, const EffectMeta *em) :
   EffectRow* stroke_color_row = new EffectRow(this, tr("Stroke Color"));
   stroke_color = new ColorField(stroke_color_row, "stroke_color");
   stroke_color->SetValueAt(0, QColor(Qt::black));
+  stroke_color->SetColumnSpan(2);
 
   EffectRow* stroke_width_row = new EffectRow(this, tr("Stroke Width"));
   stroke_width = new DoubleField(stroke_width_row, "stroke_width");
   stroke_width->SetMinimum(0);
   stroke_width->SetDefault(2.0);
-  stroke_width->SetMaximum(20);
+  stroke_width->SetMaximum(50);
+  stroke_width->SetColumnSpan(2);
 
   // Create default text
   text_val->SetValueAt(0, "<html>"
