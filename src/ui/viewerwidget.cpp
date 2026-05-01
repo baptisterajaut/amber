@@ -1147,6 +1147,10 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
   if (overlay_) overlay_->update();
 }
 
+void ViewerWidget::update_overlay() {
+  if (overlay_) overlay_->update();
+}
+
 // --- ViewerOverlay ---
 
 ViewerOverlay::ViewerOverlay(ViewerWidget* vw, QWidget* parent) : QWidget(parent), vw_(vw) {
@@ -1165,6 +1169,14 @@ void ViewerOverlay::paintEvent(QPaintEvent*) {
     vw_->draw_guides(p);
     if (vw_->gizmos != nullptr) {
       vw_->draw_gizmos(p);
+    }
+    if (vw_->viewer->preroll_seconds_left > 0) {
+      QFont f = p.font();
+      f.setPointSize(qMax(48, height() / 6));
+      f.setBold(true);
+      p.setFont(f);
+      p.setPen(QColor(255, 255, 255, 200));
+      p.drawText(rect(), Qt::AlignCenter, QString::number(vw_->viewer->preroll_seconds_left));
     }
   }
 }

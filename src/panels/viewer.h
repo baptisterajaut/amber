@@ -89,6 +89,10 @@ class Viewer : public Panel {
   long recording_end;
   int recording_track;
 
+  // Pre-roll countdown state. Read by ViewerOverlay::paintEvent to draw the
+  // 3,2,1 countdown overlay before voice-over recording actually starts.
+  int preroll_seconds_left{0};
+
   void reset_all_audio();
   void update_parents(bool reload_fx = false, bool scrubbing = false);
 
@@ -131,6 +135,7 @@ class Viewer : public Panel {
   void update_playhead();
   void timer_update();
   void recording_flasher_update();
+  void preroll_tick();
   void resize_move(double d);
 
   void drag_video_only();
@@ -174,6 +179,7 @@ class Viewer : public Panel {
 
   bool cue_recording_internal{false};
   QTimer recording_flasher;
+  QTimer preroll_timer;
 
   long previous_playhead;
   int playback_speed{0};
