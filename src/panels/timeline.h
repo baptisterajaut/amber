@@ -158,6 +158,7 @@ public:
   void SetTrackHeight(int track, int height);
 
   int SeamY();
+  void InvalidateSeamY() { seam_y_dirty_ = true; }
 
   // snapping
   bool snapping{true};
@@ -308,6 +309,9 @@ private:
   long rc_ripple_max;
 
   QVector<TimelineTrackHeight> track_heights;
+
+  int seam_y_cache_{0};
+  bool seam_y_dirty_{true};
 
   QWidget* timeline_area_widget;
   TimelineWidget* timeline_area;

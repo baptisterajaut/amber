@@ -96,13 +96,20 @@ Timeline::Timeline(QWidget *parent) :
 Timeline::~Timeline() = default;
 
 int Timeline::SeamY() {
-  if (!amber::ActiveSequence) return 0;
+  if (!seam_y_dirty_) return seam_y_cache_;
+  if (!amber::ActiveSequence) {
+    seam_y_cache_ = 0;
+    seam_y_dirty_ = false;
+    return 0;
+  }
   amber::timeline_layout::TrackHeights h;
   int video_count = 0, audio_count = 0;
   amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t)  h.audio.append(GetTrackHeight(t));
-  return amber::timeline_layout::seam_y(h);
+  seam_y_cache_ = amber::timeline_layout::seam_y(h);
+  seam_y_dirty_ = false;
+  return seam_y_cache_;
 }
 
 // Retranslate() moved to timeline_ui.cpp
@@ -852,6 +859,7 @@ int Timeline::GetTrackHeight(int track) {
 }
 
 void Timeline::SetTrackHeight(int track, int height) {
+  seam_y_dirty_ = true;
   for (auto & track_height : track_heights) {
     if (track_height.index == track) {
       track_height.height = height;

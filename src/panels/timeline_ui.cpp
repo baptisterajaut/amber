@@ -258,6 +258,7 @@ void Timeline::resizeEvent(QResizeEvent *) {
 }
 
 void Timeline::repaint_timeline() {
+  seam_y_dirty_ = true;
   if (!block_repaints) {
     if (amber::ActiveSequence != nullptr
         && !horizontalScrollBar->isSliderDown()
