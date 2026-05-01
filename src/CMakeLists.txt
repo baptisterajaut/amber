@@ -329,6 +329,8 @@ set(AMBER_EFFECTS
   effects/shaders/tile.xml
   effects/shaders/toonify.frag
   effects/shaders/toonify.xml
+  effects/shaders/turbulentdisplacement.frag
+  effects/shaders/turbulentdisplacement.xml
   effects/shaders/vignette.frag
   effects/shaders/vignette.xml
   effects/shaders/volumetriclight.frag
