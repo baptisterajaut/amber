@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Turbulent Displacement" category="Distort">
+	<row name="Amplitude X">
+		<field type="double" min="0" default="5" max="100" id="amplitude_x"/>
+	</row>
+	<row name="Amplitude Y">
+		<field type="double" min="0" default="5" max="100" id="amplitude_y"/>
+	</row>
+	<row name="Scale">
+		<field type="double" min="0.1" default="4" max="50" id="scale"/>
+	</row>
+	<row name="Evolution">
+		<field type="double" default="0" id="evolution"/>
+	</row>
+	<shader vert="common.vert" frag="turbulentdisplacement.frag"/>
+</effect>
