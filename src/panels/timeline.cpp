@@ -36,6 +36,7 @@
 
 #include "global/global.h"
 #include "panels/panels.h"
+#include "panels/timeline_layout.h"
 #include "project/projectelements.h"
 #include "ui/timelinewidget.h"
 #include "ui/icons.h"
@@ -67,9 +68,7 @@ Timeline::Timeline(QWidget *parent) :
 
   headers->viewer = panel_sequence_viewer;
 
-  video_area->bottom_align = true;
-  video_area->scrollBar = videoScrollbar;
-  audio_area->scrollBar = audioScrollbar;
+  timeline_area->scrollBar = verticalScrollbar;
 
   tool_buttons.append(toolArrowButton);
   tool_buttons.append(toolEditButton);
@@ -84,8 +83,7 @@ Timeline::Timeline(QWidget *parent) :
   toolArrowButton->click();
 
   connect(horizontalScrollBar, &ResizableScrollBar::valueChanged, this, &Timeline::setScroll);
-  connect(videoScrollbar, &QScrollBar::valueChanged, video_area, &TimelineWidget::setScroll);
-  connect(audioScrollbar, &QScrollBar::valueChanged, audio_area, &TimelineWidget::setScroll);
+  connect(verticalScrollbar, &QScrollBar::valueChanged, timeline_area, &TimelineWidget::setScroll);
   connect(horizontalScrollBar, &ResizableScrollBar::resize_move, this, &Timeline::resize_move);
 
   update_sequence();
@@ -94,6 +92,16 @@ Timeline::Timeline(QWidget *parent) :
 }
 
 Timeline::~Timeline() = default;
+
+int Timeline::SeamY() {
+  if (!amber::ActiveSequence) return 0;
+  amber::timeline_layout::TrackHeights h;
+  int video_count = 0, audio_count = 0;
+  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
+  for (int t = 0; t <= audio_count; ++t)  h.audio.append(GetTrackHeight(t));
+  return amber::timeline_layout::seam_y(h);
+}
 
 // Retranslate() moved to timeline_ui.cpp
 
@@ -582,20 +590,22 @@ void Timeline::select_all() {
 }
 
 void Timeline::scroll_to_frame(long frame) {
-  scroll_to_frame_internal(horizontalScrollBar, frame, zoom, timeline_area->width());
+  scroll_to_frame_internal(horizontalScrollBar, frame, zoom, timeline_area_widget->width());
 }
 
 void Timeline::scroll_to_track(int track) {
-  if (track < 0) {
-    // Video track — compute pixel offset from bottom for the target track
-    int offset = 0;
-    for (int t = -1; t > track; t--) {
-      offset += GetTrackHeight(t);
-    }
-    // Video area is bottom-aligned: scrollbar minimum is negative, 0 = bottom
-    int target = -(offset);
-    videoScrollbar->setValue(qMin(target, videoScrollbar->value()));
-  }
+  if (!amber::ActiveSequence) return;
+
+  // Build TrackHeights for all tracks in the sequence so we can locate the target track.
+  amber::timeline_layout::TrackHeights h;
+  int video_count = 0, audio_count = 0;
+  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
+  for (int t = 0; t <= audio_count; ++t)  h.audio.append(GetTrackHeight(t));
+
+  int target_top = amber::timeline_layout::track_top_y(h, track);
+  // Only scroll up to make the track visible (matches old behavior of qMin with current value).
+  verticalScrollbar->setValue(qMin(target_top, verticalScrollbar->value()));
 }
 
 void Timeline::select_from_playhead() {

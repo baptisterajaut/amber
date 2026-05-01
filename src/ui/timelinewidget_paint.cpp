@@ -455,18 +455,15 @@ void TimelineWidget::drawTrackLines(QPainter& p, int video_track_limit, int audi
     audio_track_limit++;
     if (video_track_limit == 0) video_track_limit--;
 
-    if (bottom_align) {
-      // only draw lines for video tracks
-      for (int i=video_track_limit;i<0;i++) {
-        int line_y = getScreenPointFromTrack(i) - 1;
-        p.drawLine(0, line_y, rect().width(), line_y);
-      }
-    } else {
-      // only draw lines for audio tracks
-      for (int i=0;i<audio_track_limit;i++) {
-        int line_y = getScreenPointFromTrack(i) + panel_timeline->GetTrackHeight(i);
-        p.drawLine(0, line_y, rect().width(), line_y);
-      }
+    // draw lines for video tracks
+    for (int i=video_track_limit;i<0;i++) {
+      int line_y = getScreenPointFromTrack(i) - 1;
+      p.drawLine(0, line_y, rect().width(), line_y);
+    }
+    // draw lines for audio tracks
+    for (int i=0;i<audio_track_limit;i++) {
+      int line_y = getScreenPointFromTrack(i) + panel_timeline->GetTrackHeight(i);
+      p.drawLine(0, line_y, rect().width(), line_y);
     }
   }
 }
@@ -485,11 +482,6 @@ void TimelineWidget::drawSelections(QPainter& p) {
   // draw rectangle select
   if (panel_timeline->rect_select_proc) {
     QRect rect_select = panel_timeline->rect_select_rect;
-
-    if (bottom_align) {
-      rect_select.translate(0, height());
-    }
-
     draw_selection_rectangle(p, rect_select);
   }
 }
@@ -588,22 +580,9 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
 
     // start by adding a track height worth of padding
     int panel_height = amber::timeline::kTrackDefaultHeight;
-
-    // loop through tracks for maximum panel height
-    if (bottom_align) {
-      for (int i=-1;i>=video_track_limit;i--) {
-        panel_height += panel_timeline->GetTrackHeight(i);
-      }
-    } else {
-      for (int i=0;i<=audio_track_limit;i++) {
-        panel_height += panel_timeline->GetTrackHeight(i);
-      }
-    }
-    if (bottom_align) {
-      scrollBar->setMinimum(qMin(0, - panel_height + height()));
-    } else {
-      scrollBar->setMaximum(qMax(0, panel_height - height()));
-    }
+    for (int i=-1;i>=video_track_limit;i--) panel_height += panel_timeline->GetTrackHeight(i);
+    for (int i=0;i<=audio_track_limit;i++)  panel_height += panel_timeline->GetTrackHeight(i);
+    scrollBar->setMaximum(qMax(0, panel_height - height()));
 
     drawClips(p);
     drawRecordingClip(p);
@@ -612,11 +591,6 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
     drawGhosts(p);
     drawSplittingCursor(p);
     drawPlayhead(p);
-
-    // draw border
-    p.setPen(QColor(0, 0, 0, 64));
-    int edge_y = (bottom_align) ? rect().height()-1 : 0;
-    p.drawLine(0, edge_y, rect().width(), edge_y);
 
     // draw snap point
     if (panel_timeline->snapped) {

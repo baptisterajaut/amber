@@ -240,6 +240,8 @@ set(OLIVE_SOURCES
   panels/undohistorypanel.h
   panels/timeline.cpp
   panels/timeline_clipboard.cpp
+  panels/timeline_layout.cpp
+  panels/timeline_layout.h
   panels/timeline_splitting.cpp
   panels/timeline_ui.cpp
   panels/timeline.h

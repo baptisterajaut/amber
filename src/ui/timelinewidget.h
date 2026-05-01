@@ -50,7 +50,6 @@ class TimelineWidget : public QWidget {
 public:
   explicit TimelineWidget(QWidget *parent = nullptr);
   QScrollBar* scrollBar;
-  bool bottom_align;
 
 public slots:
 
