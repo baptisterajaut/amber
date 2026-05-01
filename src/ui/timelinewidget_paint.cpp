@@ -592,6 +592,16 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
     drawSplittingCursor(p);
     drawPlayhead(p);
 
+    // draw the V/A seam — slightly stronger than the inter-track lines so the
+    // boundary between video and audio tracks remains visible after the merge.
+    {
+      const int seam_screen_y = panel_timeline->SeamY() - scroll;
+      if (seam_screen_y >= 0 && seam_screen_y < height()) {
+        p.setPen(QColor(0, 0, 0, 160));
+        p.drawLine(0, seam_screen_y, rect().width(), seam_screen_y);
+      }
+    }
+
     // draw snap point
     if (panel_timeline->snapped) {
       p.setPen(Qt::white);
