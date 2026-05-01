@@ -20,6 +20,8 @@
 
 #include "timeline.h"
 
+#include <limits>
+
 #include <QCheckBox>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -1218,7 +1220,12 @@ long getFrameFromScreenPoint(double zoom, int x) {
   return f;
 }
 
-int getScreenPointFromFrame(double zoom, long frame) { return qRound(double(frame) * zoom); }
+int getScreenPointFromFrame(double zoom, long frame) {
+  const double v = double(frame) * zoom;
+  if (v >= double(std::numeric_limits<int>::max())) return std::numeric_limits<int>::max();
+  if (v <= double(std::numeric_limits<int>::min())) return std::numeric_limits<int>::min();
+  return qRound(v);
+}
 
 long Timeline::getTimelineFrameFromScreenPoint(int x) { return getFrameFromScreenPoint(zoom, x + scroll); }
 
