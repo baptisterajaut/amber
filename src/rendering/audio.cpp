@@ -381,6 +381,10 @@ void write_wave_trailer(QFile& f) {
 }
 
 bool start_recording(const QString& project_filename) {
+  if (recording) {
+    qWarning() << "start_recording() called while recording is already active";
+    return false;
+  }
   QString audio_path = QCoreApplication::translate("Audio", "%1 Audio").arg(project_filename);
   QDir audio_dir(audio_path);
   if (!audio_dir.exists() && !audio_dir.mkpath(".")) {
