@@ -20,6 +20,8 @@
 
 #include "timeline.h"
 
+#include <limits>
+
 #include <QTime>
 #include <QScrollBar>
 #include <QtMath>
@@ -1256,7 +1258,10 @@ long getFrameFromScreenPoint(double zoom, int x) {
 }
 
 int getScreenPointFromFrame(double zoom, long frame) {
-  return qRound(double(frame)*zoom);
+  const double v = double(frame) * zoom;
+  if (v >= double(std::numeric_limits<int>::max())) return std::numeric_limits<int>::max();
+  if (v <= double(std::numeric_limits<int>::min())) return std::numeric_limits<int>::min();
+  return qRound(v);
 }
 
 long Timeline::getTimelineFrameFromScreenPoint(int x) {
