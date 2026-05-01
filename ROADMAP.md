@@ -16,7 +16,25 @@ Amber inherits Olive 0.1's greatest strength: everything is where you expect it.
 - ~~Shift+Arrow multi-frame skip — alias for Jump Backward/Forward, configurable step in preferences~~ (shipped in v1.6.0, #15)
 - ~~Bold timecodes on viewer~~ (shipped in v1.6.0, #12)
 
-### 1.7+ — Quality-of-life (pending)
+### 1.7 — Quality-of-life (in progress)
+
+Visible features and small effects, no architectural change, no `.ove` format change.
+
+- **Color labels on media** — surface the existing `Clip` color label field on `Media` items in the project panel; right-click → label color, optional column tint.
+- **Text stroke** — QPainterPath outline on the rich text effect (color + width fields). (#12)
+- **Effect controls alignment** — labels and values laid out in a consistent grid in `CollapsibleWidget` / `EffectRow` (labels left-aligned, values right-aligned). (#12)
+- **Gradient generator** — linear/radial generator effect with multi-stop color ramp, applicable to solids and text. New XML+GLSL shader effect, fits existing infrastructure. (#21)
+- **Turbulent displacement** — single-pass fragment shader (Perlin/simplex noise → UV warp → texture lookup) for stop-motion / glitch / heat-haze looks. Fits existing XML+GLSL shader effect infrastructure. (#35)
+- **Unified timeline (no video/audio split)** — merge the `video_area` / `audio_area` widgets into a single continuous track stack. Removes the splitter handle inherited from Olive 0.1. Track-id semantics (`<0` video, `>=0` audio) and `.ove` format unchanged. Replaces the previously-planned compact timeline mode. (#38)
+- **Voice-over UX polish** — recording itself already works (record button arms Add Audio, click to choose track, Play/Stop saves WAV + inserts clip). Adds a live input VU meter while armed/recording and an optional pre-roll countdown. (#39)
+
+Stretch goals — pulled in if the above ship cleanly:
+
+- **Linked clip vertical drag** — V+A clips move together across tracks when dragging a linked pair, standard NLE behavior. (#12)
+- **Motion blur** — shutter-angle integration on animated transforms via keyframe sub-sampling at render time. Per-clip toggle + global default. Animation-driven only — true per-pixel motion vectors stays post-2.0. (#36)
+- **Hardware encoding export (NVENC, VAAPI, QSV)** — hwaccel decoding exists; expose FFmpeg encoder variants in the export dialog.
+
+### 1.x backlog (post-1.7)
 
 - **Canvas Painter for viewer overlays (Qt 6.11)** — replace QPainter with Qt Canvas Painter (GPU-accelerated 2D on QRhi, 2-10x faster) for title-safe, guides, gizmos. Drop-in API swap, same drawing logic. Tech preview — API may shift in 6.12.
 - **Callback-based audio I/O (Qt 6.11)** — `QAudioSink::start()` now accepts a callback for real-time audio processing, replacing QIODevice push/pull. Adopt for audio monitoring and scrub playback — cleaner, lower latency.
@@ -61,16 +79,12 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Audio FFT input (`iChannel` of type audio)
 
 ### New built-in effects
-- Gradient generator — linear/radial with multi-stop color ramp, applicable to solids and text (#21)
 - Timer / countdown
 - Progress bar
 - Lift / gamma / gain (3-way color correction)
 - Color correction tool (curves, scopes — waveform, vectorscope, histogram)
 - Subtitle editor — dedicated floating window for bulk subtitle editing (import is shipped in 1.5.0, this is the full editing UI)
-- **Text stroke** — QPainterPath outline on rich text effect (#12)
 - **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
-- **Turbulent displacement** — noise-driven UV warp for stop-motion / glitch / heat-haze looks. Single-pass fragment shader (Perlin/simplex noise → displacement vector → texture lookup), fits the existing XML+GLSL shader effect infrastructure. Also reachable via ShaderToy import once that lands. (#35)
-- **Motion blur** — shutter-angle integration on animated transforms: at render time, sample the Transform effect's keyframes at N sub-frame positions within the shutter window and accumulate. Per-clip toggle + global default. Scope: animation-driven motion blur only — true per-pixel motion vectors (camera/object motion in source footage) is post-2.0, requires optical flow. (#36)
 
 ### Scopes & monitoring
 
