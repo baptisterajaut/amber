@@ -1068,9 +1068,6 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
           } else {
             stream.writeAttribute("parent", QString::number(amber::project_model.getItem(item.parent())->temp_id));
           }
-          if (m->color_label() > 0) {
-            stream.writeAttribute("label", QString::number(m->color_label()));
-          }
           stream.writeEndElement();
         }
         // save_folder(stream, item, type, set_ids_only);
