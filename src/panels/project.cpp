@@ -1068,6 +1068,9 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
           } else {
             stream.writeAttribute("parent", QString::number(amber::project_model.getItem(item.parent())->temp_id));
           }
+          if (m->color_label() > 0) {
+            stream.writeAttribute("label", QString::number(m->color_label()));
+          }
           stream.writeEndElement();
         }
         // save_folder(stream, item, type, set_ids_only);
@@ -1091,6 +1094,9 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
 
           stream.writeAttribute("proxy", QString::number(f->proxy));
           stream.writeAttribute("proxypath", f->proxy_path);
+          if (m->color_label() > 0) {
+            stream.writeAttribute("label", QString::number(m->color_label()));
+          }
 
           // save video stream metadata
           for (const auto& ms : f->video_tracks) {
@@ -1141,6 +1147,9 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
             stream.writeAttribute("workarea", QString::number(s->using_workarea));
             stream.writeAttribute("workareaIn", QString::number(s->workarea_in));
             stream.writeAttribute("workareaOut", QString::number(s->workarea_out));
+            if (m->color_label() > 0) {
+              stream.writeAttribute("label", QString::number(m->color_label()));
+            }
 
             for (const auto& guide : s->guides) {
               stream.writeStartElement("guide");

@@ -64,6 +64,10 @@ public:
   double get_frame_rate(int stream = -1);
   int get_sampling_rate(int stream = -1);
 
+  int color_label() const { return color_label_; }
+  void set_color_label(int label) { color_label_ = label; }
+  int* color_label_ptr() { return &color_label_; }
+
   // item functions
   void appendChild(MediaPtr child);
   bool setData(int col, const QVariant &value);
@@ -86,6 +90,7 @@ public:
 private:
   int type{-1};
   VoidPtr object;
+  int color_label_{0};
 
   QString GetStringDuration();
 

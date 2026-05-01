@@ -300,6 +300,8 @@ void LoadThread::parse_folder(QXmlStreamReader& stream) {
       folder->set_name(attr.value().toString());
     } else if (attr.name() == QLatin1String("parent")) {
       folder->temp_id2 = attr.value().toInt();
+    } else if (attr.name() == QLatin1String("label")) {
+      folder->set_color_label(attr.value().toInt());
     }
   }
   loaded_folders.append(folder);
@@ -341,6 +343,8 @@ void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& chil
       f->proxy_path = attr.value().toString();
     } else if (attr.name() == QLatin1String("startnumber")) {
       f->start_number = attr.value().toInt();
+    } else if (attr.name() == QLatin1String("label")) {
+      item->set_color_label(attr.value().toInt());
     }
   }
 
@@ -466,7 +470,7 @@ bool LoadThread::parse_clip(QXmlStreamReader& stream, SequencePtr s) {
   return true;
 }
 
-void LoadThread::parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent) {
+void LoadThread::parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr s, Media*& parent, int& color_label) {
   for (int j = 0; j < stream.attributes().size(); j++) {
     const QXmlStreamAttribute& attr = stream.attributes().at(j);
     if (attr.name() == QLatin1String("name")) {
@@ -494,6 +498,8 @@ void LoadThread::parse_sequence_attributes(QXmlStreamReader& stream, SequencePtr
       s->workarea_in = attr.value().toLong();
     } else if (attr.name() == QLatin1String("workareaOut")) {
       s->workarea_out = attr.value().toLong();
+    } else if (attr.name() == QLatin1String("label")) {
+      color_label = attr.value().toInt();
     }
   }
 
@@ -541,9 +547,10 @@ bool LoadThread::correct_clip_links(SequencePtr s) {
 
 bool LoadThread::parse_sequence(QXmlStreamReader& stream, const QStringView& child_search) {
   Media* parent = nullptr;
+  int color_label = 0;
   SequencePtr s = std::make_shared<Sequence>();
 
-  parse_sequence_attributes(stream, s, parent);
+  parse_sequence_attributes(stream, s, parent, color_label);
 
   // load all clips, markers, and guides
   while (!cancelled_ && !(stream.name() == child_search && stream.isEndElement()) && !stream.atEnd()) {
@@ -561,6 +568,9 @@ bool LoadThread::parse_sequence(QXmlStreamReader& stream, const QStringView& chi
   if (!correct_clip_links(s)) return false;
 
   MediaPtr m = panel_project->create_sequence_internal(nullptr, s, false, parent);
+  if (m) {
+    m->set_color_label(color_label);
+  }
 
   loaded_sequences.append(m.get());
   return true;
