@@ -28,6 +28,8 @@ extern "C" {
 
 #include <QCoreApplication>
 #include <QtMath>
+#include <QPainter>
+#include <QBrush>
 
 #include "engine/sequence.h"
 #include "engine/undo/undo.h"
@@ -36,6 +38,7 @@ extern "C" {
 #include "global/config.h"
 #include "global/debug.h"
 #include "projectmodel.h"
+#include "ui/colorlabel.h"
 #include "ui/icons.h"
 
 QString get_interlacing_name(int interlacing) {
@@ -323,13 +326,21 @@ QVariant Media::data(int column, int role) {
   switch (role) {
     case Qt::DecorationRole:
       if (column == 0) {
+        QIcon base_icon = icon;
         if (get_type() == MEDIA_TYPE_FOOTAGE) {
           Footage* f = to_footage();
           if (f->video_tracks.size() > 0 && f->video_tracks.at(0).preview_done) {
-            return QIcon(QPixmap::fromImage(f->video_tracks.at(0).video_preview));
+            base_icon = QIcon(QPixmap::fromImage(f->video_tracks.at(0).video_preview));
           }
         }
-        return icon;
+        if (amber::CurrentConfig.show_color_labels && color_label_ > 0) {
+          QPixmap px = base_icon.pixmap(32, 32);
+          QPainter p(&px);
+          p.fillRect(px.width() - 7, px.height() - 7, 6, 6, amber::GetColorLabel(color_label_));
+          p.end();
+          return QIcon(px);
+        }
+        return base_icon;
       }
       break;
     case Qt::DisplayRole:
@@ -348,6 +359,13 @@ QVariant Media::data(int column, int role) {
       return tooltip;
     case Qt::UserRole:
       return GetStringDuration();
+    case Qt::BackgroundRole:
+      if (amber::CurrentConfig.show_color_labels && color_label_ > 0) {
+        QColor c = amber::GetColorLabel(color_label_);
+        c.setAlpha(60);
+        return QBrush(c);
+      }
+      break;
   }
   return QVariant();
 }

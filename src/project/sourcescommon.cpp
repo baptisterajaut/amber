@@ -44,8 +44,10 @@
 #include "rendering/renderfunctions.h"
 #include "ui/mainwindow.h"
 #include "ui/menu.h"
+#include "ui/colorlabel.h"
 #include "ui/menuhelper.h"
 #include "ui/viewerwidget.h"
+#include "engine/undo/undostack.h"
 
 SourcesCommon::SourcesCommon(Project* parent, ProjectFilter& sort_filter)
     :
@@ -201,6 +203,19 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
     }
     QAction* properties_action = menu.addAction(tr("Properties..."));
     QObject::connect(properties_action, &QAction::triggered, project_parent, &Project::open_properties);
+
+    if (amber::CurrentConfig.show_color_labels) {
+      QMenu* color_menu = amber::BuildColorLabelMenu(&menu);
+      QList<Media*> targets;
+      for (const auto& it : items) targets.append(project_parent->item_to_media(it));
+      connect(color_menu, &QMenu::triggered, this, [targets](QAction* action) {
+        int label = action->data().toInt();
+        ComboAction* ca = new ComboAction(QObject::tr("Set Color Label"));
+        for (Media* m : targets) ca->append(new SetInt(m->color_label_ptr(), label));
+        amber::UndoStack.push(ca);
+      });
+      menu.addMenu(color_menu);
+    }
   }
 
   menu.exec(QCursor::pos());
