@@ -203,6 +203,10 @@ class Cacher : public QThread {
    */
   void Close(bool wait_for_finish);
 
+  // See prewarmed_ for semantics.
+  bool IsPrewarmed() const { return prewarmed_.load(std::memory_order_relaxed); }
+  void MarkPrewarmed() { prewarmed_.store(true, std::memory_order_relaxed); }
+
   /**
    * @brief Interrupt and reset audio state
    *
@@ -846,6 +850,11 @@ class Cacher : public QThread {
   bool cacheServeStillImage();
   bool cacheTryQueueHit();
   void cacheWaitForResponse();
+
+  // Set true after the first pre-decode at the start of an open cycle.
+  // Prevents repeated pre-decodes that would steal iGPU decode bandwidth from
+  // the currently-playing clip (see issue #43 fix). Reset in CloseWorker().
+  std::atomic<bool> prewarmed_{false};
 };
 
 #endif  // CACHER_H

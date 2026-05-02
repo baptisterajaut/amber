@@ -65,6 +65,9 @@ class Clip {
   bool IsActiveAt(long timecode);
   bool IsSelected(bool containing = true);
 
+  bool IsPrewarmed() const { return cacher.IsPrewarmed(); }
+  void MarkPrewarmed() { cacher.MarkPrewarmed(); }
+
   const QColor& color() const;
   void set_color(int r, int g, int b);
   void set_color(const QColor& c);
