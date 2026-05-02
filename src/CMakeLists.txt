@@ -2,7 +2,16 @@ cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
 project(amber-editor LANGUAGES CXX)
 
-set(AMBER_VERSION "dev" CACHE STRING "Application version (pass -DAMBER_VERSION=x.y.z)")
+# Version: prefer -DAMBER_VERSION, fall back to AMBER_VERSION env var, then "dev".
+if(NOT AMBER_VERSION OR AMBER_VERSION STREQUAL "dev")
+  if(DEFINED ENV{AMBER_VERSION} AND NOT "$ENV{AMBER_VERSION}" STREQUAL "")
+    set(AMBER_VERSION "$ENV{AMBER_VERSION}" CACHE STRING "Application version" FORCE)
+  endif()
+endif()
+set(AMBER_VERSION "${AMBER_VERSION}" CACHE STRING "Application version (pass -DAMBER_VERSION=x.y.z or set AMBER_VERSION env var)")
+if(NOT AMBER_VERSION)
+  set(AMBER_VERSION "dev")
+endif()
 
 option(BUILD_DOXYGEN "Build Doxygen documentation" OFF)
 
@@ -19,12 +28,25 @@ set(AMBER_DEFINITIONS -DQT_DEPRECATED_WARNINGS)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-if(UNIX AND NOT APPLE AND NOT DEFINED OpenGL_GL_PREFERENCE)
-  set(OpenGL_GL_PREFERENCE LEGACY)
+# Detect mingw / Windows (target). Fedora's mingw64-cmake toolchain doesn't
+# always set CMAKE_SYSTEM_NAME=Windows reliably, so we also pattern-match the
+# compiler path. On Windows we skip find_package(OpenGL) entirely — Qt6::OpenGL
+# transitively pulls opengl32, and FindOpenGL with GLVND drift in fedora:42's
+# mingw64-mesa breaks the configure step.
+if(WIN32 OR MINGW OR CMAKE_CXX_COMPILER MATCHES "mingw|w64-")
+  set(AMBER_TARGET_WINDOWS TRUE)
+else()
+  set(AMBER_TARGET_WINDOWS FALSE)
 endif()
-find_package(OpenGL REQUIRED)
 
-if(UNIX AND NOT APPLE)
+if(NOT AMBER_TARGET_WINDOWS)
+  if(UNIX AND NOT APPLE AND NOT DEFINED OpenGL_GL_PREFERENCE)
+    set(OpenGL_GL_PREFERENCE LEGACY)
+  endif()
+  find_package(OpenGL REQUIRED)
+endif()
+
+if(UNIX AND NOT APPLE AND NOT AMBER_TARGET_WINDOWS)
   find_package(X11 REQUIRED)
 endif()
 
@@ -58,7 +80,7 @@ if(NOFREI0R)
   list(APPEND AMBER_DEFINITIONS -DNOFREI0R)
 endif()
 
-if(WIN32)
+if(AMBER_TARGET_WINDOWS)
   find_package(OpenColorIO)
   if(OPENCOLORIO_FOUND)
     list(APPEND AMBER_DEFINITIONS -DAMBER_OCIO)
@@ -172,7 +194,7 @@ set_target_properties(amber-engine PROPERTIES AUTOMOC ON AUTORCC ON)
 target_compile_definitions(amber-engine PUBLIC ${AMBER_DEFINITIONS})
 
 target_link_libraries(amber-engine PUBLIC
-  OpenGL::GL
+  $<$<NOT:$<BOOL:${AMBER_TARGET_WINDOWS}>>:OpenGL::GL>
   Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::Widgets Qt6::Multimedia
   Qt6::OpenGL Qt6::OpenGLWidgets Qt6::ShaderToolsPrivate Qt6::Svg
   FFMPEG::avutil FFMPEG::avcodec FFMPEG::avformat FFMPEG::avfilter
@@ -364,6 +386,37 @@ if(APPLE)
   set(AMBER_TARGET "Amber")
 endif()
 
+# Windows: embed icon + version info via resources.rc, parse AMBER_VERSION into MAJOR/MINOR/PATCH
+# for VS_VERSION_INFO. Falls back to 0.0.0 for "dev" or unparseable versions.
+if(AMBER_TARGET_WINDOWS)
+  enable_language(RC)
+
+  string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" _AMBER_VER_MATCH "${AMBER_VERSION}")
+  if(CMAKE_MATCH_1)
+    set(AMBER_VER_MAJOR "${CMAKE_MATCH_1}")
+    set(AMBER_VER_MINOR "${CMAKE_MATCH_2}")
+    set(AMBER_VER_PATCH "${CMAKE_MATCH_3}")
+  else()
+    set(AMBER_VER_MAJOR 0)
+    set(AMBER_VER_MINOR 0)
+    set(AMBER_VER_PATCH 0)
+  endif()
+
+  set(WINRES_DIR "${CMAKE_BINARY_DIR}/winres")
+  configure_file(
+    "${CMAKE_SOURCE_DIR}/../packaging/windows/version.h.in"
+    "${WINRES_DIR}/version.h"
+    @ONLY
+  )
+  file(COPY
+    "${CMAKE_SOURCE_DIR}/../packaging/windows/resources.rc"
+    "${CMAKE_SOURCE_DIR}/../packaging/windows/amber.ico"
+    "${CMAKE_SOURCE_DIR}/../packaging/windows/olive_ove.ico"
+    DESTINATION "${WINRES_DIR}"
+  )
+  list(APPEND AMBER_RESOURCES "${WINRES_DIR}/resources.rc")
+endif()
+
 add_executable(${AMBER_TARGET}
   ${UI_SOURCES}
   ${AMBER_RESOURCES}
@@ -371,12 +424,21 @@ add_executable(${AMBER_TARGET}
   ${AMBER_QM_FILES}
 )
 
+# Windows GUI subsystem: WIN32_EXECUTABLE only activates when CMake's WIN32 var
+# is TRUE, which it isn't reliably on Fedora's mingw64 toolchain. Add -mwindows
+# to the linker explicitly so the exe doesn't spawn a console window. Qt6::Core
+# transitively links Qt6::EntryPoint which provides the WinMain → main shim.
+if(AMBER_TARGET_WINDOWS)
+  set_target_properties(${AMBER_TARGET} PROPERTIES WIN32_EXECUTABLE TRUE)
+  target_link_options(${AMBER_TARGET} PRIVATE -mwindows)
+endif()
+
 target_link_libraries(${AMBER_TARGET} PRIVATE
   amber-engine
   $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
 )
 
-if(WIN32 AND OPENCOLORIO_FOUND)
+if(AMBER_TARGET_WINDOWS AND OPENCOLORIO_FOUND)
   target_link_libraries(${AMBER_TARGET} PRIVATE OpenColorIO)
 endif()
 
