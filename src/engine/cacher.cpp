@@ -462,6 +462,7 @@ void Cacher::CacheWorker() {
 }
 
 void Cacher::CloseWorker() {
+  prewarmed_ = false;
   retrieved_frame = nullptr;
   queue_.lock();
   queue_.clear();

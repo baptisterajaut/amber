@@ -199,6 +199,18 @@ class Cacher : public QThread {
   void Close(bool wait_for_finish);
 
   /**
+   * @brief Whether this cacher has already pre-decoded its first frame in the current open cycle.
+   *
+   * Used by the compositor to fire a pre-warm decode at most once per open cycle.
+   */
+  bool IsPrewarmed() const { return prewarmed_; }
+
+  /**
+   * @brief Mark this cacher as having issued a pre-warm decode in the current open cycle.
+   */
+  void MarkPrewarmed() { prewarmed_ = true; }
+
+  /**
    * @brief Interrupt and reset audio state
    *
    * Used in tandem with Cache(), only for audio clips. Cache() will decode and send audio continually as it's
@@ -720,6 +732,11 @@ class Cacher : public QThread {
    * @brief Internal function using the Cacher's known information to determine whether this media is playing in reverse
    */
   bool IsReversed();
+
+  // Set true after the first pre-decode at the start of an open cycle.
+  // Prevents repeated pre-decodes that would steal iGPU decode bandwidth from
+  // the currently-playing clip (see issue #43 fix). Reset in CloseWorker().
+  bool prewarmed_{false};
 };
 
 #endif  // CACHER_H
