@@ -487,10 +487,13 @@ static QVector<Clip*> collect_active_clips(Sequence* s, long playhead, ComposeSe
             // stutter at cuts on Windows (issue #43).
             //
             // Gates:
-            //   - wait_for_mutexes && video : only the RenderThread, never the
-            //     GUI thread (compose_audio path) or ExportThread.
-            //   - track() < 0              : video only. Pre-decoding an audio
-            //     clip would write into audio_ibuffer at the wrong offset.
+            //   - wait_for_mutexes && video : RenderThread only, never the
+            //     GUI thread (compose_audio path) or ExportThread. Audio clips
+            //     are already filtered out by the params.video guard above.
+            //   - !scrubbing               : playback only. During scrub the
+            //     user's hover dictates which clip to decode; pre-warming
+            //     would block the render thread on cacher-respond for clips
+            //     the user may not even reach.
             //   - playhead < timeline_in   : the playhead hasn't reached this
             //     clip yet (we're inside the open_buffer pre-warm window).
             //   - !IsPrewarmed()           : fire at most once per open cycle
@@ -499,7 +502,7 @@ static QVector<Clip*> collect_active_clips(Sequence* s, long playhead, ComposeSe
             // Cache args MUST match the live composite_video_clip call so the
             // queue lookup hits on the same target_pts when the playhead
             // actually crosses in.
-            if (params.wait_for_mutexes && params.video && c->track() < 0
+            if (params.wait_for_mutexes && params.video && !params.scrubbing
                 && playhead < c->timeline_in(true)
                 && c->IsOpen()
                 && !c->IsPrewarmed()) {
