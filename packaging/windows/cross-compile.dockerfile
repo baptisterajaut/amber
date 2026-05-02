@@ -31,6 +31,7 @@ ARG GIT_HASH
 ARG VERSION=dev
 
 COPY src/ /src
+COPY packaging/ /packaging
 COPY LICENSE /LICENSE
 WORKDIR /src/build
 
