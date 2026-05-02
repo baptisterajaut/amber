@@ -479,6 +479,33 @@ static QVector<Clip*> collect_active_clips(Sequence* s, long playhead, ComposeSe
             if (!c->IsOpen()) {
               c->Open();
             }
+            // Pre-decode the first frame of upcoming video clips while still
+            // inside the IsActiveAt open_buffer window (~2s before the playhead
+            // crosses in). Without this, the first Cache() call at the boundary
+            // wakes the cacher cold and the render thread stalls until the
+            // first frame is decoded — that stall is the audible/visible
+            // stutter at cuts on Windows (issue #43).
+            //
+            // Gates:
+            //   - wait_for_mutexes && video : only the RenderThread, never the
+            //     GUI thread (compose_audio path) or ExportThread.
+            //   - track() < 0              : video only. Pre-decoding an audio
+            //     clip would write into audio_ibuffer at the wrong offset.
+            //   - playhead < timeline_in   : the playhead hasn't reached this
+            //     clip yet (we're inside the open_buffer pre-warm window).
+            //   - !IsPrewarmed()           : fire at most once per open cycle
+            //     to avoid hammering shared iGPU decode bandwidth.
+            //
+            // Cache args MUST match the live composite_video_clip call so the
+            // queue lookup hits on the same target_pts when the playhead
+            // actually crosses in.
+            if (params.wait_for_mutexes && params.video && c->track() < 0
+                && playhead < c->timeline_in(true)
+                && c->IsOpen()
+                && !c->IsPrewarmed()) {
+              c->Cache(c->timeline_in(), false, params.nests, params.playback_speed);
+              c->MarkPrewarmed();
+            }
             clip_is_active = true;
             if (c->track() >= 0) audio_track_count++;
           } else if (c->IsOpen()) {
