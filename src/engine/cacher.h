@@ -198,17 +198,9 @@ class Cacher : public QThread {
    */
   void Close(bool wait_for_finish);
 
-  /**
-   * @brief Whether this cacher has already pre-decoded its first frame in the current open cycle.
-   *
-   * Used by the compositor to fire a pre-warm decode at most once per open cycle.
-   */
-  bool IsPrewarmed() const { return prewarmed_; }
-
-  /**
-   * @brief Mark this cacher as having issued a pre-warm decode in the current open cycle.
-   */
-  void MarkPrewarmed() { prewarmed_ = true; }
+  // See prewarmed_ for semantics.
+  bool IsPrewarmed() const { return prewarmed_.load(std::memory_order_relaxed); }
+  void MarkPrewarmed() { prewarmed_.store(true, std::memory_order_relaxed); }
 
   /**
    * @brief Interrupt and reset audio state
@@ -736,7 +728,7 @@ class Cacher : public QThread {
   // Set true after the first pre-decode at the start of an open cycle.
   // Prevents repeated pre-decodes that would steal iGPU decode bandwidth from
   // the currently-playing clip (see issue #43 fix). Reset in CloseWorker().
-  bool prewarmed_{false};
+  std::atomic<bool> prewarmed_{false};
 };
 
 #endif  // CACHER_H
