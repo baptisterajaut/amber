@@ -8,7 +8,9 @@ RUN dnf install -y \
     mingw64-qt6-qttools \
     mingw64-qt6-qtmultimedia \
     mingw64-qt6-qtshadertools \
-    qt6-qttools \
+    qt6-qtbase-devel \
+    qt6-qttools-devel \
+    qt6-qtshadertools-devel \
     cmake \
     make \
     && dnf clean all
@@ -37,7 +39,9 @@ WORKDIR /src/build
 
 RUN mingw64-cmake -DCMAKE_BUILD_TYPE=Release \
       ${GIT_HASH:+-DGIT_HASH=${GIT_HASH}} \
-      -DAMBER_VERSION=${VERSION} .. && \
+      -DAMBER_VERSION=${VERSION} \
+      -DQT_HOST_PATH=/usr \
+      -DQT_HOST_PATH_CMAKE_DIR=/usr/lib64/cmake .. && \
     make -j$(nproc)
 
 # --- Packaging stage ---

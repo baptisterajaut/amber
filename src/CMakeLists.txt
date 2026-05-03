@@ -39,6 +39,14 @@ else()
   set(AMBER_TARGET_WINDOWS FALSE)
 endif()
 
+# Enable RC language up front (Windows target) so that CMake doesn't trigger a
+# second configure pass after find_package(Qt6). On Fedora's mingw cross build,
+# the second pass loses QT_HOST_PATH_CMAKE_DIR prepending and fails to locate
+# Qt6CoreTools.
+if(AMBER_TARGET_WINDOWS)
+  enable_language(RC)
+endif()
+
 if(NOT AMBER_TARGET_WINDOWS)
   if(UNIX AND NOT APPLE AND NOT DEFINED OpenGL_GL_PREFERENCE)
     set(OpenGL_GL_PREFERENCE LEGACY)
@@ -389,8 +397,6 @@ endif()
 # Windows: embed icon + version info via resources.rc, parse AMBER_VERSION into MAJOR/MINOR/PATCH
 # for VS_VERSION_INFO. Falls back to 0.0.0 for "dev" or unparseable versions.
 if(AMBER_TARGET_WINDOWS)
-  enable_language(RC)
-
   string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" _AMBER_VER_MATCH "${AMBER_VERSION}")
   if(CMAKE_MATCH_1)
     set(AMBER_VER_MAJOR "${CMAKE_MATCH_1}")
