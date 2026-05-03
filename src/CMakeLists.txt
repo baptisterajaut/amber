@@ -28,12 +28,33 @@ set(OLIVE_DEFINITIONS -DQT_DEPRECATED_WARNINGS)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-if(UNIX AND NOT APPLE AND NOT DEFINED OpenGL_GL_PREFERENCE)
-  set(OpenGL_GL_PREFERENCE LEGACY)
+# Detect mingw / Windows (target). Fedora's mingw64-cmake toolchain doesn't
+# always set CMAKE_SYSTEM_NAME=Windows reliably, so we also pattern-match the
+# compiler path. On Windows we skip find_package(OpenGL) entirely — Qt6::OpenGL
+# transitively pulls opengl32, and FindOpenGL with GLVND drift in fedora:42's
+# mingw64-mesa breaks the configure step.
+if(WIN32 OR MINGW OR CMAKE_CXX_COMPILER MATCHES "mingw|w64-")
+  set(AMBER_TARGET_WINDOWS TRUE)
+else()
+  set(AMBER_TARGET_WINDOWS FALSE)
 endif()
-find_package(OpenGL REQUIRED)
 
-if(UNIX AND NOT APPLE)
+# Enable RC language up front (Windows target) so that CMake doesn't trigger a
+# second configure pass after find_package(Qt6). On Fedora's mingw cross build,
+# the second pass loses QT_HOST_PATH_CMAKE_DIR prepending and fails to locate
+# Qt6CoreTools.
+if(AMBER_TARGET_WINDOWS)
+  enable_language(RC)
+endif()
+
+if(NOT AMBER_TARGET_WINDOWS)
+  if(UNIX AND NOT APPLE AND NOT DEFINED OpenGL_GL_PREFERENCE)
+    set(OpenGL_GL_PREFERENCE LEGACY)
+  endif()
+  find_package(OpenGL REQUIRED)
+endif()
+
+if(UNIX AND NOT APPLE AND NOT AMBER_TARGET_WINDOWS)
   find_package(X11 REQUIRED)
 endif()
 
@@ -67,7 +88,7 @@ if(NOFREI0R)
   list(APPEND OLIVE_DEFINITIONS -DNOFREI0R)
 endif()
 
-if(WIN32)
+if(AMBER_TARGET_WINDOWS)
   find_package(OpenColorIO)
   if(OPENCOLORIO_FOUND)
     list(APPEND OLIVE_DEFINITIONS -DOLIVE_OCIO)
@@ -479,9 +500,7 @@ endif()
 
 # Windows: embed icon + version info via resources.rc, parse AMBER_VERSION into MAJOR/MINOR/PATCH
 # for VS_VERSION_INFO. Falls back to 0.0.0 for "dev" or unparseable versions.
-if(WIN32)
-  enable_language(RC)
-
+if(AMBER_TARGET_WINDOWS)
   string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)" _AMBER_VER_MATCH "${AMBER_VERSION}")
   if(CMAKE_MATCH_1)
     set(AMBER_VER_MAJOR "${CMAKE_MATCH_1}")
@@ -508,12 +527,21 @@ if(WIN32)
   list(APPEND OLIVE_RESOURCES "${WINRES_DIR}/resources.rc")
 endif()
 
-add_executable(${OLIVE_TARGET} WIN32
+add_executable(${OLIVE_TARGET}
   ${OLIVE_SOURCES}
   ${OLIVE_RESOURCES}
   ${OLIVE_EFFECTS}
   ${OLIVE_QM_FILES}
 )
+
+# Windows GUI subsystem: WIN32_EXECUTABLE only activates when CMake's WIN32 var
+# is TRUE, which it isn't reliably on Fedora's mingw64 toolchain. Add -mwindows
+# to the linker explicitly so the exe doesn't spawn a console window. Qt6::Core
+# transitively links Qt6::EntryPoint which provides the WinMain → main shim.
+if(AMBER_TARGET_WINDOWS)
+  set_target_properties(${OLIVE_TARGET} PROPERTIES WIN32_EXECUTABLE TRUE)
+  target_link_options(${OLIVE_TARGET} PRIVATE -mwindows)
+endif()
 
 add_subdirectory(core)
 add_subdirectory(engine)
@@ -568,7 +596,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 target_link_libraries(${OLIVE_TARGET}
   PRIVATE
-  OpenGL::GL
+  $<$<NOT:$<BOOL:${AMBER_TARGET_WINDOWS}>>:OpenGL::GL>
   Qt6::Core
   Qt6::Gui
   Qt6::GuiPrivate
@@ -587,7 +615,7 @@ target_link_libraries(${OLIVE_TARGET}
   $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
 )
 
-if(WIN32 AND OPENCOLORIO_FOUND)
+if(AMBER_TARGET_WINDOWS AND OPENCOLORIO_FOUND)
   target_link_libraries(${OLIVE_TARGET} PRIVATE OpenColorIO)
 endif()
 
