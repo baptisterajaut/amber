@@ -454,6 +454,27 @@ void Viewer::play(bool in_to_out) {
     return;
   }
 
+  // Pre-open audio cachers active around the upcoming playhead so OpenWorker's
+  // codec/filter-graph setup runs before the audio sender starts pulling. After
+  // a razor cut, the post clip's brand-new cacher would otherwise open exactly
+  // when playing=true is set; on slow Windows audio stacks OpenWorker can take
+  // tens to hundreds of ms during which the sender drains silence from the
+  // ibuffer. The cacher's underrun auto-correct (cacher_audio.cpp:299) then
+  // skips that slack by advancing frame_sample_index_, so the post-cut audio
+  // stays silent until the offset realigns — visible as "audio doesn't play
+  // after a cut" until the user scrolls back (which warms the cacher early).
+  // Mirrors the video pre-decode fix from e30d5a667 (issue #43), audio side.
+  if (seq != nullptr) {
+    for (const auto& cp : seq->clips) {
+      Clip* c = cp.get();
+      if (c == nullptr) continue;
+      if (c->track() < 0) continue;  // audio clips only
+      if (!c->IsActiveAt(seq->playhead)) continue;
+      if (c->IsOpen()) continue;
+      c->Open();
+    }
+  }
+
   playhead_start = seq->playhead;
   playing = true;
   SetAudioWakeObject(this);
