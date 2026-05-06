@@ -30,6 +30,9 @@
 #include "global/global.h"
 #include "rendering/renderfunctions.h"
 #include "engine/undo/undostack.h"
+#include "ui/mainwindow.h"
+
+#include <QStatusBar>
 
 void Timeline::copy(bool del) {
   if (amber::ActiveSequence == nullptr) return;
@@ -112,7 +115,11 @@ void Timeline::relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>&
 
 void Timeline::paste(bool insert) {
   if (amber::ActiveSequence == nullptr) return;
-  if (clipboard.size() > 0) {
+  if (clipboard.size() == 0) {
+    amber::MainWindow->statusBar()->showMessage(tr("Clipboard is empty"), 3000);
+    return;
+  }
+  {
     if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
       ComboAction* ca = new ComboAction(tr("Paste"));
 
@@ -189,6 +196,13 @@ void Timeline::paste(bool insert) {
       bool ask_conflict = true;
 
       QVector<Clip*> selected_clips = amber::ActiveSequence->SelectedClips();
+
+      if (selected_clips.isEmpty()) {
+        amber::MainWindow->statusBar()->showMessage(
+            tr("Select a clip to paste effects into"), 3000);
+        delete ca;
+        return;
+      }
 
       for (auto c : selected_clips) {
         for (const auto & j : clipboard) {

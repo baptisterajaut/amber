@@ -41,6 +41,7 @@
 #include "dialogs/footagerelinkdialog.h"
 #include "dialogs/loaddialog.h"
 #include "dialogs/autocutsilencedialog.h"
+#include "project/clipboard.h"
 #include "project/loadthread.h"
 #include "project/projectmodel.h"
 #include "ui/menuhelper.h"
@@ -231,6 +232,9 @@ void OliveGlobal::ClearProject()
 
   // clear project contents (footage, sequences, etc.)
   panel_project->clear();
+
+  // clipboard holds raw Media* into the project model — invalid after clear.
+  clear_clipboard();
 
   // clear undo stack
   amber::UndoStack.clear();
