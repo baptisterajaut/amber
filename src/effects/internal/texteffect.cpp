@@ -81,6 +81,12 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
   word_wrap_field = new BoolField(word_wrap_row, "wordwrap");
   word_wrap_field->SetColumnSpan(2);
 
+  EffectRow* line_height_row = new EffectRow(this, tr("Line Height"));
+  line_height_field = new DoubleField(line_height_row, "lineheight");
+  line_height_field->SetMinimum(0.1);
+  line_height_field->SetDefault(1.0);
+  line_height_field->SetColumnSpan(2);
+
   EffectRow* padding_row = new EffectRow(this, tr("Padding"));
   padding_field = new DoubleField(padding_row, "padding");
   padding_field->SetColumnSpan(2);
@@ -204,7 +210,8 @@ void TextEffect::redraw(double timecode) {
 
   QPainterPath path;
 
-  int text_height = fm.height()*lines.size();
+  int line_h = qRound(fm.height() * line_height_field->GetDoubleAt(timecode));
+  int text_height = (lines.size() - 1) * line_h + fm.height();
 
   for (int i=0;i<lines.size();i++) {
     int text_x, text_y;
@@ -243,14 +250,14 @@ void TextEffect::redraw(double timecode) {
 
     switch (valign_field->GetValueAt(timecode).toInt()) {
     case Qt::AlignTop:
-      text_y = (fm.height()*i)+fm.ascent();
+      text_y = (line_h*i)+fm.ascent();
       break;
     case Qt::AlignBottom:
-      text_y = (height - text_height - fm.descent()) + (fm.height()*(i+1));
+      text_y = (height - text_height - fm.descent()) + (line_h*i) + fm.height();
       break;
     case Qt::AlignVCenter:
     default:
-      text_y = ((height/2) - (text_height/2) - fm.descent()) + (fm.height()*(i+1));
+      text_y = ((height/2) - (text_height/2) - fm.descent()) + (line_h*i) + fm.height();
       break;
     }
 

@@ -44,6 +44,7 @@ private:
   ComboField* halign_field;
   ComboField* valign_field;
   BoolField* word_wrap_field;
+  DoubleField* line_height_field;
   DoubleField* padding_field;
   DoubleField* position_x;
   DoubleField* position_y;
