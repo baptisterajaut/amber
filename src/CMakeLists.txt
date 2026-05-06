@@ -279,6 +279,8 @@ set(OLIVE_SOURCES
   panels/viewer.h
   project/clipboard.cpp
   project/clipboard.h
+  project/clipboard_serializer.cpp
+  project/clipboard_serializer.h
   project/footage.cpp
   project/footage.h
   project/loadthread.cpp

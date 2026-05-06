@@ -26,9 +26,12 @@
 
 #include "panels/panels.h"
 #include "project/clipboard.h"
+#include "project/clipboard_serializer.h"
+#include "project/previewgenerator.h"
 #include "global/config.h"
 #include "global/global.h"
 #include "rendering/renderfunctions.h"
+#include "engine/undo/undo_media.h"
 #include "engine/undo/undostack.h"
 #include "ui/mainwindow.h"
 
@@ -92,6 +95,9 @@ void Timeline::copy(bool del) {
   if (del && copied) {
     delete_selection(amber::ActiveSequence->selections, false);
   }
+
+  // Mirror to system clipboard so other Amber processes can paste.
+  amber::push_clipboard_to_system();
 }
 
 void Timeline::relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>& new_clips) {
@@ -115,6 +121,12 @@ void Timeline::relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>&
 
 void Timeline::paste(bool insert) {
   if (amber::ActiveSequence == nullptr) return;
+
+  // Pull from system clipboard first — if another Amber process pushed clips/effects,
+  // this replaces our in-process globals.
+  QVector<MediaPtr> imported_media;
+  amber::pull_clipboard_from_system(imported_media);
+
   if (clipboard.size() == 0) {
     amber::MainWindow->statusBar()->showMessage(tr("Clipboard is empty"), 3000);
     return;
@@ -122,6 +134,12 @@ void Timeline::paste(bool insert) {
   {
     if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
       ComboAction* ca = new ComboAction(tr("Paste"));
+
+      // Auto-import any media referenced by pasted clips that isn't already
+      // in this project. Wrapping in the paste ComboAction keeps undo coherent.
+      for (const auto& m : imported_media) {
+        ca->append(new AddMediaCommand(m, nullptr));
+      }
 
       // create copies and delete areas that we'll be pasting to
       QVector<Selection> delete_areas;
@@ -182,6 +200,16 @@ void Timeline::paste(bool insert) {
       ca->append(new AddClipCommand(amber::ActiveSequence.get(), pasted_clips));
 
       amber::UndoStack.push(ca);
+
+      // Auto-imported media is now attached to the project model — analyze
+      // each so previews/thumbnails are generated.
+      for (const auto& m : imported_media) {
+        PreviewGenerator::AnalyzeMedia(m.get());
+      }
+      if (!imported_media.isEmpty()) {
+        amber::MainWindow->statusBar()->showMessage(
+            tr("Auto-imported %1 media file(s) from another project").arg(imported_media.size()), 4000);
+      }
 
       update_ui(true);
 

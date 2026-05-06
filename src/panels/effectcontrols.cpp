@@ -48,6 +48,7 @@
 #include "ui/menuhelper.h"
 #include "ui/icons.h"
 #include "project/clipboard.h"
+#include "project/clipboard_serializer.h"
 #include "global/config.h"
 #include "ui/timelineheader.h"
 #include "ui/keyframeview.h"
@@ -186,6 +187,8 @@ void EffectControls::copy(bool del) {
       delete ca;
     }
   }
+
+  amber::push_clipboard_to_system();
 }
 
 void EffectControls::scroll_to_frame(long frame) {
