@@ -45,6 +45,7 @@ class TextEffect : public Effect {
   ComboField* halign_field;
   ComboField* valign_field;
   BoolField* word_wrap_field;
+  DoubleField* line_height_field;
   DoubleField* padding_field;
   DoubleField* position_x;
   DoubleField* position_y;
@@ -63,7 +64,7 @@ class TextEffect : public Effect {
   // Helpers for redraw()
   void ApplyWordWrap(QStringList& lines, const QFontMetrics& fm, int width);
   int ComputeTextX(const QString& line, int halign, const QFontMetrics& fm, int width);
-  int ComputeTextY(int line_index, int valign, const QFontMetrics& fm, int text_height, int height);
+  int ComputeTextY(int line_index, int valign, const QFontMetrics& fm, int line_h, int text_height, int height);
   void DrawShadow(QPainter& p, const QPainterPath& path, double timecode);
   void DrawOutline(QPainter& p, const QPainterPath& path, double timecode);
 };

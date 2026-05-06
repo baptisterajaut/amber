@@ -79,6 +79,12 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   word_wrap_field = new BoolField(word_wrap_row, "wordwrap");
   word_wrap_field->SetColumnSpan(2);
 
+  EffectRow* line_height_row = new EffectRow(this, tr("Line Height"));
+  line_height_field = new DoubleField(line_height_row, "lineheight");
+  line_height_field->SetMinimum(0.1);
+  line_height_field->SetDefault(1.0);
+  line_height_field->SetColumnSpan(2);
+
   EffectRow* padding_row = new EffectRow(this, tr("Padding"));
   padding_field = new DoubleField(padding_row, "padding");
   padding_field->SetColumnSpan(2);
@@ -181,11 +187,11 @@ int TextEffect::ComputeTextX(const QString& line, int halign, const QFontMetrics
   return 0;
 }
 
-int TextEffect::ComputeTextY(int i, int valign, const QFontMetrics& fm, int text_height, int height) {
-  if (valign == Qt::AlignTop) return fm.height() * i + fm.ascent();
-  if (valign == Qt::AlignBottom) return (height - text_height - fm.descent()) + fm.height() * (i + 1);
+int TextEffect::ComputeTextY(int i, int valign, const QFontMetrics& fm, int line_h, int text_height, int height) {
+  if (valign == Qt::AlignTop) return line_h * i + fm.ascent();
+  if (valign == Qt::AlignBottom) return (height - text_height - fm.descent()) + line_h * i + fm.height();
   // AlignVCenter (default)
-  return ((height / 2) - (text_height / 2) - fm.descent()) + fm.height() * (i + 1);
+  return ((height / 2) - (text_height / 2) - fm.descent()) + line_h * i + fm.height();
 }
 
 void TextEffect::DrawShadow(QPainter& p, const QPainterPath& path, double timecode) {
@@ -244,7 +250,8 @@ void TextEffect::redraw(double timecode) {
   if (word_wrap_field->GetBoolAt(timecode)) ApplyWordWrap(lines, fm, width);
 
   QPainterPath path;
-  int text_height = fm.height() * lines.size();
+  int line_h = qRound(fm.height() * line_height_field->GetDoubleAt(timecode));
+  int text_height = (lines.size() - 1) * line_h + fm.height();
   int halign = halign_field->GetValueAt(timecode).toInt();
   int valign = valign_field->GetValueAt(timecode).toInt();
 
@@ -266,7 +273,7 @@ void TextEffect::redraw(double timecode) {
         lines[i] = spaced;
       }
     }
-    int text_y = ComputeTextY(i, valign, fm, text_height, height);
+    int text_y = ComputeTextY(i, valign, fm, line_h, text_height, height);
     path.addText(text_x, text_y, font, lines.at(i));
   }
 
