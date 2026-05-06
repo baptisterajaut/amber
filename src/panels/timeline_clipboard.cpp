@@ -30,6 +30,9 @@
 #include "panels/panels.h"
 #include "project/clipboard.h"
 #include "rendering/renderfunctions.h"
+#include "ui/mainwindow.h"
+
+#include <QStatusBar>
 
 // Returns true if the clip overlaps the selection on the same track.
 static bool clip_overlaps_selection(ClipPtr c, const Selection& s) {
@@ -178,6 +181,10 @@ static void paste_effects(Timeline* tl, ComboAction* ca) {
   bool ask_conflict = true;
 
   QVector<Clip*> selected_clips = amber::ActiveSequence->SelectedClips();
+  if (selected_clips.isEmpty()) {
+    amber::MainWindow->statusBar()->showMessage(tl->tr("Select a clip to paste effects into"), 3000);
+    return;
+  }
   for (auto c : selected_clips) {
     for (const auto& j : clipboard) {
       EffectPtr e = std::static_pointer_cast<Effect>(j);
@@ -230,7 +237,10 @@ static void paste_effects(Timeline* tl, ComboAction* ca) {
 
 void Timeline::paste(bool insert) {
   if (amber::ActiveSequence == nullptr) return;
-  if (clipboard.isEmpty()) return;
+  if (clipboard.isEmpty()) {
+    amber::MainWindow->statusBar()->showMessage(tr("Clipboard is empty"), 3000);
+    return;
+  }
 
   if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
     ComboAction* ca = new ComboAction(tr("Paste"));
