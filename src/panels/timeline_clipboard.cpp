@@ -24,11 +24,14 @@
 #include <QMessageBox>
 #include <QPushButton>
 
+#include "engine/undo/undo_media.h"
 #include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/global.h"
 #include "panels/panels.h"
 #include "project/clipboard.h"
+#include "project/clipboard_serializer.h"
+#include "project/previewgenerator.h"
 #include "rendering/renderfunctions.h"
 #include "ui/mainwindow.h"
 
@@ -88,6 +91,9 @@ void Timeline::copy(bool del) {
   if (del && copied) {
     delete_selection(amber::ActiveSequence->selections, false);
   }
+
+  // Mirror to system clipboard so other Amber processes can paste.
+  amber::push_clipboard_to_system();
 }
 
 void Timeline::relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>& new_clips) {
@@ -237,6 +243,12 @@ static void paste_effects(Timeline* tl, ComboAction* ca) {
 
 void Timeline::paste(bool insert) {
   if (amber::ActiveSequence == nullptr) return;
+
+  // Pull from system clipboard first — if another Amber process pushed clips/effects,
+  // this replaces our in-process globals.
+  QVector<MediaPtr> imported_media;
+  amber::pull_clipboard_from_system(imported_media);
+
   if (clipboard.isEmpty()) {
     amber::MainWindow->statusBar()->showMessage(tr("Clipboard is empty"), 3000);
     return;
@@ -244,7 +256,15 @@ void Timeline::paste(bool insert) {
 
   if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
     ComboAction* ca = new ComboAction(tr("Paste"));
+    // Auto-imported media from another project — wrapped in the paste ComboAction
+    // for undo coherence. Constructor of AddMediaCommand already attaches to project_model.
+    for (const auto& m : imported_media) ca->append(new AddMediaCommand(m, nullptr));
     paste_clips(this, ca, insert);
+    for (const auto& m : imported_media) PreviewGenerator::AnalyzeMedia(m.get());
+    if (!imported_media.isEmpty()) {
+      amber::MainWindow->statusBar()->showMessage(
+          tr("Auto-imported %1 media file(s) from another project").arg(imported_media.size()), 4000);
+    }
   } else if (clipboard_type == CLIPBOARD_TYPE_EFFECT) {
     ComboAction* ca = new ComboAction(tr("Paste Effect(s)"));
     paste_effects(this, ca);
