@@ -626,7 +626,8 @@ void Cacher::cacheWaitForResponse() {
 // ---------------------------------------------------------------------------
 // Cache
 // ---------------------------------------------------------------------------
-void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed) {
+void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
+                   bool nonblocking) {
   if (!is_valid_state_) return;
   if (cacheServeStillImage()) return;
 
@@ -641,7 +642,7 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   // Audio scrub: fire-and-forget — never block the UI thread.
   bool audio_scrub = (scrubbing && clip->track() >= 0);
 
-  if (need_wait && !audio_scrub) {
+  if (need_wait && !audio_scrub && !nonblocking) {
     cacheWaitForResponse();
   } else {
     // just wake the cacher without blocking
