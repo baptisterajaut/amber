@@ -642,14 +642,16 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
 
   // Upcoming clip in IsActiveAt's open_buffer window: prefetch the cacher
   // queue around timeline_in so the playhead crossing the cut hits a queued
-  // frame instead of waking the cacher cold (issue #43). Mirrors Olive base
-  // behavior — commit 7413d8655 broke this when it moved the boundary check
-  // above the Cache call. Cacher::Cache() no-ops cleanly while OpenWorker
-  // is still running (is_valid_state_ false), and is retried every render
-  // frame, so we don't need to gate on cacher state.
+  // frame instead of waking the cacher cold (issue #43). nonblocking=true:
+  // fire-and-forget, never block the render thread on the cacher response.
+  // Blocking here produced periodic ~30-frame stutters at every cut on slow
+  // iGPU machines (issue #47) — render thread waited on each queue refill.
+  // Cacher::Cache() no-ops cleanly while OpenWorker is still running
+  // (is_valid_state_ false), and is retried every render frame.
   if (playhead < c->timeline_in(true)) {
     if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
-      c->Cache(c->timeline_in(), params.scrubbing, params.nests, params.playback_speed);
+      c->Cache(c->timeline_in(), params.scrubbing, params.nests, params.playback_speed,
+               /*nonblocking=*/true);
     }
     return;
   }

@@ -528,8 +528,9 @@ void Clip::Close(bool wait) {
 
 bool Clip::IsOpen() { return open_; }
 
-void Clip::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed) {
-  cacher.Cache(playhead, scrubbing, nests, playback_speed);
+void Clip::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
+                 bool nonblocking) {
+  cacher.Cache(playhead, scrubbing, nests, playback_speed, nonblocking);
   cacher_frame = playhead;
 }
 

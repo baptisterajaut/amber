@@ -165,8 +165,17 @@ class Cacher : public QThread {
    * @param playback_speed
    *
    * The current playback speed (controlled by Shuttle Left/Stop/Right)
+   *
+   * @param nonblocking
+   *
+   * **TRUE** to fire-and-forget: wake the cacher and return immediately, never block on
+   * the cacher response. Used by the prefetch path in composite_video_clip when the
+   * playhead hasn't reached the clip yet (issue #47): blocking the render thread to wait
+   * for an upcoming-clip queue refill produced periodic stutters at every cut on slow
+   * iGPU machines (~30-frame cycle = queue drain → blocking refill → drain again).
    */
-  void Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed);
+  void Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
+             bool nonblocking = false);
 
   /**
    * @brief Retrieve frame requested by Cache()

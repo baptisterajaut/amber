@@ -550,7 +550,8 @@ void Cacher::Open()
   start((clip->track() < 0) ? QThread::HighPriority : QThread::TimeCriticalPriority);
 }
 
-void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed)
+void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
+                   bool nonblocking)
 {
 
   if (!is_valid_state_) {
@@ -611,7 +612,13 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   // Same pattern as start_render() for video.
   bool audio_scrub = (scrubbing && clip->track() >= 0);
 
-  if (wait_for_cacher_to_respond && !audio_scrub) {
+  // Prefetch path (issue #47): also fire-and-forget, so an upcoming-clip queue
+  // refill never blocks the render thread. Blocking here produced periodic
+  // ~30-frame stutters at every cut on slow iGPU machines (queue drain →
+  // blocking refill → drain → repeat).
+  bool blocking = wait_for_cacher_to_respond && !audio_scrub && !nonblocking;
+
+  if (blocking) {
     main_thread_lock_.lock();
     main_thread_woken_ = false;
   }
@@ -620,14 +627,14 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   wait_cond_.wakeAll();
 
   // wait for cacher to respond (video and audio playback only, not audio scrub)
-  if (wait_for_cacher_to_respond && !audio_scrub) {
+  if (blocking) {
     interrupt_ = true;
     if (!main_thread_woken_) {
       main_thread_wait_.wait(&main_thread_lock_, 2000);
     }
   }
 
-  if (wait_for_cacher_to_respond && !audio_scrub) {
+  if (blocking) {
     main_thread_lock_.unlock();
   }
 }
