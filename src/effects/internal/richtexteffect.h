@@ -12,6 +12,7 @@ protected:
   bool AlwaysUpdate() override;
 private:
   StringField* text_val;
+  DoubleField* line_height_field;
   DoubleField* padding_field;
   DoubleField* position_x;
   DoubleField* position_y;

@@ -26,6 +26,12 @@ RichTextEffect::RichTextEffect(Clip *c, const EffectMeta *em) :
   text_val = new StringField(text_row, "text");
   text_val->SetColumnSpan(2);
 
+  EffectRow* line_height_row = new EffectRow(this, tr("Line Height"));
+  line_height_field = new DoubleField(line_height_row, "lineheight");
+  line_height_field->SetMinimum(0.1);
+  line_height_field->SetDefault(1.0);
+  line_height_field->SetColumnSpan(2);
+
   EffectRow* padding_row = new EffectRow(this, tr("Padding"));
   padding_field = new DoubleField(padding_row, "padding");
   padding_field->SetColumnSpan(2);
@@ -118,6 +124,15 @@ void RichTextEffect::redraw(double timecode)
   QTextDocument td;
   td.setHtml(text_val->GetStringAt(timecode));
   td.setTextWidth(width);
+
+  {
+    QTextCursor block_cursor(&td);
+    block_cursor.select(QTextCursor::Document);
+    QTextBlockFormat block_fmt;
+    block_fmt.setLineHeight(line_height_field->GetDoubleAt(timecode) * 100.0,
+                            QTextBlockFormat::ProportionalHeight);
+    block_cursor.mergeBlockFormat(block_fmt);
+  }
 
   if (stroke_bool->GetBoolAt(timecode)) {
     QTextCursor cursor(&td);
