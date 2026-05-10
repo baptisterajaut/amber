@@ -497,11 +497,22 @@ void Timeline::unnest() {
     // Frame rate conversion factor
     double rate_factor = amber::ActiveSequence->frame_rate / inner_seq->frame_rate;
 
-    // Track remapping: offset inner tracks relative to the nested clip's position
-    // Video: inner -1 (V1) → nested_clip->track(), inner -2 → nested_clip->track()-1, etc.
-    // Audio: inner 0 (A1) → -(nested_clip->track()+1), inner 1 → -(nested_clip->track()+1)+1, etc.
-    int video_offset = nested_clip->track() - (-1);  // e.g. nested on -3 → offset = -2
-    int audio_offset = -(nested_clip->track() + 1);  // e.g. nested on -3 → audio starts at 2
+    // Anchor remap on the inner sequence's actual topmost tracks: nest() preserves original
+    // parent tracks (Clip::copy keeps track), so a clip nested from V2 has innermost video = -2,
+    // not -1. Hardcoding -1 made unnest land one track below the nest and overwrite the user's
+    // content there.
+    int innermost_video = INT_MIN;
+    int innermost_audio = INT_MAX;
+    for (const auto& ic : inner_seq->clips) {
+      if (ic == nullptr) continue;
+      if (ic->track() < 0) {
+        innermost_video = qMax(innermost_video, ic->track());
+      } else {
+        innermost_audio = qMin(innermost_audio, ic->track());
+      }
+    }
+    int video_offset = (innermost_video == INT_MIN) ? 0 : nested_clip->track() - innermost_video;
+    int audio_offset = (innermost_audio == INT_MAX) ? 0 : -innermost_audio;
 
     // Build mapping from inner clip index → new_clips index (for relinking)
     QMap<int, int> inner_to_new;
