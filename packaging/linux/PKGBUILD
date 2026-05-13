@@ -15,7 +15,11 @@ depends=(
 makedepends=(
   'cmake'
   'qt6-tools'
+  'vulkan-headers'
 )
+# vulkan-headers enables the Vulkan RHI backend in the binary. On systems
+# without a Vulkan ICD the backend falls back to OpenGL at runtime, so this
+# is effectively free for old GPUs. Matches the AppImage build.
 conflicts=('olive')
 source=("git+https://github.com/baptisterajaut/amber.git#tag=v1.7.5")
 sha256sums=('SKIP')
