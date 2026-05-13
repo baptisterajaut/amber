@@ -142,6 +142,7 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 
 ### Export improvements
 - Hardware encoding (NVENC, VAAPI, QSV) — hwaccel decoding exists, expose FFmpeg encoder variants in export dialog
+- **Per-codec options panel** — generalize the export dialog so each codec declares its own parameter set instead of one-off field additions. Concrete asks driving the redesign (#58): x264/x265 `-preset` (veryslow→ultrafast), SVT-AV1 (preset −2..13, CRF 0..63), rav1e (`-speed` −1..10, `-qp` 0..255), libaom-av1, AV1 2-pass encoding, average-bitrate as a compression mode for x264/x265/SVT-AV1/rav1e, FLAC compression levels, `+faststart` movflag for MOV-family containers (MP4/MOV/3GPP/FLV), per-codec pixel format filtering.
 - Render queue — non-modal export with queue UI, continue editing during render
 - Batch export — multi-sequence export in one operation
 
