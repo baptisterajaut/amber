@@ -205,6 +205,11 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
     qCritical() << "Could not open codec";
     av_dict_free(&opts);
     avcodec_free_context(&codecCtx);
+    // codecCtx->hw_device_ctx (the ref'd copy) is freed by avcodec_free_context above; the
+    // Cacher member is a separate AVBufferRef we must release ourselves to avoid a leak.
+    if (hw_device_ctx) {
+      av_buffer_unref(&hw_device_ctx);
+    }
     avformat_close_input(&formatCtx);
     return false;
   }
