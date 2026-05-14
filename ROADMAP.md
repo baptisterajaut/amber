@@ -63,7 +63,9 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Timer / countdown
 - Progress bar
 - Lift / gamma / gain (3-way color correction)
-- Color correction tool (curves, scopes — waveform, vectorscope, histogram)
+- **Tone Curve** — graphical curve editor (input → output mapping) with RGB / Luma / R / G / B modes, custom 2D widget + LUT texture shader. Complementary to the 3-way corrector. (#59)
+- **Alpha Mask (image source)** — masking effect that takes a PNG/SVG file as alpha source, with invert / feather / opacity / blend controls. Covers text reveals, shape stencils, static masks. Track-based variant (mask = clip on adjacent track) deferred — see Future. (#61)
+- Color correction tool (scopes — waveform, vectorscope, histogram)
 - Subtitle editor — dedicated floating window for bulk subtitle editing (import is shipped in 1.5.0, this is the full editing UI)
 - **Text stroke** — QPainterPath outline on rich text effect (#12)
 - **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
@@ -131,3 +133,4 @@ Features that require major architectural work or are outside the current scope.
 - **2.5D compositing** — per-layer Z-depth with perspective camera. Requires 3D projection matrix in `compose_sequence()`, Z-order per clip, camera node. Major architectural change. (#12)
 - **Text animation** — letter-by-letter, word-by-word, line-by-line transforms + typewriter effect. Requires a mini animation engine within the text effect. (#12)
 - **2.5D motion tracker** — point/planar tracking with compositing integration. Requires optical flow or feature matching (CPU-bound). (#12)
+- **Track-based alpha mask** — extension of the 2.0 image-source Alpha Mask: use a clip on the adjacent track as a dynamic alpha source (animated masks, video-as-mask). Requires reordering `compose_sequence()` so the mask clip renders into its own buffer without being drawn to the final target, plus a per-clip "is-mask" flag, plus edge-case handling (mask not active at playhead, effects on the mask, dimension mismatch). Revisit if demand confirms after 2.0 ships. (#61)
