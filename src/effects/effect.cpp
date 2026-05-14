@@ -509,89 +509,75 @@ void Effect::SetEnabled(bool b) {
 }
 
 void Effect::load(QXmlStreamReader& stream) {
-  int row_count = 0;
-
   QString tag = stream.name().toString();
 
   while (!stream.atEnd() && !(stream.name() == tag && stream.isEndElement())) {
     stream.readNext();
     if (stream.name() == QLatin1String("row") && stream.isStartElement()) {
-      if (row_count < rows.size()) {
-        EffectRow* row = rows.at(row_count);
+      while (!stream.atEnd() && !(stream.name() == QLatin1String("row") && stream.isEndElement())) {
+        stream.readNext();
 
-        while (!stream.atEnd() && !(stream.name() == QLatin1String("row") && stream.isEndElement())) {
-          stream.readNext();
+        if (stream.name() == QLatin1String("field") && stream.isStartElement()) {
+          EffectField* found_field = nullptr;
 
-          // read field
-          if (stream.name() == QLatin1String("field") && stream.isStartElement()) {
-            int field_number = -1;
-
-            // match field using ID
-            for (int k = 0; k < stream.attributes().size(); k++) {
-              const QXmlStreamAttribute& attr = stream.attributes().at(k);
-              if (attr.name() == QLatin1String("id")) {
+          for (int k = 0; k < stream.attributes().size(); k++) {
+            const QXmlStreamAttribute& attr = stream.attributes().at(k);
+            if (attr.name() == QLatin1String("id")) {
+              for (int r = 0; r < rows.size() && !found_field; r++) {
+                EffectRow* row = rows.at(r);
                 for (int l = 0; l < row->FieldCount(); l++) {
                   if (row->Field(l)->id() == attr.value()) {
-                    field_number = l;
+                    found_field = row->Field(l);
                     break;
                   }
                 }
+              }
+              break;
+            }
+          }
+
+          if (found_field) {
+            for (int k = 0; k < stream.attributes().size(); k++) {
+              const QXmlStreamAttribute& attr = stream.attributes().at(k);
+              if (attr.name() == QLatin1String("value")) {
+                found_field->persistent_data_ = found_field->ConvertStringToValue(attr.value().toString());
                 break;
               }
             }
 
-            if (field_number > -1) {
-              EffectField* field = row->Field(field_number);
+            while (!stream.atEnd() && !(stream.name() == QLatin1String("field") && stream.isEndElement())) {
+              stream.readNext();
 
-              // get current field value
-              for (int k = 0; k < stream.attributes().size(); k++) {
-                const QXmlStreamAttribute& attr = stream.attributes().at(k);
-                if (attr.name() == QLatin1String("value")) {
-                  field->persistent_data_ = field->ConvertStringToValue(attr.value().toString());
-                  break;
-                }
-              }
+              if (stream.name() == QLatin1String("key") && stream.isStartElement()) {
+                found_field->GetParentRow()->SetKeyframingInternal(true);
 
-              while (!stream.atEnd() && !(stream.name() == QLatin1String("field") && stream.isEndElement())) {
-                stream.readNext();
-
-                // read keyframes
-                if (stream.name() == QLatin1String("key") && stream.isStartElement()) {
-                  row->SetKeyframingInternal(true);
-
-                  EffectKeyframe key;
-                  for (int k = 0; k < stream.attributes().size(); k++) {
-                    const QXmlStreamAttribute& attr = stream.attributes().at(k);
-                    if (attr.name() == QLatin1String("value")) {
-                      key.data = field->ConvertStringToValue(attr.value().toString());
-                    } else if (attr.name() == QLatin1String("frame")) {
-                      key.time = attr.value().toLong();
-                    } else if (attr.name() == QLatin1String("type")) {
-                      key.type = attr.value().toInt();
-                    } else if (attr.name() == QLatin1String("prehx")) {
-                      key.pre_handle_x = attr.value().toDouble();
-                    } else if (attr.name() == QLatin1String("prehy")) {
-                      key.pre_handle_y = attr.value().toDouble();
-                    } else if (attr.name() == QLatin1String("posthx")) {
-                      key.post_handle_x = attr.value().toDouble();
-                    } else if (attr.name() == QLatin1String("posthy")) {
-                      key.post_handle_y = attr.value().toDouble();
-                    }
+                EffectKeyframe key;
+                for (int k = 0; k < stream.attributes().size(); k++) {
+                  const QXmlStreamAttribute& attr = stream.attributes().at(k);
+                  if (attr.name() == QLatin1String("value")) {
+                    key.data = found_field->ConvertStringToValue(attr.value().toString());
+                  } else if (attr.name() == QLatin1String("frame")) {
+                    key.time = attr.value().toLong();
+                  } else if (attr.name() == QLatin1String("type")) {
+                    key.type = attr.value().toInt();
+                  } else if (attr.name() == QLatin1String("prehx")) {
+                    key.pre_handle_x = attr.value().toDouble();
+                  } else if (attr.name() == QLatin1String("prehy")) {
+                    key.pre_handle_y = attr.value().toDouble();
+                  } else if (attr.name() == QLatin1String("posthx")) {
+                    key.post_handle_x = attr.value().toDouble();
+                  } else if (attr.name() == QLatin1String("posthy")) {
+                    key.post_handle_y = attr.value().toDouble();
                   }
-                  field->keyframes.append(key);
                 }
+                found_field->keyframes.append(key);
               }
-
-              field->Changed();
             }
+
+            found_field->Changed();
           }
         }
-
-      } else {
-        qCritical() << "Too many rows for effect" << id << ". Project might be corrupt. (Got" << row_count
-                    << ", expected <" << rows.size() - 1 << ")";
       }
-      row_count++;
     } else if (stream.isStartElement()) {
       custom_load(stream);
     }
