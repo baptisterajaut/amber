@@ -385,9 +385,11 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
   }
 
   // If the frame is in hardware format, transfer to software
-  if (result >= 0 && hw_device_ctx != nullptr && f->format != AV_PIX_FMT_NONE &&
-      av_pix_fmt_desc_get(static_cast<AVPixelFormat>(f->format))->flags & AV_PIX_FMT_FLAG_HWACCEL) {
-    result = transferHwFrameToSoftware(f);
+  if (result >= 0 && hw_device_ctx != nullptr && f->format != AV_PIX_FMT_NONE) {
+    const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(static_cast<AVPixelFormat>(f->format));
+    if (desc != nullptr && (desc->flags & AV_PIX_FMT_FLAG_HWACCEL)) {
+      result = transferHwFrameToSoftware(f);
+    }
   }
 
   return result;
