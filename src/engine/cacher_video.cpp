@@ -450,6 +450,31 @@ int Cacher::RetrieveFrameAndProcess(AVFrame **f)
       // we retrieved a decoded video frame, which we will send to the AVFilter stack to convert to RGBA (with other
       // adjustments if necessary)
 
+      // On the first successful decode after (re)opening the filter graph, lock the buffersrc
+      // to the actual frame layout. For software decoding this matches what we seeded from
+      // stream->codecpar in openWorkerVideoFilter(). For hardware decoding, the post-transfer
+      // software format (NV12, P010, ...) differs from codecpar's hwaccel format, so without
+      // this FFmpeg logs "Changing video frame properties on the fly is not supported" for
+      // every single frame. hw_frames_ctx is left null because frames are already transferred
+      // to system memory in RetrieveFrameFromDecoder before reaching this point.
+      if (!buffersrc_params_set_ && buffersrc_ctx != nullptr) {
+        AVBufferSrcParameters* bsp = av_buffersrc_parameters_alloc();
+        if (bsp != nullptr) {
+          bsp->format = frame_->format;
+          bsp->width = frame_->width;
+          bsp->height = frame_->height;
+          bsp->sample_aspect_ratio = frame_->sample_aspect_ratio;
+          bsp->time_base = stream->time_base;
+          bsp->hw_frames_ctx = nullptr;
+          int set_ret = av_buffersrc_parameters_set(buffersrc_ctx, bsp);
+          av_free(bsp);
+          if (set_ret < 0) {
+            qWarning() << "Failed to set buffersrc parameters from first frame:" << set_ret;
+          }
+        }
+        buffersrc_params_set_ = true;
+      }
+
       if ((send_code = av_buffersrc_add_frame_flags(buffersrc_ctx, frame_, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0) {
         qCritical() << "Failed to add frame to buffer source." << send_code;
         break;

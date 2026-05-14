@@ -201,6 +201,13 @@ void Cacher::openWorkerVideoFilter(const FootageStream* ms) {
     qWarning() << "Cacher::openWorkerVideoFilter: FootageStream is null";
     return;
   }
+  // Mark buffersrc params as not yet configured from a real frame. When hardware decoding is
+  // active, stream->codecpar->format advertises a hwaccel format (e.g. AV_PIX_FMT_VAAPI) which
+  // does not match the software pixel format produced by av_hwframe_transfer_data (NV12, P010,
+  // ...). We seed buffersrc with the stream's declared format here so configuration succeeds,
+  // then call av_buffersrc_parameters_set() on the first decoded frame in
+  // RetrieveFrameAndProcess() to lock the graph to the real frame layout.
+  buffersrc_params_set_ = false;
   char filter_args[512];
   snprintf(filter_args, sizeof(filter_args), "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
            stream->codecpar->width,

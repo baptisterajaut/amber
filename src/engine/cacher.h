@@ -443,6 +443,19 @@ class Cacher : public QThread {
   AVFilterContext* buffersrc_ctx{nullptr};
 
   /**
+   * @brief Whether buffersrc parameters have been set from an actual decoded frame
+   *
+   * Reset to false in openWorkerVideoFilter(). When false, the first frame pushed
+   * into buffersrc_ctx will call av_buffersrc_parameters_set() with the frame's
+   * actual format/dimensions/SAR so the filter graph reconfigures correctly. This
+   * is required for hardware-accelerated decoding paths where the stream codecpar
+   * format does not match the post-transfer software pixel format (e.g. VAAPI HEVC
+   * landing as NV12 after hwframe transfer while codecpar advertises a hwaccel
+   * format).
+   */
+  bool buffersrc_params_set_{false};
+
+  /**
    * @brief FFmpeg buffer sink
    *
    * Converted/filtered frames are retrieved from here and sent to Cacher::queue.
