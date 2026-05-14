@@ -85,18 +85,23 @@ int FieldTypeFromString(const QString& type_str) {
   return -1;
 }
 
-// Find the field index in `row` matching the "id" attribute in `stream`.
-// Returns -1 if not found.
-int FindFieldByStreamId(QXmlStreamReader& stream, EffectRow* row) {
+// Find the EffectField matching the "id" attribute in `stream` across all rows of `effect`.
+// Returns nullptr if no field with the requested id exists in any row. Searching across all
+// rows (rather than just the row at the current XML position) makes load() resilient to row
+// reordering or insertion between project save and load (e.g. new fields added to an effect
+// in a later release).
+EffectField* FindFieldInEffectByStreamId(QXmlStreamReader& stream, const QVector<EffectRow*>& rows) {
   for (const auto& attr : stream.attributes()) {
     if (attr.name() == QLatin1String("id")) {
-      for (int l = 0; l < row->FieldCount(); l++) {
-        if (row->Field(l)->id() == attr.value()) return l;
+      for (EffectRow* row : rows) {
+        for (int l = 0; l < row->FieldCount(); l++) {
+          if (row->Field(l)->id() == attr.value()) return row->Field(l);
+        }
       }
       break;
     }
   }
-  return -1;
+  return nullptr;
 }
 
 // Apply the "value" attribute from `stream` to `field`'s persistent data.
@@ -133,17 +138,20 @@ EffectKeyframe ParseKeyframe(QXmlStreamReader& stream, EffectField* field) {
 }
 
 // Load a single <field> element (including nested <key> children) from `stream`.
-void LoadFieldElement(QXmlStreamReader& stream, EffectRow* row) {
-  int field_number = FindFieldByStreamId(stream, row);
-  if (field_number < 0) return;
+// Looks up the target field by id across every row in `rows`, not just the row at the current
+// XML position. This fixes a bug where fields written to row N in the saved project but
+// belonging to row M at load time would be silently dropped (or worse, written to the wrong
+// field at row N).
+void LoadFieldElement(QXmlStreamReader& stream, const QVector<EffectRow*>& rows) {
+  EffectField* field = FindFieldInEffectByStreamId(stream, rows);
+  if (field == nullptr) return;
 
-  EffectField* field = row->Field(field_number);
   ApplyFieldValue(stream, field);
 
   while (!stream.atEnd() && !(stream.name() == QLatin1String("field") && stream.isEndElement())) {
     stream.readNext();
     if (stream.name() == QLatin1String("key") && stream.isStartElement()) {
-      row->SetKeyframingInternal(true);
+      field->GetParentRow()->SetKeyframingInternal(true);
       field->keyframes.append(ParseKeyframe(stream, field));
     }
   }
@@ -152,11 +160,11 @@ void LoadFieldElement(QXmlStreamReader& stream, EffectRow* row) {
 }
 
 // Load a single <row> element (including nested <field> children) from `stream`.
-void LoadRowElement(QXmlStreamReader& stream, EffectRow* row) {
+void LoadRowElement(QXmlStreamReader& stream, const QVector<EffectRow*>& rows) {
   while (!stream.atEnd() && !(stream.name() == QLatin1String("row") && stream.isEndElement())) {
     stream.readNext();
     if (stream.name() == QLatin1String("field") && stream.isStartElement()) {
-      LoadFieldElement(stream, row);
+      LoadFieldElement(stream, rows);
     }
   }
 }
@@ -659,20 +667,15 @@ void Effect::SetEnabled(bool b) {
 }
 
 void Effect::load(QXmlStreamReader& stream) {
-  int row_count = 0;
-
   QString tag = stream.name().toString();
 
   while (!stream.atEnd() && !(stream.name() == tag && stream.isEndElement())) {
     stream.readNext();
     if (stream.name() == QLatin1String("row") && stream.isStartElement()) {
-      if (row_count < rows.size()) {
-        LoadRowElement(stream, rows.at(row_count));
-      } else {
-        qCritical() << "Too many rows for effect" << id << ". Project might be corrupt. (Got" << row_count
-                    << ", expected <" << rows.size() - 1 << ")";
-      }
-      row_count++;
+      // Field lookup inside LoadRowElement searches all rows by id, so row order in the saved
+      // project no longer has to match the in-code row order. This makes load() forward- and
+      // backward-compatible with effects that gain or reorder rows between releases.
+      LoadRowElement(stream, rows);
     } else if (stream.isStartElement()) {
       custom_load(stream);
     }
