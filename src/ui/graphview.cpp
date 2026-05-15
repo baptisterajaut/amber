@@ -338,11 +338,12 @@ void GraphView::paintEvent(QPaintEvent*) {
       for (int i = row->FieldCount() - 1; i >= 0; i--) {
         paint_field_curves(p, i);
       }
-    }
 
-    p.setPen(Qt::red);
-    int playhead_x = qRound((double(panel_sequence_viewer->seq->playhead - visible_in) * x_zoom) - x_scroll);
-    p.drawLine(playhead_x, 0, playhead_x, height());
+      // draw playhead (only meaningful when a row is selected; visible_in is row-dependent)
+      p.setPen(Qt::red);
+      int playhead_x = qRound((double(panel_sequence_viewer->seq->playhead - visible_in) * x_zoom) - x_scroll);
+      p.drawLine(playhead_x, 0, playhead_x, height());
+    }
 
     if (rect_select) {
       draw_selection_rectangle(p, QRect(rect_select_x, rect_select_y, rect_select_w, rect_select_h));
@@ -819,10 +820,13 @@ void GraphView::set_row(EffectRow* r) {
       visible_in = row->GetParentEffect()->parent_clip->timeline_in();
       set_view_to_all();
     } else {
+      visible_in = 0;
       update();
     }
   }
 }
+
+void GraphView::set_visible_in(long i) { visible_in = i; }
 
 void GraphView::set_selected_keyframe_type(int type) {
   if (selected_keys.size() > 0) {

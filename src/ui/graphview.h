@@ -41,6 +41,7 @@ class GraphView : public QWidget {
   void wheelEvent(QWheelEvent* event) override;
 
   void set_row(EffectRow* r);
+  void set_visible_in(long i);
 
   void set_selected_keyframe_type(int type);
   void set_field_visibility(int field, bool b);

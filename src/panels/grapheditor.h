@@ -21,20 +21,20 @@
 #ifndef GRAPHEDITOR_H
 #define GRAPHEDITOR_H
 
-#include <QPushButton>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPushButton>
 
-#include "ui/panel.h"
-#include "ui/graphview.h"
-#include "ui/timelineheader.h"
-#include "ui/labelslider.h"
-#include "ui/keyframenavigator.h"
 #include "effects/effectrow.h"
+#include "ui/graphview.h"
+#include "ui/keyframenavigator.h"
+#include "ui/labelslider.h"
+#include "ui/panel.h"
+#include "ui/timelineheader.h"
 
 class GraphEditor : public Panel {
   Q_OBJECT
-public:
+ public:
   GraphEditor(QWidget* parent = nullptr);
 
   EffectRow* get_row();
@@ -47,8 +47,9 @@ public:
   void select_all();
 
   void Retranslate() override;
-protected:
-private:
+
+ protected:
+ private:
   GraphView* view;
   TimelineHeader* header;
   QHBoxLayout* value_layout;
@@ -60,10 +61,10 @@ private:
   QPushButton* linear_button;
   QPushButton* bezier_button;
   QPushButton* hold_button;
-private slots:
+ private slots:
   void set_key_button_enabled(bool e, int type);
   void set_keyframe_type();
   void set_field_visibility(bool b);
 };
 
-#endif // GRAPHEDITOR_H
+#endif  // GRAPHEDITOR_H
