@@ -20,24 +20,24 @@
 
 #include "grapheditor.h"
 
-#include <QVBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QVBoxLayout>
 #include <QVariant>
 
-#include "ui/keyframenavigator.h"
-#include "ui/timelineheader.h"
-#include "ui/timelinetools.h"
-#include "ui/labelslider.h"
-#include "ui/graphview.h"
 #include "effects/effect.h"
 #include "effects/effectfields.h"
 #include "effects/effectrow.h"
 #include "engine/clip.h"
-#include "rendering/renderfunctions.h"
-#include "panels.h"
-#include "ui/icons.h"
 #include "global/debug.h"
+#include "panels.h"
+#include "rendering/renderfunctions.h"
+#include "ui/graphview.h"
+#include "ui/icons.h"
+#include "ui/keyframenavigator.h"
+#include "ui/labelslider.h"
+#include "ui/timelineheader.h"
+#include "ui/timelinetools.h"
 
 GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   resize(720, 480);
@@ -109,7 +109,7 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   QWidget* central_value_widget = new QWidget();
   value_layout = new QHBoxLayout(central_value_widget);
   value_layout->setContentsMargins(0, 0, 0, 0);
-  value_layout->addWidget(new QLabel("")); // a spacer so the layout doesn't jump
+  value_layout->addWidget(new QLabel(""));  // a spacer so the layout doesn't jump
   values->addWidget(central_value_widget);
 
   values->addStretch();
@@ -131,10 +131,7 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   Retranslate();
 }
 
-EffectRow *GraphEditor::get_row()
-{
-  return row;
-}
+EffectRow* GraphEditor::get_row() { return row; }
 
 void GraphEditor::Retranslate() {
   setWindowTitle(tr("Graph Editor"));
@@ -146,8 +143,15 @@ void GraphEditor::Retranslate() {
 void GraphEditor::update_panel() {
   if (isVisible()) {
     if (row != nullptr) {
+      // Refresh the clip-relative offset every tick so that ripple/timeline edits
+      // moving the parent clip while the same row stays selected keep the Graph
+      // Editor playhead aligned with the main timeline playhead.
+      const long visible_in = row->GetParentEffect()->parent_clip->timeline_in();
+      header->set_visible_in(visible_in);
+      view->set_visible_in(visible_in);
+
       int slider_index = 0;
-      for (int i=0;i<row->FieldCount();i++) {
+      for (int i = 0; i < row->FieldCount(); i++) {
         EffectField* field = row->Field(i);
         if (field->type() == EffectField::EFFECT_FIELD_DOUBLE) {
           field->UpdateWidgetValue(field_sliders_.at(slider_index), field->Now());
@@ -161,10 +165,10 @@ void GraphEditor::update_panel() {
   }
 }
 
-void GraphEditor::set_row(EffectRow *r) {
+void GraphEditor::set_row(EffectRow* r) {
   if (r == row) return;
 
-  for (int i=0;i<field_sliders_.size();i++) {
+  for (int i = 0; i < field_sliders_.size(); i++) {
     delete field_sliders_.at(i);
     delete field_enable_buttons.at(i);
   }
@@ -181,7 +185,7 @@ void GraphEditor::set_row(EffectRow *r) {
   bool found_vals = false;
 
   if (r != nullptr && r->IsKeyframing()) {
-    for (int i=0;i<r->FieldCount();i++) {
+    for (int i = 0; i < r->FieldCount(); i++) {
       EffectField* field = r->Field(i);
       if (field->type() == EffectField::EFFECT_FIELD_DOUBLE) {
         QPushButton* slider_button = new QPushButton();
@@ -189,7 +193,7 @@ void GraphEditor::set_row(EffectRow *r) {
         slider_button->setChecked(field->IsEnabled());
         slider_button->setIcon(amber::icon::CreateIconFromSVG(":/icons/record.svg", false));
         slider_button->setProperty("field", i);
-        slider_button->setIconSize(slider_button->iconSize()*0.5);
+        slider_button->setIconSize(slider_button->iconSize() * 0.5);
         connect(slider_button, &QPushButton::toggled, this, &GraphEditor::set_field_visibility);
         field_enable_buttons.append(slider_button);
         value_layout->addWidget(slider_button);
@@ -206,10 +210,13 @@ void GraphEditor::set_row(EffectRow *r) {
 
   if (found_vals) {
     row = r;
-    current_row_desc->setText(row->GetParentEffect()->parent_clip->name()
-                              + " :: " + row->GetParentEffect()->meta->name
-                              + " :: " + row->name());
-    header->set_visible_in(r->GetParentEffect()->parent_clip->timeline_in());
+    current_row_desc->setText(row->GetParentEffect()->parent_clip->name() +
+                              " :: " + row->GetParentEffect()->meta->name + " :: " + row->name());
+    const long visible_in = r->GetParentEffect()->parent_clip->timeline_in();
+    header->set_visible_in(visible_in);
+    // view->set_row() below also updates its own cached visible_in, but set it
+    // here too so both header and view stay consistent regardless of order.
+    view->set_visible_in(visible_in);
 
     connect(keyframe_nav, &KeyframeNavigator::goto_previous_key, row, &EffectRow::GoToPreviousKeyframe);
     connect(keyframe_nav, &KeyframeNavigator::toggle_key, row, &EffectRow::ToggleKeyframe);
@@ -217,26 +224,22 @@ void GraphEditor::set_row(EffectRow *r) {
   } else {
     row = nullptr;
     current_row_desc->setText(nullptr);
+    // Clear stale offsets so the header ruler and (defensive) the view do not
+    // keep the previously selected clip's timeline_in cached.
+    header->set_visible_in(0);
+    view->set_visible_in(0);
   }
   view->set_row(row);
   update_panel();
 }
 
-bool GraphEditor::view_is_focused() {
-  return view->hasFocus() || header->hasFocus();
-}
+bool GraphEditor::view_is_focused() { return view->hasFocus() || header->hasFocus(); }
 
-bool GraphEditor::view_is_under_mouse() {
-  return view->underMouse() || header->underMouse();
-}
+bool GraphEditor::view_is_under_mouse() { return view->underMouse() || header->underMouse(); }
 
-void GraphEditor::delete_selected_keys() {
-  view->delete_selected_keys();
-}
+void GraphEditor::delete_selected_keys() { view->delete_selected_keys(); }
 
-void GraphEditor::select_all() {
-  view->select_all();
-}
+void GraphEditor::select_all() { view->select_all(); }
 
 void GraphEditor::set_key_button_enabled(bool e, int type) {
   linear_button->setEnabled(e);
@@ -254,6 +257,4 @@ void GraphEditor::set_keyframe_type() {
   view->set_selected_keyframe_type(sender()->property("type").toInt());
 }
 
-void GraphEditor::set_field_visibility(bool b) {
-  view->set_field_visibility(sender()->property("field").toInt(), b);
-}
+void GraphEditor::set_field_visibility(bool b) { view->set_field_visibility(sender()->property("field").toInt(), b); }
