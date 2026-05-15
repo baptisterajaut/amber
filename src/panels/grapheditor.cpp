@@ -167,6 +167,18 @@ void GraphEditor::update_panel() {
   }
 }
 
+void GraphEditor::repaint_only() {
+  if (!isVisible()) return;
+  if (row != nullptr) {
+    // Keep the clip-relative offset in sync (cheap: one long copy each).
+    const long visible_in = row->GetParentEffect()->parent_clip->timeline_in();
+    header->set_visible_in(visible_in);
+    view->set_visible_in(visible_in);
+  }
+  header->update();
+  view->update();
+}
+
 void GraphEditor::set_row(EffectRow* r) {
   if (r == row) return;
 

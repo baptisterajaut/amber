@@ -47,7 +47,15 @@ void update_ui(bool modified, bool scrubbing) {
   }
   if (panel_timeline != nullptr) panel_timeline->repaint_timeline();
   if (panel_sequence_viewer != nullptr) panel_sequence_viewer->update_viewer();
-  if (!scrubbing && panel_graph_editor != nullptr) panel_graph_editor->update_panel();
+  if (panel_graph_editor != nullptr) {
+    // During scrubbing, only repaint the Graph Editor so its playhead tracks
+    // the main timeline. Skip the expensive per-field LabelSlider value sync.
+    if (scrubbing) {
+      panel_graph_editor->repaint_only();
+    } else {
+      panel_graph_editor->update_panel();
+    }
+  }
 }
 
 QDockWidget* get_focused_panel(bool force_hover) {

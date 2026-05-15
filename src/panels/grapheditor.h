@@ -41,6 +41,10 @@ class GraphEditor : public Panel {
   void set_row(EffectRow* r);
 
   void update_panel();
+  // Cheap repaint path used during scrubbing: refresh row-relative offsets and
+  // repaint header + graph view, but skip the expensive per-field LabelSlider
+  // value sync that update_panel() performs.
+  void repaint_only();
   bool view_is_focused();
   bool view_is_under_mouse();
   void delete_selected_keys();
