@@ -100,6 +100,7 @@ class EffectControls : public Panel {
 
  protected:
   void resizeEvent(QResizeEvent* event) override;
+  void showEvent(QShowEvent* event) override;
 
  private:
   QVector<Clip*> selected_clips_;
@@ -109,6 +110,10 @@ class EffectControls : public Panel {
   bool load_one_effect(QVBoxLayout* layout, Clip* c, Effect* e);
 
   void SyncLabelColumnWidth();
+
+  void ClampSplitterSizes();
+
+  bool splitter_clamp_pending_{false};
 
   void DeleteEffect(ComboAction* ca, Effect* effect_ref);
 

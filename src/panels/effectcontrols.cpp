@@ -27,7 +27,9 @@
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QShowEvent>
 #include <QSpacerItem>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include "effects/effect.h"
@@ -488,9 +490,60 @@ void EffectControls::Retranslate() {
   UpdateTitle();
 }
 
-void EffectControls::LoadLayoutState(const QByteArray& data) { splitter->restoreState(data); }
+void EffectControls::LoadLayoutState(const QByteArray& data) {
+  splitter->restoreState(data);
+
+  // The splitter's width is not yet final at this point (LoadLayoutState is
+  // called during XML layout parsing, before the panel is shown). Defer the
+  // clamp until the widget has been shown and laid out so that
+  // splitter->width() reports the actual on-screen size.
+  splitter_clamp_pending_ = true;
+  QTimer::singleShot(0, this, [this]() { ClampSplitterSizes(); });
+}
 
 QByteArray EffectControls::SaveLayoutState() { return splitter->saveState(); }
+
+void EffectControls::ClampSplitterSizes() {
+  if (splitter == nullptr) {
+    return;
+  }
+
+  const int total = splitter->width();
+  if (total <= 0) {
+    // Not laid out yet — try again on the next event loop tick.
+    QTimer::singleShot(0, this, [this]() { ClampSplitterSizes(); });
+    return;
+  }
+
+  splitter_clamp_pending_ = false;
+
+  QList<int> sizes = splitter->sizes();
+
+  // Reserve at least 100 px for the keyframe pane so the Insert Keyframe
+  // diamond buttons (rightmost column of each effect row) remain reachable
+  // without horizontal scrolling.
+  const int kMinRightPane = 100;
+  const int max_left = qMax(0, total - kMinRightPane);
+
+  bool needs_default = false;
+  if (sizes.size() < 2) {
+    needs_default = true;
+  } else {
+    int sum = 0;
+    for (int s : sizes) sum += s;
+    if (sum <= 0 || sum > total + 1 /* tolerate rounding */) {
+      needs_default = true;
+    } else if (sizes.value(0) >= max_left) {
+      needs_default = true;
+    }
+  }
+
+  if (needs_default) {
+    const int left = qMax(1, (total * 6) / 10);  // 60% to params
+    const int right = qMax(kMinRightPane, total - left);
+    splitter->setSizes({left, right});
+  }
+}
 
 void EffectControls::update_scrollbar() {
   verticalScrollBar->setMaximum(qMax(0, effects_area->height() - keyframeView->height() - headers->height()));
@@ -668,7 +721,20 @@ void EffectControls::video_transition_click() { show_effect_menu(EFFECT_TYPE_TRA
 
 void EffectControls::audio_transition_click() { show_effect_menu(EFFECT_TYPE_TRANSITION, EFFECT_TYPE_AUDIO); }
 
-void EffectControls::resizeEvent(QResizeEvent*) { update_scrollbar(); }
+void EffectControls::resizeEvent(QResizeEvent* event) {
+  Panel::resizeEvent(event);
+  update_scrollbar();
+  // Only correct truly broken splitter states on resize; don't fight a user
+  // resize that's within reasonable bounds.
+  ClampSplitterSizes();
+}
+
+void EffectControls::showEvent(QShowEvent* event) {
+  Panel::showEvent(event);
+  if (splitter_clamp_pending_) {
+    ClampSplitterSizes();
+  }
+}
 
 bool EffectControls::is_focused() {
   if (this->hasFocus()) return true;
