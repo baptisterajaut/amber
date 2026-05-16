@@ -76,3 +76,15 @@ add_executable(amber-test-recordingtap
 target_include_directories(amber-test-recordingtap PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-recordingtap PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-recordingtap COMMAND amber-test-recordingtap)
+
+# Effect integration tests — exercises compose_sequence() with real effects.
+add_executable(amber-test-effects-gpu
+  test_effects_gpu.cpp
+  test_render_harness.cpp
+  test_render_harness.h
+  ${AMBER_TEST_STUBS}
+)
+target_include_directories(amber-test-effects-gpu PRIVATE ${CMAKE_SOURCE_DIR})
+target_compile_definitions(amber-test-effects-gpu PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(amber-test-effects-gpu PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-effects-gpu COMMAND amber-test-effects-gpu)
