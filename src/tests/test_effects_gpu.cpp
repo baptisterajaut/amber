@@ -1025,6 +1025,22 @@ void TestEffectsGpu::bulgePreservesCenter() {
   Rgba mid_out = pixel_at(with_fx, 64, 32, 32);
   const int d = qAbs(mid_in.r - mid_out.r) + qAbs(mid_in.g - mid_out.g) + qAbs(mid_in.b - mid_out.b);
   QVERIFY2(d <= 24, qPrintable(QString("expected centre preserved, channel sum diff=%1").arg(d)));
+
+  // Off-centre witness: pixel (32, 8) is on the Y-axis (vTexCoord ≈ (0.508,
+  // 0.133) with gl_FragCoord half-pixel offset). The shader redistorts the
+  // sample down the +Y radial. On a vertical gradient (slope ≈ 2.82 luma/px)
+  // reading a different y → meaningfully different luma. Passthrough would
+  // read (32, 8) unchanged → diff = 0.
+  //   bulge: reads ~(32.3, 14.7), expected diff ≈ 19
+  Rgba off_in = pixel_at(baseline, 64, 32, 8);
+  Rgba off_out = pixel_at(with_fx, 64, 32, 8);
+  const int luma_in = (off_in.r + off_in.g + off_in.b) / 3;
+  const int luma_out = (off_out.r + off_out.g + off_out.b) / 3;
+  const int luma_diff = qAbs(luma_in - luma_out);
+  QVERIFY2(luma_diff >= 15,
+           qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 15, "
+                              "got %1 (baseline %2 → effect %3)")
+                          .arg(luma_diff).arg(luma_in).arg(luma_out)));
 }
 
 void TestEffectsGpu::fisheyeDistorts() {
@@ -1062,6 +1078,22 @@ void TestEffectsGpu::fisheyePreservesCenter() {
   Rgba mid_out = pixel_at(with_fx, 64, 32, 32);
   const int d = qAbs(mid_in.r - mid_out.r) + qAbs(mid_in.g - mid_out.g) + qAbs(mid_in.b - mid_out.b);
   QVERIFY2(d <= 24, qPrintable(QString("expected centre preserved, channel sum diff=%1").arg(d)));
+
+  // Off-centre witness: pixel (32, 8) is on the Y-axis (vTexCoord ≈ (0.508,
+  // 0.133) with gl_FragCoord half-pixel offset). The shader redistorts the
+  // sample down the +Y radial. On a vertical gradient (slope ≈ 2.82 luma/px)
+  // reading a different y → meaningfully different luma. Passthrough would
+  // read (32, 8) unchanged → diff = 0.
+  //   fisheye: reads ~(32.0, 15.2), expected diff ≈ 20
+  Rgba off_in = pixel_at(baseline, 64, 32, 8);
+  Rgba off_out = pixel_at(with_fx, 64, 32, 8);
+  const int luma_in = (off_in.r + off_in.g + off_in.b) / 3;
+  const int luma_out = (off_out.r + off_out.g + off_out.b) / 3;
+  const int luma_diff = qAbs(luma_in - luma_out);
+  QVERIFY2(luma_diff >= 15,
+           qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 15, "
+                              "got %1 (baseline %2 → effect %3)")
+                          .arg(luma_diff).arg(luma_in).arg(luma_out)));
 }
 
 void TestEffectsGpu::sphereDistorts() {
@@ -1102,6 +1134,22 @@ void TestEffectsGpu::spherePreservesCenter() {
   // shift even at the centre because of `1.5 - scale*0.01` and adj_tc==0 only
   // exactly at the screen centre, which falls on a pixel boundary.
   QVERIFY2(d <= 48, qPrintable(QString("expected centre preserved, channel sum diff=%1").arg(d)));
+
+  // Off-centre witness: pixel (32, 8) is on the Y-axis (vTexCoord ≈ (0.508,
+  // 0.133) with gl_FragCoord half-pixel offset). The shader redistorts the
+  // sample down the +Y radial. On a vertical gradient (slope ≈ 2.82 luma/px)
+  // reading a different y → meaningfully different luma. Passthrough would
+  // read (32, 8) unchanged → diff = 0.
+  //   sphere: reads ~(32.4, 11.0), expected diff ≈ 10
+  Rgba off_in = pixel_at(baseline, 64, 32, 8);
+  Rgba off_out = pixel_at(with_fx, 64, 32, 8);
+  const int luma_in = (off_in.r + off_in.g + off_in.b) / 3;
+  const int luma_out = (off_out.r + off_out.g + off_out.b) / 3;
+  const int luma_diff = qAbs(luma_in - luma_out);
+  QVERIFY2(luma_diff >= 5,
+           qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 5, "
+                              "got %1 (baseline %2 → effect %3)")
+                          .arg(luma_diff).arg(luma_in).arg(luma_out)));
 }
 
 void TestEffectsGpu::swirlDistorts() {
