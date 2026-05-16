@@ -32,6 +32,7 @@ class TestEffectsGpu : public QObject {
   void transformScale();
   void transformRotate180();
   void keyframedTransform();
+  void boundaryTimecodes();
   void textRenders();
   void richTextRenders();
   void shakeChangesOutput();
@@ -46,6 +47,7 @@ class TestEffectsGpu : public QObject {
   void volumeMute();
   void volumePassthrough();
   void panHardLeft();
+  void audioFillLeftRightRestoresChannel();
 
   // Phase 3a — Blur family (XML shader effects).
   void boxblurRadiusZero();
@@ -104,6 +106,7 @@ class TestEffectsGpu : public QObject {
 
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
+  void yuvDecodeNV12();
 
  private:
   std::unique_ptr<TestRenderHarness> h_;
@@ -381,6 +384,29 @@ void TestEffectsGpu::keyframedTransform() {
   const int a_t15 = alpha_of(pixels15, 64, 4, 32);
   QVERIFY2(a_t15 < 50,
            qPrintable(QString("expected transparent at t=15 (4,32) outside translated quad, alpha=%1").arg(a_t15)));
+}
+
+void TestEffectsGpu::boundaryTimecodes() {
+  // Solid red clip spanning [0, 30) with default Transform. Render at both
+  // edges of the clip's lifetime: playhead=0 (first frame) and playhead=29
+  // (last frame). Both must yield red at the centre — guards against
+  // off-by-one bugs at clip boundaries (e.g. compose_sequence() skipping
+  // the in-point frame or the last frame).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+
+  for (long playhead : {0L, 29L}) {
+    QByteArray pixels = h_->render_frame(seq.get(), playhead);
+    QVERIFY2(!pixels.isEmpty(), qPrintable(QString("render_frame returned empty at playhead=%1").arg(playhead)));
+    Rgba px = pixel_at(pixels, 64, 32, 32);
+    QVERIFY2(px.r > 200 && px.a > 200, qPrintable(QString("expected red at playhead=%1 (32,32), got (%2,%3,%4,%5)")
+                                                      .arg(playhead)
+                                                      .arg(px.r)
+                                                      .arg(px.g)
+                                                      .arg(px.b)
+                                                      .arg(px.a)));
+  }
 }
 
 void TestEffectsGpu::textRenders() {
@@ -724,6 +750,27 @@ void TestEffectsGpu::panHardLeft() {
   h_->assert_channel_silence(buf, /*channel=*/1, /*tolerance=*/4);
 }
 
+void TestEffectsGpu::audioFillLeftRightRestoresChannel() {
+  // Tone → Pan(-100) silences the right channel. FillLeftRight with mode=1
+  // ("Fill Right with Left") copies the left channel onto the right, so the
+  // resulting buffer must be non-silent AND have equal L/R samples.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+  Effect* tone = c->effects[0].get();
+  h_->set_field_double(tone, 2, 0, 50.0);
+
+  EffectPtr pan = h_->attach_internal(c, EFFECT_INTERNAL_PAN, EFFECT_TYPE_EFFECT);
+  h_->set_field_double(pan.get(), 0, 0, -100.0);
+
+  EffectPtr fill = h_->attach_internal(c, EFFECT_INTERNAL_FILLLEFTRIGHT, EFFECT_TYPE_EFFECT);
+  // FillLeftRight row 0 = Type combo. Index 1 = FILL_TYPE_RIGHT ("Fill Right with Left").
+  h_->set_field_combo(fill.get(), 0, 0, 1);
+
+  QByteArray buf = h_->render_audio(c, 0.0, 100);
+  h_->assert_audio_non_silence(buf, /*min_abs_threshold=*/1000);
+  h_->assert_channels_equal(buf, /*tolerance=*/2);
+}
+
 // ---------------------------------------------------------------------------
 // Phase 3a — Blur family (XML shader effects)
 // ---------------------------------------------------------------------------
@@ -783,9 +830,9 @@ void TestEffectsGpu::boxblurNonZero() {
   auto seq = h_->make_sequence(64, 64, 30.0);
   Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
   Effect* solid = c->effects[1].get();
-  h_->set_field_combo(solid, 0, 0, 2);  // Type = SOLID_TYPE_CHECKERBOARD
+  h_->set_field_combo(solid, 0, 0, 2);                  // Type = SOLID_TYPE_CHECKERBOARD
   h_->set_field_color(solid, 2, 0, QColor(Qt::white));  // even cells; odd cells hardcoded black
-  h_->set_field_double(solid, 3, 0, 16.0);  // cell size 16 px
+  h_->set_field_double(solid, 3, 0, 16.0);              // cell size 16 px
 
   EffectPtr fx = h_->attach_xml_shader(c, "Box Blur");
   h_->set_field_double(fx.get(), 0, 0, 8.0);  // radius
@@ -933,20 +980,18 @@ void TestEffectsGpu::directionalblurNonZero() {
   // (9,10): grey side, 1 px before the yellow boundary. Horizontal kernel
   // reaches into yellow (B=0) → B drops below 150. Passthrough keeps B=192.
   Rgba h_a = pixel_at(horiz, 64, 9, 10);
-  QVERIFY2(h_a.b < 150,
-           qPrintable(QString("expected horizontal blur to pull B<150 at (9,10), got RGB=%1,%2,%3")
-                          .arg(h_a.r)
-                          .arg(h_a.g)
-                          .arg(h_a.b)));
+  QVERIFY2(h_a.b < 150, qPrintable(QString("expected horizontal blur to pull B<150 at (9,10), got RGB=%1,%2,%3")
+                                       .arg(h_a.r)
+                                       .arg(h_a.g)
+                                       .arg(h_a.b)));
   // (9,35): same column, deeper Y but still in top-zone (first_bar_height≈43).
   // SMPTE bars are row-invariant in this band so horizontal blur sees the
   // identical X-pattern → B again drops. Confirms blur is X-uniform.
   Rgba h_b = pixel_at(horiz, 64, 9, 35);
-  QVERIFY2(h_b.b < 150,
-           qPrintable(QString("expected horizontal blur to pull B<150 at (9,35), got RGB=%1,%2,%3")
-                          .arg(h_b.r)
-                          .arg(h_b.g)
-                          .arg(h_b.b)));
+  QVERIFY2(h_b.b < 150, qPrintable(QString("expected horizontal blur to pull B<150 at (9,35), got RGB=%1,%2,%3")
+                                       .arg(h_b.r)
+                                       .arg(h_b.g)
+                                       .arg(h_b.b)));
 
   // Second render: same clip, change angle to 90° → vertical blur.
   h_->set_field_double(fx.get(), 1, 0, 90.0);
@@ -956,11 +1001,10 @@ void TestEffectsGpu::directionalblurNonZero() {
   // [0, 20], all grey (top-zone runs to y≈43). B stays ≈ 192. Directionality
   // witness: angle=0 dropped B, angle=90 leaves it intact.
   Rgba v_a = pixel_at(vert, 64, 9, 10);
-  QVERIFY2(v_a.b > 150,
-           qPrintable(QString("expected vertical blur to leave B>150 at (9,10), got RGB=%1,%2,%3")
-                          .arg(v_a.r)
-                          .arg(v_a.g)
-                          .arg(v_a.b)));
+  QVERIFY2(v_a.b > 150, qPrintable(QString("expected vertical blur to leave B>150 at (9,10), got RGB=%1,%2,%3")
+                                       .arg(v_a.r)
+                                       .arg(v_a.g)
+                                       .arg(v_a.b)));
 }
 
 void TestEffectsGpu::radialblurRadiusZero() {
@@ -1015,9 +1059,9 @@ void TestEffectsGpu::radialblurNonZero() {
   h_->set_field_double(solid, 3, 0, 13.0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Radial Blur");
-  h_->set_field_double(fx.get(), 0, 0, 20.0);    // radius (pixel-scaled, gives ~3-tap kernel near edges)
-  h_->set_field_double(fx.get(), 1, 0, -12.0);   // center_x: image centre + (-12) = pixel 20
-  h_->set_field_double(fx.get(), 1, 1, -26.0);   // center_y: image centre + (-26) = pixel 6
+  h_->set_field_double(fx.get(), 0, 0, 20.0);   // radius (pixel-scaled, gives ~3-tap kernel near edges)
+  h_->set_field_double(fx.get(), 1, 0, -12.0);  // center_x: image centre + (-12) = pixel 20
+  h_->set_field_double(fx.get(), 1, 1, -26.0);  // center_y: image centre + (-26) = pixel 6
   QByteArray pixels = h_->render_frame(seq.get(), 0);
 
   // Witness 1: pixel (20, 12). In WHITE cell (1, 0). Radial direction from
@@ -1108,10 +1152,11 @@ void TestEffectsGpu::bulgePreservesCenter() {
   const int luma_in = (off_in.r + off_in.g + off_in.b) / 3;
   const int luma_out = (off_out.r + off_out.g + off_out.b) / 3;
   const int luma_diff = qAbs(luma_in - luma_out);
-  QVERIFY2(luma_diff >= 15,
-           qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 15, "
-                              "got %1 (baseline %2 → effect %3)")
-                          .arg(luma_diff).arg(luma_in).arg(luma_out)));
+  QVERIFY2(luma_diff >= 15, qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 15, "
+                                               "got %1 (baseline %2 → effect %3)")
+                                           .arg(luma_diff)
+                                           .arg(luma_in)
+                                           .arg(luma_out)));
 }
 
 void TestEffectsGpu::fisheyeDistorts() {
@@ -1161,10 +1206,11 @@ void TestEffectsGpu::fisheyePreservesCenter() {
   const int luma_in = (off_in.r + off_in.g + off_in.b) / 3;
   const int luma_out = (off_out.r + off_out.g + off_out.b) / 3;
   const int luma_diff = qAbs(luma_in - luma_out);
-  QVERIFY2(luma_diff >= 15,
-           qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 15, "
-                              "got %1 (baseline %2 → effect %3)")
-                          .arg(luma_diff).arg(luma_in).arg(luma_out)));
+  QVERIFY2(luma_diff >= 15, qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 15, "
+                                               "got %1 (baseline %2 → effect %3)")
+                                           .arg(luma_diff)
+                                           .arg(luma_in)
+                                           .arg(luma_out)));
 }
 
 void TestEffectsGpu::sphereDistorts() {
@@ -1217,10 +1263,11 @@ void TestEffectsGpu::spherePreservesCenter() {
   const int luma_in = (off_in.r + off_in.g + off_in.b) / 3;
   const int luma_out = (off_out.r + off_out.g + off_out.b) / 3;
   const int luma_diff = qAbs(luma_in - luma_out);
-  QVERIFY2(luma_diff >= 5,
-           qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 5, "
-                              "got %1 (baseline %2 → effect %3)")
-                          .arg(luma_diff).arg(luma_in).arg(luma_out)));
+  QVERIFY2(luma_diff >= 5, qPrintable(QString("off-centre (32,8) expected distorted luma diff >= 5, "
+                                              "got %1 (baseline %2 → effect %3)")
+                                          .arg(luma_diff)
+                                          .arg(luma_in)
+                                          .arg(luma_out)));
 }
 
 void TestEffectsGpu::swirlDistorts() {
@@ -1412,10 +1459,8 @@ void TestEffectsGpu::huesatbriContrast() {
 
   Rgba low = pixel_at(pixels, 64, 32, 10);
   Rgba high = pixel_at(pixels, 64, 32, 54);
-  QVERIFY2(low.r < 30,
-           qPrintable(QString("expected contrast push low pixel toward black, low.r=%1").arg(low.r)));
-  QVERIFY2(high.r > 220,
-           qPrintable(QString("expected contrast push high pixel toward white, high.r=%1").arg(high.r)));
+  QVERIFY2(low.r < 30, qPrintable(QString("expected contrast push low pixel toward black, low.r=%1").arg(low.r)));
+  QVERIFY2(high.r > 220, qPrintable(QString("expected contrast push high pixel toward white, high.r=%1").arg(high.r)));
 }
 
 void TestEffectsGpu::huesatbriHueRotate() {
@@ -1533,11 +1578,11 @@ void TestEffectsGpu::colorselHueRanges() {
     int b_min, b_max;
   };
   const HueCase cases[] = {
-      {"red",     QColor(255, 0, 0),     QColor(0, 255, 0),  0.0,  5.0,  200, 255,   0,  30,   0,  30},
-      {"green",   QColor(0, 255, 0),     QColor(255, 0, 0),  28.0, 38.0,   0,  30, 200, 255,   0,  30},
-      {"blue",    QColor(0, 0, 255),     QColor(255, 0, 0),  62.0, 72.0,   0,  30,   0,  30, 200, 255},
-      {"yellow",  QColor(255, 255, 0),   QColor(255, 0, 0),  12.0, 22.0, 200, 255, 200, 255,   0,  30},
-      {"magenta", QColor(255, 0, 255),   QColor(255, 0, 0),  78.0, 88.0, 200, 255,   0,  30, 200, 255},
+      {"red", QColor(255, 0, 0), QColor(0, 255, 0), 0.0, 5.0, 200, 255, 0, 30, 0, 30},
+      {"green", QColor(0, 255, 0), QColor(255, 0, 0), 28.0, 38.0, 0, 30, 200, 255, 0, 30},
+      {"blue", QColor(0, 0, 255), QColor(255, 0, 0), 62.0, 72.0, 0, 30, 0, 30, 200, 255},
+      {"yellow", QColor(255, 255, 0), QColor(255, 0, 0), 12.0, 22.0, 200, 255, 200, 255, 0, 30},
+      {"magenta", QColor(255, 0, 255), QColor(255, 0, 0), 78.0, 88.0, 200, 255, 0, 30, 200, 255},
   };
   for (const auto& c : cases) {
     // Sub-scope A: target colour inside the hue window → preserved.
@@ -1546,19 +1591,25 @@ void TestEffectsGpu::colorselHueRanges() {
       Clip* clip = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
       h_->set_field_color(clip->effects[1].get(), 2, 0, c.target);
       EffectPtr fx = h_->attach_xml_shader(clip, "Color Finder");
-      h_->set_field_combo(fx.get(), 0, 0, 2);    // Find by = Hue
+      h_->set_field_combo(fx.get(), 0, 0, 2);  // Find by = Hue
       h_->set_field_double(fx.get(), 1, 0, c.loc);
       h_->set_field_double(fx.get(), 2, 0, c.hic);
       QByteArray pixels = h_->render_frame(seq.get(), 0);
       Rgba mid = pixel_at(pixels, 64, 32, 32);
-      QVERIFY2(mid.r >= c.r_min && mid.r <= c.r_max && mid.g >= c.g_min && mid.g <= c.g_max &&
-                   mid.b >= c.b_min && mid.b <= c.b_max,
-               qPrintable(QString("[%1] expected target preserved in range r=[%2..%3] g=[%4..%5] b=[%6..%7], got (%8,%9,%10)")
-                              .arg(c.name)
-                              .arg(c.r_min).arg(c.r_max)
-                              .arg(c.g_min).arg(c.g_max)
-                              .arg(c.b_min).arg(c.b_max)
-                              .arg(mid.r).arg(mid.g).arg(mid.b)));
+      QVERIFY2(mid.r >= c.r_min && mid.r <= c.r_max && mid.g >= c.g_min && mid.g <= c.g_max && mid.b >= c.b_min &&
+                   mid.b <= c.b_max,
+               qPrintable(
+                   QString("[%1] expected target preserved in range r=[%2..%3] g=[%4..%5] b=[%6..%7], got (%8,%9,%10)")
+                       .arg(c.name)
+                       .arg(c.r_min)
+                       .arg(c.r_max)
+                       .arg(c.g_min)
+                       .arg(c.g_max)
+                       .arg(c.b_min)
+                       .arg(c.b_max)
+                       .arg(mid.r)
+                       .arg(mid.g)
+                       .arg(mid.b)));
     }
     // Sub-scope B: non-target colour against same window → suppressed (black).
     {
@@ -1566,14 +1617,17 @@ void TestEffectsGpu::colorselHueRanges() {
       Clip* clip = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
       h_->set_field_color(clip->effects[1].get(), 2, 0, c.other);
       EffectPtr fx = h_->attach_xml_shader(clip, "Color Finder");
-      h_->set_field_combo(fx.get(), 0, 0, 2);    // Find by = Hue
+      h_->set_field_combo(fx.get(), 0, 0, 2);  // Find by = Hue
       h_->set_field_double(fx.get(), 1, 0, c.loc);
       h_->set_field_double(fx.get(), 2, 0, c.hic);
       QByteArray pixels = h_->render_frame(seq.get(), 0);
       Rgba mid = pixel_at(pixels, 64, 32, 32);
       QVERIFY2(mid.r < 30 && mid.g < 30 && mid.b < 30,
                qPrintable(QString("[%1] expected non-target suppressed → black, got (%2,%3,%4)")
-                              .arg(c.name).arg(mid.r).arg(mid.g).arg(mid.b)));
+                              .arg(c.name)
+                              .arg(mid.r)
+                              .arg(mid.g)
+                              .arg(mid.b)));
     }
   }
 }
@@ -1601,9 +1655,10 @@ void TestEffectsGpu::posterizeReducesLevels() {
     for (int i = 0; i + 3 < pixels.size(); i += 4) {
       r_values.insert(static_cast<uchar>(pixels[i + 0]));
     }
-    QVERIFY2(r_values.size() <= N + 2,
-             qPrintable(QString("posterize N=%1 expected ≤ %2 distinct R values, got %3")
-                            .arg(N).arg(N + 2).arg(r_values.size())));
+    QVERIFY2(
+        r_values.size() <= N + 2,
+        qPrintable(
+            QString("posterize N=%1 expected ≤ %2 distinct R values, got %3").arg(N).arg(N + 2).arg(r_values.size())));
   }
 }
 
@@ -1627,14 +1682,14 @@ void TestEffectsGpu::chromakeyTransparent() {
     h_->set_field_color(c->effects[1].get(), 2, 0, kc.key);
 
     EffectPtr fx = h_->attach_xml_shader(c, "Chroma Key");
-    h_->set_field_combo(fx.get(), 0, 0, 1);     // Mode = Alpha
+    h_->set_field_combo(fx.get(), 0, 0, 1);       // Mode = Alpha
     h_->set_field_color(fx.get(), 1, 0, kc.key);  // Key Color
     QByteArray pixels = h_->render_frame(seq.get(), 0);
 
     Rgba mid = pixel_at(pixels, 64, 32, 32);
     QVERIFY2(mid.r < 30 && mid.g < 30 && mid.b < 30,
-             qPrintable(QString("[%1] expected keyed → black, got (%2,%3,%4)")
-                            .arg(kc.name).arg(mid.r).arg(mid.g).arg(mid.b)));
+             qPrintable(
+                 QString("[%1] expected keyed → black, got (%2,%3,%4)").arg(kc.name).arg(mid.r).arg(mid.g).arg(mid.b)));
   }
 }
 
@@ -1654,9 +1709,10 @@ void TestEffectsGpu::chromakeyCompositeMode() {
     h_->set_field_combo(fx.get(), 0, 0, 0);  // Mode = Composite
     QByteArray pixels = h_->render_frame(seq.get(), 0);
     Rgba mid = pixel_at(pixels, 64, 32, 32);
-    QVERIFY2(mid.r < 30 && mid.g < 30 && mid.b < 30,
-             qPrintable(QString("expected green keyed → premultiplied black, got (%1,%2,%3)")
-                            .arg(mid.r).arg(mid.g).arg(mid.b)));
+    QVERIFY2(
+        mid.r < 30 && mid.g < 30 && mid.b < 30,
+        qPrintable(
+            QString("expected green keyed → premultiplied black, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
   }
   // B: solid red + default key=green + Mode=Composite → red preserved.
   {
@@ -1668,8 +1724,7 @@ void TestEffectsGpu::chromakeyCompositeMode() {
     QByteArray pixels = h_->render_frame(seq.get(), 0);
     Rgba mid = pixel_at(pixels, 64, 32, 32);
     QVERIFY2(mid.r > 200 && mid.g < 30 && mid.b < 30,
-             qPrintable(QString("expected red preserved (non-key), got (%1,%2,%3)")
-                            .arg(mid.r).arg(mid.g).arg(mid.b)));
+             qPrintable(QString("expected red preserved (non-key), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
   }
 }
 
@@ -1692,9 +1747,9 @@ void TestEffectsGpu::chromakeyOriginalMode() {
   h_->set_field_combo(fx.get(), 0, 0, 2);  // Mode = Original (no-op)
   QByteArray pixels = h_->render_frame(seq.get(), 0);
   Rgba mid = pixel_at(pixels, 64, 32, 32);
-  QVERIFY2(qAbs(mid.r - 50) <= 5 && qAbs(mid.g - 200) <= 5 && qAbs(mid.b - 100) <= 5,
-           qPrintable(QString("expected input unchanged (50,200,100), got (%1,%2,%3)")
-                          .arg(mid.r).arg(mid.g).arg(mid.b)));
+  QVERIFY2(
+      qAbs(mid.r - 50) <= 5 && qAbs(mid.g - 200) <= 5 && qAbs(mid.b - 100) <= 5,
+      qPrintable(QString("expected input unchanged (50,200,100), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
 }
 
 void TestEffectsGpu::lumakeyBands() {
@@ -1721,16 +1776,17 @@ void TestEffectsGpu::lumakeyBands() {
   Rgba mid3 = pixel_at(pixels, 64, 32, 44);
   Rgba bot = pixel_at(pixels, 64, 32, 60);
 
-  QVERIFY2(top.r < 10,
-           qPrintable(QString("expected below-loc → premultiplied black, top.r=%1").arg(top.r)));
-  QVERIFY2(bot.r > 180,
-           qPrintable(QString("expected above-hic → opaque source preserved, bot.r=%1").arg(bot.r)));
+  QVERIFY2(top.r < 10, qPrintable(QString("expected below-loc → premultiplied black, top.r=%1").arg(top.r)));
+  QVERIFY2(bot.r > 180, qPrintable(QString("expected above-hic → opaque source preserved, bot.r=%1").arg(bot.r)));
   QVERIFY2(mid1.r < mid2.r && mid2.r < mid3.r,
-           qPrintable(QString("expected strict monotonic in-band ramp, got (%1,%2,%3)")
-                          .arg(mid1.r).arg(mid2.r).arg(mid3.r)));
+           qPrintable(
+               QString("expected strict monotonic in-band ramp, got (%1,%2,%3)").arg(mid1.r).arg(mid2.r).arg(mid3.r)));
   QVERIFY2(mid1.r > top.r + 10 && mid3.r < bot.r - 10,
            qPrintable(QString("expected in-band between edges, top=%1 mid1=%2 mid3=%3 bot=%4")
-                          .arg(top.r).arg(mid1.r).arg(mid3.r).arg(bot.r)));
+                          .arg(top.r)
+                          .arg(mid1.r)
+                          .arg(mid3.r)
+                          .arg(bot.r)));
 }
 
 void TestEffectsGpu::despillReducesGreen() {
@@ -1750,8 +1806,7 @@ void TestEffectsGpu::despillReducesGreen() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(mid.g < 190, qPrintable(QString("expected G reduced, got G=%1").arg(mid.g)));
   QVERIFY2(qAbs(mid.r - 50) <= 5 && qAbs(mid.b - 50) <= 5,
-           qPrintable(QString("expected R and B preserved at ~50, got (%1,%2,%3)")
-                          .arg(mid.r).arg(mid.g).arg(mid.b)));
+           qPrintable(QString("expected R and B preserved at ~50, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
 }
 
 // ---------------------------------------------------------------------------
@@ -1994,9 +2049,7 @@ void TestEffectsGpu::yuvDecodeRoundtrip() {
   // individual failures.
   long luma_sum = 0;
   for (int i = 0; i + 3 < out.size(); i += 4) {
-    luma_sum += (static_cast<uchar>(out[i + 0]) + static_cast<uchar>(out[i + 1]) +
-                 static_cast<uchar>(out[i + 2])) /
-                3;
+    luma_sum += (static_cast<uchar>(out[i + 0]) + static_cast<uchar>(out[i + 1]) + static_cast<uchar>(out[i + 2])) / 3;
   }
   QVERIFY2(luma_sum > 100000, qPrintable(QString("yuv decode produced near-empty frame, luma_sum=%1").arg(luma_sum)));
 
@@ -2013,13 +2066,77 @@ void TestEffectsGpu::yuvDecodeRoundtrip() {
       const uchar b = static_cast<uchar>(out[off + 2]);
       const int luma = (int(r) + int(g) + int(b)) / 3;
       if (expected_white) {
-        QVERIFY2(luma > 200,
-                 qPrintable(QString("block (%1,%2) expected white, luma=%3 rgb=(%4,%5,%6)")
-                                .arg(bx).arg(by).arg(luma).arg(r).arg(g).arg(b)));
+        QVERIFY2(luma > 200, qPrintable(QString("block (%1,%2) expected white, luma=%3 rgb=(%4,%5,%6)")
+                                            .arg(bx)
+                                            .arg(by)
+                                            .arg(luma)
+                                            .arg(r)
+                                            .arg(g)
+                                            .arg(b)));
       } else {
-        QVERIFY2(luma < 55,
-                 qPrintable(QString("block (%1,%2) expected black, luma=%3 rgb=(%4,%5,%6)")
-                                .arg(bx).arg(by).arg(luma).arg(r).arg(g).arg(b)));
+        QVERIFY2(luma < 55, qPrintable(QString("block (%1,%2) expected black, luma=%3 rgb=(%4,%5,%6)")
+                                           .arg(bx)
+                                           .arg(by)
+                                           .arg(luma)
+                                           .arg(r)
+                                           .arg(g)
+                                           .arg(b)));
+      }
+    }
+  }
+}
+
+void TestEffectsGpu::yuvDecodeNV12() {
+  // Exercises the NV12 branch in engine/clip.cpp:756-763 (interleaved CbCr
+  // plane, distinct from the YUV420P path covered by yuvDecodeRoundtrip).
+  // Fixture is a rawvideo NV12 .mkv with the same 8x8 checkerboard pattern.
+  if (!avcodec_find_decoder(AV_CODEC_ID_RAWVIDEO)) {
+    QSKIP("rawvideo decoder unavailable in this build of libavcodec");
+  }
+
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Media* m = h_->import_video_media(SOURCE_DIR "/tests/fixtures/t2_nv12_input.mkv",
+                                    /*w=*/64, /*h=*/64, /*fps=*/30.0);
+  QVERIFY(m != nullptr);
+  h_->add_video_clip(seq.get(), 0, 30, m);
+
+  QByteArray out = h_->render_frame(seq.get(), 0);
+  QVERIFY(!out.isEmpty());
+
+  // Sum-of-luma canary: see yuvDecodeRoundtrip for rationale.
+  long luma_sum = 0;
+  for (int i = 0; i + 3 < out.size(); i += 4) {
+    luma_sum += (static_cast<uchar>(out[i + 0]) + static_cast<uchar>(out[i + 1]) + static_cast<uchar>(out[i + 2])) / 3;
+  }
+  QVERIFY2(luma_sum > 100000, qPrintable(QString("nv12 decode produced near-empty frame, luma_sum=%1").arg(luma_sum)));
+
+  // 8x8 checkerboard: 8 rows x 8 cols of 8-pixel blocks. (bx+by)%2 == 0 => white.
+  for (int by = 0; by < 8; ++by) {
+    for (int bx = 0; bx < 8; ++bx) {
+      const bool expected_white = ((bx + by) % 2 == 0);
+      const int px = bx * 8 + 4;
+      const int py = by * 8 + 4;
+      const int off = (py * 64 + px) * 4;
+      const uchar r = static_cast<uchar>(out[off + 0]);
+      const uchar g = static_cast<uchar>(out[off + 1]);
+      const uchar b = static_cast<uchar>(out[off + 2]);
+      const int luma = (int(r) + int(g) + int(b)) / 3;
+      if (expected_white) {
+        QVERIFY2(luma > 200, qPrintable(QString("block (%1,%2) expected white, luma=%3 rgb=(%4,%5,%6)")
+                                            .arg(bx)
+                                            .arg(by)
+                                            .arg(luma)
+                                            .arg(r)
+                                            .arg(g)
+                                            .arg(b)));
+      } else {
+        QVERIFY2(luma < 55, qPrintable(QString("block (%1,%2) expected black, luma=%3 rgb=(%4,%5,%6)")
+                                           .arg(bx)
+                                           .arg(by)
+                                           .arg(luma)
+                                           .arg(r)
+                                           .arg(g)
+                                           .arg(b)));
       }
     }
   }
