@@ -19,6 +19,12 @@ class SubtitleEffect : public Effect {
   void save(QXmlStreamWriter& stream) override;
   EffectPtr copy(Clip* c) override;
 
+  // Force redraw every frame: the active subtitle entry depends on the playhead
+  // (timecode), not on any keyframed EffectField. Without this, the base
+  // Effect::valueHasChanged() short-circuit can skip a re-render when scrubbing
+  // past an entry boundary, leaving the previous overlay on screen.
+  bool AlwaysUpdate() override { return true; }
+
   void SetCues(const QVector<SubtitleCue>& cues);
 
  private slots:
