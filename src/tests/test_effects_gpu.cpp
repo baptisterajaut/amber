@@ -868,6 +868,266 @@ void TestEffectsGpu::radialblurNonZero() {
   QVERIFY2(diff > 1000, qPrintable(QString("expected radial blur to change output, diff=%1").arg(diff)));
 }
 
+// ---------------------------------------------------------------------------
+// Phase 3b — Distortions (XML shader effects)
+// ---------------------------------------------------------------------------
+//
+// Centre-preserving distortions (bulge, fisheye, sphere) sample the input at
+// (0.5, 0.5) when the distortion is centred at the origin (xoff=yoff=0). We
+// assert the output centre pixel ≈ input centre pixel within ±8.
+//
+// Non-symmetric distortions (swirl, ripple, wave, turbulent) only require
+// Pattern B: output differs from baseline.
+
+void TestEffectsGpu::bulgeDistorts() {
+  // bulge.xml: row 0 = Amount, row 1 = Center (xoff, yoff).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Bulge");
+  // default amount=100 already produces a noticeable bulge.
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected bulge to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::bulgePreservesCenter() {
+  // At xoff=yoff=0 the bulge is centred. At texCoord (0.5, 0.5) the radial
+  // distortion maps to (0.5, 0.5) → output centre samples input centre.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Bulge");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  Rgba mid_in = pixel_at(baseline, 64, 32, 32);
+  Rgba mid_out = pixel_at(with_fx, 64, 32, 32);
+  const int d = qAbs(mid_in.r - mid_out.r) + qAbs(mid_in.g - mid_out.g) + qAbs(mid_in.b - mid_out.b);
+  QVERIFY2(d <= 24, qPrintable(QString("expected centre preserved, channel sum diff=%1").arg(d)));
+}
+
+void TestEffectsGpu::fisheyeDistorts() {
+  // fisheye.xml: row 0 = Size (default 100).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Fisheye");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected fisheye to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::fisheyePreservesCenter() {
+  // Fisheye is centred on (0.5, 0.5) by design — no offset field. At texCoord
+  // (0.5, 0.5) the shader samples uv=(0.5, 0.5).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Fisheye");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  Rgba mid_in = pixel_at(baseline, 64, 32, 32);
+  Rgba mid_out = pixel_at(with_fx, 64, 32, 32);
+  const int d = qAbs(mid_in.r - mid_out.r) + qAbs(mid_in.g - mid_out.g) + qAbs(mid_in.b - mid_out.b);
+  QVERIFY2(d <= 24, qPrintable(QString("expected centre preserved, channel sum diff=%1").arg(d)));
+}
+
+void TestEffectsGpu::sphereDistorts() {
+  // sphere.xml: row 0 = Center (xoff,yoff), row 1 = Scale, plus bool rows.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Sphere");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected sphere to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::spherePreservesCenter() {
+  // At texCoord (0.5, 0.5) with default xoff=yoff=0, scale=75, the sphere
+  // shader computes uv near (0.5, 0.5) → centre sample roughly preserved.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Sphere");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  Rgba mid_in = pixel_at(baseline, 64, 32, 32);
+  Rgba mid_out = pixel_at(with_fx, 64, 32, 32);
+  const int d = qAbs(mid_in.r - mid_out.r) + qAbs(mid_in.g - mid_out.g) + qAbs(mid_in.b - mid_out.b);
+  // Loosened to 48 — the sphere's `f = (1-sqrt(1-r))/r` term contributes a small
+  // shift even at the centre because of `1.5 - scale*0.01` and adj_tc==0 only
+  // exactly at the screen centre, which falls on a pixel boundary.
+  QVERIFY2(d <= 48, qPrintable(QString("expected centre preserved, channel sum diff=%1").arg(d)));
+}
+
+void TestEffectsGpu::swirlDistorts() {
+  // swirl.xml: row 0 = Radius (default 200), row 1 = Angle (default 10).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Swirl");
+  // Defaults already swirl (radius=200, angle=10).
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected swirl to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::rippleDistorts() {
+  // ripple.xml: defaults intensity=100, frequency=100, speed=100 → clear ripple.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Ripple");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected ripple to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::waveDistorts() {
+  // wave.xml: defaults frequency=10, intensity=10.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Wave");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected wave to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::chromaticAberrationShifts() {
+  // chromaticaberration.xml: rows R/G/B amounts. Defaults already non-zero.
+  // On a uniform white input the per-channel UV shifts sample the same white
+  // texels — output stays mostly white. Use a gradient so channels separate
+  // visibly at the colour boundary.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Chromatic Aberration");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  // Output must differ from a grey-gradient baseline (where R==G==B per pixel)
+  // because aberration shifts each channel independently.
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected aberration to change output, diff=%1").arg(diff)));
+
+  // Look for at least one pixel where channels visibly differ (R != B).
+  bool found_split = false;
+  for (int i = 0; i + 3 < with_fx.size(); i += 4) {
+    const int r = static_cast<uchar>(with_fx[i + 0]);
+    const int b = static_cast<uchar>(with_fx[i + 2]);
+    if (qAbs(r - b) > 10) {
+      found_split = true;
+      break;
+    }
+  }
+  QVERIFY2(found_split, "expected at least one pixel with R != B by > 10 (channels separated)");
+}
+
+void TestEffectsGpu::tileRepeats() {
+  // tile.xml row 0 = Scale (percent). adj_scale = scale/100. Output coord
+  // sampler does `vTexCoord/adj_scale` so tile_count_across = 1/adj_scale.
+  // Scale=25 → adj_scale=0.25 → 4 tiles across 64 px → tile width = 16 px.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::red));
+  h_->set_field_double(gradient, 3, 0, 0.0);  // left→right
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Tile");
+  h_->set_field_double(fx.get(), 0, 0, 25.0);  // Scale=25 → 16-px tiles
+  // Mirror flags default to false.
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  // Two pixels 16 px apart at the same y should sample equivalent texCoord
+  // due to the mod(coord, 1.0) wrapping in tile.frag.
+  Rgba a = pixel_at(with_fx, 64, 16, 32);
+  Rgba b = pixel_at(with_fx, 64, 32, 32);
+  const int d = qAbs(a.r - b.r) + qAbs(a.g - b.g) + qAbs(a.b - b.b);
+  QVERIFY2(d <= 30, qPrintable(QString("expected tile repeat: (16,32)=(%1,%2,%3) (32,32)=(%4,%5,%6) sum-diff=%7")
+                                   .arg(a.r)
+                                   .arg(a.g)
+                                   .arg(a.b)
+                                   .arg(b.r)
+                                   .arg(b.g)
+                                   .arg(b.b)
+                                   .arg(d)));
+}
+
+void TestEffectsGpu::turbulentDisplaces() {
+  // turbulentdisplacement.xml: defaults amplitude_x=5, amplitude_y=5, scale=4.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Turbulent Displacement");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected turbulent to change output, diff=%1").arg(diff)));
+}
+
 int main(int argc, char* argv[]) {
   qputenv("QT_QPA_PLATFORM", "offscreen");
 
