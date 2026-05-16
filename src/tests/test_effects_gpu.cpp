@@ -5,6 +5,10 @@
 
 #include <memory>
 
+extern "C" {
+#include <libavcodec/avcodec.h>
+}
+
 #include "effects/effect.h"
 #include "effects/internal/srtparser.h"
 #include "effects/internal/subtitleeffect.h"
@@ -91,6 +95,9 @@ class TestEffectsGpu : public QObject {
   void pixelateBlocks();
   void crossstitchOutputDiffers();
   void volumetricLightOutputDiffers();
+
+  // Phase 4 — YUV decode regression.
+  void yuvDecodeRoundtrip();
 
  private:
   std::unique_ptr<TestRenderHarness> h_;
@@ -1534,6 +1541,54 @@ void TestEffectsGpu::volumetricLightOutputDiffers() {
 
   const int diff = buf_diff(baseline, with_fx);
   QVERIFY2(diff > 1000, qPrintable(QString("expected volumetric light to change output, diff=%1").arg(diff)));
+}
+
+// Phase 4 — only test that exercises the YUV decode path (yuv2rgb.frag.qsb).
+// All other slots use generator clips (RGBA-direct, bypass YUV). This slot
+// loads a committed 1-frame H.264 yuv420p MP4 containing an 8x8 checkerboard,
+// decodes it via the Cacher, and asserts the readback recovers the pattern.
+void TestEffectsGpu::yuvDecodeRoundtrip() {
+  if (!avcodec_find_decoder(AV_CODEC_ID_H264)) {
+    QSKIP("H.264 decoder unavailable in this build of libavcodec");
+  }
+
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Media* m = h_->import_video_media(SOURCE_DIR "/tests/fixtures/t1_yuv_input.mp4",
+                                    /*w=*/64, /*h=*/64, /*fps=*/30.0);
+  QVERIFY(m != nullptr);
+  h_->add_video_clip(seq.get(), 0, 30, m);
+
+  // First render primes the codec + filter graph (FFmpeg open + AVFilter init
+  // on the Cacher worker thread). Cacher::Retrieve has a 4 x 500ms attempt
+  // budget — a cold start at the limit yields a black frame on attempt 1.
+  // Discard frame 1, assert on frame 2 (codec is warm by then).
+  (void)h_->render_frame(seq.get(), 0);
+  QByteArray out = h_->render_frame(seq.get(), 0);
+  QVERIFY(!out.isEmpty());
+
+  // 8x8 checkerboard: 8 rows x 8 cols of 8-pixel blocks. (bx+by)%2 == 0 => white.
+  for (int by = 0; by < 8; ++by) {
+    for (int bx = 0; bx < 8; ++bx) {
+      const bool expected_white = ((bx + by) % 2 == 0);
+      // Sample the centre of the block to dodge YUV 4:2:0 chroma-edge artifacts.
+      const int px = bx * 8 + 4;
+      const int py = by * 8 + 4;
+      const int off = (py * 64 + px) * 4;
+      const uchar r = static_cast<uchar>(out[off + 0]);
+      const uchar g = static_cast<uchar>(out[off + 1]);
+      const uchar b = static_cast<uchar>(out[off + 2]);
+      const int luma = (int(r) + int(g) + int(b)) / 3;
+      if (expected_white) {
+        QVERIFY2(luma > 200,
+                 qPrintable(QString("block (%1,%2) expected white, luma=%3 rgb=(%4,%5,%6)")
+                                .arg(bx).arg(by).arg(luma).arg(r).arg(g).arg(b)));
+      } else {
+        QVERIFY2(luma < 55,
+                 qPrintable(QString("block (%1,%2) expected black, luma=%3 rgb=(%4,%5,%6)")
+                                .arg(bx).arg(by).arg(luma).arg(r).arg(g).arg(b)));
+      }
+    }
+  }
 }
 
 int main(int argc, char* argv[]) {

@@ -11,6 +11,7 @@
 
 #include "effects/effect.h"
 #include "engine/sequence.h"
+#include "project/media.h"
 #include "tests/test_appcontext_stub.h"
 
 class Clip;
@@ -75,6 +76,22 @@ class TestRenderHarness {
   // QFAIL on RHI errors (caller's QTest slot reports failure).
   QByteArray render_frame(Sequence* seq, long playhead);
 
+  // Build a `Media*` of type MEDIA_TYPE_FOOTAGE backed by an on-disk video file
+  // (e.g. a committed .mp4 fixture). The harness owns the MediaPtr+FootagePtr —
+  // they live until the harness is destroyed (or clear_owned_media() is called).
+  //
+  // PreviewGenerator::AnalyzeMedia is a no-op in the test build (test_ui_stubs.cpp),
+  // so we populate Footage::url + Footage::ready=true + a single FootageStream
+  // directly. The cacher opens the file via FFmpeg and reads the actual streams;
+  // it does not depend on prior analysis.
+  Media* import_video_media(const QString& path, int width, int height, double frame_rate);
+
+  // Add a video clip backed by a Media* (from import_video_media). Mirrors
+  // add_generator_clip but without injecting Transform/generator effects — the
+  // clip's source is the decoded footage, not a GPU generator. Returns a
+  // non-owning Clip*.
+  Clip* add_video_clip(Sequence* seq, long in, long out, Media* media);
+
   // Add an audio generator clip on an audio track (track >= 0). No media,
   // no Transform (video-only). Attaches the requested audio generator
   // (e.g. EFFECT_INTERNAL_TONE, EFFECT_INTERNAL_NOISE) as the first effect.
@@ -125,6 +142,10 @@ class TestRenderHarness {
   QRhiRenderPassDescriptor* backend_rpd_ = nullptr;
 
   TestAppContext app_ctx_;
+
+  // Keeps MediaPtr / FootagePtr alive for the harness lifetime. Clip stores a
+  // raw Media*, so something has to own the shared_ptr until tests tear down.
+  QVector<MediaPtr> owned_media_;
 };
 
 #endif  // TEST_RENDER_HARNESS_H

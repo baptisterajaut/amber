@@ -14,6 +14,8 @@
 #include "engine/clip.h"
 #include "engine/sequence_fwd.h"
 #include "global/config.h"
+#include "project/footage.h"
+#include "project/media.h"
 #include "rendering/audio.h"
 #include "rendering/renderfunctions.h"
 
@@ -192,6 +194,63 @@ EffectPtr TestRenderHarness::attach_effect(Clip* clip, const EffectMeta* meta) {
   EffectPtr eff = Effect::Create(clip, meta);
   clip->effects.append(eff);
   return eff;
+}
+
+Media* TestRenderHarness::import_video_media(const QString& path, int width, int height, double frame_rate) {
+  Q_ASSERT_X(QFile::exists(path), "import_video_media", qPrintable("fixture not found: " + path));
+  MediaPtr m = std::make_shared<Media>();
+  FootagePtr f = std::make_shared<Footage>();
+  f->url = path;
+  f->ready = true;
+  f->invalid = false;
+  f->using_inout = false;
+
+  // Footage::length is in AV_TIME_BASE (microsecond) units. The ctor leaves it
+  // value-initialised to 0, which makes Clip::media_length() return 0 and
+  // IsActiveAt(playhead) always false — compose_sequence then never calls
+  // Clip::Open() and the Cacher never decodes the file. Production code path
+  // is PreviewGenerator → m->length; in the test build that path is stubbed,
+  // so we set length here. 30 frames @ frame_rate seconds is enough for the
+  // [0, 30) clip range used by the YUV regression test.
+  f->length = static_cast<int64_t>((30.0 / frame_rate) * AV_TIME_BASE);
+
+  // Footage ctor calls ready_lock.lock() (footage.cpp:41) expecting PreviewGenerator
+  // to unlock once analysis completes. With PreviewGenerator stubbed in tests,
+  // unlock it ourselves so ~Footage() doesn't warn "destroying locked mutex".
+  f->ready_lock.unlock();
+
+  FootageStream s{};
+  s.file_index = 0;
+  s.video_width = width;
+  s.video_height = height;
+  s.video_frame_rate = frame_rate;
+  s.video_interlacing = VIDEO_PROGRESSIVE;
+  s.infinite_length = false;
+  s.enabled = true;
+  f->video_tracks.append(s);
+
+  m->set_footage(f);
+  owned_media_.append(m);
+  return m.get();
+}
+
+Clip* TestRenderHarness::add_video_clip(Sequence* seq, long in, long out, Media* media) {
+  ClipPtr c = std::make_shared<Clip>(seq);
+  c->set_media(media, /*stream=*/0);
+  c->set_timeline_in(in);
+  c->set_timeline_out(out);
+  c->set_clip_in(0);
+  c->set_track(-1);
+  c->set_name("VideoClip");
+
+  // Transform on top so compose_sequence's CoordsFlag path runs and the clip
+  // texture is composited to the main target.
+  const EffectMeta* transform_meta = Effect::GetInternalMeta(EFFECT_INTERNAL_TRANSFORM, EFFECT_TYPE_EFFECT);
+  Q_ASSERT(transform_meta);
+  c->effects.append(Effect::Create(c.get(), transform_meta));
+
+  seq->clips.append(c);
+  return c.get();
 }
 
 EffectPtr TestRenderHarness::attach_internal(Clip* clip, EffectInternal id, int type) {
