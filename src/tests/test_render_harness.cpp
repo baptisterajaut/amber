@@ -206,6 +206,20 @@ EffectPtr TestRenderHarness::attach_xml_effect(Clip* clip, const QString& effect
   return attach_effect(clip, meta);
 }
 
+EffectPtr TestRenderHarness::attach_xml_shader(Clip* clip, const QString& name) {
+  for (int i = 0; i < effects.size(); ++i) {
+    // Skip internal effects. The audio Noise registers with name "Noise" and
+    // internal=EFFECT_INTERNAL_NOISE (>= 0); the XML shader Noise has
+    // internal == -1. Without this filter the audio one wins.
+    if (effects[i].internal != -1) continue;
+    if (effects[i].name == name) {
+      return attach_effect(clip, &effects[i]);
+    }
+  }
+  Q_ASSERT_X(false, "attach_xml_shader", qPrintable(QString("effect not found: ") + name));
+  return nullptr;
+}
+
 void TestRenderHarness::set_field_double(Effect* e, int row, int field, double value) {
   e->row(row)->Field(field)->SetValueAt(0.0, QVariant(value));
 }

@@ -47,6 +47,16 @@ class TestRenderHarness {
   EffectPtr attach_internal(Clip* clip, EffectInternal id, int type);
   EffectPtr attach_xml_effect(Clip* clip, const QString& effect_name);
 
+  // Attach an XML shader effect by its display name (e.g. "Box Blur",
+  // "Hue/Saturation/Brightness"). Walks the global `effects` vector and matches
+  // on EffectMeta::name exactly. Filters out internal effects (meta.internal !=
+  // -1) so the audio Noise (EFFECT_INTERNAL_NOISE) doesn't shadow the XML
+  // shader Noise (internal == -1). Q_ASSERTs if not found.
+  //
+  // Why not get_meta_from_name(): that helper splits on '/' (effect.cpp:1072),
+  // which breaks names like "Hue/Saturation/Brightness".
+  EffectPtr attach_xml_shader(Clip* clip, const QString& name);
+
   // Field setters — all go through SetValueAt(0.0, ...).
   // When the field is non-keyframable (default), SetValueAt writes persistent_data_
   // which is what GetValueAt returns at every timecode. This matches what
