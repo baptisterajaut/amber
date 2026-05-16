@@ -22,6 +22,7 @@ class TestEffectsGpu : public QObject {
   void cleanupTestCase();
 
   void solidColorPassthrough();
+  void multiEffectChain();
 
   void effectPassthroughSweep_data();
   void effectPassthroughSweep();
@@ -30,6 +31,7 @@ class TestEffectsGpu : public QObject {
   void transformTranslate();
   void transformScale();
   void transformRotate180();
+  void keyframedTransform();
   void textRenders();
   void richTextRenders();
   void shakeChangesOutput();
@@ -77,6 +79,7 @@ class TestEffectsGpu : public QObject {
   void invertSwapsChannels();
   void huesatbriSaturationZero();
   void huesatbriContrast();
+  void huesatbriHueRotate();
   void colorCorrectionShift();
   void colorselIsolates();
   void colorselHueRanges();
@@ -239,6 +242,23 @@ inline bool buffers_within(const QByteArray& a, const QByteArray& b, int toleran
 
 }  // namespace
 
+void TestEffectsGpu::multiEffectChain() {
+  // Solid red -> Box Blur (no-op on uniform) -> Invert. Invert at amount=100 maps
+  // rgb=(1,0,0) -> (0,1,1) = cyan. Verifies effects chained in series both fire:
+  // if either is passthrough, output stays red and fails `mid.r < 30`.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+
+  h_->attach_xml_shader(c, "Box Blur");
+  h_->attach_xml_shader(c, "Invert");
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r < 30 && mid.g > 200 && mid.b > 200,
+           qPrintable(QString("expected red -> cyan after chain, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
 void TestEffectsGpu::transformTranslate() {
   // Solid red generator + Transform translated +16 in X. Without translation
   // every pixel is red. With +16 translation, the leftmost 16 columns of the
@@ -320,6 +340,47 @@ void TestEffectsGpu::transformRotate180() {
       top.r > bot.r + 50,
       qPrintable(
           QString("expected top brighter than bottom after 180 rotation, top.r=%1 bot.r=%2").arg(top.r).arg(bot.r)));
+}
+
+void TestEffectsGpu::keyframedTransform() {
+  // Transform.position_x keyframed: posx=32 at frame 0 (quad centred -> pixel (4,32) inside),
+  // posx=52 at frame 15 (quad shifted +20 -> pixel (4,32) outside, alpha~=0). Uses direct
+  // EffectField::keyframes.append() -- SetValueAt() on an empty keyframe array falls through
+  // to persistent_data_ instead of creating keyframes. Pattern mirrors effect.cpp:144-147.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+
+  Effect* transform = c->effects[0].get();
+  EffectRow* row = transform->row(0);  // Position row
+  row->SetKeyframingInternal(true);
+  EffectField* posx = row->Field(0);
+  EffectKeyframe k0;
+  k0.time = 0;
+  k0.data = QVariant(32.0);
+  k0.type = EFFECT_KEYFRAME_LINEAR;
+  EffectKeyframe k1;
+  k1.time = 15;
+  k1.data = QVariant(52.0);
+  k1.type = EFFECT_KEYFRAME_LINEAR;
+  posx->keyframes.append(k0);
+  posx->keyframes.append(k1);
+
+  QByteArray pixels0 = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels0.isEmpty());
+  Rgba inside_t0 = pixel_at(pixels0, 64, 4, 32);
+  QVERIFY2(inside_t0.r > 200 && inside_t0.a > 200,
+           qPrintable(QString("expected red at t=0 (4,32) inside quad, got (%1,%2,%3,%4)")
+                          .arg(inside_t0.r)
+                          .arg(inside_t0.g)
+                          .arg(inside_t0.b)
+                          .arg(inside_t0.a)));
+
+  QByteArray pixels15 = h_->render_frame(seq.get(), 15);
+  QVERIFY(!pixels15.isEmpty());
+  const int a_t15 = alpha_of(pixels15, 64, 4, 32);
+  QVERIFY2(a_t15 < 50,
+           qPrintable(QString("expected transparent at t=15 (4,32) outside translated quad, alpha=%1").arg(a_t15)));
 }
 
 void TestEffectsGpu::textRenders() {
@@ -1355,6 +1416,22 @@ void TestEffectsGpu::huesatbriContrast() {
            qPrintable(QString("expected contrast push low pixel toward black, low.r=%1").arg(low.r)));
   QVERIFY2(high.r > 220,
            qPrintable(QString("expected contrast push high pixel toward white, high.r=%1").arg(high.r)));
+}
+
+void TestEffectsGpu::huesatbriHueRotate() {
+  // huesatbri row 0 = Hue. Shader applies `hsv.r += hue/360`. Red (1,0,0) -> HSV (0,1,1).
+  // Hue=+120 -> HSV (1/3, 1, 1) -> RGB (0,1,0) = green. Passthrough fails `mid.g > 200`.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Hue/Saturation/Brightness");
+  h_->set_field_double(fx.get(), 0, 0, 120.0);  // hue +120 -> red -> green
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.g > 200 && mid.r < 30 && mid.b < 30,
+           qPrintable(QString("expected red rotated to green, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
 }
 
 void TestEffectsGpu::colorCorrectionShift() {
