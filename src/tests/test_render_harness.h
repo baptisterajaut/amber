@@ -65,10 +65,35 @@ class TestRenderHarness {
   // QFAIL on RHI errors (caller's QTest slot reports failure).
   QByteArray render_frame(Sequence* seq, long playhead);
 
+  // Add an audio generator clip on an audio track (track >= 0). No media,
+  // no Transform (video-only). Attaches the requested audio generator
+  // (e.g. EFFECT_INTERNAL_TONE, EFFECT_INTERNAL_NOISE) as the first effect.
+  // Subsequent effects can be attached with attach_internal().
+  Clip* add_audio_generator_clip(Sequence* seq, int track, long in, long out, EffectInternal generator);
+
+  // Synchronously evaluate the clip's audio chain over
+  // [timecode_start, timecode_start + duration_ms / 1000] seconds. Walks
+  // clip->effects in order and calls each effect's process_audio() in place on
+  // a local stereo S16 LE interleaved buffer (4 bytes per frame). Returns the
+  // mutated buffer.
+  //
+  // Does NOT touch the global audio_ibuffer or kick the Cacher — the production
+  // audio path is asynchronous (Cacher worker writes the ring buffer) and racy
+  // for tests. This bypass exercises the same per-effect contract used in
+  // production minus the threading.
+  QByteArray render_audio(Clip* clip, double timecode_start, int duration_ms);
+
   // Pixel assertions. `pixels` is the QByteArray from render_frame.
   // `w` is the sequence width (needed to compute the row offset for (x, y)).
   void assert_pixel(const QByteArray& pixels, int w, int x, int y, QColor expected, int tolerance = 2);
   void assert_solid_color(const QByteArray& pixels, int w, int h, QColor expected, int tolerance = 2);
+
+  // Audio assertions. `samples` is stereo S16 LE interleaved (4 bytes/frame).
+  // `channel`: 0 = left, 1 = right.
+  void assert_audio_silence(const QByteArray& samples, int tolerance = 1);
+  void assert_audio_non_silence(const QByteArray& samples, int min_abs_threshold = 1000);
+  void assert_channel_silence(const QByteArray& samples, int channel, int tolerance = 1);
+  void assert_channels_equal(const QByteArray& samples, int tolerance = 1);
 
  private:
   void load_core_shaders();

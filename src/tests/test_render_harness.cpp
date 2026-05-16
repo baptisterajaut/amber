@@ -327,3 +327,90 @@ void TestRenderHarness::assert_solid_color(const QByteArray& pixels, int w, int 
     }
   }
 }
+
+Clip* TestRenderHarness::add_audio_generator_clip(Sequence* seq, int track, long in, long out,
+                                                  EffectInternal generator) {
+  Q_ASSERT(track >= 0);  // Olive convention: track >= 0 == audio. See clip.cpp:203.
+  ClipPtr c = std::make_shared<Clip>(seq);
+  c->set_media(nullptr, 0);
+  c->set_timeline_in(in);
+  c->set_timeline_out(out);
+  c->set_clip_in(0);
+  c->set_track(track);
+  c->set_name("Audio Generator");
+
+  // All internal audio effects register with type == EFFECT_TYPE_EFFECT (their
+  // subtype is EFFECT_TYPE_AUDIO) — see effectloaders.cpp:50-75. The
+  // GetInternalMeta helper filters on `type`, not `subtype`, so we pass
+  // EFFECT_TYPE_EFFECT here just like the video path.
+  const EffectMeta* gen_meta = Effect::GetInternalMeta(generator, EFFECT_TYPE_EFFECT);
+  Q_ASSERT(gen_meta);
+  c->effects.append(Effect::Create(c.get(), gen_meta));
+
+  seq->clips.append(c);
+  return c.get();
+}
+
+QByteArray TestRenderHarness::render_audio(Clip* clip, double timecode_start, int duration_ms) {
+  Q_ASSERT(clip != nullptr);
+  Q_ASSERT(clip->sequence != nullptr);
+  const int sample_rate = clip->sequence->audio_frequency;
+  const int channels = 2;
+  const int frame_count = duration_ms * sample_rate / 1000;
+  const int byte_count = frame_count * channels * static_cast<int>(sizeof(qint16));
+
+  // Zero-init: generators with "mix" enabled start from silence so their
+  // output equals the generated signal alone.
+  QByteArray buf(byte_count, '\0');
+  const double timecode_end = timecode_start + duration_ms / 1000.0;
+
+  // Walk the effect chain in order — same contract as the production
+  // Cacher::CacheAudioWorker, minus the threading and the global ring buffer.
+  for (EffectPtr& fx : clip->effects) {
+    if (!fx) continue;
+    if (!fx->IsEnabled()) continue;
+    fx->process_audio(timecode_start, timecode_end, reinterpret_cast<quint8*>(buf.data()), byte_count, channels);
+  }
+  return buf;
+}
+
+void TestRenderHarness::assert_audio_silence(const QByteArray& samples, int tolerance) {
+  const qint16* p = reinterpret_cast<const qint16*>(samples.constData());
+  const int n = samples.size() / static_cast<int>(sizeof(qint16));
+  for (int i = 0; i < n; ++i) {
+    QVERIFY2(qAbs(p[i]) <= tolerance,
+             qPrintable(QString("sample %1 = %2, expected silence +/-%3").arg(i).arg(p[i]).arg(tolerance)));
+  }
+}
+
+void TestRenderHarness::assert_audio_non_silence(const QByteArray& samples, int min_abs_threshold) {
+  const qint16* p = reinterpret_cast<const qint16*>(samples.constData());
+  const int n = samples.size() / static_cast<int>(sizeof(qint16));
+  for (int i = 0; i < n; ++i) {
+    if (qAbs(p[i]) >= min_abs_threshold) return;
+  }
+  QFAIL(qPrintable(QString("no sample exceeded +/-%1 in %2 samples").arg(min_abs_threshold).arg(n)));
+}
+
+void TestRenderHarness::assert_channel_silence(const QByteArray& samples, int channel, int tolerance) {
+  Q_ASSERT(channel == 0 || channel == 1);
+  const qint16* p = reinterpret_cast<const qint16*>(samples.constData());
+  const int n = samples.size() / 4;  // stereo frames
+  for (int i = 0; i < n; ++i) {
+    qint16 s = p[2 * i + channel];
+    QVERIFY2(
+        qAbs(s) <= tolerance,
+        qPrintable(QString("frame %1 ch %2 = %3, expected silence +/-%4").arg(i).arg(channel).arg(s).arg(tolerance)));
+  }
+}
+
+void TestRenderHarness::assert_channels_equal(const QByteArray& samples, int tolerance) {
+  const qint16* p = reinterpret_cast<const qint16*>(samples.constData());
+  const int n = samples.size() / 4;
+  for (int i = 0; i < n; ++i) {
+    qint16 l = p[2 * i + 0];
+    qint16 r = p[2 * i + 1];
+    QVERIFY2(qAbs(l - r) <= tolerance,
+             qPrintable(QString("frame %1 L=%2 R=%3 differ by +/-%4").arg(i).arg(l).arg(r).arg(tolerance)));
+  }
+}
