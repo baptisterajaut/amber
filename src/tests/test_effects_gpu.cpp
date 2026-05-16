@@ -261,6 +261,12 @@ void TestEffectsGpu::transformTranslate() {
   h_->assert_pixel(pixels, 64, 32, 32, QColor(255, 0, 0, 255), 4);
   // A pixel inside the quad's new position only (e.g. (40, 32)): still red.
   h_->assert_pixel(pixels, 64, 40, 32, QColor(255, 0, 0, 255), 4);
+  // Outside-quad witness: with posx=+16 the quad spans x ∈ [16, 80]; pixel (4, 32) is
+  // outside → main_tex stays at the clear (alpha=0). Catches passthrough Transform
+  // (identity quad covers everything → pixel (4, 32) inside → solid red, alpha=255).
+  const int a_out = alpha_of(pixels, 64, 4, 32);
+  QVERIFY2(a_out < 50,
+           qPrintable(QString("expected transparent outside translated quad at (4,32), alpha=%1").arg(a_out)));
 }
 
 void TestEffectsGpu::transformScale() {
@@ -1774,13 +1780,20 @@ void TestEffectsGpu::yuvDecodeRoundtrip() {
   QVERIFY(m != nullptr);
   h_->add_video_clip(seq.get(), 0, 30, m);
 
-  // First render primes the codec + filter graph (FFmpeg open + AVFilter init
-  // on the Cacher worker thread). Cacher::Retrieve has a 4 x 500ms attempt
-  // budget — a cold start at the limit yields a black frame on attempt 1.
-  // Discard frame 1, assert on frame 2 (codec is warm by then).
-  (void)h_->render_frame(seq.get(), 0);
   QByteArray out = h_->render_frame(seq.get(), 0);
   QVERIFY(!out.isEmpty());
+
+  // Sum-of-luma canary: any decode that produced white blocks yields ~522 000
+  // (4096 pixels, half white at luma ≈ 255). A black/empty frame yields 0.
+  // Catches "Cacher returned nothing" before the per-block loop emits 32+
+  // individual failures.
+  long luma_sum = 0;
+  for (int i = 0; i + 3 < out.size(); i += 4) {
+    luma_sum += (static_cast<uchar>(out[i + 0]) + static_cast<uchar>(out[i + 1]) +
+                 static_cast<uchar>(out[i + 2])) /
+                3;
+  }
+  QVERIFY2(luma_sum > 100000, qPrintable(QString("yuv decode produced near-empty frame, luma_sum=%1").arg(luma_sum)));
 
   // 8x8 checkerboard: 8 rows x 8 cols of 8-pixel blocks. (bx+by)%2 == 0 => white.
   for (int by = 0; by < 8; ++by) {
