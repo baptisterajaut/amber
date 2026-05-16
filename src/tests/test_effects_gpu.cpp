@@ -33,6 +33,13 @@ class TestEffectsGpu : public QObject {
   void subtitleActiveEntry();
   void gradientRendersTwoStops();
 
+  // Bespoke audio effect tests (Phase 2).
+  void toneGeneratesAudio();
+  void audioNoiseNotSilent();
+  void volumeMute();
+  void volumePassthrough();
+  void panHardLeft();
+
  private:
   std::unique_ptr<TestRenderHarness> h_;
 };
@@ -449,6 +456,110 @@ void TestEffectsGpu::gradientRendersTwoStops() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(mid.r > 40 && mid.b > 40,
            qPrintable(QString("expected purple near middle, got R=%1 G=%2 B=%3").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+// ---------------------------------------------------------------------------
+// Bespoke audio effect tests
+// ---------------------------------------------------------------------------
+//
+// All audio tests use TestRenderHarness::add_audio_generator_clip() +
+// render_audio(), which bypasses compose_audio() and the global audio_ibuffer
+// ring. Each effect's process_audio() is invoked directly on a local
+// stereo S16 LE buffer. See test_render_harness.cpp::render_audio for the
+// exact contract.
+
+void TestEffectsGpu::toneGeneratesAudio() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  // track=0 is an audio track (Olive: track >= 0 == audio).
+  Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+  // ToneEffect rows: 0=Type (Sine), 1=Frequency (default 1000 Hz), 2=Amount
+  // (default 25, range 0-100), 3=Mix (default true). Bump amount to 50 to
+  // make sure samples cross the +/-1000 threshold.
+  Effect* tone = c->effects[0].get();
+  h_->set_field_double(tone, 2, 0, 50.0);
+
+  QByteArray buf = h_->render_audio(c, 0.0, 100);
+  h_->assert_audio_non_silence(buf, /*min_abs_threshold=*/1000);
+}
+
+void TestEffectsGpu::audioNoiseNotSilent() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  // EFFECT_INTERNAL_NOISE registers under subtype EFFECT_TYPE_AUDIO (audio
+  // noise via AudioNoiseEffect), with type EFFECT_TYPE_EFFECT — the same
+  // pattern as Tone/Volume/Pan. The harness's GetInternalMeta filter on
+  // type == EFFECT_TYPE_EFFECT resolves it correctly.
+  Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_NOISE);
+  // AudioNoise default amount is 20 — already audible.
+  QByteArray buf = h_->render_audio(c, 0.0, 100);
+  h_->assert_audio_non_silence(buf, /*min_abs_threshold=*/1000);
+}
+
+void TestEffectsGpu::volumeMute() {
+  // Tone → Volume = 0. VolumeEffect's process_audio multiplies samples by
+  // the raw field value (`left_samp *= vol_val`). The DisplayType::Decibel
+  // setting in the ctor only affects the UI representation, not the stored
+  // number. So setting the field to 0 gives a literal zero multiplier and
+  // produces silence regardless of dB/linear interpretation.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+  Effect* tone = c->effects[0].get();
+  h_->set_field_double(tone, 2, 0, 50.0);  // amount
+
+  EffectPtr vol_eff = h_->attach_internal(c, EFFECT_INTERNAL_VOLUME, EFFECT_TYPE_EFFECT);
+  // Volume row 0, field 0 = volume (double). 0 → silence.
+  h_->set_field_double(vol_eff.get(), 0, 0, 0.0);
+
+  QByteArray buf = h_->render_audio(c, 0.0, 100);
+  // Multiplication by exactly 0 yields exact 0; allow tiny rounding tolerance.
+  h_->assert_audio_silence(buf, /*tolerance=*/4);
+}
+
+void TestEffectsGpu::volumePassthrough() {
+  // Two parallel clips, separate sequences:
+  //   A: Tone only.
+  //   B: Tone + Volume = 1.0 (literal multiplier; passthrough).
+  // Both Tones share the same params (amount=50, frequency=1000) and start
+  // with sinX = INT_MIN, so the two output buffers should be sample-identical
+  // up to int16 round-trip tolerance.
+  auto seq_a = h_->make_sequence(64, 64, 30.0);
+  Clip* a = h_->add_audio_generator_clip(seq_a.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+  h_->set_field_double(a->effects[0].get(), 2, 0, 50.0);
+  QByteArray buf_a = h_->render_audio(a, 0.0, 50);
+
+  auto seq_b = h_->make_sequence(64, 64, 30.0);
+  Clip* b = h_->add_audio_generator_clip(seq_b.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+  h_->set_field_double(b->effects[0].get(), 2, 0, 50.0);
+  EffectPtr vol_eff = h_->attach_internal(b, EFFECT_INTERNAL_VOLUME, EFFECT_TYPE_EFFECT);
+  h_->set_field_double(vol_eff.get(), 0, 0, 1.0);  // passthrough multiplier
+  QByteArray buf_b = h_->render_audio(b, 0.0, 50);
+
+  QCOMPARE(buf_a.size(), buf_b.size());
+  const qint16* pa = reinterpret_cast<const qint16*>(buf_a.constData());
+  const qint16* pb = reinterpret_cast<const qint16*>(buf_b.constData());
+  const int n = buf_a.size() / static_cast<int>(sizeof(qint16));
+  // Tolerance ±32 absorbs the int16 round-trip in VolumeEffect (multiply,
+  // clamp, re-pack via 8-bit shifts).
+  for (int i = 0; i < n; ++i) {
+    QVERIFY2(qAbs(pa[i] - pb[i]) <= 32,
+             qPrintable(QString("sample %1: A=%2 B=%3 diff=%4").arg(i).arg(pa[i]).arg(pb[i]).arg(pa[i] - pb[i])));
+  }
+}
+
+void TestEffectsGpu::panHardLeft() {
+  // Tone (stereo identical L/R) + Pan = -100 → right channel multiplied by
+  // (1.0 - log_volume(1.0)) = 0; right channel goes silent.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+  Effect* tone = c->effects[0].get();
+  h_->set_field_double(tone, 2, 0, 50.0);
+
+  EffectPtr pan_eff = h_->attach_internal(c, EFFECT_INTERNAL_PAN, EFFECT_TYPE_EFFECT);
+  // Pan row 0, field 0 = pan (-100 .. 100, default 0).
+  h_->set_field_double(pan_eff.get(), 0, 0, -100.0);
+
+  QByteArray buf = h_->render_audio(c, 0.0, 100);
+  // Right channel (index 1) must be silent.
+  h_->assert_channel_silence(buf, /*channel=*/1, /*tolerance=*/4);
 }
 
 int main(int argc, char* argv[]) {
