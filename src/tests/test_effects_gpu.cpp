@@ -40,6 +40,57 @@ class TestEffectsGpu : public QObject {
   void volumePassthrough();
   void panHardLeft();
 
+  // Phase 3a — Blur family (XML shader effects).
+  void boxblurRadiusZero();
+  void boxblurSolidColor();
+  void boxblurNonZero();
+  void gaussianblurRadiusZero();
+  void gaussianblurSolidColor();
+  void gaussianblurNonZero();
+  void directionalblurRadiusZero();
+  void directionalblurSolidColor();
+  void directionalblurNonZero();
+  void radialblurRadiusZero();
+  void radialblurSolidColor();
+  void radialblurNonZero();
+
+  // Phase 3b — Distortions (XML shader effects).
+  void bulgeDistorts();
+  void bulgePreservesCenter();
+  void fisheyeDistorts();
+  void fisheyePreservesCenter();
+  void sphereDistorts();
+  void spherePreservesCenter();
+  void swirlDistorts();
+  void rippleDistorts();
+  void waveDistorts();
+  void chromaticAberrationShifts();
+  void tileRepeats();
+  void turbulentDisplaces();
+
+  // Phase 3c — Color & key (XML shader effects).
+  void invertSwapsChannels();
+  void huesatbriSaturationZero();
+  void huesatbriContrast();
+  void colorCorrectionShift();
+  void colorselIsolates();
+  void posterizeReducesLevels();
+  void chromakeyTransparent();
+  void lumakeyBands();
+  void despillReducesGreen();
+
+  // Phase 3d — Effects, crop & misc (XML shader effects).
+  void flipHorizontal();
+  void flipVertical();
+  void cropTransparentBorders();
+  void embossOutputDiffers();
+  void toonifyOutputDiffers();
+  void noiseShaderOutputDiffers();
+  void vignetteDarkensCorners();
+  void pixelateBlocks();
+  void crossstitchOutputDiffers();
+  void volumetricLightOutputDiffers();
+
  private:
   std::unique_ptr<TestRenderHarness> h_;
 };
@@ -148,6 +199,31 @@ struct Rgba {
 inline Rgba pixel_at(const QByteArray& pixels, int w, int x, int y) {
   const uchar* p = reinterpret_cast<const uchar*>(pixels.constData()) + (y * w + x) * 4;
   return {p[0], p[1], p[2], p[3]};
+}
+
+// Sum of absolute byte differences between two equally-sized buffers. Used by
+// Phase 3 slots to test "effect changed output" (Pattern B) and "identity at
+// neutral parameter" (Pattern A). Never assert on alpha — the compositing
+// pipeline forces final-readback alpha=255 regardless of source (Phase 2
+// lesson, subtitleActiveEntry).
+inline int buf_diff(const QByteArray& a, const QByteArray& b) {
+  Q_ASSERT(a.size() == b.size());
+  int total = 0;
+  for (int i = 0; i < a.size(); ++i) {
+    total += qAbs(static_cast<int>(static_cast<uchar>(a[i])) - static_cast<int>(static_cast<uchar>(b[i])));
+  }
+  return total;
+}
+
+// True if every channel of every pixel matches within `tolerance`.
+inline bool buffers_within(const QByteArray& a, const QByteArray& b, int tolerance) {
+  if (a.size() != b.size()) return false;
+  for (int i = 0; i < a.size(); ++i) {
+    if (qAbs(static_cast<int>(static_cast<uchar>(a[i])) - static_cast<int>(static_cast<uchar>(b[i]))) > tolerance) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace
@@ -567,6 +643,229 @@ void TestEffectsGpu::panHardLeft() {
   QByteArray buf = h_->render_audio(c, 0.0, 100);
   // Right channel (index 1) must be silent.
   h_->assert_channel_silence(buf, /*channel=*/1, /*tolerance=*/4);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3a — Blur family (XML shader effects)
+// ---------------------------------------------------------------------------
+//
+// Each blur effect gets three slots:
+//   <name>RadiusZero  — Pattern A: neutral radius/length/sigma ⇒ passthrough
+//                       (every shader has a `radius > 0` short-circuit).
+//   <name>SolidColor  — solid colour input ⇒ centre pixel preserves colour
+//                       even after blurring (edges may darken).
+//   <name>NonZero     — Pattern B: non-zero parameter ⇒ output differs from
+//                       baseline by a wide margin.
+//
+// All field row/field indices were read from src/effects/shaders/<name>.xml.
+
+void TestEffectsGpu::boxblurRadiusZero() {
+  // boxblur.xml: row 0 = Radius (double, default 10). Setting to 0 takes the
+  // `radius > 0` short-circuit in boxblur.frag → texture passthrough.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Box Blur");
+  h_->set_field_double(fx.get(), 0, 0, 0.0);  // radius=0
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/4),
+           qPrintable(QString("expected radius=0 passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::boxblurSolidColor() {
+  // Blur on uniform red: every sample of the kernel is the same red, so the
+  // centre pixel (far from the edge fall-off) must remain ~red.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Box Blur");
+  // default radius=10 is fine.
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r > 230 && mid.g < 30 && mid.b < 30,
+           qPrintable(
+               QString("expected solid red preserved at centre, got R=%1 G=%2 B=%3").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::boxblurNonZero() {
+  // Pattern B: gradient + radius=10 must change output meaningfully.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Box Blur");
+  h_->set_field_double(fx.get(), 0, 0, 10.0);
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  // 10-px blur on a vertical gradient redistributes intensity at the edges.
+  // 1000 is a generous lower bound (calibration: empirically much higher).
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected blur to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::gaussianblurRadiusZero() {
+  // gaussianblur.xml: row 0 = Sigma. Shader explicitly short-circuits at
+  // sigma == 0 (radius_is_zero branch → texture(image, vTexCoord)).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Gaussian Blur");
+  h_->set_field_double(fx.get(), 0, 0, 0.0);  // sigma=0
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/4),
+           qPrintable(QString("expected sigma=0 passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::gaussianblurSolidColor() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Gaussian Blur");
+  // default sigma=5.5
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r > 230 && mid.g < 30 && mid.b < 30,
+           qPrintable(
+               QString("expected solid red preserved at centre, got R=%1 G=%2 B=%3").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::gaussianblurNonZero() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Gaussian Blur");
+  h_->set_field_double(fx.get(), 0, 0, 5.0);
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected blur to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::directionalblurRadiusZero() {
+  // directionalblur.xml: row 0 = Length (default 10). length=0 → texture
+  // passthrough (else branch in directionalblur.frag).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Directional Blur");
+  h_->set_field_double(fx.get(), 0, 0, 0.0);  // length=0
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/4),
+           qPrintable(QString("expected length=0 passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::directionalblurSolidColor() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Directional Blur");
+  // default length=10, angle=0
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r > 230 && mid.g < 30 && mid.b < 30,
+           qPrintable(
+               QString("expected solid red preserved at centre, got R=%1 G=%2 B=%3").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::directionalblurNonZero() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Directional Blur");
+  h_->set_field_double(fx.get(), 0, 0, 15.0);  // length
+  h_->set_field_double(fx.get(), 1, 0, 90.0);  // angle perpendicular to gradient
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected blur to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::radialblurRadiusZero() {
+  // radialblur.xml: row 0 = Radius. radius=0 → texture passthrough.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Radial Blur");
+  h_->set_field_double(fx.get(), 0, 0, 0.0);  // radius=0
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/4),
+           qPrintable(QString("expected radius=0 passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::radialblurSolidColor() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Radial Blur");
+  // default radius=100, center=(0,0)
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r > 230 && mid.g < 30 && mid.b < 30,
+           qPrintable(
+               QString("expected solid red preserved at centre, got R=%1 G=%2 B=%3").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::radialblurNonZero() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Radial Blur");
+  h_->set_field_double(fx.get(), 0, 0, 50.0);  // radius
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected radial blur to change output, diff=%1").arg(diff)));
 }
 
 int main(int argc, char* argv[]) {
