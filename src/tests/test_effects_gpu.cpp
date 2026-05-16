@@ -1320,6 +1320,222 @@ void TestEffectsGpu::despillReducesGreen() {
   QVERIFY2(mid.g < 200 - 10, qPrintable(QString("expected G reduced, got G=%1").arg(mid.g)));
 }
 
+// ---------------------------------------------------------------------------
+// Phase 3d — Effects, crop & misc (XML shader effects)
+// ---------------------------------------------------------------------------
+
+void TestEffectsGpu::flipHorizontal() {
+  // flip.xml row 0=horiz (default true), row 1=vert (default false). Use a
+  // left→right gradient (red→blue) so the flip is detectable.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
+  h_->set_field_double(gradient, 3, 0, 0.0);  // left→right
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Flip");
+  // defaults: horiz=true, vert=false
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  // Left edge of flipped output corresponds to right edge of input.
+  Rgba a = pixel_at(baseline, 64, 58, 32);
+  Rgba b = pixel_at(with_fx, 64, 5, 32);
+  const int d = qAbs(a.r - b.r) + qAbs(a.g - b.g) + qAbs(a.b - b.b);
+  QVERIFY2(d <= 30, qPrintable(QString("expected horizontal mirror: in(58)=(%1,%2,%3) out(5)=(%4,%5,%6) sum-diff=%7")
+                                   .arg(a.r)
+                                   .arg(a.g)
+                                   .arg(a.b)
+                                   .arg(b.r)
+                                   .arg(b.g)
+                                   .arg(b.b)
+                                   .arg(d)));
+}
+
+void TestEffectsGpu::flipVertical() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
+  h_->set_field_double(gradient, 3, 0, 90.0);  // top→bottom
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Flip");
+  h_->set_field_bool(fx.get(), 0, 0, false);  // horiz=false
+  h_->set_field_bool(fx.get(), 1, 0, true);   // vert=true
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  Rgba a = pixel_at(baseline, 64, 32, 58);
+  Rgba b = pixel_at(with_fx, 64, 32, 5);
+  const int d = qAbs(a.r - b.r) + qAbs(a.g - b.g) + qAbs(a.b - b.b);
+  QVERIFY2(d <= 30, qPrintable(QString("expected vertical mirror: in(58)=(%1,%2,%3) out(5)=(%4,%5,%6) sum-diff=%7")
+                                   .arg(a.r)
+                                   .arg(a.g)
+                                   .arg(a.b)
+                                   .arg(b.r)
+                                   .arg(b.g)
+                                   .arg(b.b)
+                                   .arg(d)));
+}
+
+void TestEffectsGpu::cropTransparentBorders() {
+  // crop.xml rows 0..3 = Left/Top/Right/Bottom percent. With 20% margins,
+  // pixels outside [0.2, 0.8] get alpha=0 and rgb premultiplied → after the
+  // compositor's alpha-force they read as (0,0,0,255). Phase 2 lesson: never
+  // assert alpha — assert colour distance instead.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 100, 50, 255));
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Crop");
+  h_->set_field_double(fx.get(), 0, 0, 20.0);
+  h_->set_field_double(fx.get(), 1, 0, 20.0);
+  h_->set_field_double(fx.get(), 2, 0, 20.0);
+  h_->set_field_double(fx.get(), 3, 0, 20.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba corner = pixel_at(pixels, 64, 1, 1);
+  const int corner_d = qAbs(corner.r - 200) + qAbs(corner.g - 100) + qAbs(corner.b - 50);
+  QVERIFY2(corner_d > 100, qPrintable(QString("expected corner cropped, got (%1,%2,%3) input-diff=%4")
+                                          .arg(corner.r)
+                                          .arg(corner.g)
+                                          .arg(corner.b)
+                                          .arg(corner_d)));
+
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 200) <= 10 && qAbs(mid.g - 100) <= 10 && qAbs(mid.b - 50) <= 10,
+           qPrintable(QString("expected centre preserved, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::embossOutputDiffers() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Emboss");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected emboss to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::toonifyOutputDiffers() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Toonify");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected toonify to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::noiseShaderOutputDiffers() {
+  // The XML shader "Noise" has internal == -1; attach_xml_shader's filter
+  // skips the audio Noise (internal == EFFECT_INTERNAL_NOISE) so we get the
+  // right one.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128, 255));
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Noise");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected shader noise to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::vignetteDarkensCorners() {
+  // vignette.xml defaults: lensRadiusX=45, lensRadiusY=38 → noticeable vignette.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 200, 200, 255));
+
+  h_->attach_xml_shader(c, "Vignette");
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba corner = pixel_at(pixels, 64, 2, 2);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  const int corner_sum = corner.r + corner.g + corner.b;
+  const int mid_sum = mid.r + mid.g + mid.b;
+  QVERIFY2(
+      mid_sum > corner_sum + 30,
+      qPrintable(QString("expected corner darker than centre, corner_sum=%1 mid_sum=%2").arg(corner_sum).arg(mid_sum)));
+}
+
+void TestEffectsGpu::pixelateBlocks() {
+  // pixelate.xml row 0 = Horizontal Pixels (count of blocks across; default 16).
+  // With Horizontal Pixels=8 on a 64-px canvas → 8 blocks of 8 px each.
+  // Pixels (1, 4) and (6, 4) are in the same block; pixel (12, 4) is in the
+  // next block. Gradient supplies the inter-block colour difference.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 0.0);  // left→right
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Pixelate");
+  h_->set_field_double(fx.get(), 0, 0, 8.0);  // Horizontal Pixels (blocks across)
+  h_->set_field_double(fx.get(), 1, 0, 8.0);  // Vertical Pixels (blocks down)
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+
+  Rgba in_block_a = pixel_at(pixels, 64, 1, 4);
+  Rgba in_block_b = pixel_at(pixels, 64, 6, 4);
+  Rgba next_block = pixel_at(pixels, 64, 12, 4);
+
+  const int same_d =
+      qAbs(in_block_a.r - in_block_b.r) + qAbs(in_block_a.g - in_block_b.g) + qAbs(in_block_a.b - in_block_b.b);
+  const int diff_d =
+      qAbs(in_block_a.r - next_block.r) + qAbs(in_block_a.g - next_block.g) + qAbs(in_block_a.b - next_block.b);
+  QVERIFY2(same_d <= 12, qPrintable(QString("expected same-block pixels equal, sum-diff=%1").arg(same_d)));
+  QVERIFY2(diff_d > 4, qPrintable(QString("expected next-block pixel different, sum-diff=%1").arg(diff_d)));
+}
+
+void TestEffectsGpu::crossstitchOutputDiffers() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
+  h_->set_field_double(gradient, 3, 0, 0.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Cross Stitch");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected cross stitch to change output, diff=%1").arg(diff)));
+}
+
+void TestEffectsGpu::volumetricLightOutputDiffers() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Volumetric Light");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected volumetric light to change output, diff=%1").arg(diff)));
+}
+
 int main(int argc, char* argv[]) {
   qputenv("QT_QPA_PLATFORM", "offscreen");
 
