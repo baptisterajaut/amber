@@ -12,6 +12,7 @@
 #include "effects/effectloaders.h"
 #include "effects/effectrow.h"
 #include "engine/clip.h"
+#include "engine/sequence_fwd.h"
 #include "global/config.h"
 #include "rendering/audio.h"
 #include "rendering/renderfunctions.h"
@@ -76,6 +77,7 @@ TestRenderHarness::TestRenderHarness() {
 }
 
 TestRenderHarness::~TestRenderHarness() {
+  amber::ActiveSequence = nullptr;
   if (rhi_) {
     release_buffers();
     delete sampler_;
@@ -155,6 +157,11 @@ SequencePtr TestRenderHarness::make_sequence(int w, int h, double fps) {
   seq->audio_frequency = 48000;
   seq->audio_layout = 3;  // stereo, matches AV_CH_LAYOUT_STEREO
   seq->save_id = 0;       // Sequence::save_id is uninitialised in the default ctor; set explicitly.
+
+  // Several effects (e.g. TimecodeEffect::redraw) read amber::ActiveSequence
+  // directly instead of the compose_sequence params — install it so they don't
+  // null-deref. Tests assume a single sequence at a time; the harness owns it.
+  amber::ActiveSequence = seq;
   return seq;
 }
 
