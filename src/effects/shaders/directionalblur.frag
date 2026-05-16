@@ -13,10 +13,10 @@ layout(location = 0) out vec4 fragColor;
 void main(void) {
 	if (blur_len > 0.0) {
 		float ceillen = ceil(blur_len);
-		float radians = (angle*M_PI)/180.0;
+		float angle_rad = (angle*M_PI)/180.0;
 		float divider = 1.0 / ceillen;
-		float sin_angle = sin(radians);
-		float cos_angle = cos(radians);
+		float sin_angle = sin(angle_rad);
+		float cos_angle = cos(angle_rad);
 
 		vec4 color = vec4(0.0);
 		for (float i=-ceillen+0.5;i<=ceillen;i+=2.0) {
