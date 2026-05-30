@@ -65,3 +65,4 @@ out/
 squashfs-root/
 aqtinstall.log
 .worktrees/
+/.antigravitycli

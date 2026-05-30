@@ -1,4 +1,4 @@
-﻿/***
+/***
 
     Olive - Non-Linear Video Editor
     Copyright (C) 2019  Olive Team
@@ -584,10 +584,15 @@ void MainWindow::setup_menus() {
   setedit_marker_ =
       MenuHelper::create_menu_action(edit_menu, "marker", &amber::FocusFilter, SLOT(set_marker()), QKeySequence("M"));
 
+#ifndef Q_OS_WIN
   edit_menu->addSeparator();
 
   preferences_action_ = MenuHelper::create_menu_action(edit_menu, "prefs", amber::Global.get(),
                                                        SLOT(open_preferences()), QKeySequence("Ctrl+,"));
+#else
+  preferences_action_ = MenuHelper::create_menu_action(nullptr, "prefs", amber::Global.get(),
+                                                       SLOT(open_preferences()), QKeySequence("Ctrl+,"));
+#endif
 
   // INITIALIZE VIEW MENU
 
@@ -938,8 +943,10 @@ void MainWindow::setup_menus() {
   smooth_autoscroll->setCheckable(true);
   autoscroll_group->addAction(smooth_autoscroll);
 
+#ifdef Q_OS_WIN
   tools_menu->addSeparator();
   tools_menu->addAction(preferences_action_);
+#endif
 
 #ifdef QT_DEBUG
   clear_undo_action_ =
