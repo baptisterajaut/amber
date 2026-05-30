@@ -1,0 +1,572 @@
+diff --git a/README.md b/README.md
+index e5c3aa371..9cd3addf7 100644
+--- a/README.md
++++ b/README.md
+@@ -13,6 +13,7 @@ Amber picks up where the amazing [Olive 0.1](https://github.com/olive-editor/oli
+ ## Features
+ 
+ - **Multi-track timeline** with clip splitting, ripple/rolling/slip/slide tools, transitions, and keyframe animation
++- **Smart Action Search Dialog** that learns and prioritizes recommending your most frequently used actions over time
+ - **GPU-accelerated rendering** via Qt RHI (Vulkan, Metal, D3D12, OpenGL fallback) — no raw OpenGL calls in the codebase
+ - **Hardware video decoding** (VAAPI, D3D11VA, VideoToolbox) — enabled by default, software fallback automatic
+ - **Frei0r plugin support**
+@@ -33,6 +34,8 @@ For GPUs older than OpenGL 3.2, use [version 1.1.0](https://github.com/baptister
+ 
+ ## Packages
+ 
++For detailed build instructions for **Fedora Linux 44**, check out [docs/prerequisites-fedora.md](docs/prerequisites-fedora.md)!
++
+ Pre-built packages for Windows, Linux (AppImage) and macOS on the [Releases](https://github.com/baptisterajaut/amber/releases) page. Arch Linux: `makepkg -si` from `packaging/linux/PKGBUILD`. Tested on Arch only; other builds are best-effort.
+ 
+ ## Build
+@@ -61,7 +64,7 @@ docker run --rm amber-win64 cat /out/amber-setup.exe > amber-setup.exe
+ 
+ **Dependencies:** Qt 6.10+ (Core, Gui, GuiPrivate, Widgets, Multimedia, OpenGL, OpenGLWidgets, ShaderTools, ShaderToolsPrivate, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample).
+ 
+-More details coming soon...
++For detailed build instructions for **Fedora Linux 44**, check out [documentation/prerequisites-fedora.md](documentation/prerequisites-fedora.md)!
+ 
+ ## License
+ 
+diff --git a/docs/prerequisites-fedora.md b/docs/prerequisites-fedora.md
+new file mode 100644
+index 000000000..d8d5b1745
+--- /dev/null
++++ b/docs/prerequisites-fedora.md
+@@ -0,0 +1,36 @@
++# Fedora Prerequisites for Amber Video Editor
++
++To build Amber on Fedora Linux, you must ensure your system meets the minimum hardware requirements and has the necessary Qt 6 and FFmpeg development packages installed. The following has been tested on Fedora 44.
++
++## Required Dependencies
++
++Amber requires **Qt 6.10+** (specifically the Core, Gui, GuiPrivate, Widgets, Multimedia, OpenGL, OpenGLWidgets, ShaderTools, ShaderToolsPrivate, Svg, and LinguistTools modules) alongside **FFmpeg 3.4–8**.
++
++Run the following command to install the complete build environment and all required headers on Fedora:
++
++```bash
++sudo dnf install \
++  qt6-qtbase-devel \
++  qt6-qtbase-private-devel \
++  qt6-qtmultimedia-devel \
++  qt6-qtshadertools-devel \
++  qt6-qtsvg-devel \
++  qt6-qttools-devel \
++  ffmpeg-free-devel \
++  cmake gcc-c++ make -y
++```
++
++> **Note:** If you are utilizing the RPM Fusion repository for full codec support, you can replace `ffmpeg-free-devel` with `ffmpeg-devel`.
++
++## Build Instructions
++
++Once all prerequisites are installed, you can configure and build the project from the source directory:
++
++```bash
++cmake -S src -B build -DCMAKE_BUILD_TYPE=Release
++cmake --build build -j$(nproc)
++```
++
++## Wayland & GNOME Compatibility
++
++Amber includes native compatibility workarounds for running under GNOME Wayland sessions. GNOME's compositor (Mutter) does not support Server-Side Decorations (SSD). Amber automatically detects GNOME Wayland environments at startup and transparently falls back to XWayland (`xcb`) to restore native window title bars and borders.
+diff --git a/src/dialogs/actionsearch.cpp b/src/dialogs/actionsearch.cpp
+index d249c6e34..00c51a183 100644
+--- a/src/dialogs/actionsearch.cpp
++++ b/src/dialogs/actionsearch.cpp
+@@ -24,6 +24,8 @@
+ #include <QKeyEvent>
+ #include <QMenuBar>
+ #include <QLabel>
++#include <QSettings>
++#include <algorithm>
+ 
+ #include "ui/mainwindow.h"
+ 
+@@ -81,80 +83,76 @@ ActionSearch::ActionSearch(QWidget *parent) :
+   // Instantly focus on the entry field to allow for fully keyboard operation (if this popup was initiated by keyboard
+   // shortcut for example).
+   entry_field->setFocus();
++
++  search_update("");
+ }
+ 
+ void ActionSearch::search_update(const QString &s, const QString &p, QMenu *parent) {
++  Q_UNUSED(p);
++  Q_UNUSED(parent);
+ 
+-  // This function is recursive, using the `parent` parameter to loop through a menu's items. It functions in two
+-  // modes - the parent being NULL, meaning it'll get MainWindow's menubar and loop over its menus, and the parent
+-  // referring to a menu at which point it'll loop over its actions (and call itself recursively if it finds any
+-  // submenus).
+-
+-  if (parent == nullptr) {
+-
+-    // If parent is NULL, we'll pull from the MainWindow's menubar and call this recursively on all of its submenus
+-    // (and their submenus).
+-
+-    // We'll clear all the current items in the list since if we're here, we're just starting.
+-    list_widget->clear();
+-
+-    QList<QAction*> menus = amber::MainWindow->menuBar()->actions();
+-
+-    // Loop through all menus from the menubar and run this function on each one.
+-    for (auto i : menus) {
+-      QMenu* menu = i->menu();
+-
+-      search_update(s, p, menu);
+-    }
++  list_widget->clear();
+ 
+-    // Once we're here, all the recursion/item retrieval is complete. We auto-select the first item for better
+-    // keyboard-exclusive functionality.
+-    if (list_widget->count() > 0) {
+-      list_widget->item(0)->setSelected(true);
++  QList<SearchResultAction> results;
++  QList<QAction*> menus = amber::MainWindow->menuBar()->actions();
++  for (auto i : menus) {
++    QMenu* menu = i->menu();
++    if (menu != nullptr) {
++      collect_actions(s, "", menu, results);
+     }
++  }
+ 
+-  } else {
+-
+-    // Parent was not NULL, so we loop over the actions in the menu we were given in `parent`.
+-
+-    // The list shows a '>' delimited hierarchy of the menus in which this action came from. We construct it here by
+-    // adding the current menu's text to the existing hierarchy (passed in `p`).
+-    QString menu_text;
+-    if (!p.isEmpty()) menu_text += p + " > ";
+-    menu_text += parent->title().replace("&", ""); // Strip out any &s used in menu action names
+-
+-    // Loop over the menu's actions
+-    QList<QAction*> actions = parent->actions();
+-    for (auto a : actions) {
+-
+-      // Ignore separator actions
+-      if (!a->isSeparator()) {
+-
+-        if (a->menu() != nullptr) {
+-
+-          // If the action is a menu, run this function recursively on it
+-          search_update(s, menu_text, a->menu());
+-
+-        } else {
+-
+-          // This is a valid non-separator non-menu action, so check it against the currently entered string.
+-
+-          // Strip out all &s from the action's name
+-          QString comp = a->text().replace("&", "");
+-
+-          // See if the action's name contains any of the currently entered string
+-          if (comp.contains(s, Qt::CaseInsensitive)) {
+-
+-            // If so, we add it to the list widget.
+-            QListWidgetItem* item = new QListWidgetItem(QString("%1\n(%2)").arg(comp, menu_text), list_widget);
++  // Sort the collected actions by usage_count (descending)
++  std::stable_sort(results.begin(), results.end(), [](const SearchResultAction &a, const SearchResultAction &b) {
++    return a.usage_count > b.usage_count;
++  });
+ 
+-            // Add a pointer to the original QAction in the item's data
+-            item->setData(Qt::UserRole+1, reinterpret_cast<quintptr>(a));
++  // Populate the list_widget with sorted results
++  for (const auto& res : results) {
++    QListWidgetItem* item = new QListWidgetItem(QString("%1\n(%2)").arg(res.comp, res.menu_text), list_widget);
++    item->setData(Qt::UserRole+1, reinterpret_cast<quintptr>(res.action));
++    list_widget->addItem(item);
++  }
+ 
+-            list_widget->addItem(item);
++  if (list_widget->count() > 0) {
++    list_widget->item(0)->setSelected(true);
++  }
++}
+ 
++void ActionSearch::collect_actions(const QString &s, const QString &p, QMenu *parent, QList<SearchResultAction> &results) {
++  if (parent == nullptr) return;
++
++  QString menu_text;
++  if (!p.isEmpty()) menu_text += p + " > ";
++  menu_text += parent->title().replace("&", "");
++
++  QList<QAction*> actions = parent->actions();
++  for (auto a : actions) {
++    if (!a->isSeparator()) {
++      if (a->menu() != nullptr) {
++        collect_actions(s, menu_text, a->menu(), results);
++      } else {
++        QString comp = a->text().replace("&", "");
++        if (s.isEmpty() || comp.contains(s, Qt::CaseInsensitive)) {
++          // Retrieve usage count from QSettings
++          QString action_id = a->property("id").toString();
++          if (action_id.isEmpty()) {
++            action_id = a->text();
++          }
++          int usage_count = 0;
++          if (!action_id.isEmpty()) {
++            QSettings settings;
++            settings.beginGroup("action_search_usage");
++            usage_count = settings.value(action_id, 0).toInt();
++            settings.endGroup();
+           }
+ 
++          SearchResultAction res;
++          res.action = a;
++          res.comp = comp;
++          res.menu_text = menu_text;
++          res.usage_count = usage_count;
++          results.append(res);
+         }
+       }
+     }
+@@ -172,6 +170,19 @@ void ActionSearch::perform_action() {
+     // Get QAction pointer from item's data
+     QAction* a = reinterpret_cast<QAction*>(item->data(Qt::UserRole+1).value<quintptr>());
+ 
++    // Save usage count to QSettings
++    QString action_id = a->property("id").toString();
++    if (action_id.isEmpty()) {
++      action_id = a->text();
++    }
++    if (!action_id.isEmpty()) {
++      QSettings settings;
++      settings.beginGroup("action_search_usage");
++      int count = settings.value(action_id, 0).toInt();
++      settings.setValue(action_id, count + 1);
++      settings.endGroup();
++    }
++
+     a->trigger();
+ 
+   }
+diff --git a/src/dialogs/actionsearch.h b/src/dialogs/actionsearch.h
+index d2562f2ca..1081b911d 100644
+--- a/src/dialogs/actionsearch.h
++++ b/src/dialogs/actionsearch.h
+@@ -99,6 +99,14 @@ private slots:
+    */
+   void move_selection_down();
+ private:
++  struct SearchResultAction {
++    QAction* action;
++    QString comp;
++    QString menu_text;
++    int usage_count;
++  };
++  void collect_actions(const QString &s, const QString &p, QMenu *parent, QList<SearchResultAction> &results);
++
+   /**
+    * @brief Main widget that shows the list of commands
+    */
+diff --git a/src/dialogs/preferencesdialog.cpp b/src/dialogs/preferencesdialog.cpp
+index 7b9c05fa6..33ec15ca6 100644
+--- a/src/dialogs/preferencesdialog.cpp
++++ b/src/dialogs/preferencesdialog.cpp
+@@ -765,6 +765,7 @@ void PreferencesDialog::setup_ui() {
+   appearance_layout->addWidget(effect_panel_shrinkable, row, 0, 1, 3);
+ 
+   row++;
++  appearance_layout->setRowStretch(row, 1);
+ 
+   // Playback
+   QWidget* playback_tab = new QWidget(this);
+@@ -793,6 +794,7 @@ void PreferencesDialog::setup_ui() {
+   previous_queue_type->setCurrentIndex(amber::CurrentConfig.previous_queue_type);
+   memory_usage_layout->addWidget(previous_queue_type, 1, 2);
+   playback_tab_layout->addWidget(memory_usage_group);
++  playback_tab_layout->addStretch();
+ 
+   tabWidget->addTab(playback_tab, tr("Playback"));
+ 
+diff --git a/src/main.cpp b/src/main.cpp
+index 891b3fe70..a40ebd95d 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -269,6 +269,16 @@ int main(int argc, char* argv[]) {
+   // pipewire-pulse.  Safe on native PulseAudio systems and no-ops on Windows/macOS.
+   qputenv("QT_AUDIO_BACKEND", "pulseaudio");
+ 
++  // Work around missing window decorations on GNOME Wayland
++  if (qgetenv("QT_QPA_PLATFORM").isEmpty()) {
++    QByteArray session_type = qgetenv("XDG_SESSION_TYPE");
++    QByteArray current_desktop = qgetenv("XDG_CURRENT_DESKTOP");
++    if ((session_type == "wayland" || !qgetenv("WAYLAND_DISPLAY").isEmpty()) &&
++        current_desktop.toLower().contains("gnome")) {
++      qputenv("QT_QPA_PLATFORM", "xcb");
++    }
++  }
++
+   setup_qt_surface_format();
+ 
+   QApplication a(argc, argv);
+diff --git a/src/panels/effectcontrols.cpp b/src/panels/effectcontrols.cpp
+index 95f1d017e..1f510376d 100644
+--- a/src/panels/effectcontrols.cpp
++++ b/src/panels/effectcontrols.cpp
+@@ -318,6 +318,7 @@ void EffectControls::setup_ui() {
+   scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+   scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+   scrollArea->setWidgetResizable(true);
++  scrollArea->setMinimumWidth(200);
+ 
+   QWidget* scrollAreaWidgetContents = new QWidget();
+ 
+@@ -539,7 +540,7 @@ void EffectControls::ClampSplitterSizes() {
+   }
+ 
+   if (needs_default) {
+-    const int left = qMax(1, (total * 6) / 10);  // 60% to params
++    const int left = qMax(200, (total * 6) / 10);  // 60% to params, at least 200px
+     const int right = qMax(kMinRightPane, total - left);
+     splitter->setSizes({left, right});
+   }
+diff --git a/src/panels/project.cpp b/src/panels/project.cpp
+index ac86b54aa..4d8f57f54 100644
+--- a/src/panels/project.cpp
++++ b/src/panels/project.cpp
+@@ -1,4 +1,4 @@
+-﻿/***
++/***
+ 
+     Olive - Non-Linear Video Editor
+     Copyright (C) 2019  Olive Team
+@@ -39,6 +39,8 @@ extern "C" {
+ #include <QVBoxLayout>
+ #include <QXmlStreamReader>
+ #include <QXmlStreamWriter>
++#include <QLabel>
++#include <QMouseEvent>
+ 
+ #include "dialogs/loaddialog.h"
+ #include "dialogs/mediapropertiesdialog.h"
+@@ -66,6 +68,31 @@ extern "C" {
+ #include "ui/sourceiconview.h"
+ #include "ui/sourcetable.h"
+ 
++class ProjectPlaceholderLabel : public QLabel {
++public:
++  ProjectPlaceholderLabel(QWidget* parent, Project* project) : QLabel(parent), project_(project) {
++    setAlignment(Qt::AlignCenter);
++    setAutoFillBackground(true);
++    QPalette pal = palette();
++    pal.setColor(QPalette::Window, pal.color(QPalette::Base));
++    QColor textColor = pal.color(QPalette::Text);
++    textColor.setAlpha(128);
++    pal.setColor(QPalette::WindowText, textColor);
++    setPalette(pal);
++    QFont f = font();
++    f.setPointSize(11);
++    setFont(f);
++  }
++protected:
++  void mouseDoubleClickEvent(QMouseEvent* event) override {
++    if (event->button() == Qt::LeftButton) {
++      project_->import_dialog();
++    }
++  }
++private:
++  Project* project_;
++};
++
+ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(this, sorter) {
+   QWidget* dockWidgetContents = new QWidget(this);
+ 
+@@ -81,6 +108,7 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
+   toolbar_widget = new QWidget();
+   toolbar_widget->setVisible(amber::CurrentConfig.show_project_toolbar);
+   toolbar_widget->setObjectName("project_toolbar");
++  toolbar_widget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+ 
+   QHBoxLayout* toolbar = new QHBoxLayout(toolbar_widget);
+   toolbar->setContentsMargins(0, 0, 0, 0);
+@@ -191,6 +219,11 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
+ 
+   verticalLayout->addWidget(icon_view_container);
+ 
++  placeholder_label = new ProjectPlaceholderLabel(dockWidgetContents, this);
++  placeholder_label->setText(tr("No media. Double click to import."));
++  placeholder_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
++  verticalLayout->addWidget(placeholder_label);
++
+   connect(directory_up, &QPushButton::clicked, this, &Project::go_up_dir);
+   connect(icon_view, &SourceIconView::changed_root, this, &Project::set_up_dir_enabled);
+ 
+@@ -207,7 +240,11 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
+   connect(&amber::UndoStack, &QUndoStack::indexChanged, icon_view->viewport(),
+           qOverload<>(&QWidget::update));
+ 
+-  update_view_type();
++  connect(&amber::project_model, &QAbstractItemModel::rowsInserted, this, &Project::update_placeholder_visibility);
++  connect(&amber::project_model, &QAbstractItemModel::rowsRemoved, this, &Project::update_placeholder_visibility);
++  connect(&amber::project_model, &QAbstractItemModel::modelReset, this, &Project::update_placeholder_visibility);
++
++  update_placeholder_visibility();
+ 
+   Retranslate();
+ }
+@@ -1327,6 +1364,17 @@ void Project::update_view_type() {
+   }
+ }
+ 
++void Project::update_placeholder_visibility() {
++  bool empty = (amber::project_model.childCount() == 0);
++  placeholder_label->setVisible(empty);
++  if (empty) {
++    tree_view->setVisible(false);
++    icon_view_container->setVisible(false);
++  } else {
++    update_view_type();
++  }
++}
++
+ void Project::set_icon_view() {
+   amber::CurrentConfig.project_view_type = amber::PROJECT_VIEW_ICON;
+   update_view_type();
+diff --git a/src/panels/project.h b/src/panels/project.h
+index 6f18d9c05..c887b172a 100644
+--- a/src/panels/project.h
++++ b/src/panels/project.h
+@@ -49,6 +49,8 @@ SequencePtr create_sequence_from_media(QVector<amber::timeline::MediaImportData>
+ QString get_channel_layout_name(int channels, uint64_t layout);
+ QString get_interlacing_name(int interlacing);
+ 
++class QLabel;
++
+ class Project : public Panel {
+   Q_OBJECT
+  public:
+@@ -125,9 +127,11 @@ class Project : public Panel {
+ 
+   ProjectFilter sorter;
+   SourcesCommon sources_common;
++  QLabel* placeholder_label;
+  private slots:
+   void update_view_type();
+   void clear_recent_projects();
++  void update_placeholder_visibility();
+ 
+  public slots:
+   void set_icon_view();
+diff --git a/src/panels/timeline_ui.cpp b/src/panels/timeline_ui.cpp
+index 39173c0ef..771a5dd17 100644
+--- a/src/panels/timeline_ui.cpp
++++ b/src/panels/timeline_ui.cpp
+@@ -47,9 +47,14 @@ void Timeline::setup_ui() {
+ 
+   setWidget(dockWidgetContents);
+ 
++  QSplitter* timelineSplitter = new QSplitter(Qt::Horizontal);
++  timelineSplitter->setChildrenCollapsible(false);
++  timelineSplitter->setHandleWidth(3);
++  horizontalLayout->addWidget(timelineSplitter);
++
+   tool_button_widget = new QWidget();
+   tool_button_widget->setObjectName("timeline_toolbar");
+-  tool_button_widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
++  tool_button_widget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+ 
+   FlowLayout* tool_buttons_layout = new FlowLayout(tool_button_widget);
+   tool_buttons_layout->setSpacing(4);
+@@ -144,7 +149,7 @@ void Timeline::setup_ui() {
+   connect(addButton, &QPushButton::clicked, this, &Timeline::add_btn_click);
+   tool_buttons_layout->addWidget(addButton);
+ 
+-  horizontalLayout->addWidget(tool_button_widget);
++  timelineSplitter->addWidget(tool_button_widget);
+ 
+   timeline_area_widget = new QWidget();
+   QSizePolicy timeline_area_policy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+@@ -197,7 +202,14 @@ void Timeline::setup_ui() {
+ 
+   timeline_area_layout->addWidget(horizontalScrollBar);
+ 
+-  horizontalLayout->addWidget(timeline_area_widget);
++  timelineSplitter->addWidget(timeline_area_widget);
++
++  // Set default sizes and stretch factors for timelineSplitter
++  timelineSplitter->setStretchFactor(0, 0);
++  timelineSplitter->setStretchFactor(1, 1);
++  int default_tools_width = toolArrowButton->sizeHint().width() + 8;
++  timelineSplitter->setSizes({default_tools_width, 10000});
++  tool_button_widget->setMinimumWidth(toolArrowButton->sizeHint().width() + 4);
+ 
+   audio_monitor = new AudioMonitor();
+   audio_monitor->setMinimumSize(QSize(50, 0));
+@@ -226,35 +238,11 @@ void Timeline::Retranslate() {
+   UpdateTitle();
+ }
+ 
+-void Timeline::resizeEvent(QResizeEvent *) {
++void Timeline::resizeEvent(QResizeEvent *event) {
+   // adjust maximum scrollbar
+   if (amber::ActiveSequence != nullptr) set_sb_max();
+ 
+-
+-  // resize tool button widget to its contents
+-  QList<QWidget*> tool_button_children = tool_button_widget->findChildren<QWidget*>();
+-
+-  int horizontal_spacing = static_cast<FlowLayout*>(tool_button_widget->layout())->horizontalSpacing();
+-  int vertical_spacing = static_cast<FlowLayout*>(tool_button_widget->layout())->verticalSpacing();
+-  int total_area = tool_button_widget->height();
+-
+-  int button_count = tool_button_children.size();
+-  int button_height = tool_button_children.at(0)->sizeHint().height() + vertical_spacing;
+-
+-  int cols = 0;
+-
+-  int col_height;
+-
+-  if (button_height < total_area) {
+-    do {
+-      cols++;
+-      col_height = (qCeil(double(button_count)/double(cols))*button_height)-vertical_spacing;
+-    } while (col_height > total_area);
+-  } else {
+-    cols = button_count;
+-  }
+-
+-  tool_button_widget->setFixedWidth((tool_button_children.at(0)->sizeHint().width())*cols + horizontal_spacing*(cols-1) + 1);
++  Panel::resizeEvent(event);
+ }
+ 
+ void Timeline::repaint_timeline() {
+diff --git a/src/ui/mainwindow.cpp b/src/ui/mainwindow.cpp
+index 1f18d69ef..84f878580 100644
+--- a/src/ui/mainwindow.cpp
++++ b/src/ui/mainwindow.cpp
+@@ -1,4 +1,4 @@
+-﻿/***
++/***
+ 
+     Olive - Non-Linear Video Editor
+     Copyright (C) 2019  Olive Team
+@@ -550,10 +550,15 @@ void MainWindow::setup_menus() {
+   setedit_marker_ =
+       MenuHelper::create_menu_action(edit_menu, "marker", &amber::FocusFilter, SLOT(set_marker()), QKeySequence("M"));
+ 
++#ifndef Q_OS_WIN
+   edit_menu->addSeparator();
+ 
+   preferences_action_ = MenuHelper::create_menu_action(edit_menu, "prefs", amber::Global.get(),
+                                                        SLOT(open_preferences()), QKeySequence("Ctrl+,"));
++#else
++  preferences_action_ = MenuHelper::create_menu_action(nullptr, "prefs", amber::Global.get(),
++                                                       SLOT(open_preferences()), QKeySequence("Ctrl+,"));
++#endif
+ 
+   // INITIALIZE VIEW MENU
+ 
+@@ -903,8 +908,10 @@ void MainWindow::setup_menus() {
+   smooth_autoscroll->setCheckable(true);
+   autoscroll_group->addAction(smooth_autoscroll);
+ 
++#ifdef Q_OS_WIN
+   tools_menu->addSeparator();
+   tools_menu->addAction(preferences_action_);
++#endif
+ 
+ #ifdef QT_DEBUG
+   clear_undo_action_ =

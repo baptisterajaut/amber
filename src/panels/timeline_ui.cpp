@@ -47,9 +47,14 @@ void Timeline::setup_ui() {
 
   setWidget(dockWidgetContents);
 
+  QSplitter* timelineSplitter = new QSplitter(Qt::Horizontal);
+  timelineSplitter->setChildrenCollapsible(false);
+  timelineSplitter->setHandleWidth(3);
+  horizontalLayout->addWidget(timelineSplitter);
+
   tool_button_widget = new QWidget();
   tool_button_widget->setObjectName("timeline_toolbar");
-  tool_button_widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  tool_button_widget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 
   FlowLayout* tool_buttons_layout = new FlowLayout(tool_button_widget);
   tool_buttons_layout->setSpacing(4);
@@ -144,7 +149,7 @@ void Timeline::setup_ui() {
   connect(addButton, &QPushButton::clicked, this, &Timeline::add_btn_click);
   tool_buttons_layout->addWidget(addButton);
 
-  horizontalLayout->addWidget(tool_button_widget);
+  timelineSplitter->addWidget(tool_button_widget);
 
   timeline_area_widget = new QWidget();
   QSizePolicy timeline_area_policy(QSizePolicy::Minimum, QSizePolicy::Minimum);
@@ -197,7 +202,14 @@ void Timeline::setup_ui() {
 
   timeline_area_layout->addWidget(horizontalScrollBar);
 
-  horizontalLayout->addWidget(timeline_area_widget);
+  timelineSplitter->addWidget(timeline_area_widget);
+
+  // Set default sizes and stretch factors for timelineSplitter
+  timelineSplitter->setStretchFactor(0, 0);
+  timelineSplitter->setStretchFactor(1, 1);
+  int default_tools_width = toolArrowButton->sizeHint().width() + 8;
+  timelineSplitter->setSizes({default_tools_width, 10000});
+  tool_button_widget->setMinimumWidth(toolArrowButton->sizeHint().width() + 4);
 
   audio_monitor = new AudioMonitor();
   audio_monitor->setMinimumSize(QSize(50, 0));
@@ -226,35 +238,11 @@ void Timeline::Retranslate() {
   UpdateTitle();
 }
 
-void Timeline::resizeEvent(QResizeEvent *) {
+void Timeline::resizeEvent(QResizeEvent *event) {
   // adjust maximum scrollbar
   if (amber::ActiveSequence != nullptr) set_sb_max();
 
-
-  // resize tool button widget to its contents
-  QList<QWidget*> tool_button_children = tool_button_widget->findChildren<QWidget*>();
-
-  int horizontal_spacing = static_cast<FlowLayout*>(tool_button_widget->layout())->horizontalSpacing();
-  int vertical_spacing = static_cast<FlowLayout*>(tool_button_widget->layout())->verticalSpacing();
-  int total_area = tool_button_widget->height();
-
-  int button_count = tool_button_children.size();
-  int button_height = tool_button_children.at(0)->sizeHint().height() + vertical_spacing;
-
-  int cols = 0;
-
-  int col_height;
-
-  if (button_height < total_area) {
-    do {
-      cols++;
-      col_height = (qCeil(double(button_count)/double(cols))*button_height)-vertical_spacing;
-    } while (col_height > total_area);
-  } else {
-    cols = button_count;
-  }
-
-  tool_button_widget->setFixedWidth((tool_button_children.at(0)->sizeHint().width())*cols + horizontal_spacing*(cols-1) + 1);
+  Panel::resizeEvent(event);
 }
 
 void Timeline::repaint_timeline() {

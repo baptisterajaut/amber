@@ -13,6 +13,7 @@ Amber picks up where the amazing [Olive 0.1](https://github.com/olive-editor/oli
 ## Features
 
 - **Multi-track timeline** with clip splitting, ripple/rolling/slip/slide tools, transitions, and keyframe animation
+- **Smart Action Search Dialog** that learns and prioritizes recommending your most frequently used actions over time
 - **GPU-accelerated rendering** via Qt RHI (Vulkan, Metal, D3D12, OpenGL fallback) — no raw OpenGL calls in the codebase
 - **Hardware video decoding** (VAAPI, D3D11VA, VideoToolbox) — enabled by default, software fallback automatic
 - **Frei0r plugin support**
@@ -32,6 +33,8 @@ For GPUs older than OpenGL 3.2, use [version 1.1.0](https://github.com/baptister
 1.x is feature-complete, maintenance only. 2.0 is in active development — GPU-native effects, ShaderToy import, scopes, 3-point editing, rendering pipeline overhaul. See [ROADMAP.md](ROADMAP.md).
 
 ## Packages
+
+For detailed build instructions for **Fedora Linux 44**, check out [docs/prerequisites-fedora.md](docs/prerequisites-fedora.md)!
 
 Pre-built packages for Windows, Linux (AppImage) and macOS on the [Releases](https://github.com/baptisterajaut/amber/releases) page. Arch Linux: `makepkg -si` from `packaging/linux/PKGBUILD`. Tested on Arch only; other builds are best-effort.
 
@@ -61,7 +64,7 @@ docker run --rm amber-win64 cat /out/amber-setup.exe > amber-setup.exe
 
 **Dependencies:** Qt 6.10+ (Core, Gui, GuiPrivate, Widgets, Multimedia, OpenGL, OpenGLWidgets, ShaderTools, ShaderToolsPrivate, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample).
 
-More details coming soon...
+For detailed build instructions for **Fedora Linux 44**, check out [documentation/prerequisites-fedora.md](documentation/prerequisites-fedora.md)!
 
 ## License
 

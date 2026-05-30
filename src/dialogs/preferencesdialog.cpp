@@ -765,6 +765,7 @@ void PreferencesDialog::setup_ui() {
   appearance_layout->addWidget(effect_panel_shrinkable, row, 0, 1, 3);
 
   row++;
+  appearance_layout->setRowStretch(row, 1);
 
   // Playback
   QWidget* playback_tab = new QWidget(this);
@@ -793,6 +794,7 @@ void PreferencesDialog::setup_ui() {
   previous_queue_type->setCurrentIndex(amber::CurrentConfig.previous_queue_type);
   memory_usage_layout->addWidget(previous_queue_type, 1, 2);
   playback_tab_layout->addWidget(memory_usage_group);
+  playback_tab_layout->addStretch();
 
   tabWidget->addTab(playback_tab, tr("Playback"));
 

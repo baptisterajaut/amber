@@ -318,6 +318,7 @@ void EffectControls::setup_ui() {
   scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
   scrollArea->setWidgetResizable(true);
+  scrollArea->setMinimumWidth(200);
 
   QWidget* scrollAreaWidgetContents = new QWidget();
 
@@ -539,7 +540,7 @@ void EffectControls::ClampSplitterSizes() {
   }
 
   if (needs_default) {
-    const int left = qMax(1, (total * 6) / 10);  // 60% to params
+    const int left = qMax(200, (total * 6) / 10);  // 60% to params, at least 200px
     const int right = qMax(kMinRightPane, total - left);
     splitter->setSizes({left, right});
   }

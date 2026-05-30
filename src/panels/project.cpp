@@ -1,4 +1,4 @@
-﻿/***
+/***
 
     Olive - Non-Linear Video Editor
     Copyright (C) 2019  Olive Team
@@ -39,6 +39,8 @@ extern "C" {
 #include <QVBoxLayout>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
+#include <QLabel>
+#include <QMouseEvent>
 
 #include "dialogs/loaddialog.h"
 #include "dialogs/mediapropertiesdialog.h"
@@ -66,6 +68,31 @@ extern "C" {
 #include "ui/sourceiconview.h"
 #include "ui/sourcetable.h"
 
+class ProjectPlaceholderLabel : public QLabel {
+public:
+  ProjectPlaceholderLabel(QWidget* parent, Project* project) : QLabel(parent), project_(project) {
+    setAlignment(Qt::AlignCenter);
+    setAutoFillBackground(true);
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window, pal.color(QPalette::Base));
+    QColor textColor = pal.color(QPalette::Text);
+    textColor.setAlpha(128);
+    pal.setColor(QPalette::WindowText, textColor);
+    setPalette(pal);
+    QFont f = font();
+    f.setPointSize(11);
+    setFont(f);
+  }
+protected:
+  void mouseDoubleClickEvent(QMouseEvent* event) override {
+    if (event->button() == Qt::LeftButton) {
+      project_->import_dialog();
+    }
+  }
+private:
+  Project* project_;
+};
+
 Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(this, sorter) {
   QWidget* dockWidgetContents = new QWidget(this);
 
@@ -81,6 +108,7 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   toolbar_widget = new QWidget();
   toolbar_widget->setVisible(amber::CurrentConfig.show_project_toolbar);
   toolbar_widget->setObjectName("project_toolbar");
+  toolbar_widget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
   QHBoxLayout* toolbar = new QHBoxLayout(toolbar_widget);
   toolbar->setContentsMargins(0, 0, 0, 0);
@@ -191,6 +219,11 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
 
   verticalLayout->addWidget(icon_view_container);
 
+  placeholder_label = new ProjectPlaceholderLabel(dockWidgetContents, this);
+  placeholder_label->setText(tr("No media. Double click to import."));
+  placeholder_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  verticalLayout->addWidget(placeholder_label);
+
   connect(directory_up, &QPushButton::clicked, this, &Project::go_up_dir);
   connect(icon_view, &SourceIconView::changed_root, this, &Project::set_up_dir_enabled);
 
@@ -207,7 +240,11 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   connect(&amber::UndoStack, &QUndoStack::indexChanged, icon_view->viewport(),
           qOverload<>(&QWidget::update));
 
-  update_view_type();
+  connect(&amber::project_model, &QAbstractItemModel::rowsInserted, this, &Project::update_placeholder_visibility);
+  connect(&amber::project_model, &QAbstractItemModel::rowsRemoved, this, &Project::update_placeholder_visibility);
+  connect(&amber::project_model, &QAbstractItemModel::modelReset, this, &Project::update_placeholder_visibility);
+
+  update_placeholder_visibility();
 
   Retranslate();
 }
@@ -1324,6 +1361,17 @@ void Project::update_view_type() {
 
       sources_common.view = icon_view;
       break;
+  }
+}
+
+void Project::update_placeholder_visibility() {
+  bool empty = (amber::project_model.childCount() == 0);
+  placeholder_label->setVisible(empty);
+  if (empty) {
+    tree_view->setVisible(false);
+    icon_view_container->setVisible(false);
+  } else {
+    update_view_type();
   }
 }
 
