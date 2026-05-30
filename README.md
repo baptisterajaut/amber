@@ -61,6 +61,8 @@ docker run --rm amber-win64 cat /out/amber-setup.exe > amber-setup.exe
 
 **Dependencies:** Qt 6.10+ (Core, Gui, GuiPrivate, Widgets, Multimedia, OpenGL, OpenGLWidgets, ShaderTools, ShaderToolsPrivate, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample).
 
+For detailed build instructions for **Fedora Linux 44**, check out [documentation/prerequisites-fedora.md](documentation/prerequisites-fedora.md)!
+
 ## License
 
 GPLv3. Based on [olive-editor/olive](https://github.com/olive-editor/olive) by [MattKC](https://github.com/itsmattkc) and the Olive Team.
