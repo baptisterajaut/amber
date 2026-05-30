@@ -583,6 +583,16 @@ struct Config {
   bool show_welcome_dialog{true};
 
   /**
+   * @brief Re-open the most recent project on application restart
+   */
+  bool reopen_recent_project{false};
+
+  /**
+   * @brief Enable middle-click edge scrolling in the timeline viewport
+   */
+  bool middle_click_edge_scroll{false};
+
+  /**
    * @brief Frame skip step size
    *
    * Number of frames to skip when using the "Jump Forward" / "Jump Backward" shortcuts.
@@ -675,6 +685,22 @@ struct Config {
    * Versioned autorecovery files are not yet implemented.
    */
   int autorecovery_max{5};
+
+  /**
+   * @brief Animate clip snapping
+   *
+   * **TRUE** if clips should smoothly lerp (interpolate) to their snapped position
+   * rather than jumping abruptly. Adds a subtle animation to snap events.
+   */
+  bool snap_animation{true};
+
+  /**
+   * @brief Show clip outline only when moving
+   *
+   * **TRUE** if the white inner-highlight outline on clips should only be drawn
+   * while the clip is actively being dragged/moved. **FALSE** draws it always.
+   */
+  bool clip_outline_on_move_only{false};
 
   /**
    * @brief Load config from file

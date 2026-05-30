@@ -155,6 +155,22 @@ class TimelineWidget : public QWidget {
   int scroll;
 
   SetSelectionsCommand* selection_command;
+
+ protected:
+  void timerEvent(QTimerEvent* event) override;
+
+ private:
+  int middle_scroll_timer_id_{-1};
+  bool middle_clicking_edge_scroll_{false};
+  int last_mouse_x_{0};
+  int last_mouse_y_{0};
+
+  // Smooth ghost animation state while dragging clips.
+  QVector<double> ghost_display_x_;
+  QVector<double> ghost_display_y_;
+  QVector<long> ghost_target_frame_;
+  QVector<int> ghost_target_track_;
+
  signals:
 
  public slots:

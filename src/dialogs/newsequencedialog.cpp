@@ -195,6 +195,18 @@ void NewSequenceDialog::preset_changed(int index) {
     width_numeric->setValue(720);
     height_numeric->setValue(576);
     break;
+  case 10: // Vertical 4K
+    width_numeric->setValue(2160);
+    height_numeric->setValue(3840);
+    break;
+  case 11: // Vertical 1080p
+    width_numeric->setValue(1080);
+    height_numeric->setValue(1920);
+    break;
+  case 12: // Vertical 720p
+    width_numeric->setValue(720);
+    height_numeric->setValue(1280);
+    break;
   }
 }
 
@@ -220,6 +232,9 @@ void NewSequenceDialog::setup_ui() {
   preset_combobox->addItem(tr("144p"));
   preset_combobox->addItem(tr("NTSC (480i)"));
   preset_combobox->addItem(tr("PAL (576i)"));
+  preset_combobox->addItem(tr("Vertical 4K (2160x3840)"));
+  preset_combobox->addItem(tr("Vertical 1080p (1080x1920)"));
+  preset_combobox->addItem(tr("Vertical 720p (720x1280)"));
   preset_combobox->addItem(tr("Custom"));
   preset_combobox->setCurrentIndex(2);
 

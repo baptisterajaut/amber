@@ -269,6 +269,16 @@ int main(int argc, char* argv[]) {
   // pipewire-pulse.  Safe on native PulseAudio systems and no-ops on Windows/macOS.
   qputenv("QT_AUDIO_BACKEND", "pulseaudio");
 
+  // Work around missing window decorations on GNOME Wayland
+  if (qgetenv("QT_QPA_PLATFORM").isEmpty()) {
+    QByteArray session_type = qgetenv("XDG_SESSION_TYPE");
+    QByteArray current_desktop = qgetenv("XDG_CURRENT_DESKTOP");
+    if ((session_type == "wayland" || !qgetenv("WAYLAND_DISPLAY").isEmpty()) &&
+        current_desktop.toLower().contains("gnome")) {
+      qputenv("QT_QPA_PLATFORM", "xcb");
+    }
+  }
+
   setup_qt_surface_format();
 
   QApplication a(argc, argv);

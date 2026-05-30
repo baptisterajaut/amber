@@ -1,4 +1,4 @@
-﻿/***
+/***
 
     Olive - Non-Linear Video Editor
     Copyright (C) 2019  Olive Team
@@ -33,6 +33,9 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QStatusBar>
+#include <QSlider>
+#include <QLabel>
+#include <QtMath>
 #include <QStyleFactory>
 #include <QTimer>
 #include <QTranslator>
@@ -230,8 +233,76 @@ void MainWindow::init_panels_and_menus() {
   setup_menus();
 
   QStatusBar* statusBar = new QStatusBar(this);
+  statusBar->setSizeGripEnabled(false);
   statusBar->showMessage(tr("Welcome to %1").arg(amber::AppName));
   setStatusBar(statusBar);
+
+  // Add a status text label to show hover messages explicitly and beautifully
+  QLabel* statusLabel = new QLabel(statusBar);
+  statusLabel->setText(tr("Ready"));
+  statusLabel->setStyleSheet(QStringLiteral("color: #aaaaaa; font-weight: 500; font-size: 11px; margin-left: 6px;"));
+  statusBar->addWidget(statusLabel, 1);
+
+  // Connect statusBar message changes to update statusLabel text
+  connect(statusBar, &QStatusBar::messageChanged, this, [statusLabel](const QString &message) {
+    if (message.isEmpty()) {
+      statusLabel->setText(tr("Ready"));
+    } else {
+      statusLabel->setText(message);
+    }
+  });
+
+  // Create horizontal zoom bar container and add to status bar
+  QWidget* zoom_container = new QWidget(statusBar);
+  zoom_container->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+  QHBoxLayout* zoom_layout = new QHBoxLayout(zoom_container);
+  zoom_layout->setContentsMargins(4, 0, 4, 0);
+  zoom_layout->setSpacing(4);
+  zoom_layout->setSizeConstraint(QLayout::SetFixedSize);
+
+  QLabel* zoom_icon_out = new QLabel(zoom_container);
+  zoom_icon_out->setPixmap(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/zoomout.svg")).pixmap(12, 12));
+  zoom_layout->addWidget(zoom_icon_out);
+
+  zoom_slider_ = new QSlider(Qt::Horizontal, zoom_container);
+  zoom_slider_->setRange(0, 100);
+  double cur_zoom = panel_timeline ? panel_timeline->zoom : 1.0;
+  double slider_double = 50.0 + qLn(cur_zoom) / qLn(1.1);
+  int int_val = qBound(0, qRound(slider_double), 100);
+  zoom_slider_->setValue(int_val);
+  zoom_slider_->setFixedWidth(100);
+  zoom_slider_->setToolTip(tr("Timeline Zoom Slider"));
+  zoom_slider_->setStatusTip(tr("Timeline Zoom Slider: Drag to zoom in/out on the timeline"));
+  zoom_slider_->setStyleSheet(QStringLiteral(
+    "QSlider::groove:horizontal {"
+    "  border: 1px solid #3a3a3a;"
+    "  height: 4px;"
+    "  background: #2a2a2a;"
+    "  border-radius: 2px;"
+    "}"
+    "QSlider::handle:horizontal {"
+    "  background: #007acc;"
+    "  width: 10px;"
+    "  margin: -3px 0;"
+    "  border-radius: 5px;"
+    "}"
+    "QSlider::handle:horizontal:hover {"
+    "  background: #0098ff;"
+    "}"
+  ));
+  zoom_layout->addWidget(zoom_slider_);
+
+  QLabel* zoom_icon_in = new QLabel(zoom_container);
+  zoom_icon_in->setPixmap(amber::icon::CreateIconFromSVG(QStringLiteral(":/icons/zoomin.svg")).pixmap(12, 12));
+  zoom_layout->addWidget(zoom_icon_in);
+
+  statusBar->addPermanentWidget(zoom_container, 0);
+
+  // Link status bar zoom slider and timeline zoom bi-directionally
+  connect(zoom_slider_, &QSlider::valueChanged, this, &MainWindow::zoom_slider_changed);
+  if (panel_timeline) {
+    connect(panel_timeline, &Timeline::zoom_changed, this, &MainWindow::zoom_from_timeline_changed);
+  }
 
   amber::Global->check_for_autorecovery_file();
   set_panels_locked(amber::CurrentConfig.locked_panels);
@@ -550,10 +621,15 @@ void MainWindow::setup_menus() {
   setedit_marker_ =
       MenuHelper::create_menu_action(edit_menu, "marker", &amber::FocusFilter, SLOT(set_marker()), QKeySequence("M"));
 
+#ifndef Q_OS_WIN
   edit_menu->addSeparator();
 
   preferences_action_ = MenuHelper::create_menu_action(edit_menu, "prefs", amber::Global.get(),
                                                        SLOT(open_preferences()), QKeySequence("Ctrl+,"));
+#else
+  preferences_action_ = MenuHelper::create_menu_action(nullptr, "prefs", amber::Global.get(),
+                                                       SLOT(open_preferences()), QKeySequence("Ctrl+,"));
+#endif
 
   // INITIALIZE VIEW MENU
 
@@ -903,8 +979,10 @@ void MainWindow::setup_menus() {
   smooth_autoscroll->setCheckable(true);
   autoscroll_group->addAction(smooth_autoscroll);
 
+#ifdef Q_OS_WIN
   tools_menu->addSeparator();
   tools_menu->addAction(preferences_action_);
+#endif
 
 #ifdef QT_DEBUG
   clear_undo_action_ =
@@ -1030,25 +1108,42 @@ void MainWindow::Retranslate() {
   tools_menu->setTitle(tr("&Tools"));
 
   pointer_tool_action->setText(tr("Pointer Tool"));
+  pointer_tool_action->setStatusTip(tr("Pointer Tool: Select and move clips (V)"));
   edit_tool_action->setText(tr("Edit Tool"));
+  edit_tool_action->setStatusTip(tr("Edit Tool: Trim and resize clips (X)"));
   ripple_tool_action->setText(tr("Ripple Tool"));
+  ripple_tool_action->setStatusTip(tr("Ripple Tool: Trim clips and ripple subsequent clips (B)"));
   razor_tool_action->setText(tr("Razor Tool"));
+  razor_tool_action->setStatusTip(tr("Razor Tool: Split clips in the timeline (C)"));
   slip_tool_action->setText(tr("Slip Tool"));
+  slip_tool_action->setStatusTip(tr("Slip Tool: Slip clip's contents (Y)"));
   slide_tool_action->setText(tr("Slide Tool"));
+  slide_tool_action->setStatusTip(tr("Slide Tool: Slide clip without changing its duration (U)"));
   track_select_tool_action->setText(tr("Track Select Tool"));
+  track_select_tool_action->setStatusTip(tr("Track Select Tool: Select all clips forward or backward (A)"));
   hand_tool_action->setText(tr("Hand Tool"));
+  hand_tool_action->setStatusTip(tr("Hand Tool: Navigate the timeline (H)"));
   transition_tool_action->setText(tr("Transition Tool"));
+  transition_tool_action->setStatusTip(tr("Transition Tool: Create or edit transitions (T)"));
   snap_toggle->setText(tr("Enable Snapping"));
+  snap_toggle->setStatusTip(tr("Enable Snapping: Toggle snapping (S)"));
   color_labels_toggle->setText(tr("Color Labels"));
+  color_labels_toggle->setStatusTip(tr("Color Labels: Toggle color coding for clips"));
   autocut_silence_->setText(tr("Auto-Cut Silence"));
+  autocut_silence_->setStatusTip(tr("Auto-Cut Silence: Detect and split silent sections of audio"));
 
   no_autoscroll->setText(tr("No Auto-Scroll"));
+  no_autoscroll->setStatusTip(tr("Disable playhead automatic scrolling"));
   page_autoscroll->setText(tr("Page Auto-Scroll"));
+  page_autoscroll->setStatusTip(tr("Enable page-by-page playhead autoscrolling"));
   smooth_autoscroll->setText(tr("Smooth Auto-Scroll"));
+  smooth_autoscroll->setStatusTip(tr("Enable smooth playhead autoscrolling"));
 
   preferences_action_->setText(tr("Preferences"));
+  preferences_action_->setStatusTip(tr("Open the preferences dialog"));
 #ifdef QT_DEBUG
   clear_undo_action_->setText(tr("Clear Undo"));
+  clear_undo_action_->setStatusTip(tr("Clear Undo History"));
 #endif
 
   help_menu->setTitle(tr("&Help"));
@@ -1477,5 +1572,25 @@ void MainWindow::toggle_full_screen() {
     setWindowState(Qt::WindowMaximized);
   } else {
     setWindowState(Qt::WindowFullScreen);
+  }
+}
+
+void MainWindow::zoom_slider_changed(int value) {
+  if (panel_timeline) {
+    double zoom_val = qPow(1.1, value - 50);
+    panel_timeline->blockSignals(true);
+    panel_timeline->set_zoom_value(zoom_val);
+    panel_timeline->blockSignals(false);
+  }
+}
+
+void MainWindow::zoom_from_timeline_changed(double value) {
+  if (zoom_slider_) {
+    double slider_double = 50.0 + qLn(value) / qLn(1.1);
+    int int_val = qBound(0, qRound(slider_double), 100);
+    
+    zoom_slider_->blockSignals(true);
+    zoom_slider_->setValue(int_val);
+    zoom_slider_->blockSignals(false);
   }
 }
