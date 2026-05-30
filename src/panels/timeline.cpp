@@ -788,6 +788,8 @@ void Timeline::set_zoom_value(double v) {
   // set zoom value
   zoom = v;
 
+  emit zoom_changed(zoom);
+
   // update header zoom to match
   headers->update_zoom(zoom);
 

@@ -749,6 +749,13 @@ bool EffectControls::is_focused() {
   return false;
 }
 
+void EffectControls::fast_repaint() {
+  queue_post_update();
+  if (headers != nullptr) {
+    headers->update();
+  }
+}
+
 EffectsArea::EffectsArea(QWidget* parent) : QWidget(parent) {}
 
 void EffectsArea::resizeEvent(QResizeEvent*) {

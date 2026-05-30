@@ -39,11 +39,15 @@ GraphEditor* panel_graph_editor = nullptr;
 UndoHistoryPanel* panel_undo_history = nullptr;
 
 void update_ui(bool modified, bool scrubbing) {
-  if (!scrubbing && panel_effect_controls != nullptr) {
-    if (modified) {
-      panel_effect_controls->SetClips();
+  if (panel_effect_controls != nullptr) {
+    if (!scrubbing) {
+      if (modified) {
+        panel_effect_controls->SetClips();
+      }
+      panel_effect_controls->update_keyframes();
+    } else {
+      panel_effect_controls->fast_repaint();
     }
-    panel_effect_controls->update_keyframes();
   }
   if (panel_timeline != nullptr) panel_timeline->repaint_timeline();
   if (panel_sequence_viewer != nullptr) panel_sequence_viewer->update_viewer();

@@ -22,9 +22,11 @@
 
 #include <QAction>
 #include <QMouseEvent>
+#include <QTimerEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QScrollBar>
+#include <QWheelEvent>
 #include <QtMath>
 
 #include "dialogs/markerpropertiesdialog.h"
@@ -79,8 +81,10 @@ TimelineHeader::TimelineHeader(QWidget* parent)
 }
 
 void TimelineHeader::set_scroll(int s) {
-  scroll = s;
-  update();
+  if (scroll != s) {
+    scroll = s;
+    repaint();
+  }
 }
 
 long TimelineHeader::getHeaderFrameFromScreenPoint(int x) {
@@ -269,6 +273,24 @@ void TimelineHeader::hover_check_workarea(int mouse_x) {
 void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
   if (viewer->seq == nullptr) return;
   int mouse_x = event->position().toPoint().x();
+  last_mouse_x_ = mouse_x;
+
+  if (dragging && !resizing_workarea && !dragging_markers) {
+    bool near_left = (mouse_x < 25);
+    bool near_right = (mouse_x > width() - 25);
+
+    if (near_left || near_right) {
+      if (scroll_timer_id_ == -1) {
+        scroll_timer_id_ = startTimer(16); // ~60fps smooth scroll
+      }
+    } else {
+      if (scroll_timer_id_ != -1) {
+        killTimer(scroll_timer_id_);
+        scroll_timer_id_ = -1;
+      }
+    }
+  }
+
   if (dragging) {
     if (resizing_workarea) {
       move_drag_workarea(mouse_x);
@@ -283,6 +305,11 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
+  if (scroll_timer_id_ != -1) {
+    killTimer(scroll_timer_id_);
+    scroll_timer_id_ = -1;
+  }
+
   if (viewer->seq != nullptr) {
     dragging = false;
     if (resizing_workarea) {
@@ -314,6 +341,49 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
   }
 }
 
+void TimelineHeader::timerEvent(QTimerEvent* event) {
+  if (event->timerId() == scroll_timer_id_) {
+    if (!dragging || resizing_workarea || dragging_markers || viewer->seq == nullptr) {
+      killTimer(scroll_timer_id_);
+      scroll_timer_id_ = -1;
+      return;
+    }
+
+    QScrollBar* bar = panel_timeline->horizontalScrollBar;
+    if (bar == nullptr) return;
+
+    int mouse_x = last_mouse_x_;
+    int scroll_delta = 0;
+
+    double zoom_factor = qBound(0.2, zoom, 8.0);
+    if (mouse_x < 25) {
+      // Scroll left: speed is proportional to proximity to the left edge (comfortable and smooth)
+      double base_delta = qBound(1.0, double(25 - mouse_x) / 2.0, 15.0);
+      scroll_delta = qMax(1, qRound(base_delta * zoom_factor));
+      int new_val = qMax(0, bar->value() - scroll_delta);
+      if (new_val != bar->value()) {
+        bar->setValue(new_val);
+        set_playhead(mouse_x);
+      }
+    } else if (mouse_x > width() - 25) {
+      // Scroll right: speed is proportional to proximity to the right edge (comfortable and smooth)
+      double base_delta = qBound(1.0, double(mouse_x - (width() - 25)) / 2.0, 15.0);
+      scroll_delta = qMax(1, qRound(base_delta * zoom_factor));
+      int new_val = qMin(bar->maximum(), bar->value() + scroll_delta);
+      if (new_val != bar->value()) {
+        bar->setValue(new_val);
+        set_playhead(mouse_x);
+      }
+    } else {
+      // Mouse moved away from the edge: stop scrolling
+      killTimer(scroll_timer_id_);
+      scroll_timer_id_ = -1;
+    }
+  } else {
+    QWidget::timerEvent(event);
+  }
+}
+
 void TimelineHeader::mouseDoubleClickEvent(QMouseEvent* event) {
   if (viewer != nullptr && viewer->seq != nullptr && viewer->marker_ref != nullptr &&
       event->button() == Qt::LeftButton) {
@@ -340,6 +410,21 @@ void TimelineHeader::mouseDoubleClickEvent(QMouseEvent* event) {
 void TimelineHeader::focusOutEvent(QFocusEvent*) {
   selected_markers.clear();
   update();
+}
+
+void TimelineHeader::wheelEvent(QWheelEvent* event) {
+  if (panel_timeline != nullptr && panel_timeline->headers == this && amber::ActiveSequence != nullptr) {
+    const int delta = !event->angleDelta().isNull() ? event->angleDelta().y() : event->pixelDelta().y();
+    if (delta != 0) {
+      double zoom_ratio = 1.0 + (qAbs(delta) * 0.33 / 120.0);
+      if (delta < 0) zoom_ratio = 1.0 / zoom_ratio;
+      panel_timeline->multiply_zoom(zoom_ratio);
+      event->accept();
+      return;
+    }
+  }
+
+  QWidget::wheelEvent(event);
 }
 
 void TimelineHeader::update_parents() { viewer->update_parents(); }
@@ -393,28 +478,30 @@ void TimelineHeader::paint_ticks(QPainter& p, int w, int h, int yoff) {
   double interval = viewer->seq->frame_rate;
   int sublineCount = compute_subline_count(interval, zoom);
 
-  int textWidth = 0;
-  int lastTextBoundary = INT_MIN;
+  int lastTextBoundary = INT_MIN / 2;
   int lastLineX = INT_MIN;
-  int i = qFloor(double(scroll) / zoom / interval);
+  int i = qFloor(double(scroll) / zoom / interval) - 1;
   while (true) {
     long frame = qRound(interval * i);
     int lineX = qRound(frame * zoom) - scroll;
     if (lineX > w) break;
 
-    int text_x = 0, fullTextWidth = 0;
-    QString timecode;
-    bool draw_text = false;
-    if (text_enabled && lineX - textWidth > lastTextBoundary) {
-      timecode = frame_to_timecode(frame + in_visible, amber::CurrentConfig.timecode_view, viewer->seq->frame_rate);
-      fullTextWidth = fm.horizontalAdvance(timecode);
-      textWidth = fullTextWidth >> 1;
-      text_x = amber::CurrentConfig.center_timeline_timecodes ? lineX - textWidth : lineX + TEXT_PADDING_FROM_LINE;
-      lastTextBoundary = lineX + textWidth;
-      if (lastTextBoundary >= 0) draw_text = true;
-    }
-
     if (lineX > lastLineX + LINE_MIN_PADDING) {
+      int text_x = 0, fullTextWidth = 0;
+      QString timecode;
+      bool draw_text = false;
+      if (frame + in_visible >= 0 && text_enabled) {
+        timecode = frame_to_timecode(frame + in_visible, amber::CurrentConfig.timecode_view, viewer->seq->frame_rate);
+        fullTextWidth = fm.horizontalAdvance(timecode);
+        text_x = amber::CurrentConfig.center_timeline_timecodes ? lineX - (fullTextWidth >> 1)
+                                                                : lineX + TEXT_PADDING_FROM_LINE;
+        const int text_right = text_x + fullTextWidth;
+        if (text_right >= 0 && text_x > lastTextBoundary + 4) {
+          draw_text = true;
+          lastTextBoundary = text_right;
+        }
+      }
+
       if (draw_text) {
         p.setPen(amber::styling::GetIconColor());
         p.drawText(QRect(text_x, 0, fullTextWidth, yoff), timecode);

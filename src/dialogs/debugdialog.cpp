@@ -30,10 +30,14 @@
 DebugDialog* amber::DebugDialog = nullptr;
 
 DebugDialog::DebugDialog(QWidget *parent) : QDialog(parent) {
+  resize(640, 360);
+  setMinimumSize(640, 360);
+
   QVBoxLayout* layout = new QVBoxLayout(this);
 
   textEdit = new QTextEdit(this);
   textEdit->setWordWrapMode(QTextOption::NoWrap);
+  textEdit->verticalScrollBar()->setStyleSheet(QString());
   layout->addWidget(textEdit);
 
   Retranslate();

@@ -107,12 +107,15 @@ struct Ghost {
 class Timeline : public Panel
 {
   Q_OBJECT
+signals:
+  void zoom_changed(double v);
 public:
   explicit Timeline(QWidget *parent = nullptr);
   ~Timeline() override;
 
   bool focused();
   void multiply_zoom(double m);
+  void set_zoom_value(double v);
   void copy(bool del);
   ClipPtr split_clip(ComboAction* ca, bool transitions, int p, long frame);
   ClipPtr split_clip(ComboAction* ca, bool transitions, int p, long frame, long post_in);
@@ -219,6 +222,7 @@ public:
 
   TimelineHeader* headers;
   QLabel* breadcrumb_label;
+  QLabel* timeline_placeholder_label;
   AudioMonitor* audio_monitor;
   ResizableScrollBar* horizontalScrollBar;
 
@@ -296,7 +300,6 @@ private slots:
 private:
   void three_point_edit(bool insert);
   void ChangeTrackHeightUniformly(int diff);
-  void set_zoom_value(double v);
   QVector<QPushButton*> tool_buttons;
   void decheck_tool_buttons(QObject* sender);
   void set_tool(int tool);

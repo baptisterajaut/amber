@@ -168,6 +168,27 @@ void Timeline::setup_ui() {
   breadcrumb_label->hide();
   timeline_area_layout->addWidget(breadcrumb_label);
 
+  timeline_placeholder_label = new QLabel(timeline_area_widget);
+  timeline_placeholder_label->setText(tr("No active sequence. Drag clips here to create a sequence."));
+  timeline_placeholder_label->setAlignment(Qt::AlignCenter);
+  timeline_placeholder_label->setWordWrap(true);
+  timeline_placeholder_label->setAutoFillBackground(true);
+  {
+    QPalette pal = timeline_placeholder_label->palette();
+    pal.setColor(QPalette::Window, pal.color(QPalette::Base));
+    QColor textColor = pal.color(QPalette::Text);
+    textColor.setAlpha(128);
+    pal.setColor(QPalette::WindowText, textColor);
+    timeline_placeholder_label->setPalette(pal);
+  }
+  {
+    QFont f = timeline_placeholder_label->font();
+    f.setPointSize(11);
+    timeline_placeholder_label->setFont(f);
+  }
+  timeline_placeholder_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  timeline_area_layout->addWidget(timeline_placeholder_label);
+
   headers = new TimelineHeader();
   timeline_area_layout->addWidget(headers);
 
@@ -221,19 +242,33 @@ void Timeline::setup_ui() {
 
 void Timeline::Retranslate() {
   toolArrowButton->setToolTip(tr("Pointer Tool") + " (V)");
+  toolArrowButton->setStatusTip(tr("Pointer Tool: Select and move clips (V)"));
   toolEditButton->setToolTip(tr("Edit Tool") + " (X)");
+  toolEditButton->setStatusTip(tr("Edit Tool: Trim and resize clips (X)"));
   toolRippleButton->setToolTip(tr("Ripple Tool") + " (B)");
+  toolRippleButton->setStatusTip(tr("Ripple Tool: Trim clips and ripple subsequent clips (B)"));
   toolRazorButton->setToolTip(tr("Razor Tool") + " (C)");
+  toolRazorButton->setStatusTip(tr("Razor Tool: Split clips in the timeline (C)"));
   toolSlipButton->setToolTip(tr("Slip Tool") + " (Y)");
+  toolSlipButton->setStatusTip(tr("Slip Tool: Slip clip's contents (Y)"));
   toolSlideButton->setToolTip(tr("Slide Tool") + " (U)");
+  toolSlideButton->setStatusTip(tr("Slide Tool: Slide clip without changing its duration (U)"));
   toolTrackSelectButton->setToolTip(tr("Track Select Tool") + " (A)");
+  toolTrackSelectButton->setStatusTip(tr("Track Select Tool: Select all clips forward or backward (A)"));
   toolHandButton->setToolTip(tr("Hand Tool") + " (H)");
+  toolHandButton->setStatusTip(tr("Hand Tool: Navigate the timeline (H)"));
   toolTransitionButton->setToolTip(tr("Transition Tool") + " (T)");
+  toolTransitionButton->setStatusTip(tr("Transition Tool: Create or edit transitions (T)"));
   snappingButton->setToolTip(tr("Snapping") + " (S)");
+  snappingButton->setStatusTip(tr("Snapping: Toggle snapping (S)"));
   zoomInButton->setToolTip(tr("Zoom In") + " (=)");
+  zoomInButton->setStatusTip(tr("Zoom In (=)"));
   zoomOutButton->setToolTip(tr("Zoom Out") + " (-)");
+  zoomOutButton->setStatusTip(tr("Zoom Out (-)"));
   recordButton->setToolTip(tr("Record audio"));
+  recordButton->setStatusTip(tr("Record audio"));
   addButton->setToolTip(tr("Add title, solid, bars, etc."));
+  addButton->setStatusTip(tr("Add title, solid, bars, etc."));
 
   UpdateTitle();
 }
@@ -269,8 +304,8 @@ void Timeline::repaint_timeline() {
       }
     }
 
-    headers->update();
-    timeline_area->update();
+    headers->repaint();
+    timeline_area->repaint();
 
     if (amber::ActiveSequence != nullptr
         && !zoom_just_changed) {
@@ -291,6 +326,11 @@ void Timeline::update_sequence() {
   recordButton->setEnabled(!null_sequence);
   addButton->setEnabled(!null_sequence);
   headers->setEnabled(!null_sequence);
+
+  timeline_placeholder_label->setVisible(null_sequence);
+  headers->setVisible(!null_sequence);
+  editAreas->setVisible(!null_sequence);
+  horizontalScrollBar->setVisible(!null_sequence);
 
   // Update breadcrumb
   const auto& history = amber::Global->sequence_history();

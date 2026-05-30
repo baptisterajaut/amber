@@ -27,6 +27,7 @@ class Project;
 class EffectControls;
 class Viewer;
 class Timeline;
+class QSlider;
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -132,6 +133,8 @@ class MainWindow : public QMainWindow {
 
  private slots:
   void set_preview_resolution();
+  void zoom_slider_changed(int value);
+  void zoom_from_timeline_changed(double value);
 
   /**
    * @brief Maximizes the currently hovered panel.
@@ -372,6 +375,8 @@ class MainWindow : public QMainWindow {
 
   // used in paintEvent() to determine the first paintEvent() performed
   bool first_show{true};
+
+  QSlider* zoom_slider_{nullptr};
 };
 
 namespace amber {
