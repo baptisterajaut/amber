@@ -25,6 +25,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QScrollBar>
+#include <QTimerEvent>
 #include <QtMath>
 
 #include "dialogs/markerpropertiesdialog.h"
@@ -269,6 +270,18 @@ void TimelineHeader::hover_check_workarea(int mouse_x) {
 void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
   if (viewer->seq == nullptr) return;
   int mouse_x = event->position().toPoint().x();
+  last_mouse_x_ = mouse_x;
+
+  // while dragging a marker, auto-scroll when the cursor nears the ruler edges
+  if (dragging && dragging_markers && !resizing_workarea) {
+    if (mouse_x < 25 || mouse_x > width() - 25) {
+      if (scroll_timer_id_ == -1) scroll_timer_id_ = startTimer(16);  // ~60fps
+    } else if (scroll_timer_id_ != -1) {
+      killTimer(scroll_timer_id_);
+      scroll_timer_id_ = -1;
+    }
+  }
+
   if (dragging) {
     if (resizing_workarea) {
       move_drag_workarea(mouse_x);
@@ -283,6 +296,11 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
+  if (scroll_timer_id_ != -1) {
+    killTimer(scroll_timer_id_);
+    scroll_timer_id_ = -1;
+  }
+
   if (viewer->seq != nullptr) {
     dragging = false;
     if (resizing_workarea) {
@@ -311,6 +329,46 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
     dragging_markers = false;
     panel_timeline->snapped = false;
     update_parents();
+  }
+}
+
+void TimelineHeader::timerEvent(QTimerEvent* event) {
+  if (event->timerId() != scroll_timer_id_) {
+    QWidget::timerEvent(event);
+    return;
+  }
+
+  // stop if the drag state is no longer valid
+  if (!dragging || !dragging_markers || resizing_workarea || viewer == nullptr || viewer->seq == nullptr) {
+    killTimer(scroll_timer_id_);
+    scroll_timer_id_ = -1;
+    return;
+  }
+
+  QScrollBar* bar = (panel_timeline != nullptr) ? panel_timeline->horizontalScrollBar : nullptr;
+  if (bar == nullptr) return;
+
+  const int mouse_x = last_mouse_x_;
+  const double zoom_factor = qBound(0.2, zoom, 8.0);
+  int new_val = bar->value();
+
+  if (mouse_x < 25) {
+    int delta = qMax(1, qRound(qBound(1.0, double(25 - mouse_x) / 2.0, 15.0) * zoom_factor));
+    new_val = qMax(0, bar->value() - delta);
+  } else if (mouse_x > width() - 25) {
+    int delta = qMax(1, qRound(qBound(1.0, double(mouse_x - (width() - 25)) / 2.0, 15.0) * zoom_factor));
+    new_val = qMin(bar->maximum(), bar->value() + delta);
+  } else {
+    // cursor moved away from the edge: stop scrolling
+    killTimer(scroll_timer_id_);
+    scroll_timer_id_ = -1;
+    return;
+  }
+
+  if (new_val != bar->value()) {
+    bar->setValue(new_val);
+    // re-apply the marker movement so the dragged marker tracks the revealed frames
+    move_drag_markers(mouse_x);
   }
 }
 
@@ -393,28 +451,33 @@ void TimelineHeader::paint_ticks(QPainter& p, int w, int h, int yoff) {
   double interval = viewer->seq->frame_rate;
   int sublineCount = compute_subline_count(interval, zoom);
 
-  int textWidth = 0;
-  int lastTextBoundary = INT_MIN;
+  int lastTextBoundary = INT_MIN / 2;
   int lastLineX = INT_MIN;
-  int i = qFloor(double(scroll) / zoom / interval);
+  // start one tick earlier (i-1) so a tick scrolled partially off the left edge still draws its sub-lines/text
+  int i = qFloor(double(scroll) / zoom / interval) - 1;
   while (true) {
     long frame = qRound(interval * i);
     int lineX = qRound(frame * zoom) - scroll;
     if (lineX > w) break;
 
-    int text_x = 0, fullTextWidth = 0;
-    QString timecode;
-    bool draw_text = false;
-    if (text_enabled && lineX - textWidth > lastTextBoundary) {
-      timecode = frame_to_timecode(frame + in_visible, amber::CurrentConfig.timecode_view, viewer->seq->frame_rate);
-      fullTextWidth = fm.horizontalAdvance(timecode);
-      textWidth = fullTextWidth >> 1;
-      text_x = amber::CurrentConfig.center_timeline_timecodes ? lineX - textWidth : lineX + TEXT_PADDING_FROM_LINE;
-      lastTextBoundary = lineX + textWidth;
-      if (lastTextBoundary >= 0) draw_text = true;
-    }
-
     if (lineX > lastLineX + LINE_MIN_PADDING) {
+      // decide on text only for lines we actually draw, so labels can't overlap
+      int text_x = 0, fullTextWidth = 0;
+      QString timecode;
+      bool draw_text = false;
+      if (text_enabled && frame + in_visible >= 0) {
+        timecode = frame_to_timecode(frame + in_visible, amber::CurrentConfig.timecode_view, viewer->seq->frame_rate);
+        fullTextWidth = fm.horizontalAdvance(timecode);
+        text_x = amber::CurrentConfig.center_timeline_timecodes ? lineX - (fullTextWidth >> 1)
+                                                                : lineX + TEXT_PADDING_FROM_LINE;
+        const int text_right = text_x + fullTextWidth;
+        // skip text fully off the left edge or that would overlap the previous label
+        if (text_right >= 0 && text_x > lastTextBoundary + 4) {
+          draw_text = true;
+          lastTextBoundary = text_right;
+        }
+      }
+
       if (draw_text) {
         p.setPen(amber::styling::GetIconColor());
         p.drawText(QRect(text_x, 0, fullTextWidth, yoff), timecode);

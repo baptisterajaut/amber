@@ -27,6 +27,7 @@
 #include <QWidget>
 class Viewer;
 class QScrollBar;
+class QTimerEvent;
 class Menu;
 
 bool center_scroll_to_playhead(QScrollBar* bar, double zoom, long playhead);
@@ -61,6 +62,7 @@ class TimelineHeader : public QWidget {
   void mouseReleaseEvent(QMouseEvent*) override;
   void mouseDoubleClickEvent(QMouseEvent*) override;
   void focusOutEvent(QFocusEvent*) override;
+  void timerEvent(QTimerEvent* event) override;
 
  private:
   void update_parents();
@@ -104,6 +106,9 @@ class TimelineHeader : public QWidget {
 
   int height_actual;
   bool text_enabled;
+
+  int scroll_timer_id_{-1};
+  int last_mouse_x_{0};
 
  signals:
 };
