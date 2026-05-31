@@ -22,6 +22,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QDateTime>
 #include <QDebug>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -279,7 +280,10 @@ void AmberGlobal::open_recent(int index) {
 }
 
 bool AmberGlobal::save_project_as() {
-  QString fn = QFileDialog::getSaveFileName(amber::MainWindow, tr("Save Project As..."), "", project_file_filter);
+  QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
+  QString default_fn = QString("New_Project-%1.ove").arg(timestamp);
+  QString fn =
+      QFileDialog::getSaveFileName(amber::MainWindow, tr("Save Project As..."), default_fn, project_file_filter);
   if (!fn.isEmpty()) {
     if (!fn.endsWith(".ove", Qt::CaseInsensitive)) {
       fn += ".ove";
@@ -326,6 +330,16 @@ void AmberGlobal::open_export_dialog() {
 }
 
 void AmberGlobal::finished_initialize() {
+  // If no project was passed on the command line and the user opted in, re-open the most recent project.
+  if (!enable_load_project_on_init && amber::CurrentConfig.reopen_recent_project &&
+      !amber::project_io->recentProjects().isEmpty()) {
+    QString recent_path = amber::project_io->recentProjects().first();
+    if (QFileInfo::exists(recent_path)) {
+      amber::ActiveProjectFilename = recent_path;
+      enable_load_project_on_init = true;
+    }
+  }
+
   if (enable_load_project_on_init) {
     // if a project was set as a command line argument, we load it here
     if (QFileInfo::exists(amber::ActiveProjectFilename)) {
