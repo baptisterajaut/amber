@@ -20,23 +20,23 @@
 
 #include "timeline.h"
 
-#include <QScrollBar>
-#include <QtMath>
 #include <QHBoxLayout>
-#include <QSplitter>
 #include <QInputDialog>
+#include <QScrollBar>
+#include <QSplitter>
+#include <QtMath>
 
-#include "global/global.h"
 #include "global/config.h"
+#include "global/global.h"
 #include "panels/panels.h"
-#include "ui/timelinewidget.h"
-#include "ui/icons.h"
-#include "ui/timelineheader.h"
-#include "ui/resizablescrollbar.h"
-#include "ui/audiomonitor.h"
-#include "ui/flowlayout.h"
-#include "ui/cursors.h"
 #include "rendering/renderfunctions.h"
+#include "ui/audiomonitor.h"
+#include "ui/cursors.h"
+#include "ui/flowlayout.h"
+#include "ui/icons.h"
+#include "ui/resizablescrollbar.h"
+#include "ui/timelineheader.h"
+#include "ui/timelinewidget.h"
 
 void Timeline::setup_ui() {
   QWidget* dockWidgetContents = new QWidget();
@@ -160,6 +160,10 @@ void Timeline::setup_ui() {
   breadcrumb_label = new QLabel();
   breadcrumb_label->setContentsMargins(4, 2, 4, 2);
   breadcrumb_label->setStyleSheet("QLabel { color: #aaa; font-size: 11px; }");
+  // Keep the breadcrumb a single thin line: a QLabel defaults to a vertically
+  // growable size policy, so without this it absorbs the layout's spare height
+  // and balloons into a large empty band above the ruler once shown (#64).
+  breadcrumb_label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
   breadcrumb_label->hide();
   timeline_area_layout->addWidget(breadcrumb_label);
 
@@ -226,10 +230,9 @@ void Timeline::Retranslate() {
   UpdateTitle();
 }
 
-void Timeline::resizeEvent(QResizeEvent *) {
+void Timeline::resizeEvent(QResizeEvent*) {
   // adjust maximum scrollbar
   if (amber::ActiveSequence != nullptr) set_sb_max();
-
 
   // resize tool button widget to its contents
   QList<QWidget*> tool_button_children = tool_button_widget->findChildren<QWidget*>();
@@ -248,23 +251,21 @@ void Timeline::resizeEvent(QResizeEvent *) {
   if (button_height < total_area) {
     do {
       cols++;
-      col_height = (qCeil(double(button_count)/double(cols))*button_height)-vertical_spacing;
+      col_height = (qCeil(double(button_count) / double(cols)) * button_height) - vertical_spacing;
     } while (col_height > total_area);
   } else {
     cols = button_count;
   }
 
-  tool_button_widget->setFixedWidth((tool_button_children.at(0)->sizeHint().width())*cols + horizontal_spacing*(cols-1) + 1);
+  tool_button_widget->setFixedWidth((tool_button_children.at(0)->sizeHint().width()) * cols +
+                                    horizontal_spacing * (cols - 1) + 1);
 }
 
 void Timeline::repaint_timeline() {
   seam_y_dirty_ = true;
   if (!block_repaints) {
-    if (amber::ActiveSequence != nullptr
-        && !horizontalScrollBar->isSliderDown()
-        && !horizontalScrollBar->is_resizing()
-        && panel_sequence_viewer->playing
-        && !zoom_just_changed) {
+    if (amber::ActiveSequence != nullptr && !horizontalScrollBar->isSliderDown() &&
+        !horizontalScrollBar->is_resizing() && panel_sequence_viewer->playing && !zoom_just_changed) {
       // auto scroll — setValue triggers a recursive repaint_timeline() via setScroll,
       // so the widgets will be updated in that recursive call
       if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_PAGE_SCROLL) {
@@ -284,8 +285,7 @@ void Timeline::repaint_timeline() {
     headers->update();
     timeline_area->update();
 
-    if (amber::ActiveSequence != nullptr
-        && !zoom_just_changed) {
+    if (amber::ActiveSequence != nullptr && !zoom_just_changed) {
       set_sb_max();
     }
   }
@@ -294,7 +294,7 @@ void Timeline::repaint_timeline() {
 void Timeline::update_sequence() {
   bool null_sequence = (amber::ActiveSequence == nullptr);
 
-  for (int i=0;i<tool_buttons.count();i++) {
+  for (int i = 0; i < tool_buttons.count(); i++) {
     tool_buttons[i]->setEnabled(!null_sequence);
   }
   snappingButton->setEnabled(!null_sequence);
@@ -335,7 +335,8 @@ void Timeline::UpdateTitle() {
 }
 
 void Timeline::set_sb_max() {
-  headers->set_scrollbar_max(horizontalScrollBar, amber::ActiveSequence->getEndFrame(), editAreas->width() - getScreenPointFromFrame(zoom, 200));
+  headers->set_scrollbar_max(horizontalScrollBar, amber::ActiveSequence->getEndFrame(),
+                             editAreas->width() - getScreenPointFromFrame(zoom, 200));
 }
 
 void Timeline::set_marker() {
@@ -343,20 +344,16 @@ void Timeline::set_marker() {
   QVector<int> clips_selected;
   bool clip_mode = false;
 
-  for (int i=0;i<amber::ActiveSequence->clips.size();i++) {
+  for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     Clip* c = amber::ActiveSequence->clips.at(i).get();
-    if (c != nullptr
-        && c->IsSelected()) {
-
+    if (c != nullptr && c->IsSelected()) {
       // only add markers if the playhead is inside the clip
-      if (amber::ActiveSequence->playhead >= c->timeline_in()
-          && amber::ActiveSequence->playhead <= c->timeline_out()) {
+      if (amber::ActiveSequence->playhead >= c->timeline_in() && amber::ActiveSequence->playhead <= c->timeline_out()) {
         clips_selected.append(i);
       }
 
       // we are definitely adding markers to clips though
       clip_mode = true;
-
     }
   }
 
@@ -368,7 +365,6 @@ void Timeline::set_marker() {
 
   // pass off to internal set marker function
   set_marker_internal(amber::ActiveSequence.get(), clips_selected);
-
 }
 
 void Timeline::toggle_show_all() {
