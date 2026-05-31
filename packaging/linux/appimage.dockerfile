@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev libavcodec-dev libavutil-dev \
     libswscale-dev libswresample-dev libavfilter-dev \
     libvulkan-dev \
+    libwayland-dev \
     curl file libfuse2 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -77,10 +78,37 @@ RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
 # Remove Qt's FFmpeg media plugin before bundling — we use our own FFmpeg
 # for decoding and only need Qt Multimedia for QAudioSink (PipeWire backend).
 # Leaving it would pull in a second FFmpeg version (ABI conflict).
+#
+# Wayland: linuxdeploy-plugin-qt only deploys the xcb platform plugin by
+# default, and on Qt 6.10 its filename matching misses the Wayland plugins
+# even with EXTRA_PLATFORM_PLUGINS (qgroundcontrol#13855). Qt 6.10 also merged
+# the old libqwayland-generic.so/libqwayland-egl.so into a single
+# libqwayland.so. So we copy the Wayland platform, decoration (bradient +
+# adwaita) and shell/graphics integration plugins into the AppDir by hand
+# BEFORE linuxdeploy — its final dependency pass then bundles their
+# libQt6WaylandClient / libwayland-* dependencies. The decoration plugins give
+# native-Wayland sessions a window frame even on compositors (GNOME) that
+# refuse server-side decorations.
+# NOTE: the GNOME→xcb workaround in main.cpp still forces XWayland on GNOME;
+# this enables native Wayland (+ Vulkan) on KDE/wlroots compositors that
+# provide server-side decorations.
 RUN DESTDIR=/tmp/AppDir make install && \
     rm -f ${Qt6_DIR}/plugins/multimedia/libffmpegmediaplugin.so && \
+    mkdir -p /tmp/AppDir/usr/plugins/platforms \
+             /tmp/AppDir/usr/plugins/wayland-decoration-client \
+             /tmp/AppDir/usr/plugins/wayland-shell-integration \
+             /tmp/AppDir/usr/plugins/wayland-graphics-integration-client && \
+    cp -a ${Qt6_DIR}/plugins/platforms/libqwayland.so \
+          /tmp/AppDir/usr/plugins/platforms/ && \
+    cp -a ${Qt6_DIR}/plugins/wayland-decoration-client/. \
+          /tmp/AppDir/usr/plugins/wayland-decoration-client/ && \
+    cp -a ${Qt6_DIR}/plugins/wayland-shell-integration/. \
+          /tmp/AppDir/usr/plugins/wayland-shell-integration/ && \
+    cp -a ${Qt6_DIR}/plugins/wayland-graphics-integration-client/. \
+          /tmp/AppDir/usr/plugins/wayland-graphics-integration-client/ && \
     VERSION="${VERSION}" \
     QMAKE=${Qt6_DIR}/bin/qmake \
+    EXTRA_PLATFORM_PLUGINS="libqwayland.so" \
     linuxdeploy \
       --appdir /tmp/AppDir \
       --plugin qt \
