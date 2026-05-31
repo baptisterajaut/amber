@@ -31,9 +31,12 @@ extern "C" {
 #include <QVariant>
 
 #include <QDropEvent>
+#include <QHeaderView>
 #include <QInputDialog>
+#include <QLabel>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QSizePolicy>
 #include <QVBoxLayout>
@@ -65,6 +68,34 @@ extern "C" {
 #include "ui/menuhelper.h"
 #include "ui/sourceiconview.h"
 #include "ui/sourcetable.h"
+
+// Empty-state placeholder shown when the project has no media. Double-clicking it opens the import dialog.
+class ProjectPlaceholderLabel : public QLabel {
+ public:
+  ProjectPlaceholderLabel(QWidget* parent, Project* project) : QLabel(parent), project_(project) {
+    setAlignment(Qt::AlignCenter);
+    setAutoFillBackground(true);
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window, pal.color(QPalette::Base));
+    QColor textColor = pal.color(QPalette::Text);
+    textColor.setAlpha(128);
+    pal.setColor(QPalette::WindowText, textColor);
+    setPalette(pal);
+    QFont f = font();
+    f.setPointSize(11);
+    setFont(f);
+  }
+
+ protected:
+  void mouseDoubleClickEvent(QMouseEvent* event) override {
+    if (event->button() == Qt::LeftButton) {
+      project_->import_dialog();
+    }
+  }
+
+ private:
+  Project* project_;
+};
 
 Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(this, sorter) {
   QWidget* dockWidgetContents = new QWidget(this);
@@ -147,11 +178,14 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   tree_view->setModel(&sorter);
   verticalLayout->addWidget(tree_view);
 
-  // Set the first column width
-  // I'm not sure if there's a better way to do this, default behavior seems to have all columns fixed width
-  // and let the last column fill up the remainder when really the opposite would be preferable (having the
-  // first column fill up the majority of the space). Anyway, this will probably do for now.
-  tree_view->setColumnWidth(0, tree_view->width() / 2);
+  // Configure column sizing: the first column (Name) stretches to fill all remaining space, while the
+  // other columns stay interactive and resizable.
+  tree_view->header()->setStretchLastSection(false);
+  tree_view->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+  tree_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+  tree_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
+  tree_view->setColumnWidth(1, 100);
+  tree_view->setColumnWidth(2, 100);
 
   // icon view
   icon_view_container = new QWidget();
@@ -191,6 +225,11 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
 
   verticalLayout->addWidget(icon_view_container);
 
+  placeholder_label = new ProjectPlaceholderLabel(dockWidgetContents, this);
+  placeholder_label->setText(tr("No media. Double click to import."));
+  placeholder_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  verticalLayout->addWidget(placeholder_label);
+
   connect(directory_up, &QPushButton::clicked, this, &Project::go_up_dir);
   connect(icon_view, &SourceIconView::changed_root, this, &Project::set_up_dir_enabled);
 
@@ -202,12 +241,14 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   // SetInt-based undo actions (e.g. color labels) mutate fields silently with no
   // dataChanged signal, so the views never re-query Media::data() on push/undo/redo.
   // Force a viewport repaint whenever the undo stack moves.
-  connect(&amber::UndoStack, &QUndoStack::indexChanged, tree_view->viewport(),
-          qOverload<>(&QWidget::update));
-  connect(&amber::UndoStack, &QUndoStack::indexChanged, icon_view->viewport(),
-          qOverload<>(&QWidget::update));
+  connect(&amber::UndoStack, &QUndoStack::indexChanged, tree_view->viewport(), qOverload<>(&QWidget::update));
+  connect(&amber::UndoStack, &QUndoStack::indexChanged, icon_view->viewport(), qOverload<>(&QWidget::update));
 
-  update_view_type();
+  connect(&amber::project_model, &QAbstractItemModel::rowsInserted, this, &Project::update_placeholder_visibility);
+  connect(&amber::project_model, &QAbstractItemModel::rowsRemoved, this, &Project::update_placeholder_visibility);
+  connect(&amber::project_model, &QAbstractItemModel::modelReset, this, &Project::update_placeholder_visibility);
+
+  update_placeholder_visibility();
 
   Retranslate();
 }
@@ -1253,7 +1294,6 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
   }
 }
 
-
 void Project::save_project(bool autorecovery) {
   folder_id = 1;
   media_id = 1;
@@ -1306,6 +1346,13 @@ void Project::save_project(bool autorecovery) {
 }
 
 void Project::update_view_type() {
+  // When the project is empty, the placeholder takes over and both views stay hidden; nothing else to do.
+  if (amber::project_model.childCount() == 0) {
+    tree_view->setVisible(false);
+    icon_view_container->setVisible(false);
+    return;
+  }
+
   tree_view->setVisible(amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_TREE);
   icon_view_container->setVisible(amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_ICON ||
                                   amber::CurrentConfig.project_view_type == amber::PROJECT_VIEW_LIST);
@@ -1325,6 +1372,14 @@ void Project::update_view_type() {
       sources_common.view = icon_view;
       break;
   }
+}
+
+void Project::update_placeholder_visibility() {
+  bool empty = (amber::project_model.childCount() == 0);
+  placeholder_label->setVisible(empty);
+  // update_view_type() is itself empty-aware, so it hides the views when empty and restores the active view
+  // (tree/icon/list) when there is media. This keeps the placeholder and the view-type toggle in sync.
+  update_view_type();
 }
 
 void Project::set_icon_view() {
