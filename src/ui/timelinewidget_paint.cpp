@@ -578,11 +578,17 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
       }
     }
 
-    // padding: one default-height empty track above video and below audio (drop zones)
-    int panel_height = amber::timeline::kTrackDefaultHeight * 2;
-    for (int i=-1;i>=video_track_limit;i--) panel_height += panel_timeline->GetTrackHeight(i);
-    for (int i=0;i<=audio_track_limit;i++)  panel_height += panel_timeline->GetTrackHeight(i);
+    int panel_height = compute_panel_height();
     scrollBar->setMaximum(qMax(0, panel_height - height()));
+
+    // V/A region tints: fill the video zone [top..seam] and audio zone [seam..bottom]
+    // with very subtle distinct backgrounds so the eye reads two zones. Drawn before
+    // clips so they only show through the empty timeline background.
+    const int seam_screen_y = panel_timeline->SeamY() - scroll + vertical_offset();
+    {
+      p.fillRect(0, 0, rect().width(), qBound(0, seam_screen_y, height()), QColor(255, 255, 255, 6));
+      p.fillRect(0, qBound(0, seam_screen_y, height()), rect().width(), height(), QColor(0, 0, 0, 10));
+    }
 
     drawClips(p);
     drawRecordingClip(p);
@@ -592,14 +598,15 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
     drawSplittingCursor(p);
     drawPlayhead(p);
 
-    // draw the V/A seam — slightly stronger than the inter-track lines so the
-    // boundary between video and audio tracks remains visible after the merge.
-    {
-      const int seam_screen_y = panel_timeline->SeamY() - scroll;
-      if (seam_screen_y >= 0 && seam_screen_y < height()) {
-        p.setPen(QColor(0, 0, 0, 160));
-        p.drawLine(0, seam_screen_y, rect().width(), seam_screen_y);
-      }
+    // draw the V/A seam — a clear 2px accent line, distinct from the faint
+    // inter-track lines (0,0,0,96), with a 1px highlight so the boundary between
+    // video and audio tracks is unmistakable after the merge.
+    if (seam_screen_y >= 0 && seam_screen_y < height()) {
+      p.setPen(QColor(0, 0, 0, 200));
+      p.drawLine(0, seam_screen_y, rect().width(), seam_screen_y);
+      p.drawLine(0, seam_screen_y - 1, rect().width(), seam_screen_y - 1);
+      p.setPen(QColor(255, 255, 255, 40));
+      p.drawLine(0, seam_screen_y + 1, rect().width(), seam_screen_y + 1);
     }
 
     // draw snap point

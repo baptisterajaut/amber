@@ -113,6 +113,24 @@ int Timeline::SeamY() {
   return seam_y_cache_;
 }
 
+int Timeline::PanelHeight() {
+  if (!panel_height_dirty_) return panel_height_cache_;
+  if (!amber::ActiveSequence) {
+    panel_height_cache_ = 0;
+    panel_height_dirty_ = false;
+    return 0;
+  }
+  int video_count = 0, audio_count = 0;
+  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  // padding: one default-height empty track above video and below audio (drop zones)
+  int h = amber::timeline::kTrackDefaultHeight * 2;
+  for (int t = -1; t >= video_count; --t) h += GetTrackHeight(t);
+  for (int t = 0; t <= audio_count; ++t) h += GetTrackHeight(t);
+  panel_height_cache_ = h;
+  panel_height_dirty_ = false;
+  return h;
+}
+
 // Retranslate() moved to timeline_ui.cpp
 
 // split_clip_at_positions() moved to timeline_splitting.cpp
@@ -872,6 +890,7 @@ int Timeline::GetTrackHeight(int track) {
 
 void Timeline::SetTrackHeight(int track, int height) {
   seam_y_dirty_ = true;
+  panel_height_dirty_ = true;
   for (auto & track_height : track_heights) {
     if (track_height.index == track) {
       track_height.height = height;

@@ -158,7 +158,13 @@ public:
   void SetTrackHeight(int track, int height);
 
   int SeamY();
-  void InvalidateSeamY() { seam_y_dirty_ = true; }
+  // total content height (all tracks + top/bottom drop-zone padding); cached and
+  // invalidated together with SeamY since they share the same triggers.
+  int PanelHeight();
+  void InvalidateSeamY() {
+    seam_y_dirty_ = true;
+    panel_height_dirty_ = true;
+  }
 
   // snapping
   bool snapping{true};
@@ -312,6 +318,9 @@ private:
 
   int seam_y_cache_{0};
   bool seam_y_dirty_{true};
+
+  int panel_height_cache_{0};
+  bool panel_height_dirty_{true};
 
   QWidget* timeline_area_widget;
   TimelineWidget* timeline_area;

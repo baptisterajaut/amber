@@ -2215,10 +2215,22 @@ bool TimelineWidget::is_track_visible(int /*track*/) {
 // screen point <-> frame/track functions
 // **************************************
 
+int TimelineWidget::compute_panel_height() { return panel_timeline->PanelHeight(); }
+
+int TimelineWidget::vertical_offset() {
+  if (amber::ActiveSequence == nullptr) return 0;
+  // Only anchor when there's nothing to scroll: when the content overfills the
+  // viewport the offset is 0 and the scrolling path is byte-for-byte unchanged.
+  if (compute_panel_height() >= height()) return 0;
+  // Pin the seam to the vertical centre: SeamY() - scroll + offset == height()/2,
+  // and scroll is clamped to 0 in this branch.
+  return height() / 2 - panel_timeline->SeamY();
+}
+
 int TimelineWidget::getTrackFromScreenPoint(int y) {
   int track_candidate = 0;
 
-  y += scroll;
+  y += scroll - vertical_offset();
 
   y -= panel_timeline->SeamY();
 
@@ -2266,7 +2278,8 @@ int TimelineWidget::getScreenPointFromTrack(int track) {
   }
 
   const int seam = panel_timeline->SeamY();
-  return (track < 0) ? seam - point - scroll : seam + point - scroll;
+  const int v = scroll - vertical_offset();
+  return (track < 0) ? seam - point - v : seam + point - v;
 }
 
 int TimelineWidget::getClipIndexFromCoords(long frame, int track) {

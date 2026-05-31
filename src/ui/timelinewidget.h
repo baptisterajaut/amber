@@ -78,6 +78,13 @@ private:
   int getScreenPointFromTrack(int track);
   int getClipIndexFromCoords(long frame, int track);
 
+  // total height of all tracks plus the top/bottom drop-zone padding
+  int compute_panel_height();
+  // vertical shift applied to all track positioning so the A/V seam is pinned to
+  // the viewport centre when the content is too short to scroll. Returns 0 (and
+  // the scrolling path is therefore unchanged) whenever the content overfills.
+  int vertical_offset();
+
   void VerifyTransitionHelper();
 
   // mouseMoveEvent per-action handlers
