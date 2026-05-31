@@ -317,6 +317,7 @@ private:
 
   QWidget* timeline_area_widget;
   TimelineWidget* timeline_area;
+  QLabel* timeline_placeholder_label;
   QWidget* editAreas;
   QScrollBar* verticalScrollbar;
   QPushButton* zoomInButton;
