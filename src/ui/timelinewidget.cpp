@@ -100,12 +100,10 @@ static void collect_from_footage_viewer(QDragEnterEvent* event, QVector<amber::t
   if (event->source() != panel_footage_viewer) return;
   if (panel_footage_viewer->seq == amber::ActiveSequence) return;  // don't allow nesting the same sequence
   media_list.append(amber::timeline::MediaImportData(
-      panel_footage_viewer->media,
-      static_cast<amber::timeline::MediaImportType>(event->mimeData()->text().toInt())));
+      panel_footage_viewer->media, static_cast<amber::timeline::MediaImportType>(event->mimeData()->text().toInt())));
 }
 
-static bool collect_from_external_files(QDragEnterEvent* event,
-                                        QVector<amber::timeline::MediaImportData>& media_list) {
+static bool collect_from_external_files(QDragEnterEvent* event, QVector<amber::timeline::MediaImportData>& media_list) {
   if (!amber::CurrentConfig.enable_drag_files_to_timeline || !event->mimeData()->hasUrls()) return false;
   QList<QUrl> urls = event->mimeData()->urls();
   if (urls.isEmpty()) return false;
@@ -589,8 +587,7 @@ void TimelineWidget::mousePressDispatchTool(int effective_tool, int hovered_clip
     case TIMELINE_TOOL_MENU:
       mousePressPointer(hovered_clip, shift, alt, effective_tool);
       break;
-    case TIMELINE_TOOL_TRACK_SELECT:
-    {
+    case TIMELINE_TOOL_TRACK_SELECT: {
       // Clear previous selections unless Shift is held
       if (!shift) {
         amber::ActiveSequence->selections.clear();
@@ -647,8 +644,7 @@ void TimelineWidget::mousePressDispatchTool(int effective_tool, int hovered_clip
       }
 
       update_ui(false);
-    }
-      break;
+    } break;
     case TIMELINE_TOOL_HAND:
       panel_timeline->hand_moving = true;
       break;
@@ -1747,10 +1743,22 @@ bool TimelineWidget::is_track_visible(int /*track*/) { return true; }
 // screen point <-> frame/track functions
 // **************************************
 
+int TimelineWidget::compute_panel_height() { return panel_timeline->PanelHeight(); }
+
+int TimelineWidget::vertical_offset() {
+  if (amber::ActiveSequence == nullptr) return 0;
+  // Only anchor when there's nothing to scroll: when the content overfills the
+  // viewport the offset is 0 and the scrolling path is byte-for-byte unchanged.
+  if (compute_panel_height() >= height()) return 0;
+  // Pin the seam to the vertical centre: SeamY() - scroll + offset == height()/2,
+  // and scroll is clamped to 0 in this branch.
+  return height() / 2 - panel_timeline->SeamY();
+}
+
 int TimelineWidget::getTrackFromScreenPoint(int y) {
   int track_candidate = 0;
 
-  y += scroll;
+  y += scroll - vertical_offset();
 
   y -= panel_timeline->SeamY();
 
@@ -1797,7 +1805,8 @@ int TimelineWidget::getScreenPointFromTrack(int track) {
   }
 
   const int seam = panel_timeline->SeamY();
-  return (track < 0) ? seam - point - scroll : seam + point - scroll;
+  const int v = scroll - vertical_offset();
+  return (track < 0) ? seam - point - v : seam + point - v;
 }
 
 int TimelineWidget::getClipIndexFromCoords(long frame, int track) {

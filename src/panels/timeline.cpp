@@ -385,8 +385,7 @@ void Timeline::add_transition() {
 }
 
 // Move each ghost to a free track if it overlaps an existing clip (excluding selected_clips).
-static void resolve_ghost_track_collisions(QVector<Ghost>& ghosts, Sequence* seq,
-                                           const QVector<int>& selected_clips) {
+static void resolve_ghost_track_collisions(QVector<Ghost>& ghosts, Sequence* seq, const QVector<int>& selected_clips) {
   for (int j = 0; j < seq->clips.size(); j++) {
     Clip* c = seq->clips.at(j).get();
     if (c == nullptr || selected_clips.contains(j)) continue;
@@ -618,6 +617,27 @@ int Timeline::SeamY() {
   return seam_y_cache_;
 }
 
+int Timeline::PanelHeight() {
+  if (!panel_height_dirty_) return panel_height_cache_;
+  if (!amber::ActiveSequence) {
+    panel_height_cache_ = 0;
+    panel_height_dirty_ = false;
+    return 0;
+  }
+  amber::timeline_layout::TrackHeights h;
+  int video_count = 0, audio_count = 0;
+  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
+  for (int t = 0; t <= audio_count; ++t) h.audio.append(GetTrackHeight(t));
+  // padding: one default-height empty track above video and below audio (drop zones)
+  int height = amber::timeline::kTrackDefaultHeight * 2;
+  for (int v : h.video) height += v;
+  for (int a : h.audio) height += a;
+  panel_height_cache_ = height;
+  panel_height_dirty_ = false;
+  return height;
+}
+
 void Timeline::select_from_playhead() {
   amber::ActiveSequence->selections.clear();
   for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
@@ -838,6 +858,7 @@ int Timeline::GetTrackHeight(int track) {
 
 void Timeline::SetTrackHeight(int track, int height) {
   seam_y_dirty_ = true;
+  panel_height_dirty_ = true;
   for (auto& track_height : track_heights) {
     if (track_height.index == track) {
       track_height.height = height;
@@ -1159,7 +1180,9 @@ static bool resolve_outgoing_pref() {
   return pref;
 }
 
-bool Timeline::toolSupportsInsert() const { return tool == TIMELINE_TOOL_POINTER || tool == TIMELINE_TOOL_TRACK_SELECT || importing || creating; }
+bool Timeline::toolSupportsInsert() const {
+  return tool == TIMELINE_TOOL_POINTER || tool == TIMELINE_TOOL_TRACK_SELECT || importing || creating;
+}
 
 bool Timeline::snap_to_markers(long* l) {
   for (const auto& marker : amber::ActiveSequence->markers) {

@@ -21,21 +21,21 @@
 #ifndef TIMELINE_H
 #define TIMELINE_H
 
-#include <QVector>
-#include <QTime>
 #include <QLabel>
 #include <QPushButton>
+#include <QTime>
+#include <QVector>
 
-#include "ui/timelinewidget.h"
-#include "ui/timelinetools.h"
 #include "core/selection.h"
 #include "engine/clip.h"
-#include "timeline/mediaimportdata.h"
 #include "engine/undo/undo.h"
-#include "ui/timelineheader.h"
-#include "ui/resizablescrollbar.h"
+#include "timeline/mediaimportdata.h"
 #include "ui/audiomonitor.h"
 #include "ui/panel.h"
+#include "ui/resizablescrollbar.h"
+#include "ui/timelineheader.h"
+#include "ui/timelinetools.h"
+#include "ui/timelinewidget.h"
 
 enum CreateObjects : uint8_t {
   ADD_OBJ_TITLE,
@@ -47,37 +47,33 @@ enum CreateObjects : uint8_t {
   ADD_OBJ_AUDIO
 };
 
-enum TrimType : uint8_t {
-  TRIM_NONE,
-  TRIM_IN,
-  TRIM_OUT
-};
+enum TrimType : uint8_t { TRIM_NONE, TRIM_IN, TRIM_OUT };
 
 namespace amber {
-  namespace timeline {
-    const int kGhostThickness = 2;
-    const int kClipTextPadding = 3;
+namespace timeline {
+const int kGhostThickness = 2;
+const int kClipTextPadding = 3;
 
-    /**
-     * @brief Set default track sizes
-     *
-     * Amber has a few default constants used for adjusting track heights in the Timeline. For HiDPI, it makes
-     * sense to multiply these by the current DPI scale. It uses a variable from QApplication to do this multiplication,
-     * which means the QApplication instance needs to be instantiated before these are calculated. Therefore, call this
-     * function ONCE after QApplication is created to multiply the track heights correctly.
-     */
-    void MultiplyTrackSizesByDPI();
+/**
+ * @brief Set default track sizes
+ *
+ * Amber has a few default constants used for adjusting track heights in the Timeline. For HiDPI, it makes
+ * sense to multiply these by the current DPI scale. It uses a variable from QApplication to do this multiplication,
+ * which means the QApplication instance needs to be instantiated before these are calculated. Therefore, call this
+ * function ONCE after QApplication is created to multiply the track heights correctly.
+ */
+void MultiplyTrackSizesByDPI();
 
-    extern int kTrackDefaultHeight;
-    extern int kTrackMinHeight;
-    extern int kTrackHeightIncrement;
-  }
-}
+extern int kTrackDefaultHeight;
+extern int kTrackMinHeight;
+extern int kTrackHeightIncrement;
+}  // namespace timeline
+}  // namespace amber
 
 int getScreenPointFromFrame(double zoom, long frame);
 long getFrameFromScreenPoint(double zoom, int x);
-bool selection_contains_transition(const Selection& s, Clip *c, int type);
-void ripple_clips(ComboAction *ca, Sequence *s, long point, long length, const QVector<int>& ignore = QVector<int>());
+bool selection_contains_transition(const Selection& s, Clip* c, int type);
+void ripple_clips(ComboAction* ca, Sequence* s, long point, long length, const QVector<int>& ignore = QVector<int>());
 
 struct Ghost {
   int clip;
@@ -104,11 +100,10 @@ struct Ghost {
   TransitionPtr transition;
 };
 
-class Timeline : public Panel
-{
+class Timeline : public Panel {
   Q_OBJECT
-public:
-  explicit Timeline(QWidget *parent = nullptr);
+ public:
+  explicit Timeline(QWidget* parent = nullptr);
   ~Timeline() override;
 
   bool focused();
@@ -117,20 +112,20 @@ public:
   ClipPtr split_clip(ComboAction* ca, bool transitions, int p, long frame);
   ClipPtr split_clip(ComboAction* ca, bool transitions, int p, long frame, long post_in);
   bool split_selection(ComboAction* ca);
-  bool split_all_clips_at_point(ComboAction *ca, long point);
+  bool split_all_clips_at_point(ComboAction* ca, long point);
   bool split_clip_and_relink(ComboAction* ca, int clip, long frame, bool relink);
   void split_clip_at_positions(ComboAction* ca, int clip_index, QVector<long> positions);
   void clean_up_selections(QVector<Selection>& areas);
   void deselect_area(long in, long out, int track);
-  void delete_areas_and_relink(ComboAction *ca, QVector<Selection>& areas, bool deselect_areas);
+  void delete_areas_and_relink(ComboAction* ca, QVector<Selection>& areas, bool deselect_areas);
   void relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>& new_clips);
   void update_sequence();
 
   void edit_to_point_internal(bool in, bool ripple);
   void delete_in_out_internal(bool ripple);
 
-  void create_ghosts_from_media(Sequence *seq, long entry_point, QVector<amber::timeline::MediaImportData> &media_list);
-  void add_clips_from_ghosts(ComboAction *ca, Sequence *s);
+  void create_ghosts_from_media(Sequence* seq, long entry_point, QVector<amber::timeline::MediaImportData>& media_list);
+  void add_clips_from_ghosts(ComboAction* ca, Sequence* s);
 
   int getTimelineScreenPointFromFrame(long frame);
   long getTimelineFrameFromScreenPoint(int x);
@@ -160,7 +155,13 @@ public:
   void SetTrackHeight(int track, int height);
 
   int SeamY();
-  void InvalidateSeamY() { seam_y_dirty_ = true; }
+  // total content height (all tracks + top/bottom drop-zone padding); cached and
+  // invalidated together with SeamY since they share the same triggers.
+  int PanelHeight();
+  void InvalidateSeamY() {
+    seam_y_dirty_ = true;
+    panel_height_dirty_ = true;
+  }
 
   // snapping
   bool snapping{true};
@@ -170,7 +171,7 @@ public:
   // selecting functions
   bool selecting{false};
   int selection_offset;
-  void delete_selection(QVector<Selection> &selections, bool ripple);
+  void delete_selection(QVector<Selection>& selections, bool ripple);
   void select_all();
   bool rect_select_init{false};
   bool rect_select_proc{false};
@@ -240,9 +241,10 @@ public:
   bool can_ripple_empty_space(long frame, int track);
 
   void Retranslate() override;
-protected:
-  void resizeEvent(QResizeEvent *event) override;
-public slots:
+
+ protected:
+  void resizeEvent(QResizeEvent* event) override;
+ public slots:
   void paste(bool insert = false);
   void repaint_timeline();
   void toggle_show_all();
@@ -282,7 +284,7 @@ public slots:
   void zoom_in();
   void zoom_out();
 
-private slots:
+ private slots:
   void snapping_clicked(bool checked);
   void add_btn_click();
   void add_menu_item(QAction*);
@@ -293,7 +295,7 @@ private slots:
   void resize_move(double d);
   void set_tool();
 
-private:
+ private:
   void three_point_edit(bool insert);
   void ChangeTrackHeightUniformly(int diff);
   void set_zoom_value(double v);
@@ -315,6 +317,9 @@ private:
   int seam_y_cache_{0};
   bool seam_y_dirty_{true};
 
+  int panel_height_cache_{0};
+  bool panel_height_dirty_{true};
+
   QWidget* timeline_area_widget;
   TimelineWidget* timeline_area;
   QWidget* editAreas;
@@ -326,4 +331,4 @@ private:
   QWidget* tool_button_widget;
 };
 
-#endif // TIMELINE_H
+#endif  // TIMELINE_H
