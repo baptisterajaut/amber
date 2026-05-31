@@ -13,6 +13,7 @@ Amber picks up where the amazing [Olive 0.1](https://github.com/olive-editor/oli
 ## Features
 
 - **Multi-track timeline** with clip splitting, ripple/rolling/slip/slide tools, transitions, and keyframe animation
+- **Smart action search** that learns your most-used commands and ranks them first over time
 - **GPU-accelerated rendering** via Qt RHI (Vulkan, Metal, D3D12, OpenGL fallback) — no raw OpenGL calls in the codebase
 - **Hardware video decoding** (VAAPI, D3D11VA, VideoToolbox) — enabled by default, software fallback automatic
 - **Frei0r plugin support**
@@ -60,6 +61,8 @@ docker run --rm amber-win64 cat /out/amber-setup.exe > amber-setup.exe
 ```
 
 **Dependencies:** Qt 6.10+ (Core, Gui, GuiPrivate, Widgets, Multimedia, OpenGL, OpenGLWidgets, ShaderTools, ShaderToolsPrivate, Svg, LinguistTools), FFmpeg 3.4–8 (avutil, avcodec, avformat, avfilter, swscale, swresample).
+
+For detailed build instructions for **Fedora Linux 44**, check out [docs/prerequisites-fedora.md](docs/prerequisites-fedora.md)!
 
 ## License
 
