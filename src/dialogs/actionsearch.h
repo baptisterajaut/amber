@@ -100,6 +100,21 @@ private slots:
   void move_selection_down();
 private:
   /**
+   * @brief Intermediate result used while collecting and ranking matching actions.
+   */
+  struct SearchResultAction {
+    QAction* action;
+    QString comp;
+    QString menu_text;
+    int usage_count;
+  };
+
+  /**
+   * @brief Recursively walk a menu and collect all leaf actions matching the query.
+   */
+  void collect_actions(const QString &s, const QString &p, QMenu *parent, QList<SearchResultAction> &results);
+
+  /**
    * @brief Main widget that shows the list of commands
    */
   ActionSearchList* list_widget;
