@@ -21,7 +21,9 @@
 #include "timelinewidget.h"
 
 #include <QPainter>
+#include <QPainterPath>
 
+#include "effects/transition.h"
 #include "global/config.h"
 #include "panels/panels.h"
 #include "rendering/renderfunctions.h"
@@ -107,6 +109,42 @@ void draw_waveform(ClipPtr clip, const FootageStream* ms, long media_length, QPa
   }
 }
 
+static void drawCrossDissolveIcon(QPainter& p, const QRect& rect) {
+  const int side = qMin(rect.width(), rect.height()) - amber::timeline::kClipTextPadding * 2;
+  if (side < 8) return;
+
+  QRect icon_rect(0, 0, side, side);
+  icon_rect.moveCenter(rect.center());
+
+  auto draw_icon = [&](const QPoint& offset, const QColor& color) {
+    QRect r = icon_rect.translated(offset);
+    QPainterPath left;
+    left.moveTo(r.left(), r.top());
+    left.lineTo(r.center().x(), r.center().y());
+    left.lineTo(r.left(), r.bottom());
+    left.closeSubpath();
+
+    QPainterPath right;
+    right.moveTo(r.right(), r.top());
+    right.lineTo(r.center().x(), r.center().y());
+    right.lineTo(r.right(), r.bottom());
+    right.closeSubpath();
+
+    p.setPen(QPen(color, 1.4));
+    p.setBrush(QColor(color.red(), color.green(), color.blue(), qMin(80, color.alpha())));
+    p.drawPath(left);
+    p.drawPath(right);
+    p.drawLine(r.topLeft(), r.bottomRight());
+    p.drawLine(r.topRight(), r.bottomLeft());
+  };
+
+  p.save();
+  p.setRenderHint(QPainter::Antialiasing, true);
+  draw_icon(QPoint(2, 2), QColor(0, 0, 0, 150));
+  draw_icon(QPoint(0, 0), QColor(255, 255, 255, 230));
+  p.restore();
+}
+
 void draw_transition(QPainter& p, ClipPtr c, const QRect& clip_rect, QRect& text_rect, int transition_type) {
   if (!c) {
     qWarning() << "draw_transition: c is null";
@@ -153,7 +191,9 @@ void draw_transition(QPainter& p, ClipPtr c, const QRect& clip_rect, QRect& text
         }
       }
 
-      if (draw_text) {
+      if (draw_text && t->meta != nullptr && t->meta->internal == TRANSITION_INTERNAL_CROSSDISSOLVE) {
+        drawCrossDissolveIcon(p, transition_text_rect);
+      } else if (draw_text && t->meta != nullptr) {
         p.setPen(Qt::white);
         p.drawText(transition_text_rect, 0, t->meta->name, &transition_text_rect);
       }
@@ -350,6 +390,11 @@ static void drawClipMarkers(QPainter& p, ClipPtr clip, const QRect& clip_rect) {
 static void drawClipLabel(QPainter& p, ClipPtr clip, const QRect& clip_rect, QRect& text_rect) {
   if (text_rect.width() <= MAX_TEXT_WIDTH || text_rect.right() <= 0 || text_rect.left() >= p.device()->width()) return;
 
+  QFont original_font = p.font();
+  QFont smaller_font = original_font;
+  smaller_font.setPointSize(qMax(1, original_font.pointSize() - 1));
+  p.setFont(smaller_font);
+
   if (!clip->enabled()) {
     p.setPen(Qt::gray);
   } else if (clip->color().lightness() > 160) {
@@ -362,6 +407,7 @@ static void drawClipLabel(QPainter& p, ClipPtr clip, const QRect& clip_rect, QRe
     p.drawLine(text_rect.x(), underline_y, text_rect.x() + underline_width, underline_y);
   }
 
+  QColor text_color = p.pen().color();
   QString name = clip->name();
   if (qFuzzyIsNull(clip->speed().value)) {
     name += " (Frozen)";
@@ -370,7 +416,13 @@ static void drawClipLabel(QPainter& p, ClipPtr clip, const QRect& clip_rect, QRe
     if (clip->reversed()) name += "-";
     name += QString::number(clip->speed().value * 100) + "%)";
   }
+  // drop shadow for legibility against any clip color
+  p.setPen(QColor(0, 0, 0, 160));
+  p.drawText(text_rect.translated(1, 1), 0, name);
+  p.setPen(text_color);
   p.drawText(text_rect, 0, name, &text_rect);
+
+  p.setFont(original_font);
 }
 
 // Draws the white top-left bevel and dark bottom-right bevel of a clip.
