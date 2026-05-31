@@ -583,6 +583,22 @@ struct Config {
   bool show_welcome_dialog{true};
 
   /**
+   * @brief Re-open the most recent project on application startup
+   *
+   * **TRUE** if the most recently opened project should be re-opened automatically when the application starts
+   * (and no project was passed on the command line).
+   */
+  bool reopen_recent_project{false};
+
+  /**
+   * @brief Enable middle-click edge scrolling in the timeline viewport
+   *
+   * **TRUE** if middle-clicking and moving the cursor near the timeline viewport edges should automatically
+   * scroll the tracks in that direction.
+   */
+  bool middle_click_edge_scroll{true};
+
+  /**
    * @brief Frame skip step size
    *
    * Number of frames to skip when using the "Jump Forward" / "Jump Backward" shortcuts.
