@@ -933,16 +933,24 @@ void MainWindow::Retranslate() {
   file_menu->setTitle(tr("&File"));
   new_menu->setTitle(tr("&New"));
   open_project->setText(tr("&Open Project"));
+  open_project->setStatusTip(tr("Open an existing project file"));
   clear_open_recent_action->setText(tr("Clear Recent List"));
   open_recent->setTitle(tr("Open Recent"));
   save_project->setText(tr("&Save Project"));
+  save_project->setStatusTip(tr("Save the current project"));
   save_project_as->setText(tr("Save Project &As"));
+  save_project_as->setStatusTip(tr("Save the current project to a new file"));
   import_action->setText(tr("&Import..."));
+  import_action->setStatusTip(tr("Import media files into the project"));
   import_subtitle_action->setText(tr("Import Subtitle (.srt)..."));
   relink_media_action->setText(tr("Relink Media..."));
+  relink_media_action->setStatusTip(tr("Reconnect media files that have moved or are missing"));
   export_action->setText(tr("&Export..."));
+  export_action->setStatusTip(tr("Render and export the active sequence to a video file"));
   export_frame_action->setText(tr("Export &Frame..."));
+  export_frame_action->setStatusTip(tr("Export the current frame as an image"));
   exit_action->setText(tr("E&xit"));
+  exit_action->setStatusTip(tr("Close the application"));
 
   edit_menu->setTitle(tr("&Edit"));
   undo_action->setText(tr("&Undo"));
@@ -1030,32 +1038,52 @@ void MainWindow::Retranslate() {
   tools_menu->setTitle(tr("&Tools"));
 
   pointer_tool_action->setText(tr("Pointer Tool"));
+  pointer_tool_action->setStatusTip(tr("Pointer Tool: Select and move clips (V)"));
   edit_tool_action->setText(tr("Edit Tool"));
+  edit_tool_action->setStatusTip(tr("Edit Tool: Trim and resize clips (X)"));
   ripple_tool_action->setText(tr("Ripple Tool"));
+  ripple_tool_action->setStatusTip(tr("Ripple Tool: Trim clips and ripple subsequent clips (B)"));
   razor_tool_action->setText(tr("Razor Tool"));
+  razor_tool_action->setStatusTip(tr("Razor Tool: Split clips in the timeline (C)"));
   slip_tool_action->setText(tr("Slip Tool"));
+  slip_tool_action->setStatusTip(tr("Slip Tool: Slip clip's contents (Y)"));
   slide_tool_action->setText(tr("Slide Tool"));
+  slide_tool_action->setStatusTip(tr("Slide Tool: Slide clip without changing its duration (U)"));
   track_select_tool_action->setText(tr("Track Select Tool"));
+  track_select_tool_action->setStatusTip(tr("Track Select Tool: Select all clips forward or backward (A)"));
   hand_tool_action->setText(tr("Hand Tool"));
+  hand_tool_action->setStatusTip(tr("Hand Tool: Navigate the timeline (H)"));
   transition_tool_action->setText(tr("Transition Tool"));
+  transition_tool_action->setStatusTip(tr("Transition Tool: Create or edit transitions (T)"));
   snap_toggle->setText(tr("Enable Snapping"));
+  snap_toggle->setStatusTip(tr("Enable Snapping: Toggle snapping (S)"));
   color_labels_toggle->setText(tr("Color Labels"));
+  color_labels_toggle->setStatusTip(tr("Color Labels: Toggle color coding for clips"));
   autocut_silence_->setText(tr("Auto-Cut Silence"));
+  autocut_silence_->setStatusTip(tr("Auto-Cut Silence: Detect and split silent sections of audio"));
 
   no_autoscroll->setText(tr("No Auto-Scroll"));
+  no_autoscroll->setStatusTip(tr("Disable playhead automatic scrolling"));
   page_autoscroll->setText(tr("Page Auto-Scroll"));
+  page_autoscroll->setStatusTip(tr("Enable page-by-page playhead autoscrolling"));
   smooth_autoscroll->setText(tr("Smooth Auto-Scroll"));
+  smooth_autoscroll->setStatusTip(tr("Enable smooth playhead autoscrolling"));
 
   preferences_action_->setText(tr("Preferences"));
+  preferences_action_->setStatusTip(tr("Open the preferences dialog"));
 #ifdef QT_DEBUG
   clear_undo_action_->setText(tr("Clear Undo"));
+  clear_undo_action_->setStatusTip(tr("Clear Undo History"));
 #endif
 
   help_menu->setTitle(tr("&Help"));
 
   action_search_->setText(tr("A&ction Search"));
+  action_search_->setStatusTip(tr("Search for any menu command by name"));
   debug_log_->setText(tr("Debug Log"));
+  debug_log_->setStatusTip(tr("Open the debug log window"));
   about_action_->setText(tr("&About..."));
+  about_action_->setStatusTip(tr("Show information about the application"));
 
   panel_sequence_viewer->set_panel_name(QCoreApplication::translate("Viewer", "Sequence Viewer"));
   panel_footage_viewer->set_panel_name(QCoreApplication::translate("Viewer", "Media Viewer"));
