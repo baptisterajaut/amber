@@ -37,6 +37,7 @@
 
 class Menu;
 class Timeline;
+class QTimerEvent;
 
 struct TimelineTrackHeight {
   int index;
@@ -72,6 +73,7 @@ class TimelineWidget : public QWidget {
   void dragMoveEvent(QDragMoveEvent* event) override;
 
   void wheelEvent(QWheelEvent* event) override;
+  void timerEvent(QTimerEvent* event) override;
 
  private:
   void init_ghosts();
@@ -155,6 +157,12 @@ class TimelineWidget : public QWidget {
   int scroll;
 
   SetSelectionsCommand* selection_command;
+
+  // middle-click edge-scroll (gated behind config.middle_click_edge_scroll)
+  int middle_scroll_timer_id_{-1};
+  bool middle_clicking_edge_scroll_{false};
+  int last_mouse_x_{0};
+  int last_mouse_y_{0};
  signals:
 
  public slots:

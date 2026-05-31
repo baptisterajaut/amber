@@ -36,9 +36,12 @@
 
 #include "dialogs/clippropertiesdialog.h"
 #include "dialogs/newsequencedialog.h"
+#include "dialogs/texteditdialog.h"
 #include "effects/effect.h"
+#include "effects/fields/stringfield.h"
 #include "effects/internal/solideffect.h"
 #include "engine/undo/undo.h"
+#include "engine/undo/undo_effect.h"
 #include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/debug.h"
@@ -100,12 +103,10 @@ static void collect_from_footage_viewer(QDragEnterEvent* event, QVector<amber::t
   if (event->source() != panel_footage_viewer) return;
   if (panel_footage_viewer->seq == amber::ActiveSequence) return;  // don't allow nesting the same sequence
   media_list.append(amber::timeline::MediaImportData(
-      panel_footage_viewer->media,
-      static_cast<amber::timeline::MediaImportType>(event->mimeData()->text().toInt())));
+      panel_footage_viewer->media, static_cast<amber::timeline::MediaImportType>(event->mimeData()->text().toInt())));
 }
 
-static bool collect_from_external_files(QDragEnterEvent* event,
-                                        QVector<amber::timeline::MediaImportData>& media_list) {
+static bool collect_from_external_files(QDragEnterEvent* event, QVector<amber::timeline::MediaImportData>& media_list) {
   if (!amber::CurrentConfig.enable_drag_files_to_timeline || !event->mimeData()->hasUrls()) return false;
   QList<QUrl> urls = event->mimeData()->urls();
   if (urls.isEmpty()) return false;
@@ -427,7 +428,35 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent* event) {
       int clip_index = getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track);
       if (clip_index >= 0) {
         ClipPtr c = amber::ActiveSequence->clips.at(clip_index);
-        if (c != nullptr && c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
+        if (c == nullptr) return;
+
+        // double-clicking a text clip opens its text editor directly
+        for (const EffectPtr& effect : c->effects) {
+          if (effect == nullptr || effect->meta == nullptr ||
+              (effect->meta->internal != EFFECT_INTERNAL_TEXT && effect->meta->internal != EFFECT_INTERNAL_RICHTEXT)) {
+            continue;
+          }
+
+          StringField* text_field = dynamic_cast<StringField*>(effect->FindFieldById(QStringLiteral("text")));
+          if (text_field == nullptr) continue;
+
+          const bool rich_text = text_field->IsRichText();
+          const QString current_text = text_field->GetStringAt(text_field->Now());
+          TextEditDialog dialog(amber::MainWindow, current_text, rich_text);
+          if (dialog.exec() == QDialog::Accepted) {
+            const QString new_text = dialog.get_string();
+            if (new_text != current_text) {
+              auto* change = new KeyframeDataChange(text_field);
+              text_field->SetValueAt(text_field->Now(), new_text);
+              change->SetNewKeyframes();
+              amber::UndoStack.push(change);
+              update_ui(true);
+            }
+          }
+          return;
+        }
+
+        if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
           SequencePtr nested = c->media()->to_sequence();
           long ph = amber::ActiveSequence->playhead;
           if (ph >= c->timeline_in() && ph < c->timeline_out()) {
@@ -589,8 +618,7 @@ void TimelineWidget::mousePressDispatchTool(int effective_tool, int hovered_clip
     case TIMELINE_TOOL_MENU:
       mousePressPointer(hovered_clip, shift, alt, effective_tool);
       break;
-    case TIMELINE_TOOL_TRACK_SELECT:
-    {
+    case TIMELINE_TOOL_TRACK_SELECT: {
       // Clear previous selections unless Shift is held
       if (!shift) {
         amber::ActiveSequence->selections.clear();
@@ -647,8 +675,7 @@ void TimelineWidget::mousePressDispatchTool(int effective_tool, int hovered_clip
       }
 
       update_ui(false);
-    }
-      break;
+    } break;
     case TIMELINE_TOOL_HAND:
       panel_timeline->hand_moving = true;
       break;
@@ -679,6 +706,13 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event) {
   int effective_tool = panel_timeline->tool;
 
   if (event->button() == Qt::MiddleButton) {
+    if (amber::CurrentConfig.middle_click_edge_scroll) {
+      middle_clicking_edge_scroll_ = true;
+      last_mouse_x_ = event->position().toPoint().x();
+      last_mouse_y_ = event->position().toPoint().y();
+      if (middle_scroll_timer_id_ == -1) middle_scroll_timer_id_ = startTimer(16);  // ~60fps
+      return;
+    }
     effective_tool = TIMELINE_TOOL_HAND;
     panel_timeline->creating = false;
   } else if (event->button() == Qt::RightButton) {
@@ -1076,6 +1110,16 @@ void TimelineWidget::mouseReleaseResetState() {
 
 void TimelineWidget::mouseReleaseEvent(QMouseEvent* event) {
   QToolTip::hideText();
+
+  if (event->button() == Qt::MiddleButton && middle_clicking_edge_scroll_) {
+    middle_clicking_edge_scroll_ = false;
+    if (middle_scroll_timer_id_ != -1) {
+      killTimer(middle_scroll_timer_id_);
+      middle_scroll_timer_id_ = -1;
+    }
+    return;
+  }
+
   if (amber::ActiveSequence == nullptr) return;
 
   bool alt = (event->modifiers() & Qt::AltModifier);
@@ -1676,6 +1720,14 @@ void TimelineWidget::mouseMoveHoverTransition(QMouseEvent* event) {
 
 void TimelineWidget::mouseMoveEvent(QMouseEvent* event) {
   tooltip_timer.stop();
+
+  // while middle-click edge-scrolling, only track the cursor; the timer does the work
+  if (middle_clicking_edge_scroll_) {
+    last_mouse_x_ = event->position().toPoint().x();
+    last_mouse_y_ = event->position().toPoint().y();
+    return;
+  }
+
   if (amber::ActiveSequence == nullptr) return;
 
   bool alt = (event->modifiers() & Qt::AltModifier);
@@ -1683,7 +1735,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event) {
   panel_timeline->cursor_frame = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
   panel_timeline->cursor_track = getTrackFromScreenPoint(event->position().toPoint().y());
 
-  if (event->buttons() != 0 && panel_timeline->tool != TIMELINE_TOOL_HAND) {
+  if (event->buttons() != 0 && panel_timeline->tool != TIMELINE_TOOL_HAND && !(event->buttons() & Qt::MiddleButton)) {
     panel_timeline->scroll_to_frame(panel_timeline->cursor_frame);
   }
 
@@ -1813,4 +1865,42 @@ int TimelineWidget::getClipIndexFromCoords(long frame, int track) {
 void TimelineWidget::setScroll(int s) {
   scroll = s;
   update();
+}
+
+void TimelineWidget::timerEvent(QTimerEvent* event) {
+  if (event->timerId() != middle_scroll_timer_id_) {
+    QWidget::timerEvent(event);
+    return;
+  }
+
+  if (!middle_clicking_edge_scroll_ || amber::ActiveSequence == nullptr) {
+    killTimer(middle_scroll_timer_id_);
+    middle_scroll_timer_id_ = -1;
+    return;
+  }
+
+  QScrollBar* bar_h = panel_timeline->horizontalScrollBar;
+  QScrollBar* bar_v = scrollBar;
+  if (bar_h == nullptr || bar_v == nullptr) return;
+
+  const int mouse_x = last_mouse_x_;
+  const int mouse_y = last_mouse_y_;
+
+  // horizontal edge scrolling
+  if (mouse_x < 25) {
+    int delta = qBound(1, (25 - mouse_x) / 2, 15);
+    bar_h->setValue(qMax(0, bar_h->value() - delta));
+  } else if (mouse_x > width() - 25) {
+    int delta = qBound(1, (mouse_x - (width() - 25)) / 2, 15);
+    bar_h->setValue(qMin(bar_h->maximum(), bar_h->value() + delta));
+  }
+
+  // vertical edge scrolling
+  if (mouse_y < 25) {
+    int delta = qBound(1, (25 - mouse_y) / 2, 15);
+    bar_v->setValue(qMax(0, bar_v->value() - delta));
+  } else if (mouse_y > height() - 25) {
+    int delta = qBound(1, (mouse_y - (height() - 25)) / 2, 15);
+    bar_v->setValue(qMin(bar_v->maximum(), bar_v->value() + delta));
+  }
 }
