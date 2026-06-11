@@ -294,6 +294,7 @@ class Timeline : public Panel {
   void transition_menu_select(QAction*);
   void resize_move(double d);
   void set_tool();
+  void breadcrumb_link_clicked(const QString& link);
 
  private:
   void three_point_edit(bool insert);

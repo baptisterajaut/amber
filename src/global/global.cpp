@@ -389,6 +389,17 @@ void AmberGlobal::go_back_sequence() {
   panel_timeline->setFocus();
 }
 
+void AmberGlobal::go_to_sequence_level(int index) {
+  if (index < 0 || index >= project_io_->sequenceHistory().size()) return;
+  project_io_->goToSequenceLevel(index);
+
+  panel_graph_editor->set_row(nullptr);
+  panel_effect_controls->Clear(true);
+  panel_sequence_viewer->set_main_sequence();
+  panel_timeline->update_sequence();
+  panel_timeline->setFocus();
+}
+
 bool AmberGlobal::can_go_back() const { return project_io_->canGoBack(); }
 
 const QVector<SequencePtr>& AmberGlobal::sequence_history() const { return project_io_->sequenceHistory(); }

@@ -164,6 +164,11 @@ void Timeline::setup_ui() {
   // growable size policy, so without this it absorbs the layout's spare height
   // and balloons into a large empty band above the ruler once shown (#64).
   breadcrumb_label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+  // Breadcrumb segments are clickable links (#70): each ancestor sequence is a
+  // rich-text <a href="N"> pointing at its index in the history stack.
+  breadcrumb_label->setTextFormat(Qt::RichText);
+  breadcrumb_label->setOpenExternalLinks(false);
+  connect(breadcrumb_label, &QLabel::linkActivated, this, &Timeline::breadcrumb_link_clicked);
   breadcrumb_label->hide();
   timeline_area_layout->addWidget(breadcrumb_label);
 
@@ -310,19 +315,34 @@ void Timeline::update_sequence() {
   if (history.isEmpty()) {
     breadcrumb_label->hide();
   } else {
+    const QString separator = QStringLiteral(" &gt; ");
     QString crumb;
-    for (const auto& seq : history) {
-      if (!crumb.isEmpty()) crumb += " > ";
-      crumb += seq->name;
+    for (int i = 0; i < history.size(); i++) {
+      if (!crumb.isEmpty()) crumb += separator;
+      // Ancestor segments are clickable links back to their history level.
+      crumb += QStringLiteral("<a style=\"color:#aaa;\" href=\"%1\">%2</a>")
+                   .arg(i)
+                   .arg(history.at(i)->name.toHtmlEscaped());
     }
     if (!null_sequence) {
-      crumb += " > " + amber::ActiveSequence->name;
+      // Active sequence is the last, non-clickable segment, slightly brighter.
+      if (!crumb.isEmpty()) crumb += separator;
+      crumb += QStringLiteral("<span style=\"color:#ccc;\">%1</span>")
+                   .arg(amber::ActiveSequence->name.toHtmlEscaped());
     }
     breadcrumb_label->setText(crumb);
     breadcrumb_label->show();
   }
 
   UpdateTitle();
+}
+
+void Timeline::breadcrumb_link_clicked(const QString& link) {
+  bool ok = false;
+  int index = link.toInt(&ok);
+  if (!ok) return;
+  // go_to_sequence_level bounds-checks against the (possibly changed) history.
+  amber::Global->go_to_sequence_level(index);
 }
 
 void Timeline::UpdateTitle() {

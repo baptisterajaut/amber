@@ -33,6 +33,7 @@ class ProjectIO : public QObject {
 
   void setSequence(SequencePtr s, bool record_history = false);
   void goBackSequence();
+  void goToSequenceLevel(int index);
   bool canGoBack() const;
   const QVector<SequencePtr>& sequenceHistory() const;
   void clearSequenceHistory();

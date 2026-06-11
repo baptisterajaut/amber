@@ -114,6 +114,18 @@ void ProjectIO::goBackSequence() {
   emit sequenceChanged(prev);
 }
 
+void ProjectIO::goToSequenceLevel(int index) {
+  // Equivalent to pressing Backspace (size - index) times: the sequence stored
+  // at history index becomes active and everything above it is discarded.
+  // Bounds-guarded because the history may have changed between breadcrumb
+  // render and click.
+  if (index < 0 || index >= sequence_history_.size()) return;
+  SequencePtr target = sequence_history_.at(index);
+  sequence_history_.resize(index);
+  amber::ActiveSequence = target;
+  emit sequenceChanged(target);
+}
+
 bool ProjectIO::canGoBack() const { return !sequence_history_.isEmpty(); }
 
 const QVector<SequencePtr>& ProjectIO::sequenceHistory() const { return sequence_history_; }
