@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export_preset>
   <format>19</format>
-  <range>0</range>
   <video_enabled>1</video_enabled>
   <video_codec_index>1</video_codec_index>
   <width>1920</width>

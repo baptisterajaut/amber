@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export_preset>
   <format>10</format>
-  <range>0</range>
   <video_enabled>0</video_enabled>
   <video_codec_index>0</video_codec_index>
   <width>0</width>

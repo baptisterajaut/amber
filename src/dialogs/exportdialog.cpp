@@ -803,9 +803,6 @@ void ExportDialog::SavePreset(const QString& name) {
   // Format
   stream.writeTextElement("format", QString::number(formatCombobox->currentIndex()));
 
-  // Range
-  stream.writeTextElement("range", QString::number(rangeCombobox->currentIndex()));
-
   // Video settings
   stream.writeTextElement("video_enabled", QString::number(videoGroupbox->isChecked() ? 1 : 0));
   stream.writeTextElement("video_codec_index", QString::number(vcodecCombobox->currentIndex()));
@@ -849,7 +846,6 @@ void ExportDialog::LoadPreset(const QString& name) {
   QXmlStreamReader stream(&file);
 
   int format_index = -1;
-  int range_index = -1;
   int video_enabled = -1;
   int video_codec_index = -1;
   int width = -1;
@@ -868,8 +864,6 @@ void ExportDialog::LoadPreset(const QString& name) {
       QString tag = stream.name().toString();
       if (tag == "format") {
         format_index = stream.readElementText().toInt();
-      } else if (tag == "range") {
-        range_index = stream.readElementText().toInt();
       } else if (tag == "video_enabled") {
         video_enabled = stream.readElementText().toInt();
       } else if (tag == "video_codec_index") {
@@ -909,17 +903,12 @@ void ExportDialog::LoadPreset(const QString& name) {
     formatCombobox->setCurrentIndex(format_index);
   }
 
-  // 2. Range
-  if (range_index >= 0 && range_index < rangeCombobox->count()) {
-    rangeCombobox->setCurrentIndex(range_index);
-  }
-
-  // 3. Video codec (triggers vcodec_changed -> repopulates compression type)
+  // 2. Video codec (triggers vcodec_changed -> repopulates compression type)
   if (video_codec_index >= 0 && video_codec_index < vcodecCombobox->count()) {
     vcodecCombobox->setCurrentIndex(video_codec_index);
   }
 
-  // 4. Video settings (after codec is set so compression type combo is populated)
+  // 3. Video settings (after codec is set so compression type combo is populated)
   if (width >= 0) widthSpinbox->setValue(width);
   if (height >= 0) heightSpinbox->setValue(height);
   if (frame_rate >= 0) framerateSpinbox->setValue(frame_rate);
@@ -928,19 +917,19 @@ void ExportDialog::LoadPreset(const QString& name) {
   }
   if (video_bitrate >= 0) videobitrateSpinbox->setValue(video_bitrate);
 
-  // 5. Video/audio group enable (after codecs are set)
+  // 4. Video/audio group enable (after codecs are set)
   if (video_enabled >= 0) {
     bool has_video = vcodecCombobox->count() > 0;
     videoGroupbox->setChecked(video_enabled != 0 && has_video);
     videoGroupbox->setEnabled(has_video);
   }
 
-  // 6. Audio codec
+  // 5. Audio codec
   if (audio_codec_index >= 0 && audio_codec_index < acodecCombobox->count()) {
     acodecCombobox->setCurrentIndex(audio_codec_index);
   }
 
-  // 7. Audio settings
+  // 6. Audio settings
   if (sampling_rate >= 0) samplingRateSpinbox->setValue(sampling_rate);
   if (audio_bitrate >= 0) audiobitrateSpinbox->setValue(audio_bitrate);
 
