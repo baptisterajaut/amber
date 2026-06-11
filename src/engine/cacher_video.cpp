@@ -242,6 +242,20 @@ static bool upcoming_queue_is_full(const QueueConfig& cfg, int64_t latest_pts, i
   return latest_pts > maximum_ts;
 }
 
+// Returns the timestamp of the keyframe a BACKWARD seek to target_pts would land on,
+// or AV_NOPTS_VALUE if the container index can't tell.
+static int64_t seek_landing_timestamp(AVFormatContext* formatCtx, int stream_index, int64_t target_pts) {
+  AVStream* st = formatCtx->streams[stream_index];
+  int entry = av_index_search_timestamp(st, target_pts, AVSEEK_FLAG_BACKWARD);
+  if (entry < 0) return AV_NOPTS_VALUE;
+#if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(58, 78, 100)
+  const AVIndexEntry* e = avformat_index_get_entry(st, entry);
+  return (e != nullptr) ? e->timestamp : AV_NOPTS_VALUE;
+#else
+  return st->index_entries[entry].timestamp;
+#endif
+}
+
 // ---------------------------------------------------------------------------
 // cacheVideoDynamicClip — handle non-still-image (dynamic) clip caching
 // ---------------------------------------------------------------------------
@@ -257,7 +271,22 @@ void Cacher::cacheVideoDynamicClip() {
   bool seeked_to_zero = false;
 
   // Seek if target is outside the cached window
-  if (target_pts < stats.earliest_pts || target_pts > stats.latest_pts + second_pts || queue_.size() == 0) {
+  bool need_seek = target_pts < stats.earliest_pts || target_pts > stats.latest_pts + second_pts || queue_.size() == 0;
+
+  // Seek-storm guard (#57): when decode falls behind during forward playback, a BACKWARD
+  // seek lands on the keyframe preceding the target. On long-GOP media that keyframe is
+  // often one we already decoded past — the seek would throw the queue away and re-decode
+  // the same GOP, repeatedly, without ever catching up. If the container index tells us
+  // the landing keyframe is at or before our latest decoded frame, decoding forward is
+  // strictly cheaper: keep going instead.
+  if (need_seek && queue_.size() > 0 && target_pts > stats.latest_pts) {
+    int64_t landing = seek_landing_timestamp(formatCtx, clip->media_stream_index(), target_pts);
+    if (landing != AV_NOPTS_VALUE && landing <= stats.latest_pts) {
+      need_seek = false;
+    }
+  }
+
+  if (need_seek) {
     cacheVideoSeekToTarget(target_pts, second_pts, decoded_frame, seeked_to_zero);
     have_existing_frame_to_use = true;
     stats.frames_greater_than_target = 0;
