@@ -266,13 +266,15 @@ void Cacher::cacheVideoDynamicClip() {
 
   QueueConfig cfg = resolve_queue_config(reversed);
 
+  // qRound64: these are stream timestamps — qRound returns int, which overflows past
+  // 2^31 (~6.6 hours into a file with a 90kHz timebase)
   int64_t minimum_ts = (cfg.previous_queue_type == amber::FRAME_QUEUE_TYPE_FRAMES)
                            ? qCeil(cfg.previous_queue_size)
-                           : qRound(target_pts - second_pts * cfg.previous_queue_size);
+                           : qRound64(target_pts - second_pts * cfg.previous_queue_size);
 
   int64_t maximum_ts = (cfg.upcoming_queue_type == amber::FRAME_QUEUE_TYPE_FRAMES)
                            ? qCeil(cfg.upcoming_queue_size)
-                           : qRound(target_pts + second_pts * cfg.upcoming_queue_size);
+                           : qRound64(target_pts + second_pts * cfg.upcoming_queue_size);
 
   if (upcoming_queue_is_full(cfg, stats.latest_pts, stats.frames_greater_than_target, maximum_ts)) {
     if (have_existing_frame_to_use) av_frame_free(&decoded_frame);
