@@ -109,6 +109,8 @@ bool Cacher::cacheVideoHandleNoPtsFrame(AVFrame* decoded_frame, int64_t target_p
     queue_.unlock();
     return true;  // break the decode loop
   }
+  // Not stored anywhere — free it, the decode loop allocates a fresh frame on the next pass
+  av_frame_free(&decoded_frame);
   return false;
 }
 
