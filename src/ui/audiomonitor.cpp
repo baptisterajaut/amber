@@ -61,7 +61,7 @@ void AudioMonitor::clear() {
   clear_timer.stop();
 
   values_mutex.lock();
-  values.fill(1);
+  values.fill(0);  // values are linear peaks: 0 = silence
   values_mutex.unlock();
   repaint();
 }
@@ -82,18 +82,30 @@ void AudioMonitor::paintEvent(QPaintEvent *) {
       int channel_x = AUDIO_MONITOR_GAP;
       int channel_count = values.size();
       int channel_width = (width()/channel_count) - AUDIO_MONITOR_GAP;
+      // Bar must not extend past the widget bottom: it used to be created with the
+      // full widget height but offset below the peak header, so the bottom 18px of
+      // revealed bar rendered off-widget and quiet signals showed nothing at all.
+      int bar_height = height() - AUDIO_MONITOR_PEAK_HEIGHT - AUDIO_MONITOR_GAP;
       int i;
       for (i=0;i<channel_count;i++) {
-        QRect r(channel_x, AUDIO_MONITOR_PEAK_HEIGHT + AUDIO_MONITOR_GAP, channel_width, height());
+        QRect r(channel_x, AUDIO_MONITOR_PEAK_HEIGHT + AUDIO_MONITOR_GAP, channel_width, bar_height);
         p.fillRect(r, gradient);
 
-        bool peak = false;
+        // values are linear peaks (0..1); display on a dB scale with a -60dB floor
+        // so attenuated signals stay visible (-30dB = half bar). The old pseudo-linear
+        // mapping crushed anything below ~-12dB into the bottom few pixels.
+        double peak_linear = values.at(i);
+        double filled = 0.0;
+        if (peak_linear > 0.0) {
+          double db = 20.0 * std::log10(peak_linear);
+          filled = qBound(0.0, (db + 60.0) / 60.0, 1.0);
+        }
+        bool clipping = (filled >= 1.0);
 
-        r.setHeight(qRound(r.height()*(values.at(i))));
-        peak = (r.height() == 0);
+        r.setHeight(qRound(bar_height * (1.0 - filled)));
 
         QRect peak_rect(channel_x, 0, channel_width, AUDIO_MONITOR_PEAK_HEIGHT);
-        if (peak) {
+        if (clipping) {
           p.fillRect(peak_rect, QColor(255, 0, 0));
         } else {
           p.fillRect(peak_rect, QColor(64, 0, 0));
