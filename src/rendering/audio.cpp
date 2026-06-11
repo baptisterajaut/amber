@@ -98,6 +98,15 @@ void init_audio() {
   audio_output = new QAudioSink(info, audio_format);
   audio_output->moveToThread(QApplication::instance()->thread());
 
+  // Cap the device-side buffer at ~100ms (default is 250ms+, backend-dependent).
+  // Audio already pushed into the device keeps playing across pause/play/seek; with a
+  // large buffer that residual is heard as the same instant replaying on quick
+  // pause/play cycles (#71). Flushing it on rebase (reset()+start()) costs a backend
+  // stream recreation = audible resume latency, so bound the residual at the source
+  // instead — ≤100ms is imperceptible as duplication. Must be set before start().
+  audio_output->setBufferSize(audio_format.sampleRate() * audio_format.channelCount() *
+                              audio_format.bytesPerSample() / 10);
+
   // connect
   audio_io_device = audio_output->start();
   if (audio_io_device == nullptr) {
@@ -227,6 +236,12 @@ void AudioSenderThread::run() {
 
 int AudioSenderThread::send_audio_to_output(qint64 offset, int max) {
   audio_write_lock.lock();
+
+  // Device can be gone if a restart after QAudioSink::reset() failed (e.g. output unplugged)
+  if (audio_io_device == nullptr) {
+    audio_write_lock.unlock();
+    return 0;
+  }
 
   bool scrub_active = (scrub_grain_played_ < scrub_grain_total_);
 
