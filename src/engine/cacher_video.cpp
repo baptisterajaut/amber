@@ -98,6 +98,17 @@ void Cacher::cacheVideoTrimPreviousFrames(int64_t target_pts, int64_t minimum_ts
 }
 
 // ---------------------------------------------------------------------------
+// cacheVideoEvictBeforeTimestamp
+// ---------------------------------------------------------------------------
+void Cacher::cacheVideoEvictBeforeTimestamp(int64_t minimum_ts) {
+  queue_.lock();
+  while (queue_.size() > 1 && queue_.first()->pts < minimum_ts && queue_.first() != retrieved_frame) {
+    queue_.removeFirst();
+  }
+  queue_.unlock();
+}
+
+// ---------------------------------------------------------------------------
 // cacheVideoHandleNoPtsFrame
 // ---------------------------------------------------------------------------
 bool Cacher::cacheVideoHandleNoPtsFrame(AVFrame* decoded_frame, int64_t target_pts, int retrieve_code) {
@@ -184,6 +195,10 @@ bool Cacher::cacheVideoProcessDecodedFrame(AVFrame* decoded_frame, int retrieve_
 
   if (previous_queue_type == amber::FRAME_QUEUE_TYPE_FRAMES) {
     cacheVideoTrimPreviousFrames(target_pts, minimum_ts);
+  } else {
+    // SECONDS mode: frames older than the window were only discarded on arrival (above),
+    // never evicted once queued — during continuous playback the queue grew unbounded
+    cacheVideoEvictBeforeTimestamp(minimum_ts);
   }
 
   // Check if the upcoming queue is full

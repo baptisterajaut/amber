@@ -783,6 +783,13 @@ class Cacher : public QThread {
   void cacheVideoTrimPreviousFrames(int64_t target_pts, int64_t minimum_ts);
 
   /**
+   * @brief Evict queued frames older than minimum_ts (FRAME_QUEUE_TYPE_SECONDS previous limit).
+   *
+   * Keeps at least one frame and never evicts retrieved_frame.
+   */
+  void cacheVideoEvictBeforeTimestamp(int64_t minimum_ts);
+
+  /**
    * @brief Handle a decoded frame with AV_NOPTS_VALUE pts (still-image or seek artifact).
    *
    * Assigns target_pts to the frame, and if EOF was also signalled, stores the frame and returns true
