@@ -47,9 +47,14 @@ void Timeline::setup_ui() {
 
   setWidget(dockWidgetContents);
 
+  QSplitter* timelineSplitter = new QSplitter(Qt::Horizontal);
+  timelineSplitter->setChildrenCollapsible(false);
+  timelineSplitter->setHandleWidth(3);
+  horizontalLayout->addWidget(timelineSplitter);
+
   tool_button_widget = new QWidget();
   tool_button_widget->setObjectName("timeline_toolbar");
-  tool_button_widget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  tool_button_widget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 
   FlowLayout* tool_buttons_layout = new FlowLayout(tool_button_widget);
   tool_buttons_layout->setSpacing(4);
@@ -144,7 +149,7 @@ void Timeline::setup_ui() {
   connect(addButton, &QPushButton::clicked, this, &Timeline::add_btn_click);
   tool_buttons_layout->addWidget(addButton);
 
-  horizontalLayout->addWidget(tool_button_widget);
+  timelineSplitter->addWidget(tool_button_widget);
 
   timeline_area_widget = new QWidget();
   QSizePolicy timeline_area_policy(QSizePolicy::Minimum, QSizePolicy::Minimum);
@@ -172,22 +177,61 @@ void Timeline::setup_ui() {
   breadcrumb_label->hide();
   timeline_area_layout->addWidget(breadcrumb_label);
 
+  timeline_placeholder_label = new QLabel(timeline_area_widget);
+  timeline_placeholder_label->setText(tr("No active sequence. Drag clips here to create a sequence."));
+  timeline_placeholder_label->setAlignment(Qt::AlignCenter);
+  timeline_placeholder_label->setWordWrap(true);
+  timeline_placeholder_label->setAutoFillBackground(true);
+  {
+    QPalette pal = timeline_placeholder_label->palette();
+    pal.setColor(QPalette::Window, pal.color(QPalette::Base));
+    QColor textColor = pal.color(QPalette::Text);
+    textColor.setAlpha(128);
+    pal.setColor(QPalette::WindowText, textColor);
+    timeline_placeholder_label->setPalette(pal);
+  }
+  {
+    QFont f = timeline_placeholder_label->font();
+    f.setPointSize(11);
+    timeline_placeholder_label->setFont(f);
+  }
+  timeline_placeholder_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  timeline_area_layout->addWidget(timeline_placeholder_label);
+
   headers = new TimelineHeader();
-  timeline_area_layout->addWidget(headers);
+
+  headerContainer = new QWidget();
+  QHBoxLayout* headerContainerLayout = new QHBoxLayout(headerContainer);
+  headerContainerLayout->setSpacing(0);
+  headerContainerLayout->setContentsMargins(0, 0, 0, 0);
+  QWidget* headerSpacer = new QWidget();
+  headerSpacer->setFixedWidth(130);
+  headerContainerLayout->addWidget(headerSpacer);
+  headerContainerLayout->addWidget(headers);
+  timeline_area_layout->addWidget(headerContainer);
 
   editAreas = new QWidget();
   QHBoxLayout* editAreaLayout = new QHBoxLayout(editAreas);
   editAreaLayout->setSpacing(0);
   editAreaLayout->setContentsMargins(0, 0, 0, 0);
 
+  timeline_area = new TimelineWidget();
+  timeline_area->setFocusPolicy(Qt::ClickFocus);
+
+  track_headers = new TrackHeaderWidget();
+  track_headers->timeline_widget = timeline_area;
+  timeline_area->track_headers = track_headers;
+
+  editAreaLayout->addWidget(track_headers);
+
   QWidget* timelineContainer = new QWidget();
   QHBoxLayout* timelineContainerLayout = new QHBoxLayout(timelineContainer);
   timelineContainerLayout->setSpacing(0);
   timelineContainerLayout->setContentsMargins(0, 0, 0, 0);
-
-  timeline_area = new TimelineWidget();
-  timeline_area->setFocusPolicy(Qt::ClickFocus);
   timelineContainerLayout->addWidget(timeline_area);
+
+  timeline_placeholder_label->setAcceptDrops(true);
+  timeline_placeholder_label->installEventFilter(timeline_area);
 
   verticalScrollbar = new QScrollBar();
   verticalScrollbar->setMaximum(0);
@@ -204,9 +248,25 @@ void Timeline::setup_ui() {
   horizontalScrollBar->setSingleStep(20);
   horizontalScrollBar->setOrientation(Qt::Horizontal);
 
-  timeline_area_layout->addWidget(horizontalScrollBar);
+  scrollBarContainer = new QWidget();
+  QHBoxLayout* scrollBarContainerLayout = new QHBoxLayout(scrollBarContainer);
+  scrollBarContainerLayout->setSpacing(0);
+  scrollBarContainerLayout->setContentsMargins(0, 0, 0, 0);
+  QWidget* scrollBarSpacer = new QWidget();
+  scrollBarSpacer->setFixedWidth(130);
+  scrollBarContainerLayout->addWidget(scrollBarSpacer);
+  scrollBarContainerLayout->addWidget(horizontalScrollBar);
 
-  horizontalLayout->addWidget(timeline_area_widget);
+  timeline_area_layout->addWidget(scrollBarContainer);
+
+  timelineSplitter->addWidget(timeline_area_widget);
+
+  // Set default sizes and stretch factors for timelineSplitter
+  timelineSplitter->setStretchFactor(0, 0);
+  timelineSplitter->setStretchFactor(1, 1);
+  int default_tools_width = toolArrowButton->sizeHint().width() + 8;
+  timelineSplitter->setSizes({default_tools_width, 10000});
+  tool_button_widget->setMinimumWidth(toolArrowButton->sizeHint().width() + 4);
 
   audio_monitor = new AudioMonitor();
   audio_monitor->setMinimumSize(QSize(50, 0));
@@ -218,26 +278,45 @@ void Timeline::setup_ui() {
 
 void Timeline::Retranslate() {
   toolArrowButton->setToolTip(tr("Pointer Tool") + " (V)");
+  toolArrowButton->setStatusTip(tr("Pointer Tool: Select and move clips (V)"));
   toolEditButton->setToolTip(tr("Edit Tool") + " (X)");
+  toolEditButton->setStatusTip(tr("Edit Tool: Trim and resize clips (X)"));
   toolRippleButton->setToolTip(tr("Ripple Tool") + " (B)");
+  toolRippleButton->setStatusTip(tr("Ripple Tool: Trim clips and ripple subsequent clips (B)"));
   toolRazorButton->setToolTip(tr("Razor Tool") + " (C)");
+  toolRazorButton->setStatusTip(tr("Razor Tool: Split clips in the timeline (C)"));
   toolSlipButton->setToolTip(tr("Slip Tool") + " (Y)");
+  toolSlipButton->setStatusTip(tr("Slip Tool: Slip clip's contents (Y)"));
   toolSlideButton->setToolTip(tr("Slide Tool") + " (U)");
+  toolSlideButton->setStatusTip(tr("Slide Tool: Slide clip without changing its duration (U)"));
   toolTrackSelectButton->setToolTip(tr("Track Select Tool") + " (A)");
+  toolTrackSelectButton->setStatusTip(tr("Track Select Tool: Select all clips forward or backward (A)"));
   toolHandButton->setToolTip(tr("Hand Tool") + " (H)");
+  toolHandButton->setStatusTip(tr("Hand Tool: Navigate the timeline (H)"));
   toolTransitionButton->setToolTip(tr("Transition Tool") + " (T)");
+  toolTransitionButton->setStatusTip(tr("Transition Tool: Create or edit transitions (T)"));
   snappingButton->setToolTip(tr("Snapping") + " (S)");
+  snappingButton->setStatusTip(tr("Snapping: Toggle snapping (S)"));
   zoomInButton->setToolTip(tr("Zoom In") + " (=)");
+  zoomInButton->setStatusTip(tr("Zoom In (=)"));
   zoomOutButton->setToolTip(tr("Zoom Out") + " (-)");
+  zoomOutButton->setStatusTip(tr("Zoom Out (-)"));
   recordButton->setToolTip(tr("Record audio"));
+  recordButton->setStatusTip(tr("Record audio"));
   addButton->setToolTip(tr("Add title, solid, bars, etc."));
+  addButton->setStatusTip(tr("Add title, solid, bars, etc."));
 
   UpdateTitle();
 }
 
-void Timeline::resizeEvent(QResizeEvent*) {
+void Timeline::resizeEvent(QResizeEvent* event) {
   // adjust maximum scrollbar
   if (amber::ActiveSequence != nullptr) set_sb_max();
+
+  if (find_bar && find_bar->isVisible()) {
+    int margin = 10;
+    find_bar->move(timeline_area_widget->width() - find_bar->width() - margin, margin);
+  }
 
   // resize tool button widget to its contents
   QList<QWidget*> tool_button_children = tool_button_widget->findChildren<QWidget*>();
@@ -271,25 +350,33 @@ void Timeline::repaint_timeline() {
   panel_height_dirty_ = true;
   if (!block_repaints) {
     if (amber::ActiveSequence != nullptr && !horizontalScrollBar->isSliderDown() &&
-        !horizontalScrollBar->is_resizing() && panel_sequence_viewer->playing && !zoom_just_changed) {
-      // auto scroll — setValue triggers a recursive repaint_timeline() via setScroll,
-      // so the widgets will be updated in that recursive call
-      if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_PAGE_SCROLL) {
-        int playhead_x = getTimelineScreenPointFromFrame(amber::ActiveSequence->playhead);
-        if (playhead_x < 0 || playhead_x > (editAreas->width() - verticalScrollbar->width())) {
-          int old_scroll = horizontalScrollBar->value();
-          horizontalScrollBar->setValue(getScreenPointFromFrame(zoom, amber::ActiveSequence->playhead));
-          if (horizontalScrollBar->value() != old_scroll) return;
+        !horizontalScrollBar->is_resizing() && !hand_moving && !zoom_just_changed) {
+      if (panel_sequence_viewer->playing) {
+        // auto scroll — setValue triggers a recursive repaint_timeline() via setScroll,
+        // so the widgets will be updated in that recursive call
+        if (amber::CurrentConfig.keep_playhead_centered ||
+            amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_SMOOTH_SCROLL) {
+          if (center_scroll_to_playhead(horizontalScrollBar, zoom, amber::ActiveSequence->playhead)) {
+            return;
+          }
+        } else if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_PAGE_SCROLL) {
+          int playhead_x = getTimelineScreenPointFromFrame(amber::ActiveSequence->playhead);
+          if (playhead_x < 0 || playhead_x > (editAreas->width() - verticalScrollbar->width())) {
+            int old_scroll = horizontalScrollBar->value();
+            horizontalScrollBar->setValue(getScreenPointFromFrame(zoom, amber::ActiveSequence->playhead));
+            if (horizontalScrollBar->value() != old_scroll) return;
+          }
         }
-      } else if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_SMOOTH_SCROLL) {
-        if (center_scroll_to_playhead(horizontalScrollBar, zoom, amber::ActiveSequence->playhead)) {
-          return;
-        }
+      } else if (amber::CurrentConfig.keep_playhead_centered) {
+        center_scroll_to_playhead(horizontalScrollBar, zoom, amber::ActiveSequence->playhead);
       }
     }
 
-    headers->update();
-    timeline_area->update();
+    headers->repaint();
+    timeline_area->repaint();
+    if (track_headers) {
+      track_headers->repaint();
+    }
 
     if (amber::ActiveSequence != nullptr && !zoom_just_changed) {
       set_sb_max();
@@ -309,6 +396,14 @@ void Timeline::update_sequence() {
   recordButton->setEnabled(!null_sequence);
   addButton->setEnabled(!null_sequence);
   headers->setEnabled(!null_sequence);
+  if (track_headers) {
+    track_headers->setEnabled(!null_sequence);
+  }
+
+  timeline_placeholder_label->setVisible(null_sequence);
+  headerContainer->setVisible(!null_sequence);
+  editAreas->setVisible(!null_sequence);
+  scrollBarContainer->setVisible(!null_sequence);
 
   // Update breadcrumb
   const auto& history = amber::Global->sequence_history();

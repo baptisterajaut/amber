@@ -349,7 +349,7 @@
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="514" />
-        <source>VIDEO EFFECTS</source>
+        <source>Video Effects</source>
         <translation>EFEK VIDEO</translation>
     </message>
     <message>
@@ -364,7 +364,7 @@
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="517" />
-        <source>AUDIO EFFECTS</source>
+        <source>Audio Effects</source>
         <translation>EFEK AUDIO</translation>
     </message>
     <message>

@@ -15,6 +15,7 @@ class EffectUI : public CollapsibleWidget {
   int GetRowY(int row, QWidget* mapToWidget);
   void UpdateFromEffect();
   bool IsAttachedToClip(Clip* c);
+  void SetLabelColumnWidth(int width);
 
   const QVector<QLabel*>& labels() const { return labels_; }
 

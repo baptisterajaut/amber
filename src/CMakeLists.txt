@@ -14,10 +14,29 @@ if(NOT AMBER_VERSION)
 endif()
 
 option(BUILD_DOXYGEN "Build Doxygen documentation" OFF)
+option(BUILD_TESTS "Build unit tests" ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Speed up compilation and linking without compromising optimization
+set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  add_compile_options(-pipe)
+
+  # Use a faster linker if available (mold, lld, gold)
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -fuse-ld=mold -Wl,--version OUTPUT_VARIABLE MOLD_VERSION ERROR_QUIET)
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -fuse-ld=lld -Wl,--version OUTPUT_VARIABLE LLD_VERSION ERROR_QUIET)
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -fuse-ld=gold -Wl,--version OUTPUT_VARIABLE GOLD_VERSION ERROR_QUIET)
+  if(MOLD_VERSION)
+    add_link_options("-fuse-ld=mold")
+  elseif(LLD_VERSION)
+    add_link_options("-fuse-ld=lld")
+  elseif(GOLD_VERSION)
+    add_link_options("-fuse-ld=gold")
+  endif()
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_AUTOMOC ON)
@@ -457,7 +476,7 @@ if(ipo_supported)
 endif()
 
 # Test suite (only when not cross-compiling)
-if(NOT CMAKE_CROSSCOMPILING)
+if(NOT CMAKE_CROSSCOMPILING AND BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()

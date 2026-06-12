@@ -41,7 +41,10 @@ FootageRelinkDialog::FootageRelinkDialog(QWidget* parent, QVector<QPair<Media*, 
 
   tree_ = new QTreeWidget(this);
   tree_->setHeaderLabels({tr("Filename"), tr("Last Known Path"), tr("Status")});
-  tree_->header()->setStretchLastSection(true);
+  tree_->header()->setStretchLastSection(false);
+  tree_->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+  tree_->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+  tree_->header()->setSectionResizeMode(2, QHeaderView::Interactive);
 
   for (int i = 0; i < footage_.size(); i++) {
     Footage* f = footage_[i].second;

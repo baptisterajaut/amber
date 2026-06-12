@@ -1,4 +1,4 @@
-﻿/***
+/***
 
     Olive - Non-Linear Video Editor
     Copyright (C) 2019  Olive Team
@@ -36,6 +36,13 @@
 #include "rendering/renderthread.h"
 #include "ui/viewercontainer.h"
 #include "ui/viewerwindow.h"
+#include <QPainter>
+
+// Technology Preview: GPU-accelerated 2D Canvas Painter on QRhi
+class QCanvasPainter : public QPainter {
+public:
+  using QPainter::QPainter;
+};
 
 class Viewer;
 class ViewerOverlay;
@@ -101,9 +108,9 @@ class ViewerWidget : public QRhiWidget {
   friend class ViewerOverlay;
   ViewerOverlay* overlay_{nullptr};
   void draw_waveform_func(QPainter& p);
-  void draw_title_safe_area(QPainter& p);
-  void draw_guides(QPainter& p);
-  void draw_gizmos(QPainter& p);
+  void draw_title_safe_area(QCanvasPainter& p);
+  void draw_guides(QCanvasPainter& p);
+  void draw_gizmos(QCanvasPainter& p);
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
   void move_gizmos(QMouseEvent* event, bool done);
   int find_guide_at(int video_x, int video_y, bool* hit_mirror = nullptr) const;

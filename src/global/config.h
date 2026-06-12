@@ -343,6 +343,13 @@ struct Config {
   bool hover_focus{false};
 
   /**
+   * @brief Keep playhead centered
+   *
+   * **TRUE** to keep the playhead centered on the timeline at all times.
+   */
+  bool keep_playhead_centered{false};
+
+  /**
    * @brief Project view type
    *
    * Whether to show media in the Project panel as a tree hierarchy or as a browser of icons.
@@ -583,6 +590,16 @@ struct Config {
   bool show_welcome_dialog{true};
 
   /**
+   * @brief Re-open the most recent project on application restart
+   */
+  bool reopen_recent_project{false};
+
+  /**
+   * @brief Enable middle-click edge scrolling in the timeline viewport
+   */
+  bool middle_click_edge_scroll{false};
+
+  /**
    * @brief Frame skip step size
    *
    * Number of frames to skip when using the "Jump Forward" / "Jump Backward" shortcuts.
@@ -675,6 +692,34 @@ struct Config {
    * Versioned autorecovery files are not yet implemented.
    */
   int autorecovery_max{5};
+
+  /**
+   * @brief Animate clip snapping
+   *
+   * **TRUE** if clips should smoothly lerp (interpolate) to their snapped position
+   * rather than jumping abruptly. Adds a subtle animation to snap events.
+   */
+  bool snap_animation{true};
+
+  /**
+   * @brief Show clip outline only when moving
+   *
+   * **TRUE** if the white inner-highlight outline on clips should only be drawn
+   * while the clip is actively being dragged/moved. **FALSE** draws it always.
+   */
+  bool clip_outline_on_move_only{false};
+
+  /**
+   * @brief Show live clip content while dragging / resizing
+   *
+   * When **TRUE**, dragging or trimming a clip renders the full clip body
+   * (background gradient, waveform/thumbnail, and label) at the ghost position
+   * rather than a plain yellow outline. The same lerp easing that animates the
+   * ghost outline is applied to the clip bounds and position, so the clip
+   * content smoothly follows the cursor. **FALSE** restores the classic
+   * yellow-outline ghost behaviour.
+   */
+  bool drag_show_clip_content{false};
 
   /**
    * @brief Load config from file

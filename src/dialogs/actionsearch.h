@@ -99,6 +99,14 @@ private slots:
    */
   void move_selection_down();
 private:
+  struct SearchResultAction {
+    QAction* action;
+    QString comp;
+    QString menu_text;
+    int usage_count;
+  };
+  void collect_actions(const QString &s, const QString &p, QMenu *parent, QList<SearchResultAction> &results);
+
   /**
    * @brief Main widget that shows the list of commands
    */

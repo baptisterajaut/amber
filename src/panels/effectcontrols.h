@@ -83,6 +83,7 @@ class EffectControls : public Panel {
   void cut();
   void copy(bool del = false);
   void update_keyframes();
+  void fast_repaint();
  private slots:
   void menu_select(QAction* q);
 
@@ -146,6 +147,7 @@ class EffectControls : public Panel {
   KeyframeView* keyframeView;
   QWidget* vcontainer;
   QWidget* acontainer;
+  QLabel* no_clip_label;
 };
 
 #endif  // EFFECTCONTROLS_H

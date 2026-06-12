@@ -19,6 +19,8 @@
 ***/
 
 #include "timeline.h"
+#include <QAction>
+#include <QKeyEvent>
 
 #include <limits>
 
@@ -91,6 +93,12 @@ Timeline::Timeline(QWidget* parent)
   update_sequence();
 
   Retranslate();
+
+  QAction* find_action = new QAction(this);
+  find_action->setShortcut(QKeySequence::Find);
+  find_action->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+  connect(find_action, &QAction::triggered, this, &Timeline::show_find_bar);
+  addAction(find_action);
 }
 
 Timeline::~Timeline() = default;
@@ -807,6 +815,8 @@ void Timeline::delete_selection(QVector<Selection>& selections, bool ripple_dele
 void Timeline::set_zoom_value(double v) {
   // set zoom value
   zoom = v;
+
+  emit zoom_changed(zoom);
 
   // update header zoom to match
   headers->update_zoom(zoom);
@@ -1662,4 +1672,74 @@ void amber::timeline::MultiplyTrackSizesByDPI() {
   kTrackDefaultHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();
   kTrackMinHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();
   kTrackHeightIncrement *= QGuiApplication::primaryScreen()->devicePixelRatio();
+}
+
+void Timeline::show_find_bar() {
+  if (!find_bar) {
+    find_bar = new QLineEdit(timeline_area_widget);
+    find_bar->setPlaceholderText(tr("Find clip or marker..."));
+    find_bar->setFixedWidth(200);
+    find_bar->setStyleSheet("QLineEdit { background-color: #2a2a2a; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 4px; }");
+    connect(find_bar, &QLineEdit::textChanged, this, &Timeline::filter_timeline);
+    connect(find_bar, &QLineEdit::returnPressed, this, &Timeline::jump_to_first_match);
+    find_bar->installEventFilter(this);
+  }
+  
+  int margin = 10;
+  find_bar->move(timeline_area_widget->width() - find_bar->width() - margin, margin);
+  find_bar->show();
+  find_bar->raise();
+  find_bar->setFocus();
+  find_bar->selectAll();
+}
+
+void Timeline::filter_timeline(const QString& query) {
+  search_query = query;
+  if (timeline_area) timeline_area->update();
+  if (headers) headers->update();
+}
+
+void Timeline::jump_to_first_match() {
+  if (search_query.isEmpty() || amber::ActiveSequence == nullptr) {
+    return;
+  }
+  
+  long first_match_frame = -1;
+  bool found = false;
+  
+  for (const Marker& m : amber::ActiveSequence->markers) {
+    if (m.name.contains(search_query, Qt::CaseInsensitive)) {
+      if (!found || m.frame < first_match_frame) {
+        first_match_frame = m.frame;
+        found = true;
+      }
+    }
+  }
+  
+  for (const ClipPtr& c : amber::ActiveSequence->clips) {
+    if (c != nullptr && c->name().contains(search_query, Qt::CaseInsensitive)) {
+      long clip_start = c->timeline_in();
+      if (!found || clip_start < first_match_frame) {
+        first_match_frame = clip_start;
+        found = true;
+      }
+    }
+  }
+  
+  if (found && first_match_frame >= 0) {
+    panel_sequence_viewer->seek(first_match_frame);
+  }
+}
+
+bool Timeline::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == find_bar && event->type() == QEvent::KeyPress) {
+    QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+    if (keyEvent->key() == Qt::Key_Escape) {
+      find_bar->clear();
+      find_bar->hide();
+      timeline_area->setFocus();
+      return true;
+    }
+  }
+  return Panel::eventFilter(watched, event);
 }

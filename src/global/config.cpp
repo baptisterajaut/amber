@@ -79,6 +79,8 @@ constexpr BoolEntry kBoolEntries[] = {
     {"NativeMenuStyling", &Config::use_native_menu_styling},
     {"LockedPanels", &Config::locked_panels},
     {"ShowWelcomeDialog", &Config::show_welcome_dialog},
+    {"ReopenRecentProject", &Config::reopen_recent_project},
+    {"MiddleClickEdgeScroll", &Config::middle_click_edge_scroll},
     {"ShowGuides", &Config::show_guides},
     {"LockGuides", &Config::lock_guides},
     {"SnapToOutgoingClip", &Config::snap_to_outgoing_clip},
@@ -86,6 +88,10 @@ constexpr BoolEntry kBoolEntries[] = {
     {"ShowColorLabels", &Config::show_color_labels},
     {"AutorecoveryEnabled", &Config::autorecovery_enabled},
     {"StickyKeyframeType", &Config::sticky_keyframe_type},
+    {"SnapAnimation", &Config::snap_animation},
+    {"ClipOutlineOnMoveOnly", &Config::clip_outline_on_move_only},
+    {"DragShowClipContent", &Config::drag_show_clip_content},
+    {"KeepPlayheadCentered", &Config::keep_playhead_centered},
 };
 
 constexpr IntEntry kIntEntries[] = {
@@ -243,6 +249,7 @@ void Config::save(QString path) {
   stream.writeTextElement("UpcomingFrameQueueSize", QString::number(upcoming_queue_size));
   stream.writeTextElement("UpcomingFrameQueueType", QString::number(upcoming_queue_type));
   stream.writeTextElement("Loop", QString::number(loop));
+  stream.writeTextElement("KeepPlayheadCentered", QString::number(keep_playhead_centered));
   stream.writeTextElement("SeekAlsoSelects", QString::number(seek_also_selects));
   stream.writeTextElement("AutoSeekToBeginning", QString::number(auto_seek_to_beginning));
   stream.writeTextElement("CSSPath", css_path);
@@ -264,6 +271,8 @@ void Config::save(QString path) {
   stream.writeTextElement("DefaultSequenceAudioLayout", QString::number(default_sequence_audio_channel_layout));
   stream.writeTextElement("LockedPanels", QString::number(locked_panels));
   stream.writeTextElement("ShowWelcomeDialog", QString::number(show_welcome_dialog));
+  stream.writeTextElement("ReopenRecentProject", QString::number(reopen_recent_project));
+  stream.writeTextElement("MiddleClickEdgeScroll", QString::number(middle_click_edge_scroll));
   stream.writeTextElement("FrameSkipStep", QString::number(frame_skip_step));
   stream.writeTextElement("ShowGuides", QString::number(show_guides));
   stream.writeTextElement("SnapToOutgoingClip", QString::number(snap_to_outgoing_clip));
@@ -276,6 +285,9 @@ void Config::save(QString path) {
   stream.writeTextElement("AutorecoveryMax", QString::number(autorecovery_max));
   stream.writeTextElement("StickyKeyframeType", QString::number(sticky_keyframe_type));
   stream.writeTextElement("DefaultKeyframeType", QString::number(default_keyframe_type));
+  stream.writeTextElement("SnapAnimation", QString::number(snap_animation));
+  stream.writeTextElement("ClipOutlineOnMoveOnly", QString::number(clip_outline_on_move_only));
+  stream.writeTextElement("DragShowClipContent", QString::number(drag_show_clip_content));
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc

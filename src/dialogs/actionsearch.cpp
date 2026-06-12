@@ -24,6 +24,8 @@
 #include <QKeyEvent>
 #include <QMenuBar>
 #include <QLabel>
+#include <QSettings>
+#include <algorithm>
 
 #include "ui/mainwindow.h"
 
@@ -81,80 +83,76 @@ ActionSearch::ActionSearch(QWidget *parent) :
   // Instantly focus on the entry field to allow for fully keyboard operation (if this popup was initiated by keyboard
   // shortcut for example).
   entry_field->setFocus();
+
+  search_update("");
 }
 
 void ActionSearch::search_update(const QString &s, const QString &p, QMenu *parent) {
+  Q_UNUSED(p);
+  Q_UNUSED(parent);
 
-  // This function is recursive, using the `parent` parameter to loop through a menu's items. It functions in two
-  // modes - the parent being NULL, meaning it'll get MainWindow's menubar and loop over its menus, and the parent
-  // referring to a menu at which point it'll loop over its actions (and call itself recursively if it finds any
-  // submenus).
+  list_widget->clear();
 
-  if (parent == nullptr) {
-
-    // If parent is NULL, we'll pull from the MainWindow's menubar and call this recursively on all of its submenus
-    // (and their submenus).
-
-    // We'll clear all the current items in the list since if we're here, we're just starting.
-    list_widget->clear();
-
-    QList<QAction*> menus = amber::MainWindow->menuBar()->actions();
-
-    // Loop through all menus from the menubar and run this function on each one.
-    for (auto i : menus) {
-      QMenu* menu = i->menu();
-
-      search_update(s, p, menu);
+  QList<SearchResultAction> results;
+  QList<QAction*> menus = amber::MainWindow->menuBar()->actions();
+  for (auto i : menus) {
+    QMenu* menu = i->menu();
+    if (menu != nullptr) {
+      collect_actions(s, "", menu, results);
     }
+  }
 
-    // Once we're here, all the recursion/item retrieval is complete. We auto-select the first item for better
-    // keyboard-exclusive functionality.
-    if (list_widget->count() > 0) {
-      list_widget->item(0)->setSelected(true);
-    }
+  // Sort the collected actions by usage_count (descending)
+  std::stable_sort(results.begin(), results.end(), [](const SearchResultAction &a, const SearchResultAction &b) {
+    return a.usage_count > b.usage_count;
+  });
 
-  } else {
+  // Populate the list_widget with sorted results
+  for (const auto& res : results) {
+    QListWidgetItem* item = new QListWidgetItem(QString("%1\n(%2)").arg(res.comp, res.menu_text), list_widget);
+    item->setData(Qt::UserRole+1, reinterpret_cast<quintptr>(res.action));
+    list_widget->addItem(item);
+  }
 
-    // Parent was not NULL, so we loop over the actions in the menu we were given in `parent`.
+  if (list_widget->count() > 0) {
+    list_widget->item(0)->setSelected(true);
+  }
+}
 
-    // The list shows a '>' delimited hierarchy of the menus in which this action came from. We construct it here by
-    // adding the current menu's text to the existing hierarchy (passed in `p`).
-    QString menu_text;
-    if (!p.isEmpty()) menu_text += p + " > ";
-    menu_text += parent->title().replace("&", ""); // Strip out any &s used in menu action names
+void ActionSearch::collect_actions(const QString &s, const QString &p, QMenu *parent, QList<SearchResultAction> &results) {
+  if (parent == nullptr) return;
 
-    // Loop over the menu's actions
-    QList<QAction*> actions = parent->actions();
-    for (auto a : actions) {
+  QString menu_text;
+  if (!p.isEmpty()) menu_text += p + " > ";
+  menu_text += parent->title().replace("&", "");
 
-      // Ignore separator actions
-      if (!a->isSeparator()) {
-
-        if (a->menu() != nullptr) {
-
-          // If the action is a menu, run this function recursively on it
-          search_update(s, menu_text, a->menu());
-
-        } else {
-
-          // This is a valid non-separator non-menu action, so check it against the currently entered string.
-
-          // Strip out all &s from the action's name
-          QString comp = a->text().replace("&", "");
-
-          // See if the action's name contains any of the currently entered string
-          if (comp.contains(s, Qt::CaseInsensitive)) {
-
-            // If so, we add it to the list widget.
-            QListWidgetItem* item = new QListWidgetItem(QString("%1\n(%2)").arg(comp, menu_text), list_widget);
-
-            // Add a pointer to the original QAction in the item's data
-            item->setData(Qt::UserRole+1, reinterpret_cast<quintptr>(a));
-
-            list_widget->addItem(item);
-
+  QList<QAction*> actions = parent->actions();
+  for (auto a : actions) {
+    if (!a->isSeparator()) {
+      if (a->menu() != nullptr) {
+        collect_actions(s, menu_text, a->menu(), results);
+      } else {
+        QString comp = a->text().replace("&", "");
+        if (s.isEmpty() || comp.contains(s, Qt::CaseInsensitive)) {
+          // Retrieve usage count from QSettings
+          QString action_id = a->property("id").toString();
+          if (action_id.isEmpty()) {
+            action_id = a->text();
+          }
+          int usage_count = 0;
+          if (!action_id.isEmpty()) {
+            QSettings settings;
+            settings.beginGroup("action_search_usage");
+            usage_count = settings.value(action_id, 0).toInt();
+            settings.endGroup();
           }
 
+          SearchResultAction res;
+          res.action = a;
+          res.comp = comp;
+          res.menu_text = menu_text;
+          res.usage_count = usage_count;
+          results.append(res);
         }
       }
     }
@@ -171,6 +169,19 @@ void ActionSearch::perform_action() {
 
     // Get QAction pointer from item's data
     QAction* a = reinterpret_cast<QAction*>(item->data(Qt::UserRole+1).value<quintptr>());
+
+    // Save usage count to QSettings
+    QString action_id = a->property("id").toString();
+    if (action_id.isEmpty()) {
+      action_id = a->text();
+    }
+    if (!action_id.isEmpty()) {
+      QSettings settings;
+      settings.beginGroup("action_search_usage");
+      int count = settings.value(action_id, 0).toInt();
+      settings.setValue(action_id, count + 1);
+      settings.endGroup();
+    }
 
     a->trigger();
 

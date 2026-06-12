@@ -224,6 +224,10 @@ void EffectUI::AddAdditionalEffect(Effect* e) {
 
 Effect* EffectUI::GetEffect() { return effect_; }
 
+void EffectUI::SetLabelColumnWidth(int width) {
+  layout_->setColumnMinimumWidth(0, width);
+}
+
 int EffectUI::GetRowY(int row, QWidget* mapToWidget) {
   // Currently to get a Y value in the context of `mapToWidget`, we use `panel_effect_controls` as the base. Mapping
   // to global doesn't work for some reason, so this is the best reference point we have.

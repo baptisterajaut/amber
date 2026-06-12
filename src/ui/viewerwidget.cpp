@@ -1,4 +1,4 @@
-﻿/***
+/***
 
     Olive - Non-Linear Video Editor
     Copyright (C) 2019  Olive Team
@@ -701,7 +701,7 @@ void ViewerWidget::draw_waveform_func(QPainter& p) {
   p.drawLine(playhead_x, 0, playhead_x, height());
 }
 
-void ViewerWidget::draw_title_safe_area(QPainter& p) {
+void ViewerWidget::draw_title_safe_area(QCanvasPainter& p) {
   int w = width();
   int h = height();
 
@@ -751,7 +751,7 @@ void ViewerWidget::draw_title_safe_area(QPainter& p) {
   p.drawLine(QPointF(cx, cy - cross), QPointF(cx, cy + cross));
 }
 
-void ViewerWidget::draw_guides(QPainter& p) {
+void ViewerWidget::draw_guides(QCanvasPainter& p) {
   if (viewer->seq == nullptr || !amber::CurrentConfig.show_guides) return;
 
   // Compute image→widget coordinate transform
@@ -802,7 +802,7 @@ void ViewerWidget::draw_guides(QPainter& p) {
   }
 }
 
-void ViewerWidget::draw_gizmos(QPainter& p) {
+void ViewerWidget::draw_gizmos(QCanvasPainter& p) {
   double dot_size_px = GIZMO_DOT_SIZE;
   double target_size_px = GIZMO_TARGET_SIZE;
 
@@ -1157,10 +1157,11 @@ ViewerOverlay::ViewerOverlay(ViewerWidget* vw, QWidget* parent) : QWidget(parent
 }
 
 void ViewerOverlay::paintEvent(QPaintEvent*) {
-  QPainter p(this);
   if (vw_->waveform) {
+    QPainter p(this);
     vw_->draw_waveform_func(p);
   } else if (vw_->viewer->seq != nullptr) {
+    QCanvasPainter p(this);
     if (amber::CurrentConfig.show_title_safe_area) {
       vw_->draw_title_safe_area(p);
     }

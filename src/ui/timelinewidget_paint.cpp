@@ -21,6 +21,8 @@
 #include "timelinewidget.h"
 
 #include <QPainter>
+#include <QPainterPath>
+#include <QSet>
 
 #include "global/config.h"
 #include "panels/panels.h"
@@ -33,6 +35,22 @@
 #define TRANSITION_BETWEEN_RANGE 40
 
 bool current_tool_shows_cursor();
+
+static bool g_playhead_snap_flash_active = false;
+
+bool timeline_playhead_snap_flash() { return g_playhead_snap_flash_active; }
+
+void trigger_timeline_playhead_snap_flash() {
+  static bool clear_scheduled = false;
+  g_playhead_snap_flash_active = true;
+  if (!clear_scheduled) {
+    clear_scheduled = true;
+    QTimer::singleShot(0, []() {
+      g_playhead_snap_flash_active = false;
+      clear_scheduled = false;
+    });
+  }
+}
 
 // Returns the waveform amplitude range [min, max] (as qint8 scaled values) for a
 // pixel column spanning [offset_range_min, offset_range_max] in the preview buffer.
@@ -107,6 +125,42 @@ void draw_waveform(ClipPtr clip, const FootageStream* ms, long media_length, QPa
   }
 }
 
+static void drawCrossDissolveIcon(QPainter& p, const QRect& rect) {
+  const int side = qMin(rect.width(), rect.height()) - amber::timeline::kClipTextPadding * 2;
+  if (side < 8) return;
+
+  QRect icon_rect(0, 0, side, side);
+  icon_rect.moveCenter(rect.center());
+
+  auto draw_icon = [&](const QPoint& offset, const QColor& color) {
+    QRect r = icon_rect.translated(offset);
+    QPainterPath left;
+    left.moveTo(r.left(), r.top());
+    left.lineTo(r.center().x(), r.center().y());
+    left.lineTo(r.left(), r.bottom());
+    left.closeSubpath();
+
+    QPainterPath right;
+    right.moveTo(r.right(), r.top());
+    right.lineTo(r.center().x(), r.center().y());
+    right.lineTo(r.right(), r.bottom());
+    right.closeSubpath();
+
+    p.setPen(QPen(color, 1.4));
+    p.setBrush(QColor(color.red(), color.green(), color.blue(), qMin(80, color.alpha())));
+    p.drawPath(left);
+    p.drawPath(right);
+    p.drawLine(r.topLeft(), r.bottomRight());
+    p.drawLine(r.topRight(), r.bottomLeft());
+  };
+
+  p.save();
+  p.setRenderHint(QPainter::Antialiasing, true);
+  draw_icon(QPoint(2, 2), QColor(0, 0, 0, 150));
+  draw_icon(QPoint(0, 0), QColor(255, 255, 255, 230));
+  p.restore();
+}
+
 void draw_transition(QPainter& p, ClipPtr c, const QRect& clip_rect, QRect& text_rect, int transition_type) {
   if (!c) {
     qWarning() << "draw_transition: c is null";
@@ -153,7 +207,9 @@ void draw_transition(QPainter& p, ClipPtr c, const QRect& clip_rect, QRect& text
         }
       }
 
-      if (draw_text) {
+      if (draw_text && t->meta != nullptr && t->meta->internal == TRANSITION_INTERNAL_CROSSDISSOLVE) {
+        drawCrossDissolveIcon(p, transition_text_rect);
+      } else if (draw_text && t->meta != nullptr) {
         p.setPen(Qt::white);
         p.drawText(transition_text_rect, 0, t->meta->name, &transition_text_rect);
       }
@@ -170,7 +226,48 @@ static void drawClipBackground(QPainter& p, ClipPtr clip, const QRect& clip_rect
   if (actual.right() > widget_width) actual.setRight(widget_width);
   if (actual.y() < 0) actual.setY(0);
   if (actual.bottom() > widget_height) actual.setBottom(widget_height);
-  p.fillRect(actual, clip->enabled() ? clip->display_color() : QColor(96, 96, 96));
+
+  QColor base_color;
+  if (!clip->enabled()) {
+    base_color = QColor(96, 96, 96);
+  } else {
+    // Check if it is a video clip with audio linked to it, or vice versa
+    bool is_video = clip->track() < 0;
+    bool is_linked_av = false;
+
+    if (clip->sequence && !clip->linked.isEmpty()) {
+      for (int idx : clip->linked) {
+        if (idx >= 0 && idx < clip->sequence->clips.size()) {
+          ClipPtr other = clip->sequence->clips.at(idx);
+          if (other) {
+            bool other_is_video = other->track() < 0;
+            if (is_video != other_is_video) {
+              is_linked_av = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (is_linked_av) {
+      if (is_video) {
+        base_color = QColor(120, 175, 230); // light blue tint
+      } else {
+        base_color = QColor(100, 185, 120); // leaf green tint
+      }
+    } else {
+      base_color = clip->display_color();
+    }
+  }
+
+  // Draw subtle gradient generated programmatically based off clip color (high performance)
+  QLinearGradient gradient(actual.topLeft(), actual.bottomLeft());
+  gradient.setColorAt(0.0, base_color.lighter(105));
+  gradient.setColorAt(1.0, base_color.darker(110));
+  p.setBrush(gradient);
+  p.setPen(Qt::NoPen);
+  p.drawRoundedRect(actual, 2.0, 2.0);
 }
 
 // Draws the top-left and top-right media-end indicator triangles for footage clips.
@@ -320,7 +417,9 @@ static void drawFootageContent(QPainter& p, ClipPtr clip, const QRect& clip_rect
       }
     } else if (clip_rect.height() > amber::timeline::kTrackMinHeight) {
       // audio track: draw waveform
-      p.setPen(QColor(80, 80, 80));
+      QColor waveform_color = clip->display_color().lighter(180);
+      waveform_color.setAlpha(153);
+      p.setPen(waveform_color);
       int waveform_start = -qMin(clip_rect.x(), 0);
       long waveform_length = 0;
       int waveform_limit = computeAudioWaveformBounds(clip, ms, media_length, clip_rect, widget_width,
@@ -338,6 +437,11 @@ static void drawFootageContent(QPainter& p, ClipPtr clip, const QRect& clip_rect
 static void drawClipMarkers(QPainter& p, ClipPtr clip, const QRect& clip_rect) {
   for (int j = 0; j < clip->get_markers().size(); j++) {
     const Marker& m = clip->get_markers().at(j);
+    if (panel_timeline != nullptr && !panel_timeline->search_query.isEmpty()) {
+      if (!m.name.contains(panel_timeline->search_query, Qt::CaseInsensitive)) {
+        continue;
+      }
+    }
     long marker_time = m.frame + clip->timeline_in() - clip->clip_in();
     int marker_x = panel_timeline->getTimelineScreenPointFromFrame(marker_time);
     if (marker_x > clip_rect.x() && marker_x < clip_rect.right()) {
@@ -350,17 +454,18 @@ static void drawClipMarkers(QPainter& p, ClipPtr clip, const QRect& clip_rect) {
 static void drawClipLabel(QPainter& p, ClipPtr clip, const QRect& clip_rect, QRect& text_rect) {
   if (text_rect.width() <= MAX_TEXT_WIDTH || text_rect.right() <= 0 || text_rect.left() >= p.device()->width()) return;
 
+  QFont original_font = p.font();
+  QFont smaller_font = original_font;
+  smaller_font.setPointSize(original_font.pointSize() - 1);
+  p.setFont(smaller_font);
+
   if (!clip->enabled()) {
     p.setPen(Qt::gray);
   } else if (clip->color().lightness() > 160) {
     p.setPen(Qt::black);
   }
 
-  if (clip->linked.size() > 0) {
-    int underline_y = amber::timeline::kClipTextPadding + p.fontMetrics().height() + clip_rect.top();
-    int underline_width = qMin(text_rect.width() - 1, p.fontMetrics().horizontalAdvance(clip->name()));
-    p.drawLine(text_rect.x(), underline_y, text_rect.x() + underline_width, underline_y);
-  }
+  QColor text_color = p.pen().color();
 
   QString name = clip->name();
   if (qFuzzyIsNull(clip->speed().value)) {
@@ -370,23 +475,61 @@ static void drawClipLabel(QPainter& p, ClipPtr clip, const QRect& clip_rect, QRe
     if (clip->reversed()) name += "-";
     name += QString::number(clip->speed().value * 100) + "%)";
   }
+
+  // Append duration when the clip is wide enough to show it legibly.
+  // Use the same frame_to_timecode() formatter as the tooltip / ruler so the
+  // displayed format respects the user's timecode preference.
+  if (amber::ActiveSequence != nullptr) {
+    const QString duration_str =
+        QStringLiteral(" (%1)").arg(frame_to_timecode(clip->length(), amber::CurrentConfig.timecode_view,
+                                                      amber::ActiveSequence->frame_rate));
+    const QFontMetrics fm(p.font());
+    const int full_width = fm.horizontalAdvance(name + duration_str);
+    if (full_width <= text_rect.width()) {
+      name += duration_str;
+    }
+  }
+
+  // Draw drop shadow: dark semi-transparent color, offset by (1, 1)
+  p.setPen(QColor(0, 0, 0, 160));
+  p.drawText(text_rect.translated(1, 1), 0, name);
+
+  // Draw main text
+  p.setPen(text_color);
   p.drawText(text_rect, 0, name, &text_rect);
+
+  p.setFont(original_font);
 }
 
 // Draws the white top-left bevel and dark bottom-right bevel of a clip.
-static void drawClipBevels(QPainter& p, const QRect& clip_rect, int widget_width, int widget_height) {
-  p.setPen(Qt::white);
-  if (clip_rect.x() >= 0 && clip_rect.x() < widget_width) p.drawLine(clip_rect.bottomLeft(), clip_rect.topLeft());
-  if (clip_rect.y() >= 0 && clip_rect.y() < widget_height)
-    p.drawLine(QPoint(qMax(0, clip_rect.left()), clip_rect.top()),
-               QPoint(qMin(widget_width, clip_rect.right()), clip_rect.top()));
+static void drawClipBevels(QPainter& p, const QRect& clip_rect, int widget_width, int widget_height,
+                           bool is_being_moved) {
+  // If outline-on-move-only is enabled, skip drawing when not moving
+  if (amber::CurrentConfig.clip_outline_on_move_only && !is_being_moved) return;
 
-  p.setPen(QColor(0, 0, 0, 128));
-  if (clip_rect.right() >= 0 && clip_rect.right() < widget_width)
-    p.drawLine(clip_rect.bottomRight(), clip_rect.topRight());
-  if (clip_rect.bottom() >= 0 && clip_rect.bottom() < widget_height)
-    p.drawLine(QPoint(qMax(0, clip_rect.left()), clip_rect.bottom()),
-               QPoint(qMin(widget_width, clip_rect.right()), clip_rect.bottom()));
+  QRect actual = clip_rect;
+  if (actual.x() < 0) actual.setX(0);
+  if (actual.right() > widget_width) actual.setRight(widget_width);
+  if (actual.y() < 0) actual.setY(0);
+  if (actual.bottom() > widget_height) actual.setBottom(widget_height);
+
+  p.setBrush(Qt::NoBrush);
+  p.setPen(QPen(QColor(255, 255, 255, 40), 1));
+  p.drawRoundedRect(actual, 2.0, 2.0);
+}
+
+static void drawClipOverlay(QPainter& p, const QRect& clip_rect, int widget_width, int widget_height,
+                            const QColor& fill_color, const QColor& border_color, int border_alpha = 255) {
+  QRect actual = clip_rect;
+  if (actual.x() < 0) actual.setX(0);
+  if (actual.right() > widget_width) actual.setRight(widget_width);
+  if (actual.y() < 0) actual.setY(0);
+  if (actual.bottom() > widget_height) actual.setBottom(widget_height);
+
+  p.fillRect(actual, fill_color);
+  p.setBrush(Qt::NoBrush);
+  p.setPen(QPen(QColor(border_color.red(), border_color.green(), border_color.blue(), border_alpha), 1));
+  p.drawRoundedRect(actual, 2.0, 2.0);
 }
 
 // Draws the transition-tool hover overlay for this clip index.
@@ -421,9 +564,25 @@ static void drawTransitionToolOverlay(QPainter& p, const QRect& clip_rect, int c
 }
 
 void TimelineWidget::drawClips(QPainter& p) {
+  // Build set of clip indices that are currently in a ghost (being moved)
+  QSet<int> moving_clip_indices;
+  if (panel_timeline->moving_proc) {
+    for (const Ghost& g : panel_timeline->ghosts) {
+      if (g.clip >= 0) moving_clip_indices.insert(g.clip);
+    }
+  }
+  const bool any_moving         = !moving_clip_indices.isEmpty();
+  const bool show_clip_content  = amber::CurrentConfig.drag_show_clip_content;
+
   for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     ClipPtr clip = amber::ActiveSequence->clips.at(i);
     if (clip == nullptr || !is_track_visible(clip->track())) continue;
+
+    // When "Show Clip Content While Dragging" is on, a moving clip is drawn
+    // exclusively at its ghost (new) position by drawGhosts(). Skip rendering
+    // it here at the old position so there is no ghost body / outline left behind.
+    const bool this_clip_moving = moving_clip_indices.contains(i);
+    if (show_clip_content && this_clip_moving) continue;
 
     QRect clip_rect(
         panel_timeline->getTimelineScreenPointFromFrame(clip->timeline_in()), getScreenPointFromTrack(clip->track()),
@@ -438,6 +597,25 @@ void TimelineWidget::drawClips(QPainter& p) {
                     clip_rect.width() - amber::timeline::kClipTextPadding - 1,
                     clip_rect.height() - amber::timeline::kClipTextPadding - 1);
 
+    bool matches = true;
+    if (panel_timeline != nullptr && !panel_timeline->search_query.isEmpty()) {
+      matches = clip->name().contains(panel_timeline->search_query, Qt::CaseInsensitive);
+      if (!matches) {
+        for (const Marker& m : clip->get_markers()) {
+          if (m.name.contains(panel_timeline->search_query, Qt::CaseInsensitive)) {
+            matches = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!matches) {
+      p.setOpacity(0.25);
+    } else {
+      p.setOpacity(1.0);
+    }
+
     drawClipBackground(p, clip, clip_rect, width(), height());
 
     if (clip->media() != nullptr && clip->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
@@ -451,16 +629,28 @@ void TimelineWidget::drawClips(QPainter& p) {
     draw_transition(p, clip, clip_rect, text_rect, kTransitionOpening);
     draw_transition(p, clip, clip_rect, text_rect, kTransitionClosing);
 
-    drawClipBevels(p, clip_rect, width(), height());
+    drawClipBevels(p, clip_rect, width(), height(), any_moving ? this_clip_moving : false);
 
     p.setPen(Qt::white);
     drawClipLabel(p, clip, clip_rect, text_rect);
 
+    if (track_headers != nullptr) {
+      if (track_headers->muted_tracks.contains(clip->track())) {
+        p.fillRect(clip_rect, QColor(0, 0, 0, 110));
+      }
+      if (track_headers->locked_tracks.contains(clip->track())) {
+        p.fillRect(clip_rect, QColor(200, 50, 50, 35));
+      }
+    }
+
     if (panel_timeline->tool == TIMELINE_TOOL_TRANSITION) {
       drawTransitionToolOverlay(p, clip_rect, i, width());
     }
+
+    p.setOpacity(1.0);
   }
 }
+
 
 void TimelineWidget::drawRecordingClip(QPainter& p) {
   if (panel_sequence_viewer->is_recording_cued() && is_track_visible(panel_sequence_viewer->recording_track)) {
@@ -520,12 +710,11 @@ void TimelineWidget::drawTrackLines(QPainter& p, int video_track_limit, int audi
 void TimelineWidget::drawSelections(QPainter& p) {
   for (const auto& s : amber::ActiveSequence->selections) {
     if (is_track_visible(s.track)) {
-      int selection_y = getScreenPointFromTrack(s.track);
-      int selection_x = panel_timeline->getTimelineScreenPointFromFrame(s.in);
-      p.setPen(Qt::NoPen);
-      p.setBrush(Qt::NoBrush);
-      p.fillRect(selection_x, selection_y, panel_timeline->getTimelineScreenPointFromFrame(s.out) - selection_x,
-                 panel_timeline->GetTrackHeight(s.track), QColor(0, 0, 0, 64));
+      QRect selection_rect(panel_timeline->getTimelineScreenPointFromFrame(s.in), getScreenPointFromTrack(s.track),
+                           panel_timeline->getTimelineScreenPointFromFrame(s.out) -
+                               panel_timeline->getTimelineScreenPointFromFrame(s.in),
+                           panel_timeline->GetTrackHeight(s.track));
+      drawClipOverlay(p, selection_rect, width(), height(), QColor(0, 0, 0, 64), QColor(255, 255, 255), 40);
     }
   }
 
@@ -538,25 +727,136 @@ void TimelineWidget::drawSelections(QPainter& p) {
 
 void TimelineWidget::drawGhosts(QPainter& p) {
   if (!panel_timeline->ghosts.isEmpty()) {
+    const int ghost_count = panel_timeline->ghosts.size();
+
+    // Initialize/resize the display lerp state vectors when ghosts first appear
+    // or when the count changes (e.g. new drag started).
+    if (ghost_display_x_.size() != ghost_count) {
+      ghost_display_x_.resize(ghost_count);
+      ghost_display_y_.resize(ghost_count);
+      ghost_display_out_x_.resize(ghost_count);
+      ghost_target_frame_.resize(ghost_count);
+      ghost_target_track_.resize(ghost_count);
+      for (int i = 0; i < ghost_count; i++) {
+        const Ghost& g = panel_timeline->ghosts.at(i);
+        ghost_display_x_[i]     = panel_timeline->getTimelineScreenPointFromFrame(g.in);
+        ghost_display_y_[i]     = getScreenPointFromTrack(g.track);
+        ghost_display_out_x_[i] = panel_timeline->getTimelineScreenPointFromFrame(g.out);
+        ghost_target_frame_[i]  = g.in;
+        ghost_target_track_[i]  = g.track;
+      }
+    }
+
+    // Lerp factor: 0.35 gives a snappy-but-smooth feel (settles in ~8 frames)
+    const double kLerpFactor = 0.35;
+    const bool doAnim         = amber::CurrentConfig.snap_animation;
+    const bool showClipContent = amber::CurrentConfig.drag_show_clip_content;
+
     QVector<int> insert_points;
-    long first_ghost = LONG_MAX;
-    for (int i = 0; i < panel_timeline->ghosts.size(); i++) {
+    long first_ghost   = LONG_MAX;
+    bool needs_repaint = false;
+
+    for (int i = 0; i < ghost_count; i++) {
       const Ghost& g = panel_timeline->ghosts.at(i);
       first_ghost = qMin(first_ghost, g.in);
-      if (is_track_visible(g.track)) {
-        int ghost_x = panel_timeline->getTimelineScreenPointFromFrame(g.in);
-        int ghost_y = getScreenPointFromTrack(g.track);
-        int ghost_width = panel_timeline->getTimelineScreenPointFromFrame(g.out) - ghost_x - 1;
-        int ghost_height = panel_timeline->GetTrackHeight(g.track) - 1;
 
-        insert_points.append(ghost_y + (ghost_height >> 1));
+      if (!is_track_visible(g.track)) continue;
 
+      const double target_x     = panel_timeline->getTimelineScreenPointFromFrame(g.in);
+      const double target_out_x = panel_timeline->getTimelineScreenPointFromFrame(g.out);
+      const double target_y     = getScreenPointFromTrack(g.track);
+
+      const bool track_changed   = ghost_target_track_[i] != g.track;
+      const bool track_animating = qAbs(ghost_display_y_[i] - target_y) > 0.5;
+      const bool should_lerp     = doAnim && (panel_timeline->snapped || track_changed || track_animating);
+
+      if (should_lerp) {
+        double& disp_x     = ghost_display_x_[i];
+        double& disp_y     = ghost_display_y_[i];
+        double& disp_out_x = ghost_display_out_x_[i];
+
+        const double diff_x     = target_x     - disp_x;
+        const double diff_y     = target_y     - disp_y;
+        const double diff_out_x = target_out_x - disp_out_x;
+
+        if (qAbs(diff_x) > 0.5 || qAbs(diff_y) > 0.5 || qAbs(diff_out_x) > 0.5) {
+          disp_x     += diff_x     * kLerpFactor;
+          disp_y     += diff_y     * kLerpFactor;
+          disp_out_x += diff_out_x * kLerpFactor;
+          needs_repaint = true;
+        } else {
+          disp_x     = target_x;
+          disp_y     = target_y;
+          disp_out_x = target_out_x;
+        }
+      } else {
+        ghost_display_x_[i]     = target_x;
+        ghost_display_y_[i]     = target_y;
+        ghost_display_out_x_[i] = target_out_x;
+      }
+      ghost_target_frame_[i] = g.in;
+      ghost_target_track_[i] = g.track;
+
+      const int ghost_x      = qRound(ghost_display_x_[i]);
+      const int ghost_y      = qRound(ghost_display_y_[i]);
+      const int ghost_right  = qRound(ghost_display_out_x_[i]);
+      const int ghost_width  = ghost_right - ghost_x - 1;
+      const int ghost_height = panel_timeline->GetTrackHeight(g.track) - 1;
+
+      insert_points.append(ghost_y + (ghost_height >> 1));
+
+      if (showClipContent && g.clip >= 0 && g.clip < amber::ActiveSequence->clips.size()) {
+        // ---------------------------------------------------------------
+        // Live clip-content mode: paint the real clip body at the lerped
+        // ghost rect, then draw the yellow highlight border on top.
+        // ---------------------------------------------------------------
+        ClipPtr clip = amber::ActiveSequence->clips.at(g.clip);
+        if (clip) {
+          const QRect ghost_rect(ghost_x, ghost_y, ghost_width, ghost_height);
+
+          // Build a text_rect that mirrors what drawClips does.
+          QRect text_rect(ghost_rect.left()   + amber::timeline::kClipTextPadding,
+                          ghost_rect.top()    + amber::timeline::kClipTextPadding,
+                          ghost_rect.width()  - amber::timeline::kClipTextPadding - 1,
+                          ghost_rect.height() - amber::timeline::kClipTextPadding - 1);
+
+          // Clip painting to the ghost rect so content doesn't bleed.
+          p.save();
+          p.setClipRect(ghost_rect);
+
+          drawClipBackground(p, clip, ghost_rect, width(), height());
+
+          if (clip->media() != nullptr && clip->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
+            drawFootageContent(p, clip, ghost_rect, text_rect, width(), height());
+          }
+
+          p.setPen(Qt::white);
+          drawClipLabel(p, clip, ghost_rect, text_rect);
+
+          p.restore();
+        }
+
+        // Yellow highlight border drawn on top of the clip content.
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QColor(255, 255, 0));
+        for (int j = 0; j < amber::timeline::kGhostThickness; j++) {
+          p.drawRect(ghost_x + j, ghost_y + j, ghost_width - j * 2, ghost_height - j * 2);
+        }
+
+      } else {
+        // ---------------------------------------------------------------
+        // Classic outline-only mode (unchanged behaviour).
+        // ---------------------------------------------------------------
+        p.setBrush(Qt::NoBrush);
         p.setPen(QColor(255, 255, 0));
         for (int j = 0; j < amber::timeline::kGhostThickness; j++) {
           p.drawRect(ghost_x + j, ghost_y + j, ghost_width - j - j, ghost_height - j - j);
         }
       }
     }
+
+    // If still animating, schedule another repaint
+    if (needs_repaint) update();
 
     // draw insert indicator
     if (panel_timeline->move_insert && !insert_points.isEmpty()) {
@@ -571,8 +871,16 @@ void TimelineWidget::drawGhosts(QPainter& p) {
         p.drawPolygon(points, 3);
       }
     }
+  } else {
+    // Ghosts cleared — reset lerp state for next drag
+    ghost_display_x_.clear();
+    ghost_display_y_.clear();
+    ghost_display_out_x_.clear();
+    ghost_target_frame_.clear();
+    ghost_target_track_.clear();
   }
 }
+
 
 void TimelineWidget::drawSplittingCursor(QPainter& p) {
   if (panel_timeline->splitting) {
@@ -590,8 +898,9 @@ void TimelineWidget::drawSplittingCursor(QPainter& p) {
 }
 
 void TimelineWidget::drawPlayhead(QPainter& p) {
-  p.setPen(Qt::red);
   int playhead_x = panel_timeline->getTimelineScreenPointFromFrame(amber::ActiveSequence->playhead);
+  const QColor playhead_color = timeline_playhead_snap_flash() ? QColor(255, 215, 0) : QColor(Qt::red);
+  p.setPen(playhead_color);
   p.drawLine(playhead_x, rect().top(), playhead_x, rect().bottom());
 
   // Draw single frame highlight
@@ -599,7 +908,7 @@ void TimelineWidget::drawPlayhead(QPainter& p) {
       panel_timeline->getTimelineScreenPointFromFrame(amber::ActiveSequence->playhead + 1) - playhead_x;
   if (playhead_frame_width > 5) {  // hardcoded for now, maybe better way to do this?
     QRectF singleFrameRect(playhead_x, rect().top(), playhead_frame_width, rect().bottom());
-    p.fillRect(singleFrameRect, QColor(255, 255, 255, 15));
+    p.fillRect(singleFrameRect, timeline_playhead_snap_flash() ? QColor(255, 215, 0, 24) : QColor(255, 255, 255, 15));
   }
 }
 

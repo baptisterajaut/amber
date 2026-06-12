@@ -19,6 +19,7 @@
 ***/
 
 #include "gradienteffect.h"
+#include "engine/clip.h"
 
 #include <QImage>
 #include <QLinearGradient>
@@ -66,6 +67,23 @@ GradientEffect::GradientEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   radius_field->SetMinimum(5);
   radius_field->SetDefault(50);
   radius_field->SetMaximum(150);
+
+  EffectRow* mask_row = new EffectRow(this, tr("As Mask"));
+  mask_bool_field = new BoolField(mask_row, "as_mask");
+  mask_bool_field->SetColumnSpan(2);
+  mask_bool_field->SetValueAt(0, false);
+
+  EffectRow* ignore_shadow_row = new EffectRow(this, tr("Ignore Text Shadow"));
+  ignore_shadow_field = new BoolField(ignore_shadow_row, "ignore_shadow");
+  ignore_shadow_field->SetColumnSpan(2);
+  ignore_shadow_field->SetValueAt(0, false);
+  ignore_shadow_field->SetEnabled(false);
+
+  connect(mask_bool_field, &BoolField::Toggled, this, &GradientEffect::mask_toggled);
+}
+
+void GradientEffect::mask_toggled(bool e) {
+  ignore_shadow_field->SetEnabled(e);
 }
 
 void GradientEffect::redraw(double timecode) {
@@ -97,5 +115,35 @@ void GradientEffect::redraw(double timecode) {
     g.setColorAt(0.0, c0);
     g.setColorAt(1.0, c1);
     p.fillRect(0, 0, w, h, g);
+  }
+  p.end();
+
+  // If As Mask is enabled, mask with the previous text effect's alpha
+  if (mask_bool_field->GetBoolAt(timecode)) {
+    Effect* text_effect = nullptr;
+    for (const EffectPtr& eff : parent_clip->effects) {
+      if (eff.get() == this) break;
+      if (eff->meta->internal == EFFECT_INTERNAL_TEXT || eff->meta->internal == EFFECT_INTERNAL_RICHTEXT) {
+        text_effect = eff.get();
+      }
+    }
+
+    if (text_effect != nullptr) {
+      bool ignore_shadow = ignore_shadow_field->GetBoolAt(timecode);
+      if (ignore_shadow) {
+        text_effect->force_disable_shadow_rendering = true;
+        text_effect->TriggerRedraw(timecode);
+      }
+
+      QPainter mask_p(&img);
+      mask_p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+      mask_p.drawImage(0, 0, text_effect->GetImage());
+      mask_p.end();
+
+      if (ignore_shadow) {
+        text_effect->force_disable_shadow_rendering = false;
+        text_effect->TriggerRedraw(timecode);
+      }
+    }
   }
 }

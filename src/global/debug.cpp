@@ -64,23 +64,23 @@ void debug_message_handler(QtMsgType type, const QMessageLogContext &context, co
   switch (type) {
   case QtDebugMsg:
     msgTag = "DEBUG";
-    fontColor = "grey";
+    fontColor = "#9e9e9e";
     break;
   case QtInfoMsg:
     msgTag = "INFO";
-    fontColor = "blue";
+    fontColor = "#64b5f6";
     break;
   case QtWarningMsg:
     msgTag = "WARNING";
-    fontColor = "yellow";
+    fontColor = "#ffd54f";
     break;
   case QtCriticalMsg:
     msgTag = "ERROR";
-    fontColor = "red";
+    fontColor = "#ff6b6b";
     break;
   case QtFatalMsg:
     msgTag = "FATAL";
-    fontColor = "red";
+    fontColor = "#ff4d4d";
     break;
   default:
     fprintf(stderr, "Unknown debug msg type");

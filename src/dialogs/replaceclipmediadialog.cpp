@@ -23,6 +23,7 @@
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QHeaderView>
 #include <QMessageBox>
 
 #include "panels/panels.h"
@@ -43,6 +44,10 @@ ReplaceClipMediaDialog::ReplaceClipMediaDialog(QWidget *parent, Media* old_media
   layout->addWidget(new QLabel(tr("Select which media you want to replace this media's clips with:"), this));
 
   tree = new QTreeView(this);
+  tree->header()->setStretchLastSection(false);
+  tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+  tree->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+  tree->header()->setSectionResizeMode(2, QHeaderView::Interactive);
 
   layout->addWidget(tree);
 

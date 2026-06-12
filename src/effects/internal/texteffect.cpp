@@ -279,7 +279,7 @@ void TextEffect::redraw(double timecode) {
 
   path.translate(position_x->GetDoubleAt(timecode) + padding, position_y->GetDoubleAt(timecode) + padding);
 
-  if (shadow_bool->GetBoolAt(timecode)) DrawShadow(p, path, timecode);
+  if (shadow_bool->GetBoolAt(timecode) && !force_disable_shadow_rendering) DrawShadow(p, path, timecode);
 
   if (outline_bool->GetBoolAt(timecode)) DrawOutline(p, path, timecode);
 

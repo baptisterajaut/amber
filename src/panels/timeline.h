@@ -25,6 +25,7 @@
 #include <QPushButton>
 #include <QTime>
 #include <QVector>
+#include <QLineEdit>
 
 #include "core/selection.h"
 #include "engine/clip.h"
@@ -102,12 +103,15 @@ struct Ghost {
 
 class Timeline : public Panel {
   Q_OBJECT
- public:
-  explicit Timeline(QWidget* parent = nullptr);
+signals:
+  void zoom_changed(double v);
+public:
+  explicit Timeline(QWidget *parent = nullptr);
   ~Timeline() override;
 
   bool focused();
   void multiply_zoom(double m);
+  void set_zoom_value(double v);
   void copy(bool del);
   ClipPtr split_clip(ComboAction* ca, bool transitions, int p, long frame);
   ClipPtr split_clip(ComboAction* ca, bool transitions, int p, long frame, long post_in);
@@ -150,6 +154,14 @@ class Timeline : public Panel {
   void update_effect_controls();
   bool showing_all{false};
   double old_zoom;
+
+  // Search find bar
+  QLineEdit* find_bar{nullptr};
+  QString search_query;
+  void show_find_bar();
+  void filter_timeline(const QString& query);
+  void jump_to_first_match();
+  bool eventFilter(QObject* watched, QEvent* event) override;
 
   int GetTrackHeight(int track);
   void SetTrackHeight(int track, int height);
@@ -220,6 +232,7 @@ class Timeline : public Panel {
 
   TimelineHeader* headers;
   QLabel* breadcrumb_label;
+  QLabel* timeline_placeholder_label;
   AudioMonitor* audio_monitor;
   ResizableScrollBar* horizontalScrollBar;
 
@@ -299,7 +312,6 @@ class Timeline : public Panel {
  private:
   void three_point_edit(bool insert);
   void ChangeTrackHeightUniformly(int diff);
-  void set_zoom_value(double v);
   QVector<QPushButton*> tool_buttons;
   void decheck_tool_buttons(QObject* sender);
   void set_tool(int tool);
@@ -323,7 +335,10 @@ class Timeline : public Panel {
 
   QWidget* timeline_area_widget;
   TimelineWidget* timeline_area;
+  TrackHeaderWidget* track_headers;
   QWidget* editAreas;
+  QWidget* headerContainer;
+  QWidget* scrollBarContainer;
   QScrollBar* verticalScrollbar;
   QPushButton* zoomInButton;
   QPushButton* zoomOutButton;

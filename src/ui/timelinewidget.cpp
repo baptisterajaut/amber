@@ -1,4 +1,4 @@
-﻿/***
+/***
 
     Olive - Non-Linear Video Editor
     Copyright (C) 2019  Olive Team
@@ -36,8 +36,11 @@
 
 #include "dialogs/clippropertiesdialog.h"
 #include "dialogs/newsequencedialog.h"
+#include "dialogs/texteditdialog.h"
 #include "effects/effect.h"
+#include "effects/effectfields.h"
 #include "effects/internal/solideffect.h"
+#include "engine/undo/undo_effect.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
 #include "global/config.h"
@@ -86,6 +89,13 @@ void VerifyTransitionsAfterCreating(ComboAction* ca, Clip* open, Clip* close, lo
 void validate_transitions(Clip* c, int transition_type, long& frame_diff);
 
 bool same_sign(int a, int b) { return (a < 0) == (b < 0); }
+
+static int timeline_refresh_interval_ms(const QWidget* widget) {
+  const QScreen* screen = widget->screen();
+  const double refresh_rate = (screen != nullptr) ? screen->refreshRate() : 0.0;
+  if (refresh_rate <= 0.0) return 16;
+  return qMax(1, qRound(1000.0 / refresh_rate));
+}
 
 static void collect_from_project_panel(QDragEnterEvent* event, QVector<amber::timeline::MediaImportData>& media_list) {
   if (!panel_project->IsProjectWidget(event->source())) return;
@@ -222,7 +232,11 @@ void TimelineWidget::wheelEvent(QWheelEvent* event) {
         zoom_ratio = 1.0 / zoom_ratio;
       }
 
+      const int cursor_x = event->position().toPoint().x();
+      const long frame_at_cursor = panel_timeline->getTimelineFrameFromScreenPoint(cursor_x);
       panel_timeline->multiply_zoom(zoom_ratio);
+      const int new_x = panel_timeline->getTimelineScreenPointFromFrame(frame_at_cursor);
+      panel_timeline->horizontalScrollBar->setValue(panel_timeline->horizontalScrollBar->value() + new_x - cursor_x);
     }
 
   } else {
@@ -243,6 +257,41 @@ void TimelineWidget::wheelEvent(QWheelEvent* event) {
     bar_h->setValue(bar_h->value() + step_h);
     bar_v->setValue(bar_v->value() + step_v);
   }
+}
+
+void TimelineWidget::keyPressEvent(QKeyEvent* event) {
+  if (panel_sequence_viewer != nullptr) {
+    switch (event->key()) {
+      case Qt::Key_Space:
+        panel_sequence_viewer->toggle_play();
+        event->accept();
+        return;
+      case Qt::Key_J:
+        panel_sequence_viewer->decrease_speed();
+        event->accept();
+        return;
+      case Qt::Key_K:
+        panel_sequence_viewer->pause();
+        event->accept();
+        return;
+      case Qt::Key_L:
+        panel_sequence_viewer->increase_speed();
+        event->accept();
+        return;
+      case Qt::Key_Left:
+        panel_sequence_viewer->previous_frame();
+        event->accept();
+        return;
+      case Qt::Key_Right:
+        panel_sequence_viewer->next_frame();
+        event->accept();
+        return;
+      default:
+        break;
+    }
+  }
+
+  QWidget::keyPressEvent(event);
 }
 
 void TimelineWidget::dragLeaveEvent(QDragLeaveEvent* event) {
@@ -425,7 +474,34 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent* event) {
       int clip_index = getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track);
       if (clip_index >= 0) {
         ClipPtr c = amber::ActiveSequence->clips.at(clip_index);
-        if (c != nullptr && c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
+        if (c == nullptr) return;
+
+        for (const EffectPtr& effect : c->effects) {
+          if (effect == nullptr || effect->meta == nullptr ||
+              (effect->meta->internal != EFFECT_INTERNAL_TEXT && effect->meta->internal != EFFECT_INTERNAL_RICHTEXT)) {
+            continue;
+          }
+
+          StringField* text_field = dynamic_cast<StringField*>(effect->FindFieldById(QStringLiteral("text")));
+          if (text_field == nullptr) continue;
+
+          const bool rich_text = text_field->IsRichText();
+          const QString current_text = text_field->GetStringAt(text_field->Now());
+          TextEditDialog dialog(amber::MainWindow, current_text, rich_text);
+          if (dialog.exec() == QDialog::Accepted) {
+            const QString new_text = dialog.get_string();
+            if (new_text != current_text) {
+              auto* change = new KeyframeDataChange(text_field);
+              text_field->SetValueAt(text_field->Now(), new_text);
+              change->SetNewKeyframes();
+              amber::UndoStack.push(change);
+              update_ui(true);
+            }
+          }
+          return;
+        }
+
+        if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
           SequencePtr nested = c->media()->to_sequence();
           long ph = amber::ActiveSequence->playhead;
           if (ph >= c->timeline_in() && ph < c->timeline_out()) {
@@ -675,19 +751,30 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event) {
   int effective_tool = panel_timeline->tool;
 
   if (event->button() == Qt::MiddleButton) {
-    effective_tool = TIMELINE_TOOL_HAND;
-    panel_timeline->creating = false;
+    if (amber::CurrentConfig.middle_click_edge_scroll) {
+      middle_clicking_edge_scroll_ = true;
+      last_mouse_x_ = event->position().toPoint().x();
+      last_mouse_y_ = event->position().toPoint().y();
+      if (middle_scroll_timer_id_ == -1) {
+        middle_scroll_timer_id_ = startTimer(timeline_refresh_interval_ms(this));
+      }
+      return;
+    } else {
+      effective_tool = TIMELINE_TOOL_HAND;
+      panel_timeline->hand_moving = true;
+      panel_timeline->creating = false;
+    }
   } else if (event->button() == Qt::RightButton) {
     effective_tool = TIMELINE_TOOL_MENU;
     panel_timeline->creating = false;
   }
 
-  mouseMoveEvent(event);
-
   panel_timeline->drag_x_start = event->position().toPoint().x();
   panel_timeline->drag_y_start = event->position().toPoint().y();
   panel_timeline->drag_frame_start = panel_timeline->cursor_frame;
   panel_timeline->drag_track_start = panel_timeline->cursor_track;
+
+  mouseMoveEvent(event);
 
   int hovered_clip = panel_timeline->trim_target == -1
                          ? getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track)
@@ -1074,6 +1161,15 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent* event) {
   QToolTip::hideText();
   if (amber::ActiveSequence == nullptr) return;
 
+  if (event->button() == Qt::MiddleButton && middle_clicking_edge_scroll_) {
+    middle_clicking_edge_scroll_ = false;
+    if (middle_scroll_timer_id_ != -1) {
+      killTimer(middle_scroll_timer_id_);
+      middle_scroll_timer_id_ = -1;
+    }
+    return;
+  }
+
   bool alt = (event->modifiers() & Qt::AltModifier);
   bool shift = (event->modifiers() & Qt::ShiftModifier);
   bool ctrl = (event->modifiers() & Qt::ControlModifier);
@@ -1322,12 +1418,31 @@ void TimelineWidget::mouseMoveMovingInit(QMouseEvent* event) {
 
   if (track_resizing) {
     int diff = event->position().toPoint().y() - panel_timeline->drag_y_start;
-    int new_height = panel_timeline->GetTrackHeight(track_target);
-    new_height = (track_target < 0) ? new_height - diff : new_height + diff;
-    new_height = qMax(new_height, amber::timeline::kTrackMinHeight);
-    panel_timeline->SetTrackHeight(track_target, new_height);
+    if (track_target >= 0) {
+      const int previous_track = (track_target == 0) ? -1 : track_target - 1;
+      const int previous_height = panel_timeline->GetTrackHeight(previous_track);
+      const int target_height = panel_timeline->GetTrackHeight(track_target);
+      int applied_diff = diff;
+
+      if (previous_height + applied_diff < amber::timeline::kTrackMinHeight) {
+        applied_diff = amber::timeline::kTrackMinHeight - previous_height;
+      }
+      if (target_height - applied_diff < amber::timeline::kTrackMinHeight) {
+        applied_diff = target_height - amber::timeline::kTrackMinHeight;
+      }
+
+      panel_timeline->SetTrackHeight(previous_track, previous_height + applied_diff);
+      panel_timeline->SetTrackHeight(track_target, target_height - applied_diff);
+    } else {
+      int new_height = panel_timeline->GetTrackHeight(track_target) - diff;
+      new_height = qMax(new_height, amber::timeline::kTrackMinHeight);
+      panel_timeline->SetTrackHeight(track_target, new_height);
+    }
     panel_timeline->drag_y_start = event->position().toPoint().y();
     update();
+    if (track_headers) {
+      track_headers->update();
+    }
   } else if (panel_timeline->moving_proc) {
     update_ghosts(event->position().toPoint(), event->modifiers() & Qt::ShiftModifier);
   } else {
@@ -1483,15 +1598,25 @@ void TimelineWidget::hoverCheckTrackResize(const QMouseEvent* event, bool cursor
   int test_range = 5;
   int mouse_pos = event->position().toPoint().y();
   int hover_track = getTrackFromScreenPoint(mouse_pos);
-  int track_y_edge = getScreenPointFromTrack(hover_track);
-  if (hover_track >= 0) track_y_edge += panel_timeline->GetTrackHeight(hover_track);
+  int resize_track = hover_track;
+  int track_y_edge = getScreenPointFromTrack(resize_track);
+
+  if (hover_track >= 0) {
+    const int next_track = hover_track + 1;
+    const int next_track_top = getScreenPointFromTrack(next_track);
+    if (qAbs(mouse_pos - next_track_top) < qAbs(mouse_pos - track_y_edge)) {
+      resize_track = next_track;
+      track_y_edge = next_track_top;
+    }
+  }
+
   if (mouse_pos > track_y_edge - test_range && mouse_pos < track_y_edge + test_range) {
     bool in_range =
         cursor_contains_clip || (amber::CurrentConfig.show_track_lines && panel_timeline->cursor_track >= min_track &&
                                  panel_timeline->cursor_track <= max_track);
     if (in_range) {
       track_resizing = true;
-      track_target = hover_track;
+      track_target = resize_track;
       setCursor(Qt::SizeVerCursor);
     }
   }
@@ -1674,12 +1799,18 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent* event) {
   tooltip_timer.stop();
   if (amber::ActiveSequence == nullptr) return;
 
+  if (middle_clicking_edge_scroll_) {
+    last_mouse_x_ = event->position().toPoint().x();
+    last_mouse_y_ = event->position().toPoint().y();
+    return;
+  }
+
   bool alt = (event->modifiers() & Qt::AltModifier);
 
   panel_timeline->cursor_frame = panel_timeline->getTimelineFrameFromScreenPoint(event->position().toPoint().x());
   panel_timeline->cursor_track = getTrackFromScreenPoint(event->position().toPoint().y());
 
-  if (event->buttons() != 0 && panel_timeline->tool != TIMELINE_TOOL_HAND) {
+  if (event->buttons() != 0 && panel_timeline->tool != TIMELINE_TOOL_HAND && !panel_timeline->hand_moving && !(event->buttons() & Qt::MiddleButton)) {
     panel_timeline->scroll_to_frame(panel_timeline->cursor_frame);
   }
 
@@ -1822,4 +1953,213 @@ int TimelineWidget::getClipIndexFromCoords(long frame, int track) {
 void TimelineWidget::setScroll(int s) {
   scroll = s;
   update();
+  if (track_headers) {
+    track_headers->update();
+  }
+}
+
+void TimelineWidget::timerEvent(QTimerEvent* event) {
+  if (event->timerId() == middle_scroll_timer_id_) {
+    if (!middle_clicking_edge_scroll_ || amber::ActiveSequence == nullptr) {
+      killTimer(middle_scroll_timer_id_);
+      middle_scroll_timer_id_ = -1;
+      return;
+    }
+
+    QScrollBar* bar_h = panel_timeline->horizontalScrollBar;
+    QScrollBar* bar_v = scrollBar;
+    if (bar_h == nullptr || bar_v == nullptr) return;
+
+    int mouse_x = last_mouse_x_;
+    int mouse_y = last_mouse_y_;
+
+    // Horizontal edge scrolling
+    if (mouse_x < 25) {
+      int delta = qBound(1, (25 - mouse_x) / 2, 15);
+      bar_h->setValue(qMax(0, bar_h->value() - delta));
+    } else if (mouse_x > width() - 25) {
+      int delta = qBound(1, (mouse_x - (width() - 25)) / 2, 15);
+      bar_h->setValue(qMin(bar_h->maximum(), bar_h->value() + delta));
+    }
+
+    // Vertical edge scrolling
+    if (mouse_y < 25) {
+      int delta = qBound(1, (25 - mouse_y) / 2, 15);
+      bar_v->setValue(qMax(0, bar_v->value() - delta));
+    } else if (mouse_y > height() - 25) {
+      int delta = qBound(1, (mouse_y - (height() - 25)) / 2, 15);
+      bar_v->setValue(qMin(bar_v->maximum(), bar_v->value() + delta));
+    }
+  } else {
+    QWidget::timerEvent(event);
+  }
+}
+
+bool TimelineWidget::eventFilter(QObject* watched, QEvent* event) {
+  if (event->type() == QEvent::DragEnter) {
+    dragEnterEvent(static_cast<QDragEnterEvent*>(event));
+    return event->isAccepted();
+  } else if (event->type() == QEvent::DragMove) {
+    dragMoveEvent(static_cast<QDragMoveEvent*>(event));
+    return event->isAccepted();
+  } else if (event->type() == QEvent::DragLeave) {
+    dragLeaveEvent(static_cast<QDragLeaveEvent*>(event));
+    return event->isAccepted();
+  } else if (event->type() == QEvent::Drop) {
+    dropEvent(static_cast<QDropEvent*>(event));
+    return event->isAccepted();
+  }
+  return QWidget::eventFilter(watched, event);
+}
+
+TrackHeaderWidget::TrackHeaderWidget(QWidget* parent) : QWidget(parent) {
+  setFixedWidth(130);
+}
+
+void TrackHeaderWidget::paintEvent(QPaintEvent* event) {
+  QPainter p(this);
+  p.fillRect(rect(), QColor(35, 35, 35));
+
+  if (amber::ActiveSequence == nullptr || timeline_widget == nullptr) return;
+
+  int video_count = 0, audio_count = 0;
+  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+
+  for (int t = -1; t >= video_count; --t) {
+    int y = timeline_widget->getScreenPointFromTrack(t);
+    int h = panel_timeline->GetTrackHeight(t);
+    drawTrackHeader(p, t, y, h, true);
+  }
+  for (int t = 0; t <= audio_count; ++t) {
+    int y = timeline_widget->getScreenPointFromTrack(t);
+    int h = panel_timeline->GetTrackHeight(t);
+    drawTrackHeader(p, t, y, h, false);
+  }
+}
+
+void TrackHeaderWidget::drawTrackHeader(QPainter& p, int track_idx, int y, int h, bool is_video) {
+  p.save();
+  p.setRenderHint(QPainter::Antialiasing);
+
+  QRect rect(0, y, width(), h);
+  QLinearGradient bgGrad(rect.topLeft(), rect.bottomLeft());
+  bgGrad.setColorAt(0.0, QColor(48, 48, 51));
+  bgGrad.setColorAt(1.0, QColor(40, 40, 42));
+  p.fillRect(rect, bgGrad);
+
+  p.setPen(QPen(QColor(28, 28, 30), 1));
+  p.drawLine(0, y + h - 1, width(), y + h - 1);
+  p.drawLine(width() - 1, y, width() - 1, y + h);
+
+  p.fillRect(QRect(0, y, 4, h - 1), is_video ? QColor(0, 162, 232) : QColor(34, 177, 76));
+
+  QString name = (is_video ? "V" : "A") + QString::number(is_video ? -track_idx : (track_idx + 1));
+  QFont font = p.font();
+  font.setBold(true);
+  font.setPointSize(9);
+  p.setFont(font);
+  p.setPen(QColor(220, 220, 225));
+  p.drawText(QRect(12, y, 35, h), Qt::AlignVCenter | Qt::AlignLeft, name);
+
+  int btn_y = y + (h - 22) / 2;
+  drawButton(p, QRect(48, btn_y, 22, 22), "M", muted_tracks.contains(track_idx), QColor(220, 80, 80));
+  drawButton(p, QRect(75, btn_y, 22, 22), "S", soloed_tracks.contains(track_idx), QColor(80, 220, 80));
+  drawButton(p, QRect(102, btn_y, 22, 22), "L", locked_tracks.contains(track_idx), QColor(220, 180, 80));
+  p.restore();
+}
+
+void TrackHeaderWidget::drawButton(QPainter& p, const QRect& r, const QString& text, bool active, const QColor& active_color) {
+  p.save();
+  p.setRenderHint(QPainter::Antialiasing);
+
+  if (active) {
+    QLinearGradient grad(r.topLeft(), r.bottomLeft());
+    grad.setColorAt(0.0, active_color);
+    grad.setColorAt(1.0, active_color.darker(130));
+    p.setBrush(grad);
+    p.setPen(QPen(active_color.darker(150), 1));
+  } else {
+    QLinearGradient grad(r.topLeft(), r.bottomLeft());
+    grad.setColorAt(0.0, QColor(58, 58, 62));
+    grad.setColorAt(1.0, QColor(42, 42, 45));
+    p.setBrush(grad);
+    p.setPen(QPen(QColor(30, 30, 32), 1));
+  }
+  p.drawRoundedRect(r, 4, 4);
+
+  QFont font = p.font();
+  font.setBold(true);
+  font.setPointSize(8);
+  p.setFont(font);
+
+  p.setPen(active ? Qt::white : QColor(180, 180, 185));
+  p.drawText(r, Qt::AlignCenter, text);
+  p.restore();
+}
+
+void TrackHeaderWidget::mousePressEvent(QMouseEvent* event) {
+  if (amber::ActiveSequence == nullptr) return;
+
+  int video_count = 0, audio_count = 0;
+  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+
+  QPoint pos = event->position().toPoint();
+
+  int clicked_track = 9999;
+  int track_y = 0;
+  int track_h = 0;
+
+  auto check_track = [&](int t) {
+    int y = timeline_widget->getScreenPointFromTrack(t);
+    int h = panel_timeline->GetTrackHeight(t);
+    if (pos.y() >= y && pos.y() < y + h) {
+      clicked_track = t;
+      track_y = y;
+      track_h = h;
+      return true;
+    }
+    return false;
+  };
+
+  for (int t = -1; t >= video_count; --t) {
+    if (check_track(t)) break;
+  }
+  if (clicked_track == 9999) {
+    for (int t = 0; t <= audio_count; ++t) {
+      if (check_track(t)) break;
+    }
+  }
+
+  if (clicked_track != 9999) {
+    int btn_y = track_y + (track_h - 22) / 2;
+    QRect mute_rect(48, btn_y, 22, 22);
+    QRect solo_rect(75, btn_y, 22, 22);
+    QRect lock_rect(102, btn_y, 22, 22);
+
+    if (mute_rect.contains(pos)) {
+      if (muted_tracks.contains(clicked_track)) {
+        muted_tracks.remove(clicked_track);
+      } else {
+        muted_tracks.insert(clicked_track);
+      }
+      update();
+      timeline_widget->update();
+    } else if (solo_rect.contains(pos)) {
+      if (soloed_tracks.contains(clicked_track)) {
+        soloed_tracks.remove(clicked_track);
+      } else {
+        soloed_tracks.insert(clicked_track);
+      }
+      update();
+      timeline_widget->update();
+    } else if (lock_rect.contains(pos)) {
+      if (locked_tracks.contains(clicked_track)) {
+        locked_tracks.remove(clicked_track);
+      } else {
+        locked_tracks.insert(clicked_track);
+      }
+      update();
+      timeline_widget->update();
+    }
+  }
 }

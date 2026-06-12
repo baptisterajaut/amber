@@ -12,8 +12,15 @@ See [ROADMAP.md](ROADMAP.md). 1.x: feature-complete, bug fixes and security patc
 
 ## Build
 
+Build the project (including tests):
 ```bash
 cmake -S src -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
+```
+
+Build the project without compiling unit tests:
+```bash
+cmake -S src -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
 cmake --build build -j$(nproc)
 ```
 

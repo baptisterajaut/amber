@@ -37,6 +37,7 @@
 
 class Menu;
 class Timeline;
+class TrackHeaderWidget;
 
 struct TimelineTrackHeight {
   int index;
@@ -44,6 +45,8 @@ struct TimelineTrackHeight {
 };
 
 bool same_sign(int a, int b);
+bool timeline_playhead_snap_flash();
+void trigger_timeline_playhead_snap_flash();
 void draw_waveform(ClipPtr clip, const FootageStream* ms, long media_length, QPainter* p, const QRect& clip_rect,
                    int waveform_start, int waveform_limit, double zoom);
 
@@ -52,6 +55,11 @@ class TimelineWidget : public QWidget {
  public:
   explicit TimelineWidget(QWidget* parent = nullptr);
   QScrollBar* scrollBar;
+  TrackHeaderWidget* track_headers{nullptr};
+
+  bool eventFilter(QObject* watched, QEvent* event) override;
+  int getScreenPointFromTrack(int track);
+  bool is_track_visible(int track);
 
  public slots:
 
@@ -65,6 +73,7 @@ class TimelineWidget : public QWidget {
   void mouseReleaseEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
   void leaveEvent(QEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
 
   void dragEnterEvent(QDragEnterEvent* event) override;
   void dragLeaveEvent(QDragLeaveEvent* event) override;
@@ -76,9 +85,7 @@ class TimelineWidget : public QWidget {
  private:
   void init_ghosts();
   void update_ghosts(const QPoint& mouse_pos, bool lock_frame);
-  bool is_track_visible(int track);
   int getTrackFromScreenPoint(int y);
-  int getScreenPointFromTrack(int track);
   int getClipIndexFromCoords(long frame, int track);
 
   // total height of all tracks plus the top/bottom drop-zone padding
@@ -162,6 +169,25 @@ class TimelineWidget : public QWidget {
   int scroll;
 
   SetSelectionsCommand* selection_command;
+
+ protected:
+  void timerEvent(QTimerEvent* event) override;
+
+ private:
+  int middle_scroll_timer_id_{-1};
+  bool middle_clicking_edge_scroll_{false};
+  int last_mouse_x_{0};
+  int last_mouse_y_{0};
+
+  // Smooth ghost animation state while dragging clips.
+  QVector<double> ghost_display_x_;
+  QVector<double> ghost_display_y_;
+  // Lerped screen-x of the ghost's right edge (used when drag_show_clip_content
+  // is enabled so the clip width also eases rather than popping).
+  QVector<double> ghost_display_out_x_;
+  QVector<long> ghost_target_frame_;
+  QVector<int> ghost_target_track_;
+
  signals:
 
  public slots:
@@ -174,6 +200,28 @@ class TimelineWidget : public QWidget {
   void tooltip_timer_timeout();
   void open_sequence_properties();
   void show_clip_properties();
+};
+
+#include <QSet>
+
+class TrackHeaderWidget : public QWidget {
+  Q_OBJECT
+ public:
+  explicit TrackHeaderWidget(QWidget* parent = nullptr);
+
+  TimelineWidget* timeline_widget{nullptr};
+
+  QSet<int> muted_tracks;
+  QSet<int> soloed_tracks;
+  QSet<int> locked_tracks;
+
+ protected:
+  void paintEvent(QPaintEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
+
+ private:
+  void drawTrackHeader(QPainter& p, int track_idx, int y, int h, bool is_video);
+  void drawButton(QPainter& p, const QRect& r, const QString& text, bool active, const QColor& active_color);
 };
 
 #endif  // TIMELINEWIDGET_H

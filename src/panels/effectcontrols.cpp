@@ -251,6 +251,11 @@ void EffectControls::Clear(bool clear_cache) {
   headers->setVisible(false);
   keyframeView->setEnabled(false);
 
+  splitter->setVisible(false);
+  if (no_clip_label) {
+    no_clip_label->setVisible(true);
+  }
+
   if (clear_cache) {
     selected_clips_.clear();
   }
@@ -318,6 +323,7 @@ void EffectControls::setup_ui() {
   scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
   scrollArea->setWidgetResizable(true);
+  scrollArea->setMinimumWidth(200);
 
   QWidget* scrollAreaWidgetContents = new QWidget();
 
@@ -474,6 +480,11 @@ void EffectControls::setup_ui() {
 
   hlayout->addWidget(splitter);
 
+  no_clip_label = new QLabel();
+  no_clip_label->setAlignment(Qt::AlignCenter);
+  no_clip_label->setStyleSheet(QLatin1String("color: #888888; font-size: 13px;"));
+  hlayout->addWidget(no_clip_label);
+
   setWidget(contents);
 }
 
@@ -481,11 +492,15 @@ void EffectControls::Retranslate() {
   panel_name = tr("Effects: ");
 
   btnAddVideoEffect->setToolTip(tr("Add Video Effect"));
-  lblVideoEffects->setText(tr("VIDEO EFFECTS"));
+  lblVideoEffects->setText(tr("Video Effects"));
   btnAddVideoTransition->setToolTip(tr("Add Video Transition"));
   btnAddAudioEffect->setToolTip(tr("Add Audio Effect"));
-  lblAudioEffects->setText(tr("AUDIO EFFECTS"));
+  lblAudioEffects->setText(tr("Audio Effects"));
   btnAddAudioTransition->setToolTip(tr("Add Audio Transition"));
+
+  if (no_clip_label) {
+    no_clip_label->setText(tr("No clip selected. Select a clip to see its effects here"));
+  }
 
   UpdateTitle();
 }
@@ -539,7 +554,7 @@ void EffectControls::ClampSplitterSizes() {
   }
 
   if (needs_default) {
-    const int left = qMax(1, (total * 6) / 10);  // 60% to params
+    const int left = qMax(200, (total * 6) / 10);  // 60% to params, at least 200px
     const int right = qMax(kMinRightPane, total - left);
     splitter->setSizes({left, right});
   }
@@ -700,9 +715,18 @@ void EffectControls::Load() {
   keyframeView->SetEffects(open_effects_);
 
   if (!selected_clips_.isEmpty()) {
+    splitter->setVisible(true);
+    if (no_clip_label) {
+      no_clip_label->setVisible(false);
+    }
     keyframeView->setEnabled(true);
     headers->setVisible(true);
     QTimer::singleShot(50, this, &EffectControls::queue_post_update);
+  } else {
+    splitter->setVisible(false);
+    if (no_clip_label) {
+      no_clip_label->setVisible(true);
+    }
   }
 
   if (!graph_editor_row_is_still_active) panel_graph_editor->set_row(nullptr);
@@ -746,6 +770,13 @@ bool EffectControls::is_focused() {
   }
 
   return false;
+}
+
+void EffectControls::fast_repaint() {
+  queue_post_update();
+  if (headers != nullptr) {
+    headers->update();
+  }
 }
 
 EffectsArea::EffectsArea(QWidget* parent) : QWidget(parent) {}
