@@ -128,10 +128,14 @@ void free_panels() {
 }
 
 void scroll_to_frame_internal(QScrollBar* bar, long frame, double zoom, int area_width) {
-  if (bar->value() == bar->minimum() || bar->value() == bar->maximum()) {
-    return;
-  }
-
+// Original code.  Would not move the timeline viewport to the end when pushing the end button.	
+//  if (bar->value() == bar->minimum() || bar->value() == bar->maximum()) {
+//    return;
+//  }
+// If there is no scroll bar return
+	if (bar->maximum() == 0)return;
+	
+//	printf("Val=%d,Min=%d, Max=%d, Frame=%d\n",bar->value() ,bar->minimum() ,bar->maximum(),frame);
   int screen_point = getScreenPointFromFrame(zoom, frame) - bar->value();
   int min_x = area_width * 0.1;
   int max_x = area_width - min_x;

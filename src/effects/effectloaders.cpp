@@ -70,6 +70,15 @@ void load_internal_effects() {
   em.internal = EFFECT_INTERNAL_NOISE;
   effects.append(em);
 
+  em.name = "RNNoise";
+  em.internal = EFFECT_INTERNAL_RNNOISE;
+  effects.append(em);
+  
+  em.name = "BpFilter";
+  em.internal = EFFECT_INTERNAL_BPFILTER;
+  effects.append(em);
+  
+
   em.name = "Fill Left/Right";
   em.internal = EFFECT_INTERNAL_FILLLEFTRIGHT;
   effects.append(em);

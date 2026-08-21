@@ -35,7 +35,7 @@
 bool current_tool_shows_cursor();
 
 void draw_waveform(ClipPtr clip, const FootageStream* ms, long media_length, QPainter *p, const QRect& clip_rect, int waveform_start, int waveform_limit, double zoom) {
-  if (!ms) {
+	if (!ms) {
     qWarning() << "draw_waveform: ms is null";
     return;
   }
@@ -216,7 +216,6 @@ void TimelineWidget::drawClips(QPainter& p) {
 
             // draw thumbnail/waveform
             long media_length = clip->media_length();
-
             if (clip->track() < 0) {
               // draw thumbnail
               int thumb_y = p.fontMetrics().height()+amber::timeline::kClipTextPadding+amber::timeline::kClipTextPadding;
@@ -254,7 +253,8 @@ void TimelineWidget::drawClips(QPainter& p) {
                 draw_checkerboard = true;
                 checkerboard_rect.setLeft(panel_timeline->getTimelineScreenPointFromFrame(clip->media_length() + clip->timeline_in() - clip->clip_in()));
               }
-            } else if (clip_rect.height() > amber::timeline::kTrackMinHeight) {
+// Changed > to >=              
+            } else if (clip_rect.height() >= amber::timeline::kTrackMinHeight) {
               // draw waveform
               p.setPen(QColor(80, 80, 80));
 

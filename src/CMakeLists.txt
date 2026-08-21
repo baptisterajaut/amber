@@ -82,6 +82,32 @@ find_package(FFMPEG 3.4 REQUIRED
   swscale
   swresample
 )
+#Make sure the rnnoise library is installed
+find_library(RNNOISE_LIBRARY
+    NAMES rnnoise
+    HINTS
+        /usr/local/lib
+        /usr/lib
+        /usr/lib/x86_64-linux-gnu
+)
+#message(STATUS "rnnoise library found at: ${RNNOISE_LIBRARY}")
+find_path(RNNOISE_INCLUDE_DIR
+    NAMES rnnoise.h
+    HINTS
+        /usr/local/include
+        /usr/include
+)
+
+if(NOT RNNOISE_LIBRARY OR NOT RNNOISE_INCLUDE_DIR)
+    message(FATAL_ERROR "rnnoise not found — expected library in /usr/local/lib and rnnoise.h in /usr/local/include")
+endif()
+add_library(rnnoise::rnnoise UNKNOWN IMPORTED)
+set_target_properties(rnnoise::rnnoise PROPERTIES
+    IMPORTED_LOCATION "${RNNOISE_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${RNNOISE_INCLUDE_DIR}"
+)
+
+
 
 option(NOFREI0R "Disable Frei0r plugin support" OFF)
 if(NOFREI0R)
@@ -186,6 +212,10 @@ set(OLIVE_SOURCES
   effects/fields/stringfield.h
   effects/internal/audionoiseeffect.cpp
   effects/internal/audionoiseeffect.h
+  effects/internal/audiobpfiltereffect.h
+  effects/internal/audiobpfiltereffect.cpp
+  effects/internal/audiornnoiseeffect.cpp
+  effects/internal/audiornnoiseeffect.h
   effects/internal/common.vert
   effects/internal/cornerpin.frag
   effects/internal/cornerpin.vert
@@ -401,7 +431,7 @@ set(OLIVE_SOURCES
   ui/viewerwidget.cpp
   ui/viewerwidget.h
   ui/viewerwindow.cpp
-  ui/viewerwindow.h
+  ui/viewerwindow.h 
   main.cpp
 )
 
@@ -494,7 +524,6 @@ qt_add_translation(OLIVE_QM_FILES
   ts/amber_zh-CN.ts
   ts/amber_zh-TW.ts
 )
-
 set(OLIVE_TARGET "amber-editor")
 if(APPLE)
   set(OLIVE_TARGET "Amber")
@@ -535,6 +564,7 @@ add_executable(${OLIVE_TARGET}
   ${OLIVE_EFFECTS}
   ${OLIVE_QM_FILES}
 )
+
 
 # Windows GUI subsystem: WIN32_EXECUTABLE only activates when CMake's WIN32 var
 # is TRUE, which it isn't reliably on Fedora's mingw64 toolchain. Add -mwindows
@@ -596,6 +626,7 @@ endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+
 target_link_libraries(${OLIVE_TARGET}
   PRIVATE
   $<$<NOT:$<BOOL:${AMBER_TARGET_WINDOWS}>>:OpenGL::GL>
@@ -608,17 +639,18 @@ target_link_libraries(${OLIVE_TARGET}
   Qt6::OpenGLWidgets
   Qt6::ShaderToolsPrivate
   Qt6::Svg
-  FFMPEG::avutil
+  FFMPEG::avutil                 
   FFMPEG::avcodec
   FFMPEG::avformat
   FFMPEG::avfilter
   FFMPEG::swscale
   FFMPEG::swresample
+  PRIVATE rnnoise::rnnoise  
   $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
 )
 
 if(AMBER_TARGET_WINDOWS AND OPENCOLORIO_FOUND)
-  target_link_libraries(${OLIVE_TARGET} PRIVATE OpenColorIO)
+  target_link_libraries(${OLIVE_TARGET} PRIVATE OpenColorIO)                  
 endif()
 
 if(DOXYGEN_FOUND AND BUILD_DOXYGEN)
