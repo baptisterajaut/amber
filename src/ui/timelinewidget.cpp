@@ -895,7 +895,7 @@ bool TimelineWidget::mouseReleaseCreating(ComboAction* ca, bool shift) {
     c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TONE, EFFECT_TYPE_EFFECT)));
     break;
   case ADD_OBJ_NOISE:
-    c->set_name(tr("Noise"));
+    c->set_name(tr("NoiseCN"));
     c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_NOISE, EFFECT_TYPE_EFFECT)));
     break;
   }
@@ -1770,6 +1770,7 @@ void TimelineWidget::mouseMoveRectSelect(QMouseEvent* event, bool alt) {
     QVector<ClipPtr> selected_clips;
     for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
       ClipPtr clip = amber::ActiveSequence->clips.at(i);
+// Fix for not displaying sound graph in smallest scale >= instead of >      
       if (clip != nullptr && clip->track() >= track_min && clip->track() <= track_max &&
           !(clip->timeline_in() < frame_min && clip->timeline_out() < frame_min) &&
           !(clip->timeline_in() > frame_max && clip->timeline_out() > frame_max)) {
