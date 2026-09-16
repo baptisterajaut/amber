@@ -58,9 +58,9 @@
 #include "global/debug.h"
 #include "ui/menu.h"
 
-int amber::timeline::kTrackDefaultHeight = 40;
-int amber::timeline::kTrackMinHeight = 30;
-int amber::timeline::kTrackHeightIncrement = 10;
+int amber::timeline::kTrackDefaultHeight = 30;
+int amber::timeline::kTrackMinHeight = 15;
+int amber::timeline::kTrackHeightIncrement = 5;
 
 Timeline::Timeline(QWidget *parent) :
   Panel(parent)

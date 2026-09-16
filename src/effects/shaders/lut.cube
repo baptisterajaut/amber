@@ -1,0 +1,31 @@
+struct Lut3D {
+  int size = 0;
+  std::vector<float> data; // size^3 * 3 floats, RGB triples in a fixed grid order
+};
+
+Lut3D loadCubeFile(const QString& path) {
+  Lut3D lut;
+  QFile f(path);
+  if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return lut;
+
+  QTextStream in(&f);
+  while (!in.atEnd()) {
+    QString line = in.readLine().trimmed();
+    if (line.isEmpty() || line.startsWith('#')) continue;
+
+    if (line.startsWith("LUT_3D_SIZE")) {
+      lut.size = line.split(' ').last().toInt();
+      lut.data.reserve(lut.size * lut.size * lut.size * 3);
+    } else if (line.startsWith("TITLE") || line.startsWith("DOMAIN_")) {
+      continue; // metadata we don't need for a basic loader
+    } else {
+      QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+      if (parts.size() == 3) {
+        lut.data.push_back(parts[0].toFloat());
+        lut.data.push_back(parts[1].toFloat());
+        lut.data.push_back(parts[2].toFloat());
+      }
+    }
+  }
+  return lut;
+}

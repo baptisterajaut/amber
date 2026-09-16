@@ -106,6 +106,7 @@ RichTextEffect::RichTextEffect(Clip *c, const EffectMeta *em) :
                               "<center>Sample Text</center>"
                             "</body>"
                           "</html>");
+
 }
 
 void RichTextEffect::redraw(double timecode)

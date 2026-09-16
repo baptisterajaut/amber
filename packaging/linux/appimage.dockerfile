@@ -32,6 +32,19 @@ RUN apt-get update && apt-get install -y \
     curl file libfuse2 \
     && rm -rf /var/lib/apt/lists/*
 
+# Install tools needed to build rnnoise
+RUN apt-get update && apt-get install -y git autoconf libtool automake wget curl
+
+# Clone, build, and install rnnoise inside the container
+RUN git clone https://github.com/xiph/rnnoise /tmp/rnnoise && \
+    cd /tmp/rnnoise && \
+    ./autogen.sh && \
+    ./configure --prefix=/usr/local && \
+    make && \
+    make install && \
+    ldconfig && \
+    rm -rf /tmp/rnnoise
+
 # Qt 6.10.2 via aqtinstall (native PipeWire audio backend)
 RUN rm -f /usr/lib/python3.*/EXTERNALLY-MANAGED && \
     pip install aqtinstall && \

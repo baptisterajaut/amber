@@ -175,6 +175,7 @@ void LabelSlider::mousePressEvent(QMouseEvent *ev) {
       SetActiveCursor();
 
       drag_start = true;
+      drag_throttle_timer_.invalidate();
       drag_start_x = cursor().pos().x();
       drag_start_y = cursor().pos().y();
     }
@@ -227,8 +228,22 @@ void LabelSlider::mouseMoveEvent(QMouseEvent* event) {
     // set internal value
     SetValue(new_value);
     emit valueChanged(internal_value);
+// always update the displayed number immediately - purely local UI
+// state, costs nothing, keeps the slider feeling responsive
+//    SetValue(new_value);
 
-    // keep the cursor in the same location while dragging
+// throttle how often we actually emit valueChanged while dragging. A
+// fast mouse can fire this dozens of times per second, and each one
+// eventually writes into a field's value from this (UI) thread while
+// the render thread concurrently reads it with no synchronization -
+// cutting the emit rate sharply reduces how often that race gets hit.
+// The final value is always delivered on mouse release regardless,
+// via its own unconditional emit, so nothing is lost by throttling here.
+//    if (!drag_throttle_timer_.isValid() || drag_throttle_timer_.elapsed() >= 30) {
+//      emit valueChanged(internal_value);           
+//      drag_throttle_timer_.restart();
+//    }
+        // keep the cursor in the same location while dragging
     cursor().setPos(drag_start_x, drag_start_y);
   }
 }

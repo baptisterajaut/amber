@@ -435,9 +435,11 @@ void ViewerWidget::move_gizmos(QMouseEvent* event, bool done) {
   if (selected_gizmo != nullptr) {
     double multiplier_x = double(viewer->seq->width) / double(width());
     double multiplier_y = double(viewer->seq->height) / double(height());
+    // Precision-drag: hold Shift to move at a fraction of normal speed
+    double sens = (event->modifiers() & Qt::ShiftModifier) ? 0.2 : 1.0;
 
-    int x_movement = qRound((event->position().toPoint().x() - drag_start_x) * multiplier_x);
-    int y_movement = qRound((event->position().toPoint().y() - drag_start_y) * multiplier_y);
+    int x_movement = qRound((event->position().toPoint().x() - drag_start_x) * multiplier_x*sens);
+    int y_movement = qRound((event->position().toPoint().y() - drag_start_y) * multiplier_y*sens);
 
     gizmos->gizmo_move(selected_gizmo, x_movement, y_movement,
                        get_timecode(gizmos->parent_clip, gizmos->parent_clip->sequence->playhead), done);

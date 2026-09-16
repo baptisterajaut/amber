@@ -52,6 +52,7 @@ TransformEffect::TransformEffect(Clip* c, const EffectMeta* em) : Effect(c, em) 
 
   EffectRow* scale_row = new EffectRow(this, tr("Scale"));
 
+
   // scale X (and Y is uniform scale is selected)
   scale_x = new DoubleField(scale_row, "scalex");
   scale_x->SetMinimum(0);
@@ -72,7 +73,7 @@ TransformEffect::TransformEffect(Clip* c, const EffectMeta* em) : Effect(c, em) 
 
   anchor_x_box = new DoubleField(anchor_point_row, "anchorx"); // anchor point X
   anchor_y_box = new DoubleField(anchor_point_row, "anchory"); // anchor point Y
-
+//
   EffectRow* opacity_row = new EffectRow(this, tr("Opacity"));
 
   // opacity
@@ -95,7 +96,7 @@ TransformEffect::TransformEffect(Clip* c, const EffectMeta* em) : Effect(c, em) 
   top_center_gizmo = add_gizmo(GIZMO_TYPE_DOT);
   top_center_gizmo->set_cursor(Qt::SizeVerCursor);
   top_center_gizmo->y_field1 = scale_x;
-
+//
   top_right_gizmo = add_gizmo(GIZMO_TYPE_DOT);
   top_right_gizmo->set_cursor(Qt::SizeBDiagCursor);
   top_right_gizmo->x_field1 = scale_x;
@@ -115,7 +116,7 @@ TransformEffect::TransformEffect(Clip* c, const EffectMeta* em) : Effect(c, em) 
   left_center_gizmo = add_gizmo(GIZMO_TYPE_DOT);
   left_center_gizmo->set_cursor(Qt::SizeHorCursor);
   left_center_gizmo->x_field1 = scale_x;
-
+//
   right_center_gizmo = add_gizmo(GIZMO_TYPE_DOT);
   right_center_gizmo->set_cursor(Qt::SizeHorCursor);
   right_center_gizmo->x_field1 = scale_x;
@@ -155,7 +156,6 @@ void TransformEffect::refresh() {
 
     position_x->SetDefault(parent_clip->sequence->width/2);
     position_y->SetDefault(parent_clip->sequence->height/2);
-
     double x_percent_multipler = 200.0 / parent_clip->sequence->width;
     double y_percent_multipler = 200.0 / parent_clip->sequence->height;
 

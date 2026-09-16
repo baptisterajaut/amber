@@ -23,7 +23,7 @@
 
 #include <QLabel>
 #include <QUndoCommand>
-
+#include <QElapsedTimer>
 /**
  * @brief The LabelSlider class
  *
@@ -179,7 +179,7 @@ private:
   DisplayType display_type;
 
   double frame_rate;
-
+  QElapsedTimer drag_throttle_timer_;
   /**
    * @brief Internal function to set the standard cursor (usually SizeHorCursor)
    */

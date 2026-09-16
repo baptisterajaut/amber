@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Censor" category="Stylize">
+	<row name="Position X">
+		<field type="double" min="0" max="100" default="40" id="region_x"/>
+	</row>
+	<row name="Position Y">
+		<field type="double" min="0" max="100" default="40" id="region_y"/>
+	</row>
+	<row name="Width">
+		<field type="double" min="0" max="100" default="20" id="region_w"/>
+	</row>
+	<row name="Height">
+		<field type="double" min="0" max="100" default="15" id="region_h"/>
+	</row>
+	<row name="Pixel Size">
+		<field type="double" min="1" default="40" id="pixel_size"/>
+	</row>
+	<row name="Feather">
+		<field type="double" min="0" max="30" default="15" id="taper"/>
+	</row>
+	<shader vert="common.vert" frag="censor.frag"/>
+</effect>

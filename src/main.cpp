@@ -20,6 +20,9 @@
 
 #include <QApplication>
 #include <QWindow>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QRect>
 #include <rhi/qrhi.h>
 
 #if QT_CONFIG(vulkan)
@@ -259,7 +262,18 @@ int main(int argc, char *argv[]) {
   if (launch_fullscreen) {
     w.showFullScreen();
   } else {
-    w.showMaximized();
+//    w.showMaximized();
+	QScreen *screen = QGuiApplication::primaryScreen();
+    QRect screenGeometry = screen->geometry();
+    
+    int screenWidth = screenGeometry.width();
+    int screenHeight = screenGeometry.height();
+    
+    int targetWidth = screenWidth / 2;
+    int targetHeight = screenHeight / 2;
+    
+    w.resize(targetWidth, targetHeight);
+    w.show();
   }
 
   int ret = a.exec();

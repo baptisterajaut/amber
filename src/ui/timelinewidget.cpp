@@ -895,7 +895,7 @@ bool TimelineWidget::mouseReleaseCreating(ComboAction* ca, bool shift) {
     c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TONE, EFFECT_TYPE_EFFECT)));
     break;
   case ADD_OBJ_NOISE:
-    c->set_name(tr("NoiseCN"));
+    c->set_name(tr("Noise"));
     c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_NOISE, EFFECT_TYPE_EFFECT)));
     break;
   }

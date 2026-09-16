@@ -216,6 +216,8 @@ set(OLIVE_SOURCES
   effects/internal/audiobpfiltereffect.cpp
   effects/internal/audiornnoiseeffect.cpp
   effects/internal/audiornnoiseeffect.h
+  effects/internal/drawlineeffect.cpp
+  effects/internal/drawlineeffect.h 
   effects/internal/common.vert
   effects/internal/cornerpin.frag
   effects/internal/cornerpin.vert
@@ -473,22 +475,31 @@ set(OLIVE_EFFECTS
   effects/shaders/flip.xml
   effects/shaders/gaussianblur.frag
   effects/shaders/gaussianblur.xml
+  effects/shaders/highlightcircle.xml
+  effects/shaders/highlightcircle.frag
   effects/shaders/huesatbri.frag
   effects/shaders/huesatbri.xml
   effects/shaders/invert.frag
   effects/shaders/invert.xml
   effects/shaders/lumakey.frag
   effects/shaders/lumakey.xml
+  effects/shaders/lut.xml
+  effects/shaders/lut.frag
+  effects/shaders/lut.cube
   effects/shaders/noise.frag
   effects/shaders/noise.xml
   effects/shaders/pixelate.frag
   effects/shaders/pixelate.xml
   effects/shaders/posterize.frag
   effects/shaders/posterize.xml
+  effects/shaders/privacy_mask.xml
+  effects/shaders/privacy_mask.frag
   effects/shaders/radialblur.frag
   effects/shaders/radialblur.xml
   effects/shaders/ripple.frag
   effects/shaders/ripple.xml
+  effects/shaders/sharpen.xml
+  effects/shaders/sharpen.frag
   effects/shaders/sphere.frag
   effects/shaders/sphere.xml
   effects/shaders/swirl.frag
@@ -604,12 +615,25 @@ qt_add_shaders(${OLIVE_TARGET} "amber_shaders"
 )
 
 # Copy shader effects next to the binary so dev builds find them
-add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
+#add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
+#  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+#  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EFFECTS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+#  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#  COMMENT "Copying shader effects to build directory"
+#)
+
+set(EFFECTS_STAMP ${CMAKE_CURRENT_BINARY_DIR}/effects_stamp)
+
+add_custom_command(
+  OUTPUT ${EFFECTS_STAMP}
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EFFECTS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+  COMMAND ${CMAKE_COMMAND} -E touch ${EFFECTS_STAMP}
+  DEPENDS ${OLIVE_EFFECTS}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Copying shader effects to build directory"
 )
+
 
 file(GLOB OLIVE_EXPORT_PRESETS "${CMAKE_CURRENT_SOURCE_DIR}/exportpresets/*")
 add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
@@ -617,6 +641,9 @@ add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EXPORT_PRESETS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/exportpresets"
   COMMENT "Copying export presets to build directory"
 )
+
+add_custom_target(copy_effects ALL DEPENDS ${EFFECTS_STAMP})
+add_dependencies(${OLIVE_TARGET} copy_effects)
 
 target_compile_definitions(${OLIVE_TARGET} PRIVATE ${OLIVE_DEFINITIONS})
 

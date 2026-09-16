@@ -1519,7 +1519,20 @@ void MainWindow::fileMenu_About_To_Be_Shown() {
 void MainWindow::toggle_full_screen() {
   if (windowState() == Qt::WindowFullScreen) {
     setWindowState(Qt::WindowNoState);  // seems to be necessary for it to return to Maximized correctly on Linux
-    setWindowState(Qt::WindowMaximized);
+	QScreen *screen = QGuiApplication::primaryScreen();
+    QRect screenGeometry = screen->geometry();
+    
+    int screenWidth = screenGeometry.width();
+    int screenHeight = screenGeometry.height();
+    
+    int targetWidth = screenWidth / 2;
+    int targetHeight = screenHeight / 2;
+
+    this->resize(targetWidth, targetHeight);
+    this->move(0, 0);    
+    this->show();
+    
+//    setWindowState(Qt::WindowMaximized);
   } else {
     setWindowState(Qt::WindowFullScreen);
   }

@@ -88,11 +88,11 @@ void load_internal_effects() {
   em.name = "Transform";
   em.category = "Distort";
   em.internal = EFFECT_INTERNAL_TRANSFORM;
-  effects.append(em);
+  effects.append(em);                           
 
   em.name = "Corner Pin";
   em.internal = EFFECT_INTERNAL_CORNERPIN;
-  effects.append(em);
+  effects.append(em);                                       
 
   /*em.name = "Mask";
   em.internal = EFFECT_INTERNAL_MASK;
@@ -106,6 +106,11 @@ void load_internal_effects() {
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_TEXT;
   effects.append(em);
+  
+  em.name = "Draw line using keyframes";
+  em.internal = EFFECT_INTERNAL_DRAWLINE;
+  em.category = "Render";
+  effects.append(em);  
 
   em.name = "Rich Text";
   em.category = "Render";
