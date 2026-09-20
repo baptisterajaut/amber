@@ -3,6 +3,7 @@
 layout(std140, binding = 1) uniform FragUniforms {
     int format_type;  // 0 = YUV420P, 1 = NV12
     int color_space;  // 0 = BT.709, 1 = BT.601
+    int color_range;  // 0 = limited (Y 16-235), 1 = full (Y 0-255)
 };
 
 layout(binding = 2) uniform sampler2D y_tex;
@@ -27,24 +28,33 @@ void main() {
         v = texture(v_tex, vTexCoord).r;
     }
 
-    // Limited range offset: Y' = Y - 16/255, Cb' = U - 128/255, Cr' = V - 128/255
-    vec3 yuv = vec3(y, u, v) - vec3(16.0/255.0, 128.0/255.0, 128.0/255.0);
+    // Chroma is always centred on 128; luma only carries the 16/255 pedestal in limited range.
+    float y_offset = (color_range == 1) ? 0.0 : 16.0/255.0;
+    vec3 yuv = vec3(y, u, v) - vec3(y_offset, 128.0/255.0, 128.0/255.0);
 
     // GLSL mat3 is column-major: mat3(col0, col1, col2)
-    // BT.709 limited range YCbCr to RGB
+    // BT.709 full range YCbCr to RGB
     mat3 bt709 = mat3(
-        1.164384,  1.164384,  1.164384,
-        0.0,      -0.213249,  2.112402,
-        1.792741, -0.532909,  0.0
+        1.0,  1.0,       1.0,
+        0.0, -0.187324,  1.855600,
+        1.574800, -0.468124,  0.0
     );
-    // BT.601 limited range YCbCr to RGB
+    // BT.601 full range YCbCr to RGB
     mat3 bt601 = mat3(
-        1.164384,  1.164384,  1.164384,
-        0.0,      -0.391762,  2.017232,
-        1.596027, -0.812968,  0.0
+        1.0,  1.0,       1.0,
+        0.0, -0.344136,  1.772000,
+        1.402000, -0.714136,  0.0
     );
 
     mat3 conv = (color_space == 1) ? bt601 : bt709;
+    // Limited range stores the same colours on a narrower scale (Y on 219 codes, chroma on 224),
+    // so stretch each input component back up before the matrix. Scaling the columns of conv does
+    // exactly that: (conv * S) * yuv == conv * (S * yuv).
+    if (color_range != 1) {
+        conv = conv * mat3(255.0/219.0, 0.0, 0.0,
+                           0.0, 255.0/224.0, 0.0,
+                           0.0, 0.0, 255.0/224.0);
+    }
     vec3 rgb = clamp(conv * yuv, 0.0, 1.0);
     fragColor = vec4(rgb, 1.0);
 }

@@ -645,9 +645,15 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
             }
           }
 
+          // Full-range ("pc"/JPEG) sources put luma on 0-255 instead of 16-235: screen captures,
+          // phone footage, anything from a still camera. Decoding them with the limited-range
+          // offsets crushes the blacks and clips the highlights, so tell the shader which one it is.
+          int color_range_val = (frame->color_range == AVCOL_RANGE_JPEG) ? 1 : 0;
+
           QByteArray fragData(16, 0);
           memcpy(fragData.data(), &format_type, 4);
           memcpy(fragData.data() + 4, &color_space_val, 4);
+          memcpy(fragData.data() + 8, &color_range_val, 4);
 
           QRhiBuffer* yuvVbuf =
               rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
