@@ -53,6 +53,10 @@ namespace amber {
 namespace timeline {
 const int kGhostThickness = 2;
 const int kClipTextPadding = 3;
+// Size of the media-start/end and insert-point indicator triangles drawn on clips.
+const int kClipTriangleSize = 7;
+// Below this clip height an audio waveform is an unreadable smear, so it is not drawn.
+const int kWaveformMinClipHeight = 20;
 
 extern int kTrackDefaultHeight;
 extern int kTrackMinHeight;

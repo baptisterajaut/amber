@@ -61,8 +61,8 @@
 // its own, so these must stay logical values: the pre-Qt-6 MultiplyTrackSizesByDPI() helper that
 // scaled them here applied the ratio a second time and made tracks twice as tall on HiDPI (#73).
 int amber::timeline::kTrackDefaultHeight = 40;
-int amber::timeline::kTrackMinHeight = 30;
-int amber::timeline::kTrackHeightIncrement = 10;
+int amber::timeline::kTrackMinHeight = 15;
+int amber::timeline::kTrackHeightIncrement = 5;
 
 Timeline::Timeline(QWidget* parent)
     : Panel(parent)

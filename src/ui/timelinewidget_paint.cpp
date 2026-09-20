@@ -176,7 +176,7 @@ static void drawClipBackground(QPainter& p, ClipPtr clip, const QRect& clip_rect
 // Draws the top-left and top-right media-end indicator triangles for footage clips.
 static void drawClipEndTriangles(QPainter& p, ClipPtr clip, const QRect& clip_rect, QRect& text_rect, int widget_width,
                                  int widget_height) {
-  int triangle_size = amber::timeline::kTrackMinHeight >> 2;
+  int triangle_size = amber::timeline::kClipTriangleSize;
   if (clip_rect.width() <= triangle_size) return;
 
   p.setPen(Qt::NoPen);
@@ -318,7 +318,7 @@ static void drawFootageContent(QPainter& p, ClipPtr clip, const QRect& clip_rect
         checkerboard_rect.setLeft(panel_timeline->getTimelineScreenPointFromFrame(
             clip->media_length() + clip->timeline_in() - clip->clip_in()));
       }
-    } else if (clip_rect.height() > amber::timeline::kTrackMinHeight) {
+    } else if (clip_rect.height() >= amber::timeline::kWaveformMinClipHeight) {
       // audio track: draw waveform
       p.setPen(QColor(80, 80, 80));
       int waveform_start = -qMin(clip_rect.x(), 0);
@@ -563,7 +563,7 @@ void TimelineWidget::drawGhosts(QPainter& p) {
       p.setBrush(Qt::white);
       p.setPen(Qt::NoPen);
       int insert_x = panel_timeline->getTimelineScreenPointFromFrame(first_ghost);
-      int tri_size = amber::timeline::kTrackMinHeight >> 2;
+      int tri_size = amber::timeline::kClipTriangleSize;
 
       for (int insert_point : insert_points) {
         QPoint points[3] = {QPoint(insert_x, insert_point - tri_size), QPoint(insert_x + tri_size, insert_point),
