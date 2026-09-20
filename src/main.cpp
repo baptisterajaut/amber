@@ -258,8 +258,6 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-  amber::timeline::MultiplyTrackSizesByDPI();
-
   QObject::connect(&w, &MainWindow::finished_first_paint, amber::Global.get(), &OliveGlobal::finished_initialize, Qt::QueuedConnection);
 
   if (!load_proj.isEmpty()) {
