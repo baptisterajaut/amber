@@ -126,6 +126,16 @@ bool ExportThread::SetupVideo() {
     vcodec_ctx->bit_rate = qRound(params_.video_bitrate * 1000000);
   }
   vcodec_ctx->time_base = av_inv_q(vcodec_ctx->framerate);
+
+  // Describe the colours we actually write. sws_getContext() below defaults to the BT.601
+  // matrix and limited range for RGBA->YUV, and without these tags the file says nothing:
+  // players then assume BT.709 for HD, decode with the wrong matrix and show reds/magentas
+  // too bright and greens/cyans too dark compared to the editor (#74). Metadata only - not
+  // a single encoded pixel changes.
+  vcodec_ctx->colorspace = AVCOL_SPC_SMPTE170M;
+  vcodec_ctx->color_range = AVCOL_RANGE_MPEG;
+  vcodec_ctx->color_primaries = AVCOL_PRI_BT709;
+  vcodec_ctx->color_trc = AVCOL_TRC_BT709;
   video_stream->time_base = vcodec_ctx->time_base;
 
   if (fmt_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
