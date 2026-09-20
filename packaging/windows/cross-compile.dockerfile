@@ -15,10 +15,12 @@ RUN dnf install -y \
     make \
     && dnf clean all
 
-# Download pre-built FFmpeg 7.1 shared libs (MinGW, GPL, includes all common codecs)
-ARG FFMPEG_ARCHIVE=ffmpeg-n7.1-latest-win64-gpl-shared-7.1
+# Download pre-built FFmpeg 8.1 shared libs (MinGW, GPL, includes all common codecs)
+# BtbN only keeps the two most recent majors in the 'latest' release: n7.1 was pulled and
+# the download 404s. Keep this inside the 3.4-8 range the compat guards cover.
+ARG FFMPEG_ARCHIVE=ffmpeg-n8.1-latest-win64-gpl-shared-8.1
 RUN dnf install -y unzip curl && \
-    curl -L -o /tmp/ffmpeg.zip \
+    curl -fL -o /tmp/ffmpeg.zip \
     "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/${FFMPEG_ARCHIVE}.zip" && \
     unzip /tmp/ffmpeg.zip -d /tmp && \
     SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \
