@@ -29,7 +29,6 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QPushButton>
-#include <QScreen>
 #include <QScrollBar>
 #include <QSplitter>
 #include <QStatusBar>
@@ -58,6 +57,9 @@
 #include "ui/timelinewidget.h"
 #include "ui/viewerwidget.h"
 
+// Track heights in device-independent pixels. Qt 6 scales the whole UI by the screen's DPI on
+// its own, so these must stay logical values: the pre-Qt-6 MultiplyTrackSizesByDPI() helper that
+// scaled them here applied the ratio a second time and made tracks twice as tall on HiDPI (#73).
 int amber::timeline::kTrackDefaultHeight = 40;
 int amber::timeline::kTrackMinHeight = 30;
 int amber::timeline::kTrackHeightIncrement = 10;
@@ -1656,10 +1658,4 @@ void Timeline::unfreeze_frame() {
   } else {
     delete ca;
   }
-}
-
-void amber::timeline::MultiplyTrackSizesByDPI() {
-  kTrackDefaultHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();
-  kTrackMinHeight *= QGuiApplication::primaryScreen()->devicePixelRatio();
-  kTrackHeightIncrement *= QGuiApplication::primaryScreen()->devicePixelRatio();
 }

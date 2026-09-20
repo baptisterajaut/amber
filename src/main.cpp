@@ -302,8 +302,6 @@ int main(int argc, char* argv[]) {
   attach_vulkan_to_window(w);
 #endif
 
-  amber::timeline::MultiplyTrackSizesByDPI();
-
   QObject::connect(&w, &MainWindow::finished_first_paint, amber::Global.get(), &AmberGlobal::finished_initialize,
                    Qt::QueuedConnection);
 
