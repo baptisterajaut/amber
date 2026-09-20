@@ -153,6 +153,14 @@ static void setup_vulkan_instance() {
   bool want_vulkan = (b == RhiBackend::Auto || b == RhiBackend::Vulkan);
   if (!want_vulkan) return;
 
+  // Without an explicit API version Qt passes apiVersion = 0 to vkCreateInstance, which QRhi
+  // reads back as "Vulkan 1.0" and which then disables every 1.1+ code path it has. It also
+  // makes the Vulkan loader shipped in Ubuntu 24.04 (1.3.275, fixed in 1.3.276) print a bogus
+  // VUID-VkApplicationInfo-apiVersion error, which AppImage users report as a crash (#75).
+  // Ask for 1.1 when the loader has it; older loaders report 1.0 and are left untouched.
+  if (s_vulkanInstance.supportedApiVersion() >= QVersionNumber(1, 1)) {
+    s_vulkanInstance.setApiVersion(QVersionNumber(1, 1));
+  }
   s_vulkanInstance.setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
   if (!s_vulkanInstance.create()) {
     qWarning() << "Failed to create QVulkanInstance, Vulkan backend unavailable";
