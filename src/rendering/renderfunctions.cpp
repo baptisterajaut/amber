@@ -53,6 +53,15 @@ static QMatrix4x4 depthCorrMatrix(QRhi* rhi) {
   return m;
 }
 
+// True on backends where NDC is Y-up but the framebuffer origin is top-left (D3D11/D3D12,
+// Metal): there, every offscreen pass mirrors the image vertically in memory, and
+// clipSpaceCorrMatrix() cannot compensate because it only remaps depth on those backends
+// ("Like with Vulkan, but Y is already good" - QRhiD3D12::clipSpaceCorrMatrix).
+// False on Vulkan (NDC and framebuffer are both Y-down, a pass is already orientation-neutral)
+// and on OpenGL (both Y-up). Intermediate passes pre-flip their V coordinates when this is
+// true so that "no Y-flip" means the same thing on every backend (closes #69).
+static bool intermediatePassMirrors(QRhi* rhi) { return rhi->isYUpInNDC() && !rhi->isYUpInFramebuffer(); }
+
 // Helper: create a temporary pipeline, draw a fullscreen blit, then destroy the pipeline.
 // This replaces the old draw_clip() / full_blit() pattern.
 static bool rhi_blit_check_params(const char* caller, ComposeSequenceParams& params, QRhiTextureRenderTarget* target,
@@ -154,6 +163,11 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
       1,  1,  1, 1,  // TR
   };
 
+  // Keep intermediate passes orientation-neutral on D3D/Metal (see intermediatePassMirrors).
+  if (skipClipSpaceCorr && intermediatePassMirrors(rhi)) {
+    for (int i = 0; i < 4; i++) blitQuad[i * 4 + 3] = 1.0f - blitQuad[i * 4 + 3];
+  }
+
   // Final compositing passes: full clipSpaceCorrMatrix (Y-flip + depth remap).
   // Intermediate passes: depth-only correction (no Y-flip to avoid accumulated flips).
   QMatrix4x4 corrected_mvp = (skipClipSpaceCorr ? depthCorrMatrix(rhi) : rhi->clipSpaceCorrMatrix()) * mvp;
@@ -239,6 +253,11 @@ static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTar
   float blitQuad[] = {
       -1, -1, 0, 0, -1, 1, 0, 1, 1, -1, 1, 0, 1, 1, 1, 1,
   };
+
+  // Keep intermediate passes orientation-neutral on D3D/Metal (see intermediatePassMirrors).
+  if (skipClipSpaceCorr && intermediatePassMirrors(rhi)) {
+    for (int i = 0; i < 4; i++) blitQuad[i * 4 + 3] = 1.0f - blitQuad[i * 4 + 3];
+  }
 
   QMatrix4x4 mvp;
   mvp.ortho(-1, 1, -1, 1, -1, 1);
