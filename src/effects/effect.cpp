@@ -55,6 +55,7 @@
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
 #include "rendering/renderthread.h"
+#include "fields/filefield.h"
 
 #include "effects/internal/audionoiseeffect.h"
 #include "effects/internal/cornerpineffect.h"
@@ -857,6 +858,9 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QB
     } else if (entry.name == QLatin1String("iteration")) {
       int v = iteration;
       memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("lutSize")) {
+      float v = float(lutSize_);
+      memcpy(uboData.data() + entry.offset, &v, 4);
     }
   }
 
@@ -1064,4 +1068,104 @@ qint16 mix_audio_sample(qint16 a, qint16 b) {
   qint32 mixed_sample = static_cast<qint32>(a) + static_cast<qint32>(b);
   mixed_sample = qMax(qMin(mixed_sample, static_cast<qint32>(INT16_MAX)), static_cast<qint32>(INT16_MIN));
   return static_cast<qint16>(mixed_sample);
+}
+FileField* Effect::findLutField() {
+  if (lutFieldSearched_) return lutField_;
+  lutFieldSearched_ = true;
+
+  for (int i = 0; i < row_count(); i++) {
+    EffectRow* r = row(i);
+    for (int j = 0; j < r->FieldCount(); j++) {
+      EffectField* f = r->Field(j);
+      if (f->id() == "lut_path") {
+        lutField_ = dynamic_cast<FileField*>(f);
+        break;
+      }
+    }
+    if (lutField_) break;
+  }
+  return lutField_;
+}
+
+bool Effect::needsLut() {
+  return findLutField() != nullptr;
+}
+
+QString Effect::currentLutPath(double timecode) {
+  FileField* f = findLutField();
+  return f ? f->GetFileAt(timecode) : QString();
+}
+
+namespace {
+struct Lut3D {
+  int size = 0;
+  std::vector<float> data;
+};
+
+Lut3D loadCubeFile(const QString& path) {
+  Lut3D lut;
+  QFile f(path);
+  if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return lut;
+
+  QTextStream in(&f);
+  while (!in.atEnd()) {
+    QString line = in.readLine().trimmed();
+    if (line.isEmpty() || line.startsWith('#')) continue;
+
+    if (line.startsWith("LUT_3D_SIZE")) {
+      lut.size = line.split(' ').last().toInt();
+      lut.data.reserve(lut.size * lut.size * lut.size * 3);
+    } else if (line.startsWith("TITLE") || line.startsWith("DOMAIN_")) {
+      continue;
+    } else {
+      QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+      if (parts.size() == 3) {
+        lut.data.push_back(parts[0].toFloat());
+        lut.data.push_back(parts[1].toFloat());
+        lut.data.push_back(parts[2].toFloat());
+      }
+    }
+  }
+  return lut;
+}
+} // namespace
+
+QRhiTexture* Effect::process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& lutPath) {
+  if (lutPath != loadedLutPath_) {
+    Lut3D lut = loadCubeFile(lutPath);
+    lutSize_ = lut.size;
+    if (lutSize_ <= 0) return lutTex_;  // bad/missing file - keep whatever was there before
+
+    int texW = lutSize_ * lutSize_;
+    int texH = lutSize_;
+    QByteArray pixels;
+    pixels.resize(texW * texH * 4);
+    auto* out = reinterpret_cast<uint8_t*>(pixels.data());
+
+    for (int b = 0; b < lutSize_; b++) {
+      for (int g = 0; g < lutSize_; g++) {
+        for (int r = 0; r < lutSize_; r++) {
+          int srcIdx = (b * lutSize_ * lutSize_ + g * lutSize_ + r) * 3;
+          int dstX = b * lutSize_ + r;
+          int dstY = g;
+          int dstIdx = (dstY * texW + dstX) * 4;
+          out[dstIdx + 0] = uint8_t(qBound(0.0f, lut.data[srcIdx + 0], 1.0f) * 255.0f);
+          out[dstIdx + 1] = uint8_t(qBound(0.0f, lut.data[srcIdx + 1], 1.0f) * 255.0f);
+          out[dstIdx + 2] = uint8_t(qBound(0.0f, lut.data[srcIdx + 2], 1.0f) * 255.0f);
+          out[dstIdx + 3] = 255;
+        }
+      }
+    }
+
+    RenderThread::DeferRhiResourceDeletion(lutTex_);
+    lutTex_ = rhi->newTexture(QRhiTexture::RGBA8, QSize(texW, texH));
+    lutTex_->create();
+
+    QRhiTextureSubresourceUploadDescription desc(pixels.constData(), pixels.size());
+    desc.setSourceSize(QSize(texW, texH));
+    u->uploadTexture(lutTex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+
+    loadedLutPath_ = lutPath;
+  }
+  return lutTex_;
 }
