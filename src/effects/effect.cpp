@@ -19,6 +19,7 @@
 ***/
 
 #include "effect.h"
+#include <cmath>
 
 #include <QApplication>
 #include <QCheckBox>
@@ -33,6 +34,7 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QtMath>
+#include <QLocale>
 #include <rhi/qshaderbaker.h>
 
 #include "global/config.h"
@@ -1103,31 +1105,96 @@ struct Lut3D {
 };
 
 Lut3D loadCubeFile(const QString& path) {
-  Lut3D lut;
+  Lut3D lut;  // lut.size stays 0 on any failure path — callers already treat size<=0 as "no LUT"
+
   QFile f(path);
   if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return lut;
 
   QTextStream in(&f);
+  bool sizeSeen = false;
+
   while (!in.atEnd()) {
     QString line = in.readLine().trimmed();
     if (line.isEmpty() || line.startsWith('#')) continue;
 
-    if (line.startsWith("LUT_3D_SIZE")) {
-      lut.size = line.split(' ').last().toInt();
-      lut.data.reserve(lut.size * lut.size * lut.size * 3);
-    } else if (line.startsWith("TITLE") || line.startsWith("DOMAIN_")) {
-      continue;
-    } else {
-      QStringList parts = line.split(' ', Qt::SkipEmptyParts);
-      if (parts.size() == 3) {
-        lut.data.push_back(parts[0].toFloat());
-        lut.data.push_back(parts[1].toFloat());
-        lut.data.push_back(parts[2].toFloat());
-      }
+    if (line.startsWith("LUT_1D_SIZE")) {
+      qWarning() << "LUT file uses LUT_1D_SIZE, only 3D LUTs are supported:" << path;
+      return Lut3D();  // reject outright
     }
+
+    if (line.startsWith("LUT_3D_SIZE")) {
+      bool ok = false;
+      int size = line.split(' ', Qt::SkipEmptyParts).last().toInt(&ok);
+      if (!ok || size < 2 || size > 128) {
+        qWarning() << "LUT file has invalid LUT_3D_SIZE:" << path;
+        return Lut3D();
+      }
+      lut.size = size;
+      sizeSeen = true;
+      // size^3 * 3 is bounded (<= 128^3*3 ~= 6.3M) so this reserve is safe
+      lut.data.reserve(static_cast<size_t>(size) * size * size * 3);
+      continue;
+    }
+
+    if (line.startsWith("TITLE") || line.startsWith("DOMAIN_")) {
+      // We don't support non-default DOMAIN_MIN/MAX; if present and non-default, reject
+      // rather than silently misinterpreting the data range.
+      if (line.startsWith("DOMAIN_")) {
+        QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+        if (parts.size() == 4) {
+          bool ok0 = false, ok1 = false, ok2 = false;
+          float a = parts[1].toFloat(&ok0);
+          float b = parts[2].toFloat(&ok1);
+          float c = parts[3].toFloat(&ok2);
+          bool isDefaultMin = line.startsWith("DOMAIN_MIN") && ok0 && ok1 && ok2 && a == 0.0f && b == 0.0f && c == 0.0f;
+          bool isDefaultMax = line.startsWith("DOMAIN_MAX") && ok0 && ok1 && ok2 && a == 1.0f && b == 1.0f && c == 1.0f;
+          if (!isDefaultMin && !isDefaultMax) {
+            qWarning() << "LUT file has non-default DOMAIN_MIN/MAX, not supported:" << path;
+            return Lut3D();
+          }
+        }
+      }
+      continue;
+    }
+
+    // A data row: exactly 3 whitespace-separated floats, C-locale, finite.
+    QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+    if (parts.size() != 3) {
+      qWarning() << "LUT file has malformed data row:" << path;
+      return Lut3D();
+    }
+
+    bool ok0 = false, ok1 = false, ok2 = false;
+    float r = QLocale::c().toFloat(parts[0], &ok0);
+    float g = QLocale::c().toFloat(parts[1], &ok1);
+    float b = QLocale::c().toFloat(parts[2], &ok2);
+
+    if (!ok0 || !ok1 || !ok2 ||
+        !std::isfinite(r) || !std::isfinite(g) || !std::isfinite(b)) {
+      qWarning() << "LUT file has invalid or non-finite value:" << path;
+      return Lut3D();
+    }
+
+    lut.data.push_back(r);
+    lut.data.push_back(g);
+    lut.data.push_back(b);
   }
+
+  if (!sizeSeen) {
+    qWarning() << "LUT file missing LUT_3D_SIZE:" << path;
+    return Lut3D();
+  }
+
+  const size_t expected = static_cast<size_t>(lut.size) * lut.size * lut.size * 3;
+  if (lut.data.size() != expected) {
+    qWarning() << "LUT file row count does not match declared size (truncated or oversized):" << path
+               << "expected" << expected << "got" << lut.data.size();
+    return Lut3D();
+  }
+
   return lut;
 }
+
 } // namespace
 
 QRhiTexture* Effect::process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& lutPath) {
