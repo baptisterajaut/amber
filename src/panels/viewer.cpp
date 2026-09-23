@@ -324,7 +324,10 @@ void Viewer::go_to_start() {
 }
 
 void Viewer::go_to_end() {
-  if (seq != nullptr) seek(seq->getEndFrame());
+  if (seq != nullptr){
+  	  int real_end_frame = seq->getEndFrame();
+  	  seek(real_end_frame-1);
+  }
 }
 
 void Viewer::close_media() { set_media(nullptr); }
