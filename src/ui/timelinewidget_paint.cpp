@@ -254,7 +254,7 @@ void TimelineWidget::drawClips(QPainter& p) {
                 draw_checkerboard = true;
                 checkerboard_rect.setLeft(panel_timeline->getTimelineScreenPointFromFrame(clip->media_length() + clip->timeline_in() - clip->clip_in()));
               }
-            } else if (clip_rect.height() > amber::timeline::kTrackMinHeight) {
+            } else if (clip_rect.height() >= amber::timeline::kTrackMinHeight) {
               // draw waveform
               p.setPen(QColor(80, 80, 80));
 
