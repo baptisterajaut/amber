@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Highlight Circle" category="Stylize">
+	<row name="Center X">
+		<field type="double" min="0" max="100" default="50" id="centerX"/>
+	</row>
+	<row name="Center Y">
+		<field type="double" min="0" max="100" default="50" id="centerY"/>
+	</row>
+	<row name="Radius">
+		<field type="double" min="0" max="100" default="10" id="radius"/>
+	</row>
+	<row name="Thickness">
+		<field type="double" min="0.5" max="20" default="1" id="thickness"/>
+	</row>
+	<row name="Feather">
+		<field type="double" min="0" max="5" default="0.5" id="feather"/>
+	</row>
+	<row name="Color">
+		<field type="color" r="255" g="0" b="0" id="ringColor"/>
+	</row>
+	<shader vert="common.vert" frag="highlightcircle.frag"/>
+</effect>
