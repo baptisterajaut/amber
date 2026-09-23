@@ -1104,6 +1104,24 @@ struct Lut3D {
   std::vector<float> data;
 };
 
+Lut3D identityLut3D() {
+  // A 2x2x2 identity LUT: every corner maps to itself, so applying it is a no-op.
+  // Data order matches loadCubeFile's: R fastest, then G, then B.
+  Lut3D lut;
+  lut.size = 2;
+  lut.data.reserve(2 * 2 * 2 * 3);
+  for (int b = 0; b < 2; b++) {
+    for (int g = 0; g < 2; g++) {
+      for (int r = 0; r < 2; r++) {
+        lut.data.push_back(float(r));
+        lut.data.push_back(float(g));
+        lut.data.push_back(float(b));
+      }
+    }
+  }
+  return lut;
+}
+
 Lut3D loadCubeFile(const QString& path) {
   Lut3D lut;  // lut.size stays 0 on any failure path — callers already treat size<=0 as "no LUT"
 
@@ -1196,12 +1214,17 @@ Lut3D loadCubeFile(const QString& path) {
 }
 
 } // namespace
-
 QRhiTexture* Effect::process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& lutPath) {
   if (lutPath != loadedLutPath_) {
-    Lut3D lut = loadCubeFile(lutPath);
+    Lut3D lut = lutPath.isEmpty() ? Lut3D() : loadCubeFile(lutPath);
+
+    if (lut.size <= 0) {
+      // No file picked, or the file failed to parse: fall back to an identity
+      // LUT so the effect bypasses cleanly instead of rendering black.
+      lut = identityLut3D();
+    }
+
     lutSize_ = lut.size;
-    if (lutSize_ <= 0) return lutTex_;  // bad/missing file - keep whatever was there before
 
     int texW = lutSize_ * lutSize_;
     int texH = lutSize_;
