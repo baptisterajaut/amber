@@ -19,6 +19,7 @@
 ***/
 
 #include "effect.h"
+#include <cmath>
 
 #include <QApplication>
 #include <QCheckBox>
@@ -33,6 +34,7 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QtMath>
+#include <QLocale>
 #include <rhi/qshaderbaker.h>
 
 #include "global/config.h"
@@ -55,6 +57,7 @@
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
 #include "rendering/renderthread.h"
+#include "fields/filefield.h"
 
 #include "effects/internal/audionoiseeffect.h"
 #include "effects/internal/cornerpineffect.h"
@@ -857,6 +860,9 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QB
     } else if (entry.name == QLatin1String("iteration")) {
       int v = iteration;
       memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("lutSize")) {
+      float v = float(lutSize_);
+      memcpy(uboData.data() + entry.offset, &v, 4);
     }
   }
 
@@ -1064,4 +1070,192 @@ qint16 mix_audio_sample(qint16 a, qint16 b) {
   qint32 mixed_sample = static_cast<qint32>(a) + static_cast<qint32>(b);
   mixed_sample = qMax(qMin(mixed_sample, static_cast<qint32>(INT16_MAX)), static_cast<qint32>(INT16_MIN));
   return static_cast<qint16>(mixed_sample);
+}
+FileField* Effect::findLutField() {
+  if (lutFieldSearched_) return lutField_;
+  lutFieldSearched_ = true;
+
+  for (int i = 0; i < row_count(); i++) {
+    EffectRow* r = row(i);
+    for (int j = 0; j < r->FieldCount(); j++) {
+      EffectField* f = r->Field(j);
+      if (f->id() == "lut_path") {
+        lutField_ = dynamic_cast<FileField*>(f);
+        break;
+      }
+    }
+    if (lutField_) break;
+  }
+  return lutField_;
+}
+
+bool Effect::needsLut() {
+  return findLutField() != nullptr;
+}
+
+QString Effect::currentLutPath(double timecode) {
+  FileField* f = findLutField();
+  return f ? f->GetFileAt(timecode) : QString();
+}
+
+namespace {
+struct Lut3D {
+  int size = 0;
+  std::vector<float> data;
+};
+
+Lut3D identityLut3D() {
+  // A 2x2x2 identity LUT: every corner maps to itself, so applying it is a no-op.
+  // Data order matches loadCubeFile's: R fastest, then G, then B.
+  Lut3D lut;
+  lut.size = 2;
+  lut.data.reserve(2 * 2 * 2 * 3);
+  for (int b = 0; b < 2; b++) {
+    for (int g = 0; g < 2; g++) {
+      for (int r = 0; r < 2; r++) {
+        lut.data.push_back(float(r));
+        lut.data.push_back(float(g));
+        lut.data.push_back(float(b));
+      }
+    }
+  }
+  return lut;
+}
+
+Lut3D loadCubeFile(const QString& path) {
+  Lut3D lut;  // lut.size stays 0 on any failure path — callers already treat size<=0 as "no LUT"
+
+  QFile f(path);
+  if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) return lut;
+
+  QTextStream in(&f);
+  bool sizeSeen = false;
+
+  while (!in.atEnd()) {
+    QString line = in.readLine().trimmed();
+    if (line.isEmpty() || line.startsWith('#')) continue;
+
+    if (line.startsWith("LUT_1D_SIZE")) {
+      qWarning() << "LUT file uses LUT_1D_SIZE, only 3D LUTs are supported:" << path;
+      return Lut3D();  // reject outright
+    }
+
+    if (line.startsWith("LUT_3D_SIZE")) {
+      bool ok = false;
+      int size = line.split(' ', Qt::SkipEmptyParts).last().toInt(&ok);
+      if (!ok || size < 2 || size > 128) {
+        qWarning() << "LUT file has invalid LUT_3D_SIZE:" << path;
+        return Lut3D();
+      }
+      lut.size = size;
+      sizeSeen = true;
+      // size^3 * 3 is bounded (<= 128^3*3 ~= 6.3M) so this reserve is safe
+      lut.data.reserve(static_cast<size_t>(size) * size * size * 3);
+      continue;
+    }
+
+    if (line.startsWith("TITLE") || line.startsWith("DOMAIN_")) {
+      // We don't support non-default DOMAIN_MIN/MAX; if present and non-default, reject
+      // rather than silently misinterpreting the data range.
+      if (line.startsWith("DOMAIN_")) {
+        QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+        if (parts.size() == 4) {
+          bool ok0 = false, ok1 = false, ok2 = false;
+          float a = parts[1].toFloat(&ok0);
+          float b = parts[2].toFloat(&ok1);
+          float c = parts[3].toFloat(&ok2);
+          bool isDefaultMin = line.startsWith("DOMAIN_MIN") && ok0 && ok1 && ok2 && a == 0.0f && b == 0.0f && c == 0.0f;
+          bool isDefaultMax = line.startsWith("DOMAIN_MAX") && ok0 && ok1 && ok2 && a == 1.0f && b == 1.0f && c == 1.0f;
+          if (!isDefaultMin && !isDefaultMax) {
+            qWarning() << "LUT file has non-default DOMAIN_MIN/MAX, not supported:" << path;
+            return Lut3D();
+          }
+        }
+      }
+      continue;
+    }
+
+    // A data row: exactly 3 whitespace-separated floats, C-locale, finite.
+    QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+    if (parts.size() != 3) {
+      qWarning() << "LUT file has malformed data row:" << path;
+      return Lut3D();
+    }
+
+    bool ok0 = false, ok1 = false, ok2 = false;
+    float r = QLocale::c().toFloat(parts[0], &ok0);
+    float g = QLocale::c().toFloat(parts[1], &ok1);
+    float b = QLocale::c().toFloat(parts[2], &ok2);
+
+    if (!ok0 || !ok1 || !ok2 ||
+        !std::isfinite(r) || !std::isfinite(g) || !std::isfinite(b)) {
+      qWarning() << "LUT file has invalid or non-finite value:" << path;
+      return Lut3D();
+    }
+
+    lut.data.push_back(r);
+    lut.data.push_back(g);
+    lut.data.push_back(b);
+  }
+
+  if (!sizeSeen) {
+    qWarning() << "LUT file missing LUT_3D_SIZE:" << path;
+    return Lut3D();
+  }
+
+  const size_t expected = static_cast<size_t>(lut.size) * lut.size * lut.size * 3;
+  if (lut.data.size() != expected) {
+    qWarning() << "LUT file row count does not match declared size (truncated or oversized):" << path
+               << "expected" << expected << "got" << lut.data.size();
+    return Lut3D();
+  }
+
+  return lut;
+}
+
+} // namespace
+QRhiTexture* Effect::process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& lutPath) {
+  if (lutPath != loadedLutPath_) {
+    Lut3D lut = lutPath.isEmpty() ? Lut3D() : loadCubeFile(lutPath);
+
+    if (lut.size <= 0) {
+      // No file picked, or the file failed to parse: fall back to an identity
+      // LUT so the effect bypasses cleanly instead of rendering black.
+      lut = identityLut3D();
+    }
+
+    lutSize_ = lut.size;
+
+    int texW = lutSize_ * lutSize_;
+    int texH = lutSize_;
+    QByteArray pixels;
+    pixels.resize(texW * texH * 4);
+    auto* out = reinterpret_cast<uint8_t*>(pixels.data());
+
+    for (int b = 0; b < lutSize_; b++) {
+      for (int g = 0; g < lutSize_; g++) {
+        for (int r = 0; r < lutSize_; r++) {
+          int srcIdx = (b * lutSize_ * lutSize_ + g * lutSize_ + r) * 3;
+          int dstX = b * lutSize_ + r;
+          int dstY = g;
+          int dstIdx = (dstY * texW + dstX) * 4;
+          out[dstIdx + 0] = uint8_t(qBound(0.0f, lut.data[srcIdx + 0], 1.0f) * 255.0f);
+          out[dstIdx + 1] = uint8_t(qBound(0.0f, lut.data[srcIdx + 1], 1.0f) * 255.0f);
+          out[dstIdx + 2] = uint8_t(qBound(0.0f, lut.data[srcIdx + 2], 1.0f) * 255.0f);
+          out[dstIdx + 3] = 255;
+        }
+      }
+    }
+
+    RenderThread::DeferRhiResourceDeletion(lutTex_);
+    lutTex_ = rhi->newTexture(QRhiTexture::RGBA8, QSize(texW, texH));
+    lutTex_->create();
+
+    QRhiTextureSubresourceUploadDescription desc(pixels.constData(), pixels.size());
+    desc.setSourceSize(QSize(texW, texH));
+    u->uploadTexture(lutTex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+
+    loadedLutPath_ = lutPath;
+  }
+  return lutTex_;
 }

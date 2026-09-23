@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="LUT" category="Color">
+	<row name="LUT File">
+		<field type="file" id="lut_path" filename=""/>
+	</row>
+	<row name="Strength">
+		<field type="double" min="0" max="100" default="100" id="strength"/>
+	</row>
+	<shader vert="common.vert" frag="lut.frag"/>
+</effect>
