@@ -62,7 +62,7 @@ find_package(Qt6 REQUIRED
   COMPONENTS
   Core
   Gui
-  GuiPrivate
+  GuiPrivate                                                                                        
   Widgets
   Multimedia
   OpenGL
@@ -82,7 +82,43 @@ find_package(FFMPEG 3.4 REQUIRED
   swscale
   swresample
 )
+#Make sure the rnnoise library is installed
+option(NORNNOISE "Disable rnnoise effect" OFF)
+if(NORNNOISE)
+  list(APPEND OLIVE_DEFINITIONS -DNORNNOISE)
+endif()
+if ( NOT NORNNOISE )
+  find_library(RNNOISE_LIBRARY
+      NAMES rnnoise
+      HINTS
+          /usr/local/lib
+          /usr/lib
+          /usr/lib/x86_64-linux-gnu
+  )
+  find_path(RNNOISE_INCLUDE_DIR
+      NAMES rnnoise.h
+      HINTS
+          /usr/local/include
+          /usr/include
+  )
+  
+  if(NOT RNNOISE_LIBRARY OR NOT RNNOISE_INCLUDE_DIR)
+    list(APPEND OLIVE_DEFINITIONS -DNORNNOISE)  
+      message(STATUS "rnnoise not found — expected library in /usr/local/lib and rnnoise.h in /usr/local/include")
+      set(NORNNOISE ON)
+  endif()   
+endif()
 
+if(NORNNOISE)
+  list(APPEND OLIVE_DEFINITIONS -DNORNNOISE)
+else()
+  add_library(rnnoise::rnnoise UNKNOWN IMPORTED)
+  set_target_properties(rnnoise::rnnoise PROPERTIES
+      IMPORTED_LOCATION "${RNNOISE_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${RNNOISE_INCLUDE_DIR}"
+  )
+endif()  
+  
 option(NOFREI0R "Disable Frei0r plugin support" OFF)
 if(NOFREI0R)
   list(APPEND OLIVE_DEFINITIONS -DNOFREI0R)
@@ -184,8 +220,12 @@ set(OLIVE_SOURCES
   effects/fields/labelfield.h
   effects/fields/stringfield.cpp
   effects/fields/stringfield.h
+  $<$<NOT:$<BOOL:${NORNNOISE}>>:effects/internal/audiornnoiseeffect.cpp>
+  $<$<NOT:$<BOOL:${NORNNOISE}>>:effects/internal/audiornnoiseeffect.h>   
   effects/internal/audionoiseeffect.cpp
   effects/internal/audionoiseeffect.h
+  effects/internal/audiobpfiltereffect.h
+  effects/internal/audiobpfiltereffect.cpp
   effects/internal/common.vert
   effects/internal/cornerpin.frag
   effects/internal/cornerpin.vert
@@ -401,7 +441,7 @@ set(OLIVE_SOURCES
   ui/viewerwidget.cpp
   ui/viewerwidget.h
   ui/viewerwindow.cpp
-  ui/viewerwindow.h
+  ui/viewerwindow.h 
   main.cpp
 )
 
@@ -421,7 +461,7 @@ set(OLIVE_EFFECTS
   effects/shaders/chromaticaberration.frag
   effects/shaders/chromaticaberration.xml
   effects/shaders/colorcorrection.frag
-  effects/shaders/colorcorrection.xml
+  effects/shaders/colorcorrection.xml                                                               
   effects/shaders/colorsel.frag
   effects/shaders/colorsel.xml
   effects/shaders/common.frag
@@ -494,7 +534,6 @@ qt_add_translation(OLIVE_QM_FILES
   ts/amber_zh-CN.ts
   ts/amber_zh-TW.ts
 )
-
 set(OLIVE_TARGET "amber-editor")
 if(APPLE)
   set(OLIVE_TARGET "Amber")
@@ -536,6 +575,7 @@ add_executable(${OLIVE_TARGET}
   ${OLIVE_QM_FILES}
 )
 
+
 # Windows GUI subsystem: WIN32_EXECUTABLE only activates when CMake's WIN32 var
 # is TRUE, which it isn't reliably on Fedora's mingw64 toolchain. Add -mwindows
 # to the linker explicitly so the exe doesn't spawn a console window. Qt6::Core
@@ -574,12 +614,25 @@ qt_add_shaders(${OLIVE_TARGET} "amber_shaders"
 )
 
 # Copy shader effects next to the binary so dev builds find them
-add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
+#add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
+#  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+#  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EFFECTS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+#  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#  COMMENT "Copying shader effects to build directory"
+#)
+
+set(EFFECTS_STAMP ${CMAKE_CURRENT_BINARY_DIR}/effects_stamp)
+
+add_custom_command(
+  OUTPUT ${EFFECTS_STAMP}
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${OLIVE_EFFECTS} "$<TARGET_FILE_DIR:${OLIVE_TARGET}>/effects"
+  COMMAND ${CMAKE_COMMAND} -E touch ${EFFECTS_STAMP}
+  DEPENDS ${OLIVE_EFFECTS}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Copying shader effects to build directory"
 )
+
 
 file(GLOB OLIVE_EXPORT_PRESETS "${CMAKE_CURRENT_SOURCE_DIR}/exportpresets/*")
 add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
@@ -588,6 +641,9 @@ add_custom_command(TARGET ${OLIVE_TARGET} POST_BUILD
   COMMENT "Copying export presets to build directory"
 )
 
+add_custom_target(copy_effects ALL DEPENDS ${EFFECTS_STAMP})
+add_dependencies(${OLIVE_TARGET} copy_effects)
+
 target_compile_definitions(${OLIVE_TARGET} PRIVATE ${OLIVE_DEFINITIONS})
 
 if(APPLE)
@@ -595,6 +651,7 @@ if(APPLE)
 endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
 
 target_link_libraries(${OLIVE_TARGET}
   PRIVATE
@@ -608,17 +665,18 @@ target_link_libraries(${OLIVE_TARGET}
   Qt6::OpenGLWidgets
   Qt6::ShaderToolsPrivate
   Qt6::Svg
-  FFMPEG::avutil
+  FFMPEG::avutil                 
   FFMPEG::avcodec
   FFMPEG::avformat
   FFMPEG::avfilter
   FFMPEG::swscale
   FFMPEG::swresample
+  $<$<NOT:$<BOOL:${NORNNOISE}>>:rnnoise::rnnoise>  
   $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
 )
 
 if(AMBER_TARGET_WINDOWS AND OPENCOLORIO_FOUND)
-  target_link_libraries(${OLIVE_TARGET} PRIVATE OpenColorIO)
+  target_link_libraries(${OLIVE_TARGET} PRIVATE OpenColorIO)                  
 endif()
 
 if(DOXYGEN_FOUND AND BUILD_DOXYGEN)

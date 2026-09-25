@@ -69,6 +69,16 @@ void load_internal_effects() {
   em.name = "Noise";
   em.internal = EFFECT_INTERNAL_NOISE;
   effects.append(em);
+#ifndef NORNNOISE
+  em.name = "RNNoise";
+  em.internal = EFFECT_INTERNAL_RNNOISE;
+  effects.append(em);
+#endif  
+  
+  em.name = "BpFilter";
+  em.internal = EFFECT_INTERNAL_BPFILTER;
+  effects.append(em);
+  
 
   em.name = "Fill Left/Right";
   em.internal = EFFECT_INTERNAL_FILLLEFTRIGHT;
@@ -79,11 +89,11 @@ void load_internal_effects() {
   em.name = "Transform";
   em.category = "Distort";
   em.internal = EFFECT_INTERNAL_TRANSFORM;
-  effects.append(em);
+  effects.append(em);                 
 
   em.name = "Corner Pin";
   em.internal = EFFECT_INTERNAL_CORNERPIN;
-  effects.append(em);
+  effects.append(em);                            
 
   /*em.name = "Mask";
   em.internal = EFFECT_INTERNAL_MASK;
@@ -97,7 +107,7 @@ void load_internal_effects() {
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_TEXT;
   effects.append(em);
-
+  
   em.name = "Rich Text";
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_RICHTEXT;
