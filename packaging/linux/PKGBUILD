@@ -11,6 +11,7 @@ depends=(
   'qt6-svg'
   'ffmpeg'
   'frei0r-plugins'
+  'rnnoise'
 )
 makedepends=(
   'cmake'
