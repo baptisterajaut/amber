@@ -1,7 +1,7 @@
 #version 440
 layout(std140, binding = 0) uniform VertexUniforms {
     mat4 mvp_matrix;
-};
+} vu;  // named so GLSL output doesn't auto-name it _25 and clash with a fragment block
 layout(std140, binding = 1) uniform CornerPinParams {
     vec2 p0;
     vec2 p1;
@@ -18,7 +18,7 @@ layout(location = 3) out vec2 b3;
 layout(location = 4) out vec2 vTexCoord;
 
 void main() {
-    gl_Position = mvp_matrix * vec4(a_position, 0.0, 1.0);
+    gl_Position = vu.mvp_matrix * vec4(a_position, 0.0, 1.0);
 
     if (perspective) {
         float m1 = (p3.y - p0.y)/(p3.x - p0.x);
