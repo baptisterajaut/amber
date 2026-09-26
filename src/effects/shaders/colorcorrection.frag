@@ -17,7 +17,8 @@ layout(location = 0) out vec4 fragColor;
 void main(void) {
 	vec4 textureColor = texture(myTexture, vTexCoord);
 
-	vec3 rgb = textureColor.rgb;
+	// input is premultiplied: work on the straight colour, premultiply again on output
+	vec3 rgb = textureColor.a > 0.0 ? textureColor.rgb / textureColor.a : vec3(0.0);
 
 	// temperature
 	float temp = temperature * 0.01;
@@ -66,10 +67,5 @@ void main(void) {
 	vec3 intensity = vec3(dot(rgb, W));
 	rgb = mix(intensity, rgb, saturation*0.01);
 
-	fragColor = vec4(
-		rgb.r,
-		rgb.g,
-		rgb.b,
-		textureColor.a
-	);
+	fragColor = vec4(clamp(rgb, 0.0, 1.0) * textureColor.a, textureColor.a);
 }

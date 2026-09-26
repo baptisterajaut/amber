@@ -32,7 +32,9 @@ void main(void) {
 		noise = (noise - vec3(amount*0.005))*vec3(2.0);
 
 		vec4 textureColor = texture(myTexture, vec2(vTexCoord.x, vTexCoord.y));
-		fragColor = vec4(textureColor.rgb+noise, textureColor.a);
+		// input is premultiplied: add the grain to the straight colour, premultiply again
+		vec3 rgb = textureColor.a > 0.0 ? textureColor.rgb / textureColor.a : vec3(0.0);
+		fragColor = vec4(clamp(rgb+noise, 0.0, 1.0) * textureColor.a, textureColor.a);
 	} else {
 		fragColor = vec4(noise, 1.0);
 	}

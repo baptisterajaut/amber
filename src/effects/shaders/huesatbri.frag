@@ -28,7 +28,8 @@ vec3 hsv2rgb(vec3 c) {
 void main(void) {
 	vec4 tex_color = texture(myTexture, vTexCoord);
 
-	vec3 hsv = rgb2hsv(tex_color.rgb);
+	// input is premultiplied: work on the straight colour, premultiply again on output
+	vec3 hsv = rgb2hsv(tex_color.a > 0.0 ? tex_color.rgb / tex_color.a : vec3(0.0));
 	hsv.r += (hue/360.0);
 	hsv.g *= (saturation*0.01);
 	hsv.b *= (brightness*0.01);
@@ -36,10 +37,5 @@ void main(void) {
 	vec3 rgb = hsv2rgb(hsv);
 	rgb = (rgb - 0.5) * (contrast*0.01) + 0.5;
 
-	fragColor = vec4(
-		rgb.r,
-		rgb.g,
-		rgb.b,
-		tex_color.a
-	);
+	fragColor = vec4(clamp(rgb, 0.0, 1.0) * tex_color.a, tex_color.a);
 }
