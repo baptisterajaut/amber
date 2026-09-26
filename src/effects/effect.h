@@ -198,7 +198,15 @@ class Effect : public QObject {
 
   static QShader bakeOrLoadCached(const QString& path, QShader::Stage stage);
 
-  enum VideoEffectFlags : uint8_t { ShaderFlag = 0x1, CoordsFlag = 0x2, SuperimposeFlag = 0x4, ImageFlag = 0x8 };
+  // ClipShaderFlag: the effect's shaders replace the passthrough pair when the clip itself is drawn,
+  // instead of running as an intermediate full-frame pass like ShaderFlag.
+  enum VideoEffectFlags : uint8_t {
+    ShaderFlag = 0x1,
+    CoordsFlag = 0x2,
+    SuperimposeFlag = 0x4,
+    ImageFlag = 0x8,
+    ClipShaderFlag = 0x10
+  };
   int Flags();
   void SetFlags(int flags);
 
