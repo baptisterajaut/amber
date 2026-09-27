@@ -68,6 +68,7 @@ EffectControls::EffectControls(QWidget* parent)
 
   headers->viewer = panel_sequence_viewer;
   headers->snapping = false;
+  headers->set_scroll_bar(horizontalScrollBar);
 
   effects_area->parent_widget = scrollArea;
   effects_area->keyframe_area = keyframeView;

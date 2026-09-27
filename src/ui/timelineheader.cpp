@@ -275,7 +275,7 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
   // while dragging a marker, auto-scroll when the cursor nears the ruler edges
   if (dragging && dragging_markers && !resizing_workarea) {
     if (mouse_x < 25 || mouse_x > width() - 25) {
-      if (scroll_timer_id_ == -1) scroll_timer_id_ = startTimer(16);  // ~60fps
+      if (scroll_bar_ != nullptr && scroll_timer_id_ == -1) scroll_timer_id_ = startTimer(16);  // ~60fps
     } else if (scroll_timer_id_ != -1) {
       killTimer(scroll_timer_id_);
       scroll_timer_id_ = -1;
@@ -345,8 +345,12 @@ void TimelineHeader::timerEvent(QTimerEvent* event) {
     return;
   }
 
-  QScrollBar* bar = (panel_timeline != nullptr) ? panel_timeline->horizontalScrollBar : nullptr;
-  if (bar == nullptr) return;
+  QScrollBar* bar = scroll_bar_;
+  if (bar == nullptr) {
+    killTimer(scroll_timer_id_);
+    scroll_timer_id_ = -1;
+    return;
+  }
 
   const int mouse_x = last_mouse_x_;
   const double zoom_factor = qBound(0.2, zoom, 8.0);

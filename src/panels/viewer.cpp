@@ -75,6 +75,7 @@ Viewer::Viewer(QWidget* parent)
   headers->viewer = this;
   headers->snapping = false;
   headers->show_text(false);
+  headers->set_scroll_bar(horizontal_bar);
   viewer_container->viewer = this;
   viewer_widget = viewer_container->child;
   viewer_widget->viewer = this;

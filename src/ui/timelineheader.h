@@ -48,6 +48,9 @@ class TimelineHeader : public QWidget {
   void delete_markers();
   void set_scrollbar_max(QScrollBar* bar, long sequence_end_frame, int offset);
 
+  // Scrollbar scrolled while a marker drag nears the edges; none set = no auto-scroll.
+  void set_scroll_bar(QScrollBar* bar) { scroll_bar_ = bar; }
+
  public slots:
   void update_zoom(double z);
   void set_scroll(int);
@@ -109,6 +112,7 @@ class TimelineHeader : public QWidget {
 
   int scroll_timer_id_{-1};
   int last_mouse_x_{0};
+  QScrollBar* scroll_bar_{nullptr};
 
  signals:
 };

@@ -203,6 +203,7 @@ void Timeline::setup_ui() {
   horizontalScrollBar->setMaximum(0);
   horizontalScrollBar->setSingleStep(20);
   horizontalScrollBar->setOrientation(Qt::Horizontal);
+  headers->set_scroll_bar(horizontalScrollBar);
 
   timeline_area_layout->addWidget(horizontalScrollBar);
 
