@@ -589,7 +589,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="654" />
         <source>Bitrate (Mbps):</source>
-        <translation>Datový tok (MB/s):</translation>
+        <translation>Datový tok (Mbps):</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="741" />
@@ -629,7 +629,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="774" />
         <source>Bitrate (Kbps/CBR):</source>
-        <translation>Datový tok (KB/s/stálý datový tok):</translation>
+        <translation>Datový tok (Kbps/stálý datový tok):</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="625" />
@@ -1259,7 +1259,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1063" />
         <source>Slip Tool</source>
-        <translation>Roztočení se ztotožněním</translation>
+        <translation>Nástroj posunu obsahu</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="974" />
@@ -1544,7 +1544,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1064" />
         <source>Slide Tool</source>
-        <translation>Roztočení</translation>
+        <translation>Nástroj posunu klipu</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="277" />
@@ -2019,7 +2019,7 @@ Rozložení zvuku: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="272" />
         <source>Nest</source>
-        <translation>Vnořovat</translation>
+        <translation>Vnořit</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="328" />
@@ -3452,7 +3452,7 @@ Rozložení zvuku: %6</translation>
     <message>
         <location filename="../engine/sequence.cpp" line="36" />
         <source>%1 (copy)</source>
-        <translation>%1 (kopírovat)</translation>
+        <translation>%1 (kopie)</translation>
     </message>
 </context>
 <context>
@@ -4104,7 +4104,7 @@ Rozložení zvuku: %6</translation>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="233" />
         <source>Slip Tool</source>
-        <translation>Roztočení se ztotožněním</translation>
+        <translation>Nástroj posunu obsahu</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="230" />
@@ -4209,7 +4209,7 @@ Rozložení zvuku: %6</translation>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="234" />
         <source>Slide Tool</source>
-        <translation>Roztočení</translation>
+        <translation>Nástroj posunu klipu</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="241" />
@@ -4259,7 +4259,7 @@ Rozložení zvuku: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="646" />
         <source>Ripple Delete In/Out</source>
-        <translation>Ripple smazání vstupního/výstupního bodu</translation>
+        <translation>Vytáhnout vstupní/výstupní bod</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="646" />
@@ -4274,7 +4274,7 @@ Rozložení zvuku: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="686" />
         <source>Ripple Delete</source>
-        <translation>Smazat s posunem</translation>
+        <translation>Vytáhnout</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="686" />

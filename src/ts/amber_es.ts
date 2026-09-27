@@ -393,7 +393,7 @@
     <message>
         <location filename="../effects/effectrow.cpp" line="101" />
         <source>Disabling keyframes will delete all current keyframes. Are you sure you want to do this?</source>
-        <translation>¡Desconectar los fotogramas clave los eliminará! ¿Relamente los quieres eliminar?</translation>
+        <translation>¡Desconectar los fotogramas clave los eliminará! ¿Realmente los quieres eliminar?</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="181" />
@@ -839,7 +839,7 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="373" />
         <source>could not open output file (%1)</source>
-        <translation>no se pudo abrir el archvo de salida (%1)</translation>
+        <translation>no se pudo abrir el archivo de salida (%1)</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="408" />
@@ -1659,7 +1659,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1061" />
         <source>Ripple Tool</source>
-        <translation>Herramienta para Enrrollar/Desenrrollar</translation>
+        <translation>Herramienta de ondulación</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1062" />
@@ -2029,7 +2029,7 @@ Audio: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="259" />
         <source>&amp;Sequence</source>
-        <translation>&amp;Sequencia</translation>
+        <translation>&amp;Secuencia</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="260" />
@@ -2313,7 +2313,7 @@ Audio: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="304" />
         <source>Name:</source>
-        <translation>Name:</translation>
+        <translation>Nombre:</translation>
     </message>
 </context>
 <context>
@@ -2694,7 +2694,7 @@ selecciona los clips que cruza</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="955" />
         <source>Audio Scrubbing</source>
-        <translation>Limpiar o depurar Audio</translation>
+        <translation>Sondeo de audio</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="730" />
@@ -2960,12 +2960,12 @@ Líneas de los Cuadros de Texto:</translation>
     <message>
         <location filename="../panels/project.cpp" line="113" />
         <source>Undo</source>
-        <translation>Deshacer los cambiós</translation>
+        <translation>Deshacer los cambios</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="119" />
         <source>Redo</source>
-        <translation>Reacer los cambios</translation>
+        <translation>Rehacer los cambios</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="130" />
@@ -3436,7 +3436,7 @@ Líneas de los Cuadros de Texto:</translation>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="59" />
         <source>Shadow Angle</source>
-        <translation>Angulo de la Sombra</translation>
+        <translation>Ángulo de la Sombra</translation>
     </message>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="63" />
@@ -3528,7 +3528,7 @@ Líneas de los Cuadros de Texto:</translation>
     <message>
         <location filename="../project/sourcescommon.cpp" line="83" />
         <source>Import...</source>
-        <translation>Impotar...</translation>
+        <translation>Importar...</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="86" />
@@ -4242,7 +4242,7 @@ Fotogramas:</translation>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="231" />
         <source>Ripple Tool</source>
-        <translation>Herramienta para Enrrollar/Desenrrollar</translation>
+        <translation>Herramienta de ondulación</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="232" />
@@ -4292,7 +4292,7 @@ Fotogramas:</translation>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="241" />
         <source>Add title, solid, bars, etc.</source>
-        <translation>Añadir clip de:.</translation>
+        <translation>Añadir título, color sólido, barras, etc.</translation>
     </message>
     <message>
         <location filename="../panels/timeline_clipboard.cpp" line="117" />
@@ -4680,7 +4680,7 @@ Duración: %4</translation>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="298" />
         <source>Interface</source>
-        <translation>Interface</translation>
+        <translation>Interfaz</translation>
     </message>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="300" />
@@ -4765,7 +4765,7 @@ Duración: %4</translation>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="148" />
         <source>Disable</source>
-        <translation>Desconectar</translation>
+        <translation>Desactivar</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="152" />

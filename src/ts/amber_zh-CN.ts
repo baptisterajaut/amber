@@ -63,7 +63,7 @@
     <message>
         <location filename="../effects/internal/audionoiseeffect.cpp" line="24" />
         <source>Amount</source>
-        <translation>质量</translation>
+        <translation>数量</translation>
     </message>
     <message>
         <location filename="../effects/internal/audionoiseeffect.cpp" line="30" />
@@ -81,7 +81,7 @@
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="44" />
         <source>Attack Threshold:</source>
-        <translation>触发阀值:</translation>
+        <translation>触发阈值:</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="49" />
@@ -91,7 +91,7 @@
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="54" />
         <source>Release Threshold:</source>
-        <translation>释放阀值:</translation>
+        <translation>释放阈值:</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="59" />
@@ -128,7 +128,7 @@
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="14" />
         <source>"%1" Properties</source>
-        <translation>处理中 "%1"</translation>
+        <translation>&quot;%1&quot; 属性</translation>
     </message>
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="15" />
@@ -488,7 +488,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="81" />
         <source>Export "%1"</source>
-        <translation>汇出 "%1"</translation>
+        <translation>导出 &quot;%1&quot;</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="134" />
@@ -498,12 +498,12 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="347" />
         <source>Export Failed</source>
-        <translation>汇出失败</translation>
+        <translation>导出失败</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="347" />
         <source>Export failed - %1</source>
-        <translation>汇出失败 - %1</translation>
+        <translation>导出失败 - %1</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="465" />
@@ -528,7 +528,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="479" />
         <source>Export Media</source>
-        <translation>输出媒体</translation>
+        <translation>导出媒体</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="593" />
@@ -561,12 +561,12 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="625" />
         <source>Failed to find a suitable encoder for this codec. Export will likely fail.</source>
-        <translation>无法为此格式匹配编解码器.输出有可能会失败.</translation>
+        <translation>无法为此格式匹配编解码器.导出有可能会失败.</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="641" />
         <source>Failed to find pixel format for this encoder. Export will likely fail.</source>
-        <translation>未能找到此编码器的像素格式.输出有可能会失败.</translation>
+        <translation>未能找到此编码器的像素格式.导出有可能会失败.</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="654" />
@@ -621,7 +621,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="707" />
         <source>Entire Sequence</source>
-        <translation>整个片段</translation>
+        <translation>整个序列</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="708" />
@@ -807,7 +807,7 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="225" />
         <source>could not audio encoder for %1</source>
-        <translation>не вдалося знайти кодувальник аудіо для %1</translation>
+        <translation>无音频编解码器 %1</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="233" />
@@ -842,7 +842,7 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="363" />
         <source>could not create output format context</source>
-        <translation>无法分配音频缓冲区</translation>
+        <translation>无法创建输出格式上下文</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="373" />
@@ -858,7 +858,7 @@
         <location filename="../rendering/exportthread.cpp" line="624" />
         <source>could not write output file trailer (%1)</source>
         <translatorcomment>无法写入输出文件</translatorcomment>
-        <translation>无法写入输出文件预告片 (%1)</translation>
+        <translation>无法写入输出文件尾 (%1)</translation>
     </message>
 </context>
 <context>
@@ -927,7 +927,7 @@
     <message>
         <location filename="../effects/internal/frei0reffect.cpp" line="55" />
         <source>Failed to load Frei0r plugin "%1": %2</source>
-        <translation>无法加载 плагін 插件 "%1": %2</translation>
+        <translation>无法加载插件 &quot;%1&quot;: %2</translation>
     </message>
     <message>
         <location filename="../effects/internal/frei0reffect.cpp" line="63" />
@@ -1195,12 +1195,12 @@
     <message>
         <location filename="../project/loadthread.cpp" line="527" />
         <source>Invalid Clip Link</source>
-        <translation>无效的视频链接</translation>
+        <translation>无效的剪辑链接</translation>
     </message>
     <message>
         <location filename="../project/loadthread.cpp" line="528" />
         <source>This project contains an invalid clip link. It may be corrupt. Would you like to continue loading it?</source>
-        <translation>此项目包含无效的剪辑链接.可能已经损坏.您要继续装吗?</translation>
+        <translation>此项目包含无效的剪辑链接.可能已经损坏.您要继续加载吗?</translation>
     </message>
     <message>
         <location filename="../project/loadthread.cpp" line="738" />
@@ -1220,7 +1220,7 @@
     <message>
         <location filename="../project/loadthread.cpp" line="812" />
         <source>Couldn't load '%1'. %2</source>
-        <translation>无法加载%1'. %2</translation>
+        <translation>无法加载&apos;%1&apos;. %2</translation>
     </message>
     <message>
         <location filename="../project/loadthread.cpp" line="814" />
@@ -1230,7 +1230,7 @@
     <message>
         <location filename="../project/loadthread.cpp" line="814" />
         <source>Error loading project: %1</source>
-        <translation>加载项目是发生错误: %1</translation>
+        <translation>加载项目时发生错误: %1</translation>
     </message>
 </context>
 <context>
@@ -1278,7 +1278,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="967" />
         <source>&amp;Import...</source>
-        <translation>输入(&amp;I)</translation>
+        <translation>导入(&amp;I)</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="968" />
@@ -1293,7 +1293,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="970" />
         <source>&amp;Export...</source>
-        <translation>输出(&amp;E)</translation>
+        <translation>导出(&amp;E)</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="971" />
@@ -1677,7 +1677,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1050" />
         <source>Sequence Viewer</source>
-        <translation>片段查看器</translation>
+        <translation>序列查看器</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1051" />
@@ -1707,22 +1707,22 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1059" />
         <source>Pointer Tool</source>
-        <translation>选择/移动/默认</translation>
+        <translation>指针工具</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1060" />
         <source>Edit Tool</source>
-        <translation>选择部分</translation>
+        <translation>编辑工具</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1061" />
         <source>Ripple Tool</source>
-        <translation>涟漪的工具</translation>
+        <translation>波纹工具</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1062" />
         <source>Razor Tool</source>
-        <translation>剪刀</translation>
+        <translation>剃刀工具</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1063" />
@@ -1732,22 +1732,22 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1064" />
         <source>Slide Tool</source>
-        <translation>幻灯片工具</translation>
+        <translation>滑移工具</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1065" />
         <source>Hand Tool</source>
-        <translation>移动时间轴</translation>
+        <translation>抓手工具</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1066" />
         <source>Transition Tool</source>
-        <translation>转场/过渡效果</translation>
+        <translation>转场工具</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1067" />
         <source>Enable Snapping</source>
-        <translation>开启边缘吸合/自动对齐</translation>
+        <translation>启用吸附</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1068" />
@@ -1757,7 +1757,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1069" />
         <source>Auto-Cut Silence</source>
-        <translation>噪声分离</translation>
+        <translation>自动剪切静音</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1071" />
@@ -1782,7 +1782,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1077" />
         <source>Clear Undo</source>
-        <translation>清除撤消</translation>
+        <translation>清除撤销</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1080" />
@@ -2039,12 +2039,12 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="259" />
         <source>&amp;Sequence</source>
-        <translation>片段(&amp;S)</translation>
+        <translation>序列(&amp;S)</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="260" />
         <source>&amp;Folder</source>
-        <translation>目录(&amp;F)</translation>
+        <translation>文件夹(&amp;F)</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="261" />
@@ -2145,12 +2145,12 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="280" />
         <source>Ripple Delete</source>
-        <translation>抽出片段并删除</translation>
+        <translation>波纹删除</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="281" />
         <source>Split</source>
-        <translation>切断</translation>
+        <translation>分割</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="282" />
@@ -2198,7 +2198,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="83" />
         <source>New Sequence</source>
-        <translation>新片段</translation>
+        <translation>新序列</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="111" />
@@ -2213,7 +2213,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="209" />
         <source>Preset:</source>
-        <translation>预置:</translation>
+        <translation>预设:</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="213" />
@@ -2432,7 +2432,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="96" />
         <source>Default Sequence</source>
-        <translation>默认片段</translation>
+        <translation>默认序列</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="197" />
@@ -2463,7 +2463,7 @@ Audio Layout: %6</source>
         <location filename="../dialogs/preferencesdialog.cpp" line="448" />
         <location filename="../dialogs/preferencesdialog.cpp" line="472" />
         <source>Error saving shortcuts</source>
-        <translation>保存键盘快捷键是发生错误</translation>
+        <translation>保存键盘快捷键时发生错误</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="449" />
@@ -2473,17 +2473,17 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="456" />
         <source>Export Keyboard Shortcuts</source>
-        <translation>汇出键盘快捷键配置</translation>
+        <translation>导出键盘快捷键配置</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="470" />
         <source>Export Shortcuts</source>
-        <translation>汇出快捷键</translation>
+        <translation>导出快捷键</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="470" />
         <source>Shortcuts exported successfully</source>
-        <translation>快捷键成功汇出</translation>
+        <translation>快捷键成功导出</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="472" />
@@ -2523,7 +2523,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="553" />
         <source>Image sequence formats:</source>
-        <translation>图形片段个是:</translation>
+        <translation>图像序列格式:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="563" />
@@ -2563,7 +2563,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="615" />
         <source>Default Sequence Settings</source>
-        <translation>默认的片段设置</translation>
+        <translation>默认的序列设置</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="622" />
@@ -2808,7 +2808,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="825" />
         <source>Effect Textbox Lines:</source>
-        <translation>文本框线效果:</translation>
+        <translation>效果文本框行数:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="849" />
@@ -2901,12 +2901,12 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="982" />
         <source>Import</source>
-        <translation>输入</translation>
+        <translation>导入</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="986" />
         <source>Export</source>
-        <translation>汇出</translation>
+        <translation>导出</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="992" />
@@ -2997,7 +2997,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/project.cpp" line="221" />
         <source>Sequence</source>
-        <translation>片段</translation>
+        <translation>序列</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="310" />
@@ -3024,17 +3024,17 @@ Audio Layout: %6</source>
         <location filename="../panels/project.cpp" line="349" />
         <location filename="../panels/project.cpp" line="989" />
         <source>No active sequence</source>
-        <translation>没有已激活的片段</translation>
+        <translation>没有已激活的序列</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="350" />
         <source>No sequence is active, please open the sequence you want to replace clips from.</source>
-        <translation>没有片段处于激活状态,请打开要代替剪辑的片段.</translation>
+        <translation>没有序列处于激活状态,请打开要代替剪辑的序列.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="358" />
         <source>Active sequence selected</source>
-        <translation>激活选择的片段</translation>
+        <translation>激活选择的序列</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="359" />
@@ -3074,7 +3074,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/project.cpp" line="537" />
         <source>The media '%1' is currently used in '%2'. Deleting it will remove all instances in the sequence. Are you sure you want to do this?</source>
-        <translation>此媒体 '%1' 正在被使用于 '%2'. 删除它将删除片段中的所有实例. В你确定你要这么做吗?</translation>
+        <translation>此媒体 &apos;%1&apos; 正在被使用于 &apos;%2&apos;. 删除它将删除序列中的所有实例. 你确定你要这么做吗?</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="542" />
@@ -3109,22 +3109,22 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/project.cpp" line="836" />
         <source>Image sequence detected</source>
-        <translation>图像片段检测</translation>
+        <translation>图像序列检测</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="837" />
         <source>The file '%1' appears to be part of an image sequence. Would you like to import it as such?</source>
-        <translation>该文件 '%1' 似乎是图像片段中的一部分. 您要按原样代替吗?</translation>
+        <translation>该文件 &apos;%1&apos; 似乎是图像序列中的一部分. 您要按原样导入吗?</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="978" />
         <source>Import media...</source>
-        <translation>输入媒体...</translation>
+        <translation>导入媒体...</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="990" />
         <source>No sequence is active, please open the sequence you want to delete clips from.</source>
-        <translation>没有片段处于激活状态,请打开要从中删除剪辑的片段.</translation>
+        <translation>没有序列处于激活状态,请打开要从中删除剪辑的序列.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="993" />
@@ -3177,7 +3177,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="61" />
         <source>Format:</source>
-        <translation>个格式:</translation>
+        <translation>格式:</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="64" />
@@ -3192,7 +3192,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="75" />
         <source>Same as Source (in "%1" folder)</source>
-        <translation>使用与来源相同的大小 (在 "%1" 目录)</translation>
+        <translation>使用与来源相同的大小 (在 &quot;%1&quot; 文件夹)</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="128" />
@@ -3335,7 +3335,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="93" />
         <source>Folder selected</source>
-        <translation>目录选择</translation>
+        <translation>文件夹已选择</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="94" />
@@ -3345,12 +3345,12 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="101" />
         <source>Active sequence selected</source>
-        <translation>激活的片段已经被选择</translation>
+        <translation>激活的序列已经被选择</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="102" />
         <source>You cannot insert a sequence into itself.</source>
-        <translation>无法插入该片段至自己当中.</translation>
+        <translation>无法插入该序列至自己当中.</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="111" />
@@ -3530,7 +3530,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="83" />
         <source>Import...</source>
-        <translation>输入...</translation>
+        <translation>导入...</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="86" />
@@ -3560,7 +3560,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="104" />
         <source>Show Sequences</source>
-        <translation>显示片段</translation>
+        <translation>显示序列</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="116" />
@@ -3570,17 +3570,17 @@ Audio Layout: %6</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="120" />
         <source>Reveal in Explorer</source>
-        <translation>在浏览器中预览</translation>
+        <translation>在资源管理器中显示</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="122" />
         <source>Reveal in Finder</source>
-        <translation>在查找当中预览</translation>
+        <translation>在 Finder 中显示</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="124" />
         <source>Reveal in File Manager</source>
-        <translation>在文件管理器中预览</translation>
+        <translation>在文件管理器中显示</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="129" />
@@ -3590,7 +3590,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="152" />
         <source>Create Sequence With This Media</source>
-        <translation>使用此媒体创建片段</translation>
+        <translation>使用此媒体创建序列</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="158" />
@@ -3600,7 +3600,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="164" />
         <source>Delete All Clips Using This Media</source>
-        <translation>删除所有使用此问题的剪辑</translation>
+        <translation>删除所有使用此媒体的剪辑</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="167" />
@@ -3640,7 +3640,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="228" />
         <source>Preview in Media Viewer</source>
-        <translation>在媒体浏览器中预览</translation>
+        <translation>在媒体查看器中预览</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="234" />
@@ -3951,7 +3951,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="68" />
         <source>Alignment</source>
-        <translation>校准</translation>
+        <translation>对齐</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="70" />
@@ -3972,7 +3972,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="73" />
         <source>Justify</source>
-        <translation>整理版面</translation>
+        <translation>两端对齐</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="76" />
@@ -4060,7 +4060,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="53" />
         <source>Sequence</source>
-        <translation>片段</translation>
+        <translation>序列</translation>
     </message>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="54" />
@@ -4103,22 +4103,22 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="229" />
         <source>Pointer Tool</source>
-        <translation>选择/移动/默认</translation>
+        <translation>指针工具</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="230" />
         <source>Edit Tool</source>
-        <translation>选择部分</translation>
+        <translation>编辑工具</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="231" />
         <source>Ripple Tool</source>
-        <translation>涟漪的工具</translation>
+        <translation>波纹工具</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="232" />
         <source>Razor Tool</source>
-        <translation>剪刀</translation>
+        <translation>剃刀工具</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="233" />
@@ -4128,7 +4128,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="234" />
         <source>Slide Tool</source>
-        <translation>幻灯片工具</translation>
+        <translation>滑移工具</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="235" />
@@ -4138,12 +4138,12 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="236" />
         <source>Transition Tool</source>
-        <translation>过度/转场效果</translation>
+        <translation>转场工具</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="237" />
         <source>Snapping</source>
-        <translation>边缘吸合/自动对齐</translation>
+        <translation>吸附</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="238" />
@@ -4168,7 +4168,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/timeline.cpp" line="386" />
         <source>Nested Sequence</source>
-        <translation>嵌套的片段</translation>
+        <translation>嵌套的序列</translation>
     </message>
     <message>
         <location filename="../panels/timeline_clipboard.cpp" line="117" />
@@ -4404,7 +4404,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="71" />
         <source>Sequence Settings</source>
-        <translation>片段设置</translation>
+        <translation>序列设置</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="90" />
@@ -4424,7 +4424,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="106" />
         <source>Auto-Cut Silence</source>
-        <translation>噪声分离</translation>
+        <translation>自动剪切静音</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="109" />
@@ -4470,7 +4470,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="221" />
         <source>Couldn't locate media wrapper for sequence.</source>
-        <translation>无法找到片段的媒体包装器.</translation>
+        <translation>无法找到序列的媒体包装器.</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="375" />
@@ -4480,12 +4480,12 @@ Duration: %4</source>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="383" />
         <source>New Sequence</source>
-        <translation>新片段</translation>
+        <translation>新序列</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="384" />
         <source>No sequence has been created yet. Would you like to make one based on this footage or set custom parameters?</source>
-        <translation>尚未创建任何片段。您想根据此素材创建一个，还是设置自定义参数？</translation>
+        <translation>尚未创建任何序列。您想根据此素材创建一个，还是设置自定义参数？</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="386" />
@@ -4651,7 +4651,7 @@ Duration: %4</source>
         <location filename="../effects/internal/vsthost.cpp" line="171" />
         <location filename="../effects/internal/vsthost.cpp" line="187" />
         <source>Error loading VST plugin</source>
-        <translation>加载VST插件按时发生错误</translation>
+        <translation>加载VST插件时发生错误</translation>
     </message>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="172" />
@@ -4666,7 +4666,7 @@ Duration: %4</source>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="213" />
         <source>VST Error</source>
-        <translation>VST发生错误</translation>
+        <translation>VST 错误</translation>
     </message>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="213" />
@@ -4734,7 +4734,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1086" />
         <source>Sequence Viewer</source>
-        <translation>片段预览</translation>
+        <translation>序列预览</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1087" />
@@ -4771,7 +4771,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="152" />
         <source>Screen %1: %2x%3</source>
-        <translation>放映 %1: %2x%3</translation>
+        <translation>屏幕 %1: %2x%3</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="159" />
@@ -4806,7 +4806,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="224" />
         <source>Set Custom Zoom Value:</source>
-        <translation>设置自己定义缩放:</translation>
+        <translation>设置自定义缩放值:</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="629" />

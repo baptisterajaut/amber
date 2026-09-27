@@ -795,7 +795,7 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="194" />
         <source>could not allocate video frame buffer (%1)</source>
-        <translation>Tidak dapat mengalokasikan video buffer (%1)</translation>
+        <translation>tidak dapat mengalokasikan video buffer (%1)</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="225" />
@@ -825,7 +825,7 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="311" />
         <source>could not initialize audio resampler (%1)</source>
-        <translation>Tidak dapat menginisialisasi audio resampler (%1)</translation>
+        <translation>tidak dapat menginisialisasi audio resampler (%1)</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="333" />
@@ -954,7 +954,7 @@
     <message>
         <location filename="../panels/grapheditor.cpp" line="142" />
         <source>Bezier</source>
-        <translation>Kurva Bezier</translation>
+        <translation>Bézier</translation>
     </message>
     <message>
         <location filename="../panels/grapheditor.cpp" line="143" />
@@ -1139,7 +1139,7 @@
     <message>
         <location filename="../ui/labelslider.cpp" line="275" />
         <source>&amp;Reset to Default</source>
-        <translation>&amp;Kembalikan seperti Semula</translation>
+        <translation>&amp;Atur ulang ke default</translation>
     </message>
     <message>
         <location filename="../ui/labelslider.cpp" line="306" />
@@ -2043,12 +2043,12 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="261" />
         <source>Set In Point</source>
-        <translation>Set Titik Masuk</translation>
+        <translation>Atur Titik Masuk</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="262" />
         <source>Set Out Point</source>
-        <translation>Set Titik Keluar</translation>
+        <translation>Atur Titik Keluar</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="263" />
@@ -2483,7 +2483,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="472" />
         <source>Failed to open file for writing</source>
-        <translation>Gagal membaca file</translation>
+        <translation>Gagal menulis file</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="478" />
@@ -4218,7 +4218,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="381" />
         <source>Nest Clip(s)</source>
-        <translation>Nest Klip</translation>
+        <translation>Sarangkan Klip</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="459" />
@@ -4228,7 +4228,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="646" />
         <source>Ripple Delete In/Out</source>
-        <translation>Hapus Ripple Masuk/Keluar</translation>
+        <translation>Hapus dan Sesuaikan Masuk/Keluar</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="646" />
@@ -4243,7 +4243,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="686" />
         <source>Ripple Delete</source>
-        <translation>Hapus Ripple</translation>
+        <translation>Hapus dan Sesuaikan</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="686" />
@@ -4253,7 +4253,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="960" />
         <source>Ripple Edit</source>
-        <translation>Edit Ripple</translation>
+        <translation>Edit Sesuaikan</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="960" />
@@ -4431,7 +4431,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="109" />
         <source>Auto-S&amp;cale</source>
-        <translation>Per&amp;besar Otomatis</translation>
+        <translation>&amp;Skala Otomatis</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="159" />
@@ -4750,7 +4750,7 @@ Durasi: %4</translation>
         <location filename="../ui/viewercontainer.cpp" line="102" />
         <location filename="../ui/viewercontainer.cpp" line="110" />
         <source>Add Guide</source>
-        <translation>Tambah Guide</translation>
+        <translation>Tambah Panduan</translation>
     </message>
 </context>
 <context>
@@ -4813,7 +4813,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="629" />
         <source>Move Guide</source>
-        <translation>Pindah Guide</translation>
+        <translation>Pindah Panduan</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="886" />
@@ -4836,7 +4836,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="965" />
         <source>Add Guide</source>
-        <translation>Tambah Guide</translation>
+        <translation>Tambah Panduan</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="622" />

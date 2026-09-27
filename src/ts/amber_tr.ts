@@ -115,7 +115,7 @@
     <message>
         <location filename="../project/media.cpp" line="55" />
         <source>Mono</source>
-        <translation>Моno</translation>
+        <translation>Mono</translation>
     </message>
     <message>
         <location filename="../project/media.cpp" line="56" />
@@ -316,7 +316,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="661" />
         <source>This settings file doesn't match this effect.</source>
-        <translation>Bu ayar dosyası doesn't bu efekt ile eşleşmiyor</translation>
+        <translation>Bu ayar dosyası bu efekt ile eşleşmiyor</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="981" />
@@ -339,7 +339,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="326" />
         <source>(none)</source>
-        <translation>(пусто)</translation>
+        <translation>(boş)</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="511" />
@@ -354,7 +354,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="514" />
         <source>VIDEO EFFECTS</source>
-        <translation>VİDEO EFEKT</translation>
+        <translation>VİDEO EFEKTİ</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="515" />
@@ -487,7 +487,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="81" />
         <source>Export "%1"</source>
-        <translation>İhraç "%1"</translation>
+        <translation>Dışa Aktar &quot;%1&quot;</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="134" />
@@ -512,7 +512,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="466" />
         <source>Export width and height must both be even numbers/divisible by 2.</source>
-        <translation>İhracat genişliğinin ve yüksekliğinin her ikisi ikinci sayılar/bölünebilir olmalıdır.</translation>
+        <translation>Dışa aktarma genişliğinin ve yüksekliğinin her ikisi çift sayılar/bölünebilir olmalıdır.</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="474" />
@@ -558,17 +558,17 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="625" />
         <source>Failed to find a suitable encoder for this codec. Export will likely fail.</source>
-        <translation>Bu codec bileşeni için uygun bir kodlayıcı bulunamadı. İhracat muhtemelen başarısız olacak.</translation>
+        <translation>Bu codec bileşeni için uygun bir kodlayıcı bulunamadı. Dışa aktarma muhtemelen başarısız olacak.</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="641" />
         <source>Failed to find pixel format for this encoder. Export will likely fail.</source>
-        <translation>Bu kodlayıcı için piksel formatı bulunamadı. İhracat muhtemelen başarısız olacak.</translation>
+        <translation>Bu kodlayıcı için piksel formatı bulunamadı. Dışa aktarma muhtemelen başarısız olacak.</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="654" />
         <source>Bitrate (Mbps):</source>
-        <translation>Akış hızı (Мбіт/с):</translation>
+        <translation>Akış hızı (Mbps):</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="658" />
@@ -618,7 +618,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="707" />
         <source>Entire Sequence</source>
-        <translation>Tam Sıra</translation>
+        <translation>Tam Sekans</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="708" />
@@ -964,7 +964,7 @@
         <location filename="../panels/grapheditor.cpp" line="143" />
         <source>Hold</source>
         <translatorcomment>Rafine</translatorcomment>
-        <translation>Oldu</translation>
+        <translation>Tut</translation>
     </message>
 </context>
 <context>
@@ -1005,7 +1005,7 @@
     <message>
         <location filename="../project/media.cpp" line="45" />
         <source>None (Progressive)</source>
-        <translation>Merhaba (İlerleyen)</translation>
+        <translation>Yok (İlerleyen)</translation>
     </message>
     <message>
         <location filename="../project/media.cpp" line="46" />
@@ -1117,7 +1117,7 @@
         <location filename="../ui/keyframeview.cpp" line="72" />
         <source>Hold</source>
         <translatorcomment>Rafine</translatorcomment>
-        <translation>Oldu</translation>
+        <translation>Tut</translation>
     </message>
     <message>
         <location filename="../ui/keyframeview.cpp" line="77" />
@@ -1210,7 +1210,7 @@
     <message>
         <location filename="../project/loadthread.cpp" line="780" />
         <source>User aborted loading</source>
-        <translation>Kullanıcı iptal edildi</translation>
+        <translation>Kullanıcı yüklemeyi iptal etti</translation>
     </message>
     <message>
         <location filename="../project/loadthread.cpp" line="811" />
@@ -1220,7 +1220,7 @@
     <message>
         <location filename="../project/loadthread.cpp" line="812" />
         <source>Couldn't load '%1'. %2</source>
-        <translation>Yüklenemdi '%1'. %2</translation>
+        <translation>Yüklenemedi &apos;%1&apos;. %2</translation>
     </message>
     <message>
         <location filename="../project/loadthread.cpp" line="814" />
@@ -1278,7 +1278,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="967" />
         <source>&amp;Import...</source>
-        <translation>&amp;Dışa aktar...</translation>
+        <translation>&amp;İçe Aktar...</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="968" />
@@ -1293,7 +1293,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="970" />
         <source>&amp;Export...</source>
-        <translation>&amp;İhraç...</translation>
+        <translation>&amp;Dışa Aktar...</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="971" />
@@ -1388,7 +1388,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="991" />
         <source>Decrease Track Height</source>
-        <translation>Parça Yüksekliğini Azalt</translation>
+        <translation>İz Yüksekliğini Azalt</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="992" />
@@ -1520,7 +1520,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1022" />
         <source>Go to Start</source>
-        <translation>Başlaş Git</translation>
+        <translation>Başa Git</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1023" />
@@ -1535,7 +1535,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1025" />
         <source>Play In to Out</source>
-        <translation>Dışarıda Oynat</translation>
+        <translation>Girişten Çıkışa Oynat</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1026" />
@@ -1612,7 +1612,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1033" />
         <source>Go to Next Cut</source>
-        <translation>Snraki bölüme git</translation>
+        <translation>Sonraki bölüme git</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1034" />
@@ -1634,7 +1634,7 @@
         <location filename="../ui/mainwindow.cpp" line="1038" />
         <source>Shuttle Stop</source>
         <translatorcomment>rafine</translatorcomment>
-        <translation>Durma</translation>
+        <translation>Dur</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1039" />
@@ -1677,13 +1677,13 @@
         <location filename="../ui/mainwindow.cpp" line="1049" />
         <source>Media Viewer</source>
         <translatorcomment>rafine</translatorcomment>
-        <translation>Medya Dosyası Tarayıcısı</translation>
+        <translation>Medya Görüntüleyici</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1050" />
         <source>Sequence Viewer</source>
         <translatorcomment>rafine</translatorcomment>
-        <translation>Sıra Görüntüleyici</translation>
+        <translation>Sekans Görüntüleyici</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1051" />
@@ -1724,12 +1724,12 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1061" />
         <source>Ripple Tool</source>
-        <translation>Makas ve Montaj Aracı</translation>
+        <translation>Dalgalanma Aracı</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1062" />
         <source>Razor Tool</source>
-        <translation>Budama</translation>
+        <translation>Jilet Aracı</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1063" />
@@ -1739,7 +1739,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1064" />
         <source>Slide Tool</source>
-        <translation>Kaydırma</translation>
+        <translation>Öteleme Aracı</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1065" />
@@ -1750,7 +1750,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1066" />
         <source>Transition Tool</source>
-        <translation>Geçiş</translation>
+        <translation>Geçiş Aracı</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1067" />
@@ -1800,7 +1800,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1082" />
         <source>A&amp;ction Search</source>
-        <translation>Et&amp;kin Arama</translation>
+        <translation>İşlem &amp;Arama</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1083" />
@@ -1833,7 +1833,7 @@
     <message>
         <location filename="../timeline/marker.cpp" line="66" />
         <source>Set sequence marker name:</source>
-        <translation>Sıra işaretleyicisinin adını ayarla:</translation>
+        <translation>Sekans işaretleyicisinin adını ayarla:</translation>
     </message>
     <message>
         <location filename="../timeline/marker.cpp" line="75" />
@@ -2049,7 +2049,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="259" />
         <source>&amp;Sequence</source>
-        <translation>&amp;Sıra</translation>
+        <translation>&amp;Sekans</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="260" />
@@ -2146,7 +2146,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="278" />
         <source>Duplicate</source>
-        <translation>Yinele</translation>
+        <translation>Çoğalt</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="279" />
@@ -2156,7 +2156,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="280" />
         <source>Ripple Delete</source>
-        <translation>Dalgacığı Sil</translation>
+        <translation>Dalgalı Sil</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="281" />
@@ -2209,7 +2209,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="83" />
         <source>New Sequence</source>
-        <translation>Yeni Sıra</translation>
+        <translation>Yeni Sekans</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="111" />
@@ -2230,7 +2230,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="213" />
         <source>Film 4K</source>
-        <translation>Film 4К</translation>
+        <translation>Film 4K</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="214" />
@@ -2315,12 +2315,12 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="272" />
         <source>Interlacing:</source>
-        <translation>Karıştır:</translation>
+        <translation>Geçmeli Tarama:</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="274" />
         <source>None (Progressive)</source>
-        <translation>Merhaba (ilerleyen)</translation>
+        <translation>Yok (ilerleyen)</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="282" />
@@ -2330,7 +2330,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="286" />
         <source>Sample Rate: </source>
-        <translation>Aynı Oran:</translation>
+        <translation>Örnekleme Oranı:</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="304" />
@@ -2446,7 +2446,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="96" />
         <source>Default Sequence</source>
-        <translation>Varsayılan Sıra</translation>
+        <translation>Varsayılan Sekans</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="197" />
@@ -2497,7 +2497,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="470" />
         <source>Shortcuts exported successfully</source>
-        <translation>Kısayollar başarıyla verildi</translation>
+        <translation>Kısayollar başarıyla dışa aktarıldı</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="472" />
@@ -2537,7 +2537,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="553" />
         <source>Image sequence formats:</source>
-        <translation>Görüntü sırası formatları:</translation>
+        <translation>Görüntü dizisi formatları:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="563" />
@@ -2577,7 +2577,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="615" />
         <source>Default Sequence Settings</source>
-        <translation>Varsayılan Sıralama Ayarları</translation>
+        <translation>Varsayılan Sekans Ayarları</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="622" />
@@ -2617,7 +2617,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="664" />
         <source>Automatically Seek to the Beginning When Playing at the End of a Sequence</source>
-        <translation>Bir Sıranın Sonunda Oynarken Başlangıcı Otomatik Olarak Ara</translation>
+        <translation>Bir Sekansın Sonunda Oynarken Başlangıcı Otomatik Olarak Ara</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="668" />
@@ -2637,7 +2637,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="680" />
         <source>Seek Also Selects</source>
-        <translation>Ayrıca Arayınor</translation>
+        <translation>Ayrıca Arıyor</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="684" />
@@ -2677,7 +2677,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="705" />
         <source>Seek to the End of Pastes</source>
-        <translation>Eklerin sonuna gidin açın</translation>
+        <translation>Eklerin sonuna gidin</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="709" />
@@ -2698,7 +2698,7 @@ Ses Kanalları: %6</translation>
         <location filename="../dialogs/preferencesdialog.cpp" line="718" />
         <source>Enable Drag Files to Timeline</source>
         <translatorcomment>rafine</translatorcomment>
-        <translation>Dosyaları sürükleyerek kurulum tablosuna etkinleştirin</translation>
+        <translation>Dosyaları sürükleyerek montaj masasına etkinleştirin</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="722" />
@@ -2882,7 +2882,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="928" />
         <source>Sample Rate:</source>
-        <translation>Aynı oran:</translation>
+        <translation>Örnekleme oranı:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="944" />
@@ -2922,12 +2922,12 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="982" />
         <source>Import</source>
-        <translation>Dışa Aktar</translation>
+        <translation>İçe Aktar</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="986" />
         <source>Export</source>
-        <translation>İhraç</translation>
+        <translation>Dışa Aktar</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="992" />
@@ -2942,7 +2942,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="1002" />
         <source>Keyboard</source>
-        <translation>Klavye Kısayolları</translation>
+        <translation>Klavye</translation>
     </message>
 </context>
 <context>
@@ -3018,7 +3018,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../panels/project.cpp" line="221" />
         <source>Sequence</source>
-        <translation>Düzen</translation>
+        <translation>Sekans</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="310" />
@@ -3045,23 +3045,23 @@ Ses Kanalları: %6</translation>
         <location filename="../panels/project.cpp" line="349" />
         <location filename="../panels/project.cpp" line="989" />
         <source>No active sequence</source>
-        <translation>Etkin sıra yok</translation>
+        <translation>Etkin sekans yok</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="350" />
         <source>No sequence is active, please open the sequence you want to replace clips from.</source>
-        <translation> Hiçbir dizi etkin değil, lütfen klipleri değiştirmek istediğiniz sırayı açın..</translation>
+        <translation>Hiçbir sekans etkin değil, lütfen klipleri değiştirmek istediğiniz sekansı açın.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="358" />
         <source>Active sequence selected</source>
-        <translation>Aktif sıra seçildi</translation>
+        <translation>Aktif sekans seçildi</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="359" />
         <source>You cannot insert a sequence into itself, so no clips of this media would be in this sequence.</source>
         <translatorcomment>rafine</translatorcomment>
-        <translation>Kendi içine bir dizi ekleyemezsiniz, bu nedenle bu ortamın hiçbir klibi bu sıralamada olmaz.</translation>
+        <translation>Kendi içine bir sekans ekleyemezsiniz, bu nedenle bu ortamın hiçbir klibi bu sekansta olmaz.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="384" />
@@ -3097,7 +3097,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../panels/project.cpp" line="537" />
         <source>The media '%1' is currently used in '%2'. Deleting it will remove all instances in the sequence. Are you sure you want to do this?</source>
-        <translation>Medya '% 1'; şu anda '% 2' içinde kullanılmaktadır '%2'. Silme, dizideki tüm örnekleri siler. Bunu yapmak istediğinden emin misin?</translation>
+        <translation>Medya &apos;%1&apos; şu anda &apos;%2&apos; içinde kullanılmaktadır. Silme, sekanstaki tüm örnekleri siler. Bunu yapmak istediğinden emin misin?</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="542" />
@@ -3132,12 +3132,12 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../panels/project.cpp" line="836" />
         <source>Image sequence detected</source>
-        <translation>Görüntü sırası algılandı</translation>
+        <translation>Görüntü dizisi algılandı</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="837" />
         <source>The file '%1' appears to be part of an image sequence. Would you like to import it as such?</source>
-        <translation>Dosya '%1' bir görüntü dizisinin parçası gibi görünüyor.. Bu şekilde ithal etmek ister misiniz?</translation>
+        <translation>Dosya &apos;%1&apos; bir görüntü dizisinin parçası gibi görünüyor. Bu şekilde içe aktarmak ister misiniz?</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="978" />
@@ -3147,7 +3147,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../panels/project.cpp" line="990" />
         <source>No sequence is active, please open the sequence you want to delete clips from.</source>
-        <translation>Aktif dizi yok. Klipleri kaldırmak istediğiniz sırayı açın.</translation>
+        <translation>Aktif sekans yok. Klipleri kaldırmak istediğiniz sekansı açın.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="993" />
@@ -3190,12 +3190,12 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="56" />
         <source>Eighth Resolution (1/8)</source>
-        <translation>Sekizinci Çözünürlük (1/8)</translation>
+        <translation>Sekizde Bir Çözünürlük (1/8)</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="57" />
         <source>Sixteenth Resolution (1/16)</source>
-        <translation>Onaltıncı Çözünürlük (1/16)</translation>
+        <translation>Onaltıda Bir Çözünürlük (1/16)</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="61" />
@@ -3205,7 +3205,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="64" />
         <source>ProRes HQ</source>
-        <translation>ProRes HD</translation>
+        <translation>ProRes HQ</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="72" />
@@ -3215,7 +3215,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="75" />
         <source>Same as Source (in "%1" folder)</source>
-        <translation>Kaynakla aynı (dosya "%1" içinde )</translation>
+        <translation>Kaynakla aynı (klasör &quot;%1&quot; içinde)</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="128" />
@@ -3238,7 +3238,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../project/proxygenerator.cpp" line="382" />
         <source>Finished generating proxy for "%1"</source>
-        <translation>İçin tam bir vekil oluşturma "%1"</translation>
+        <translation>&quot;%1&quot; için vekil oluşturma tamamlandı</translation>
     </message>
 </context>
 <context>
@@ -3368,12 +3368,12 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="101" />
         <source>Active sequence selected</source>
-        <translation>Aktif sıra seçildi</translation>
+        <translation>Aktif sekans seçildi</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="102" />
         <source>You cannot insert a sequence into itself.</source>
-        <translation>Kendi içinde bir sıra ekleyemezsiniz.</translation>
+        <translation>Kendi içinde bir sekans ekleyemezsiniz.</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="111" />
@@ -3516,7 +3516,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../effects/internal/solideffect.cpp" line="44" />
         <source>Solid Color</source>
-        <translation>Koyu Renk</translation>
+        <translation>Düz Renk</translation>
     </message>
     <message>
         <location filename="../effects/internal/solideffect.cpp" line="45" />
@@ -3526,7 +3526,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../effects/internal/solideffect.cpp" line="46" />
         <source>Checkerboard</source>
-        <translation>Santrançtahtası</translation>
+        <translation>Satranç Tahtası</translation>
     </message>
     <message>
         <location filename="../effects/internal/solideffect.cpp" line="48" />
@@ -3554,7 +3554,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../project/sourcescommon.cpp" line="83" />
         <source>Import...</source>
-        <translation>İthal...</translation>
+        <translation>İçe Aktar...</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="86" />
@@ -3584,7 +3584,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../project/sourcescommon.cpp" line="104" />
         <source>Show Sequences</source>
-        <translation>Sıraları Göster</translation>
+        <translation>Sekansları Göster</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="116" />
@@ -3616,12 +3616,12 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../project/sourcescommon.cpp" line="152" />
         <source>Create Sequence With This Media</source>
-        <translation>Bu dosyalarla bir sıra oluşturun</translation>
+        <translation>Bu dosyalarla bir sekans oluşturun</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="158" />
         <source>Duplicate</source>
-        <translation>Benzer</translation>
+        <translation>Çoğalt</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="164" />
@@ -3687,7 +3687,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../project/sourcescommon.cpp" line="294" />
         <source>You dropped a file onto '%1'. Would you like to replace it with the dropped file?</source>
-        <translation>Dosyayı. '%1'. Bu dosyayı değiştirmek istiyor musunuz?</translation>
+        <translation>&apos;%1&apos; üzerine bir dosya bıraktınız. Bu dosyayla değiştirmek ister misiniz?</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="345" />
@@ -3702,7 +3702,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../project/sourcescommon.cpp" line="425" />
         <source>Delete proxy</source>
-        <translation>Vekil Sunucu</translation>
+        <translation>Vekili Sil</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="426" />
@@ -4096,7 +4096,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="53" />
         <source>Sequence</source>
-        <translation>Sıra</translation>
+        <translation>Sekans</translation>
     </message>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="54" />
@@ -4154,27 +4154,27 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="232" />
         <source>Razor Tool</source>
-        <translation>Kırpma</translation>
+        <translation>Jilet Aracı</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="233" />
         <source>Slip Tool</source>
-        <translation>Ofset kaydırma</translation>
+        <translation>Kaydırma Aracı</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="234" />
         <source>Slide Tool</source>
-        <translation>Kaydırma Aracı</translation>
+        <translation>Öteleme Aracı</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="235" />
         <source>Hand Tool</source>
-        <translation>Yol Bul</translation>
+        <translation>Yol Bulma Aracı</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="236" />
         <source>Transition Tool</source>
-        <translation>Geçiş</translation>
+        <translation>Geçiş Aracı</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="237" />
@@ -4204,7 +4204,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="386" />
         <source>Nested Sequence</source>
-        <translation>İç içe sıra</translation>
+        <translation>İç içe sekans</translation>
     </message>
     <message>
         <location filename="../panels/timeline_clipboard.cpp" line="117" />
@@ -4309,12 +4309,12 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="1232" />
         <source>Solid Color...</source>
-        <translation>Koyu Renk...</translation>
+        <translation>Düz Renk...</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1237" />
         <source>Bars...</source>
-        <translation>Test Masası...</translation>
+        <translation>Test Çubuğu...</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1244" />
@@ -4407,7 +4407,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../ui/timelineheader.cpp" line="515" />
         <source>Center Timecodes</source>
-        <translation>Tarih Kodunuortala</translation>
+        <translation>Zaman Kodlarını Ortala</translation>
     </message>
     <message>
         <location filename="../ui/timelineheader.cpp" line="528" />
@@ -4441,7 +4441,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="71" />
         <source>Sequence Settings</source>
-        <translation>Sıra Ayarları</translation>
+        <translation>Sekans Ayarları</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="90" />
@@ -4466,7 +4466,7 @@ Ses Kanalları: %6</translation>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="109" />
         <source>Auto-S&amp;cale</source>
-        <translation>Otomatik&amp;ölçeklendirme</translation>
+        <translation>Otomatik &amp;Ölçeklendirme</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="159" />
@@ -4508,7 +4508,7 @@ Süre: %4</translation>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="221" />
         <source>Couldn't locate media wrapper for sequence.</source>
-        <translation>Dizi için ortam sargısı bulunamadı.</translation>
+        <translation>Sekans için ortam sargısı bulunamadı.</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="375" />
@@ -4518,7 +4518,7 @@ Süre: %4</translation>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="383" />
         <source>New Sequence</source>
-        <translation>Yeni Sıra</translation>
+        <translation>Yeni Sekans</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="384" />
@@ -4543,7 +4543,7 @@ Süre: %4</translation>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="812" />
         <source>Solid Color</source>
-        <translation>Koyu Renk</translation>
+        <translation>Düz Renk</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="817" />
@@ -4596,7 +4596,7 @@ Süre: %4</translation>
     <message>
         <location filename="../effects/internal/toneeffect.cpp" line="31" />
         <source>Type</source>
-        <translation>Тür</translation>
+        <translation>Tür</translation>
     </message>
     <message>
         <location filename="../effects/internal/toneeffect.cpp" line="33" />
@@ -4611,7 +4611,7 @@ Süre: %4</translation>
     <message>
         <location filename="../effects/internal/toneeffect.cpp" line="41" />
         <source>Amount</source>
-        <translation>Toplam</translation>
+        <translation>Miktar</translation>
     </message>
     <message>
         <location filename="../effects/internal/toneeffect.cpp" line="47" />
@@ -4772,7 +4772,7 @@ Süre: %4</translation>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1086" />
         <source>Sequence Viewer</source>
-        <translation>Sıra Görüntüleyici</translation>
+        <translation>Sekans Görüntüleyici</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1087" />
