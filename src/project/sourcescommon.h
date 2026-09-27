@@ -48,6 +48,9 @@ class SourcesCommon : public QObject {
   void dropEvent(QWidget* parent, QDropEvent* e, const QModelIndex& drop_item, const QModelIndexList& items);
 
   void item_click(Media* m, const QModelIndex& index);
+
+  // Paints the "no media" hint over an item view's viewport when the project is empty.
+  void draw_empty_hint(QWidget* viewport);
  public slots:
   void stop_rename_timer();
  private slots:

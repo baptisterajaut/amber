@@ -31,6 +31,7 @@ extern "C" {
 #include <QVariant>
 
 #include <QDropEvent>
+#include <QHeaderView>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QMimeData>
@@ -147,11 +148,14 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   tree_view->setModel(&sorter);
   verticalLayout->addWidget(tree_view);
 
-  // Set the first column width
-  // I'm not sure if there's a better way to do this, default behavior seems to have all columns fixed width
-  // and let the last column fill up the remainder when really the opposite would be preferable (having the
-  // first column fill up the majority of the space). Anyway, this will probably do for now.
-  tree_view->setColumnWidth(0, tree_view->width() / 2);
+  // Configure column sizing: the first column (Name) stretches to fill all remaining space, while the
+  // other columns stay interactive and resizable.
+  tree_view->header()->setStretchLastSection(false);
+  tree_view->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+  tree_view->header()->setSectionResizeMode(1, QHeaderView::Interactive);
+  tree_view->header()->setSectionResizeMode(2, QHeaderView::Interactive);
+  tree_view->setColumnWidth(1, 100);
+  tree_view->setColumnWidth(2, 100);
 
   // icon view
   icon_view_container = new QWidget();
@@ -202,10 +206,8 @@ Project::Project(QWidget* parent) : Panel(parent), sorter(this), sources_common(
   // SetInt-based undo actions (e.g. color labels) mutate fields silently with no
   // dataChanged signal, so the views never re-query Media::data() on push/undo/redo.
   // Force a viewport repaint whenever the undo stack moves.
-  connect(&amber::UndoStack, &QUndoStack::indexChanged, tree_view->viewport(),
-          qOverload<>(&QWidget::update));
-  connect(&amber::UndoStack, &QUndoStack::indexChanged, icon_view->viewport(),
-          qOverload<>(&QWidget::update));
+  connect(&amber::UndoStack, &QUndoStack::indexChanged, tree_view->viewport(), qOverload<>(&QWidget::update));
+  connect(&amber::UndoStack, &QUndoStack::indexChanged, icon_view->viewport(), qOverload<>(&QWidget::update));
 
   update_view_type();
 
@@ -1252,7 +1254,6 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
     }
   }
 }
-
 
 void Project::save_project(bool autorecovery) {
   folder_id = 1;

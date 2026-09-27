@@ -125,6 +125,7 @@ class Project : public Panel {
 
   ProjectFilter sorter;
   SourcesCommon sources_common;
+
  private slots:
   void update_view_type();
   void clear_recent_projects();

@@ -203,6 +203,7 @@ void Timeline::setup_ui() {
   horizontalScrollBar->setMaximum(0);
   horizontalScrollBar->setSingleStep(20);
   horizontalScrollBar->setOrientation(Qt::Horizontal);
+  headers->set_scroll_bar(horizontalScrollBar);
 
   timeline_area_layout->addWidget(horizontalScrollBar);
 
@@ -309,6 +310,11 @@ void Timeline::update_sequence() {
   recordButton->setEnabled(!null_sequence);
   addButton->setEnabled(!null_sequence);
   headers->setEnabled(!null_sequence);
+
+  // With no active sequence the ruler and scrollbar have nothing to show; the timeline itself stays visible
+  // because it paints the empty-state hint and accepts the drop that creates a sequence.
+  headers->setVisible(!null_sequence);
+  horizontalScrollBar->setVisible(!null_sequence);
 
   // Update breadcrumb
   const auto& history = amber::Global->sequence_history();

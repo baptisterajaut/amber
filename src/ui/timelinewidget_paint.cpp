@@ -362,6 +362,7 @@ static void drawClipLabel(QPainter& p, ClipPtr clip, const QRect& clip_rect, QRe
     p.drawLine(text_rect.x(), underline_y, text_rect.x() + underline_width, underline_y);
   }
 
+  QColor text_color = p.pen().color();
   QString name = clip->name();
   if (qFuzzyIsNull(clip->speed().value)) {
     name += " (Frozen)";
@@ -370,6 +371,10 @@ static void drawClipLabel(QPainter& p, ClipPtr clip, const QRect& clip_rect, QRe
     if (clip->reversed()) name += "-";
     name += QString::number(clip->speed().value * 100) + "%)";
   }
+  // drop shadow for legibility against any clip color
+  p.setPen(QColor(0, 0, 0, 160));
+  p.drawText(text_rect.translated(1, 1), 0, name);
+  p.setPen(text_color);
   p.drawText(text_rect, 0, name, &text_rect);
 }
 
@@ -666,5 +671,12 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
     }
 
     drawEditCursor(p);
+  } else {
+    QPainter p(this);
+    QColor color = palette().color(QPalette::Text);
+    color.setAlpha(128);
+    p.setPen(color);
+    p.drawText(rect(), Qt::AlignCenter | Qt::TextWordWrap,
+               tr("No active sequence. Drag clips here to create a sequence."));
   }
 }

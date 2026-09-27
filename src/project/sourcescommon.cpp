@@ -25,6 +25,7 @@
 #include <QDesktopServices>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPainter>
 #include <QProcess>
 
 #include "dialogs/proxydialog.h"
@@ -40,6 +41,7 @@
 #include "project/footage.h"
 #include "project/media.h"
 #include "project/projectfilter.h"
+#include "project/projectmodel.h"
 #include "project/proxygenerator.h"
 #include "rendering/renderfunctions.h"
 #include "ui/mainwindow.h"
@@ -219,6 +221,17 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
   }
 
   menu.exec(QCursor::pos());
+}
+
+void SourcesCommon::draw_empty_hint(QWidget* viewport) {
+  // Checks the source model, not the search proxy: a search that matches nothing isn't an empty project.
+  if (amber::project_model.childCount() != 0) return;
+
+  QPainter p(viewport);
+  QColor color = viewport->palette().color(QPalette::Text);
+  color.setAlpha(128);
+  p.setPen(color);
+  p.drawText(viewport->rect(), Qt::AlignCenter | Qt::TextWordWrap, tr("No media. Double click to import."));
 }
 
 void SourcesCommon::mousePressEvent(QMouseEvent*) { stop_rename_timer(); }

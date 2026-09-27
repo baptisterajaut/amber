@@ -48,6 +48,7 @@ public:
   void dragEnterEvent(QDragEnterEvent *event) override;
   void dragMoveEvent(QDragMoveEvent *event) override;
   void dropEvent(QDropEvent* event) override;
+  void paintEvent(QPaintEvent* event) override;
 signals:
   void changed_root();
 private slots:
