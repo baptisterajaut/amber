@@ -31,6 +31,10 @@ For GPUs older than OpenGL 3.2, use [version 1.1.0](https://github.com/baptister
 
 1.x is feature-complete, maintenance only. 2.0 is in active development — GPU-native effects, ShaderToy import, scopes, 3-point editing, rendering pipeline overhaul. See [ROADMAP.md](ROADMAP.md).
 
+## 2.0 Preview
+
+A pre-alpha build of Amber 2.0 is published as the [Amber 2.0 Preview](https://github.com/baptisterajaut/amber/releases/tag/v2.0.0-preview) prerelease and rebuilt from the `2.0.x` branch as it moves. On top of a reworked, GPU-tested engine it already has a few things 1.x doesn't: an undo history with times, gradient-filled text, vertical sequence presets, a richer clip tooltip and an action search that ranks your most-used commands first. The full list, and what is still missing, is in [What's new in 2.0](https://github.com/baptisterajaut/amber/blob/2.0.x/WHATS_NEW_2.0.md). Use 1.x for real projects.
+
 ## Packages
 
 Pre-built packages for Windows, Linux (AppImage) and macOS on the [Releases](https://github.com/baptisterajaut/amber/releases) page. Arch Linux: `makepkg -si` from `packaging/linux/PKGBUILD`. Tested on Arch only; other builds are best-effort.
