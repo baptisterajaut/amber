@@ -749,6 +749,13 @@ void PreferencesDialog::setup_ui() {
   AddBoolPair(reopen_recent_project, &amber::CurrentConfig.reopen_recent_project);
   behavior_tab_layout->Add(reopen_recent_project);
 
+  QCheckBox* middle_click_edge_scroll = new QCheckBox(tr("Middle-Click Edge Scrolling"));
+  middle_click_edge_scroll->setToolTip(
+      tr("Hold the middle mouse button in the timeline and move the pointer near an edge to scroll in that "
+         "direction.\n\nWhen off, dragging with the middle mouse button pans the timeline."));
+  AddBoolPair(middle_click_edge_scroll, &amber::CurrentConfig.middle_click_edge_scroll);
+  behavior_tab_layout->Add(middle_click_edge_scroll);
+
   QWidget* frame_skip_row = new QWidget(behavior_tab);
   QHBoxLayout* frame_skip_layout = new QHBoxLayout(frame_skip_row);
   frame_skip_layout->setContentsMargins(0, 0, 0, 0);

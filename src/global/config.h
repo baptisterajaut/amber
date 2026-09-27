@@ -596,7 +596,7 @@ struct Config {
    * **TRUE** if middle-clicking and moving the cursor near the timeline viewport edges should automatically
    * scroll the tracks in that direction.
    */
-  bool middle_click_edge_scroll{true};
+  bool middle_click_edge_scroll{false};
 
   /**
    * @brief Frame skip step size
