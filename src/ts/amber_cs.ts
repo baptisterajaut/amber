@@ -1094,49 +1094,59 @@
 <context>
     <name>GradientEffect</name>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="32"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="33"/>
         <source>Type</source>
         <translation>Typ</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="34"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="35"/>
         <source>Linear</source>
         <translation>Lineární</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="35"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="36"/>
         <source>Radial</source>
         <translation>Radiální</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="38"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="39"/>
         <source>Start Color</source>
         <translation>Počáteční barva</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="42"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="43"/>
         <source>End Color</source>
         <translation>Koncová barva</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="46"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="47"/>
         <source>Angle</source>
         <translation>Úhel</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="52"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="53"/>
         <source>Center X</source>
         <translation>Střed X</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="58"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="59"/>
         <source>Center Y</source>
         <translation>Střed Y</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="64"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="65"/>
         <source>Radius</source>
         <translation>Poloměr</translation>
+    </message>
+    <message>
+        <location filename="../effects/internal/gradienteffect.cpp" line="71"/>
+        <source>As Mask</source>
+        <translation>Jako maska</translation>
+    </message>
+    <message>
+        <location filename="../effects/internal/gradienteffect.cpp" line="76"/>
+        <source>Ignore Text Shadow</source>
+        <translation>Ignorovat stín textu</translation>
     </message>
 </context>
 <context>
@@ -5042,7 +5052,48 @@ Když je vypnuto, tažení prostředním tlačítkem myši posouvá časovou osu
         <translation>Shoda snímku</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="188"/>
+        <source>Sequence: %1</source>
+        <translation>Úryvek: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="190"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="193"/>
+        <source>Generated</source>
+        <translation>Vytvořeno</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="195"/>
+        <source>Source: %1</source>
+        <translation>Zdroj: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="200"/>
+        <source>Frozen</source>
+        <translation>Zmrazeno</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="208"/>
+        <source>%1% (Reversed)</source>
+        <translation>%1 % (Obráceně)</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="210"/>
+        <source>%1%</source>
+        <translation>%1 %</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="213"/>
+        <source>Speed: %1</source>
+        <translation>Rychlost: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="219"/>
+        <source>Color Label: %1</source>
+        <translation>Barevný štítek: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="245"/>
         <source>Error</source>
         <translation>Chyba</translation>
     </message>
@@ -5072,7 +5123,7 @@ Když je vypnuto, tažení prostředním tlačítkem myši posouvá časovou osu
         <translation>Plná barva</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="174"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="173"/>
         <source>%1
 Start: %2
 End: %3
@@ -5093,7 +5144,7 @@ Doba trvání: %4</translation>
         <translation>&amp;Rychlost/Doba trvání</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="245"/>
         <source>Couldn&apos;t locate media wrapper for sequence.</source>
         <translation>Nepodařilo se najít obal záznamu pro tento úryvek (sled záběrů).</translation>
     </message>
@@ -5275,12 +5326,23 @@ Doba trvání: %4</translation>
 <context>
     <name>UndoHistoryPanel</name>
     <message>
-        <location filename="../panels/undohistorypanel.cpp" line="50"/>
+        <location filename="../panels/undohistorypanel.cpp" line="85"/>
         <source>Undo History</source>
         <translation>Historie kroků zpět</translation>
     </message>
     <message>
-        <location filename="../panels/undohistorypanel.cpp" line="51"/>
+        <location filename="../panels/undohistorypanel.cpp" line="86"/>
+        <source>Action</source>
+        <translation>Činnost</translation>
+    </message>
+    <message>
+        <location filename="../panels/undohistorypanel.cpp" line="86"/>
+        <source>Time</source>
+        <translation>Čas</translation>
+    </message>
+    <message>
+        <location filename="../panels/undohistorypanel.cpp" line="87"/>
+        <location filename="../panels/undohistorypanel.cpp" line="139"/>
         <source>Initial State</source>
         <translation>Počáteční stav</translation>
     </message>

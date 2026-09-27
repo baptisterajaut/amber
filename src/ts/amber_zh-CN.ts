@@ -1103,49 +1103,59 @@
 <context>
     <name>GradientEffect</name>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="32"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="33"/>
         <source>Type</source>
         <translation>类型</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="34"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="35"/>
         <source>Linear</source>
         <translation>线性</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="35"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="36"/>
         <source>Radial</source>
         <translation>径向</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="38"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="39"/>
         <source>Start Color</source>
         <translation>起始颜色</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="42"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="43"/>
         <source>End Color</source>
         <translation>结束颜色</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="46"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="47"/>
         <source>Angle</source>
         <translation>角度</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="52"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="53"/>
         <source>Center X</source>
         <translation>中心 X</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="58"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="59"/>
         <source>Center Y</source>
         <translation>中心 Y</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="64"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="65"/>
         <source>Radius</source>
         <translation>半径</translation>
+    </message>
+    <message>
+        <location filename="../effects/internal/gradienteffect.cpp" line="71"/>
+        <source>As Mask</source>
+        <translation>作为蒙版</translation>
+    </message>
+    <message>
+        <location filename="../effects/internal/gradienteffect.cpp" line="76"/>
+        <source>Ignore Text Shadow</source>
+        <translation>忽略文本阴影</translation>
     </message>
 </context>
 <context>
@@ -5091,7 +5101,7 @@ More makes playback smoother and uses more memory.</source>
         <translation>设置自动缩放</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="174"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="173"/>
         <source>%1
 Start: %2
 End: %3
@@ -5102,12 +5112,53 @@ Duration: %4</source>
 持续时间: %4</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="188"/>
+        <source>Sequence: %1</source>
+        <translation>序列: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="190"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="193"/>
+        <source>Generated</source>
+        <translation>已生成</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="195"/>
+        <source>Source: %1</source>
+        <translation>来源: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="200"/>
+        <source>Frozen</source>
+        <translation>已冻结</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="208"/>
+        <source>%1% (Reversed)</source>
+        <translation>%1% (反向)</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="210"/>
+        <source>%1%</source>
+        <translation>%1%</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="213"/>
+        <source>Speed: %1</source>
+        <translation>速度: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="219"/>
+        <source>Color Label: %1</source>
+        <translation>颜色标签: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="245"/>
         <source>Error</source>
         <translation>错误</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="245"/>
         <source>Couldn&apos;t locate media wrapper for sequence.</source>
         <translation>无法找到序列的媒体包装器.</translation>
     </message>
@@ -5284,12 +5335,23 @@ Duration: %4</source>
 <context>
     <name>UndoHistoryPanel</name>
     <message>
-        <location filename="../panels/undohistorypanel.cpp" line="50"/>
+        <location filename="../panels/undohistorypanel.cpp" line="85"/>
         <source>Undo History</source>
         <translation>撤销历史</translation>
     </message>
     <message>
-        <location filename="../panels/undohistorypanel.cpp" line="51"/>
+        <location filename="../panels/undohistorypanel.cpp" line="86"/>
+        <source>Action</source>
+        <translation>操作</translation>
+    </message>
+    <message>
+        <location filename="../panels/undohistorypanel.cpp" line="86"/>
+        <source>Time</source>
+        <translation>时间</translation>
+    </message>
+    <message>
+        <location filename="../panels/undohistorypanel.cpp" line="87"/>
+        <location filename="../panels/undohistorypanel.cpp" line="139"/>
         <source>Initial State</source>
         <translation>初始状态</translation>
     </message>

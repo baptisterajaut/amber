@@ -1094,49 +1094,59 @@
 <context>
     <name>GradientEffect</name>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="32"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="33"/>
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="34"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="35"/>
         <source>Linear</source>
         <translation>Linéaire</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="35"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="36"/>
         <source>Radial</source>
         <translation>Radial</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="38"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="39"/>
         <source>Start Color</source>
         <translation>Couleur de départ</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="42"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="43"/>
         <source>End Color</source>
         <translation>Couleur de fin</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="46"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="47"/>
         <source>Angle</source>
         <translation>Angle</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="52"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="53"/>
         <source>Center X</source>
         <translation>Centre X</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="58"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="59"/>
         <source>Center Y</source>
         <translation>Centre Y</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="64"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="65"/>
         <source>Radius</source>
         <translation>Rayon</translation>
+    </message>
+    <message>
+        <location filename="../effects/internal/gradienteffect.cpp" line="71"/>
+        <source>As Mask</source>
+        <translation>Comme masque</translation>
+    </message>
+    <message>
+        <location filename="../effects/internal/gradienteffect.cpp" line="76"/>
+        <source>Ignore Text Shadow</source>
+        <translation>Ignorer l&apos;ombre du texte</translation>
     </message>
 </context>
 <context>
@@ -5063,7 +5073,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
         <translation>Définir l&apos;échelle auto</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="174"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="173"/>
         <source>%1
 Start: %2
 End: %3
@@ -5094,12 +5104,53 @@ Durée : %4</translation>
         <translation>Propriétés</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="188"/>
+        <source>Sequence: %1</source>
+        <translation>Séquence : %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="190"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="193"/>
+        <source>Generated</source>
+        <translation>Généré</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="195"/>
+        <source>Source: %1</source>
+        <translation>Source : %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="200"/>
+        <source>Frozen</source>
+        <translation>Figé</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="208"/>
+        <source>%1% (Reversed)</source>
+        <translation>%1 % (Inversé)</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="210"/>
+        <source>%1%</source>
+        <translation>%1 %</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="213"/>
+        <source>Speed: %1</source>
+        <translation>Vitesse : %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="219"/>
+        <source>Color Label: %1</source>
+        <translation>Étiquette de couleur : %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="245"/>
         <source>Error</source>
         <translation>Erreur</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="245"/>
         <source>Couldn&apos;t locate media wrapper for sequence.</source>
         <translation>Impossible de localiser le conteneurdu média de cette séquence.</translation>
     </message>
@@ -5276,12 +5327,23 @@ Durée : %4</translation>
 <context>
     <name>UndoHistoryPanel</name>
     <message>
-        <location filename="../panels/undohistorypanel.cpp" line="50"/>
+        <location filename="../panels/undohistorypanel.cpp" line="85"/>
         <source>Undo History</source>
         <translation>Historique d&apos;annulation</translation>
     </message>
     <message>
-        <location filename="../panels/undohistorypanel.cpp" line="51"/>
+        <location filename="../panels/undohistorypanel.cpp" line="86"/>
+        <source>Action</source>
+        <translation>Action</translation>
+    </message>
+    <message>
+        <location filename="../panels/undohistorypanel.cpp" line="86"/>
+        <source>Time</source>
+        <translation>Temps</translation>
+    </message>
+    <message>
+        <location filename="../panels/undohistorypanel.cpp" line="87"/>
+        <location filename="../panels/undohistorypanel.cpp" line="139"/>
         <source>Initial State</source>
         <translation>État initial</translation>
     </message>
