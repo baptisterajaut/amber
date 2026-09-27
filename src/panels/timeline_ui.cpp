@@ -172,27 +172,6 @@ void Timeline::setup_ui() {
   breadcrumb_label->hide();
   timeline_area_layout->addWidget(breadcrumb_label);
 
-  timeline_placeholder_label = new QLabel(timeline_area_widget);
-  timeline_placeholder_label->setText(tr("No active sequence. Drag clips here to create a sequence."));
-  timeline_placeholder_label->setAlignment(Qt::AlignCenter);
-  timeline_placeholder_label->setWordWrap(true);
-  timeline_placeholder_label->setAutoFillBackground(true);
-  {
-    QPalette pal = timeline_placeholder_label->palette();
-    pal.setColor(QPalette::Window, pal.color(QPalette::Base));
-    QColor textColor = pal.color(QPalette::Text);
-    textColor.setAlpha(128);
-    pal.setColor(QPalette::WindowText, textColor);
-    timeline_placeholder_label->setPalette(pal);
-  }
-  {
-    QFont f = timeline_placeholder_label->font();
-    f.setPointSize(11);
-    timeline_placeholder_label->setFont(f);
-  }
-  timeline_placeholder_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-  timeline_area_layout->addWidget(timeline_placeholder_label);
-
   headers = new TimelineHeader();
   timeline_area_layout->addWidget(headers);
 
@@ -331,11 +310,9 @@ void Timeline::update_sequence() {
   addButton->setEnabled(!null_sequence);
   headers->setEnabled(!null_sequence);
 
-  // Show the placeholder (and hide the empty ruler/edit-area/scrollbar) when there's
-  // no active sequence, so an empty timeline doesn't look broken.
-  timeline_placeholder_label->setVisible(null_sequence);
+  // With no active sequence the ruler and scrollbar have nothing to show; the timeline itself stays visible
+  // because it paints the empty-state hint and accepts the drop that creates a sequence.
   headers->setVisible(!null_sequence);
-  editAreas->setVisible(!null_sequence);
   horizontalScrollBar->setVisible(!null_sequence);
 
   // Update breadcrumb

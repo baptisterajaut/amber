@@ -718,5 +718,12 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
     }
 
     drawEditCursor(p);
+  } else {
+    QPainter p(this);
+    QColor color = palette().color(QPalette::Text);
+    color.setAlpha(128);
+    p.setPen(color);
+    p.drawText(rect(), Qt::AlignCenter | Qt::TextWordWrap,
+               tr("No active sequence. Drag clips here to create a sequence."));
   }
 }
