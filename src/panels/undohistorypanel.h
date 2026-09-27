@@ -23,7 +23,7 @@
 
 #include "ui/panel.h"
 
-class QUndoView;
+class QTreeWidget;
 
 class UndoHistoryPanel : public Panel {
   Q_OBJECT
@@ -31,8 +31,22 @@ class UndoHistoryPanel : public Panel {
   explicit UndoHistoryPanel(QWidget* parent);
   void Retranslate() override;
 
+ private slots:
+  /** Rebuilds the tree to reflect the current stack contents and highlights
+   *  the active entry whenever the stack index changes. */
+  void onStackChanged();
+
+  /** Navigates the undo stack to the entry the user clicked. */
+  void onItemClicked();
+
  private:
-  QUndoView* view_;
+  QTreeWidget* tree_;
+
+  /** Rebuild the full list of rows from scratch. */
+  void rebuildTree();
+
+  /** Scroll to and visually select the row that matches the current index. */
+  void highlightCurrentRow();
 };
 
 #endif  // UNDOHISTORYPANEL_H
