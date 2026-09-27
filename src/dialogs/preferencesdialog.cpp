@@ -437,9 +437,7 @@ void PreferencesDialog::setup_ui() {
   general_layout->addWidget(new QLabel(tr("Language:")), row, 0);
 
   language_combobox = new QComboBox();
-  language_combobox->setToolTip(
-      tr("Choose the language for the menus and buttons in the application.\n\n"
-         "Changes will be applied immediately to all menus and windows."));
+  language_combobox->setToolTip(tr("Language of the menus and dialogs."));
 
   // add default language (en-US)
   language_combobox->addItem(QLocale::languageToString(QLocale("en-US").language()));
@@ -479,8 +477,8 @@ void PreferencesDialog::setup_ui() {
   imgSeqFormatEdit = new QLineEdit(general_tab);
   imgSeqFormatEdit->setText(amber::CurrentConfig.img_seq_formats);
   imgSeqFormatEdit->setToolTip(
-      tr("List the file types that can be loaded as a series of images (like .png or .jpg)."
-         "\n\nSeparate multiple formats with spaces or commas."));
+      tr("File extensions imported as image sequences when a file's name ends with a frame number.\n\n"
+         "Separate extensions with \"|\"."));
 
   general_layout->addWidget(imgSeqFormatEdit, row, 1, 1, 4);
 
@@ -494,9 +492,8 @@ void PreferencesDialog::setup_ui() {
   thumbnail_res_spinbox->setMaximum(INT_MAX);
   thumbnail_res_spinbox->setValue(amber::CurrentConfig.thumbnail_resolution);
   thumbnail_res_spinbox->setToolTip(
-      tr("Sets how sharp the small picture previews of video clips look in the media "
-         "list.\n\nHigher values make them look nicer but use more computer power and "
-         "memory."));
+      tr("Height in pixels of the thumbnails generated for video in the Project panel.\n\n"
+         "Higher values look sharper but use more memory and disk space."));
   general_layout->addWidget(thumbnail_res_spinbox, row, 1);
 
   general_layout->addWidget(new QLabel(tr("Waveform Resolution:"), this), row, 2);
@@ -506,16 +503,14 @@ void PreferencesDialog::setup_ui() {
   waveform_res_spinbox->setMaximum(INT_MAX);
   waveform_res_spinbox->setValue(amber::CurrentConfig.waveform_resolution);
   waveform_res_spinbox->setToolTip(
-      tr("Sets how detailed the audio soundwave squiggles look on the timeline tracks."
-         "\n\nHigher resolutions look better but can make scrolling the timeline "
-         "slower."));
+      tr("Number of waveform points stored per second of audio.\n\n"
+         "Higher values draw more detailed waveforms but use more memory and disk space."));
   general_layout->addWidget(waveform_res_spinbox, row, 3);
 
   QPushButton* delete_preview_btn = new QPushButton(tr("Delete Previews"));
   delete_preview_btn->setToolTip(
-      tr("Cleans up all saved temporary thumbnail and audio files to free up disk space."
-         "\n\nThis is safe to do, but the app will have to rebuild them next time you open "
-         "the project."));
+      tr("Delete all cached thumbnails and waveforms. They are generated again the next time the media is "
+         "opened."));
   general_layout->addWidget(delete_preview_btn, row, 4);
   connect(delete_preview_btn, &QPushButton::clicked, this, &PreferencesDialog::delete_all_previews);
 
@@ -529,8 +524,7 @@ void PreferencesDialog::setup_ui() {
   default_still_length_slider->SetMaximum(9999);
   default_still_length_slider->SetValue(amber::CurrentConfig.default_still_length);
   default_still_length_slider->setToolTip(
-      tr("The default length/duration that will be used when you import a photo "
-         "or flat color into the timeline."));
+      tr("Duration given to still images and generated clips when they are added to a timeline."));
   if (amber::ActiveSequence != nullptr) {
     default_still_length_slider->SetFrameRate(amber::ActiveSequence->frame_rate);
   }
@@ -540,10 +534,6 @@ void PreferencesDialog::setup_ui() {
 
   // General -> Use Software Fallbacks When Possible
   QCheckBox* use_software_fallbacks_checkbox = new QCheckBox(tr("Use Software Fallbacks When Possible"));
-  use_software_fallbacks_checkbox->setToolTip(
-      tr("Tells the app to use safe, standard software drawing if the graphic "
-         "card behaves badly.\n\nHelps fix visual glitches, but will run "
-         "slower than hardware graphics."));
   AddBoolPair(use_software_fallbacks_checkbox, &amber::CurrentConfig.use_software_fallback, true);
   general_layout->addWidget(use_software_fallbacks_checkbox, row, 0, 1, 4);
 
@@ -551,10 +541,8 @@ void PreferencesDialog::setup_ui() {
 
   // General -> Hardware Decoding
   QCheckBox* hardware_decoding_checkbox = new QCheckBox(tr("Hardware Decoding (VAAPI/D3D11VA/VideoToolbox)"));
-  hardware_decoding_checkbox->setToolTip(
-      tr("Uses your graphics card to decode video files much faster, saving CPU "
-         "power.\n\nMay cause crashes on older computer graphics cards. Requires "
-         "restart."));
+  hardware_decoding_checkbox->setToolTip(tr(
+      "Use GPU-accelerated video decoding when available. Falls back to software if unsupported. Requires restart."));
   AddBoolPair(hardware_decoding_checkbox, &amber::CurrentConfig.hardware_decoding, true);
   general_layout->addWidget(hardware_decoding_checkbox, row, 0, 1, 4);
 
@@ -562,9 +550,7 @@ void PreferencesDialog::setup_ui() {
 
   // General -> Default Sequence Settings
   QPushButton* default_sequence_settings = new QPushButton(tr("Default Sequence Settings"));
-  default_sequence_settings->setToolTip(
-      tr("Set the default width, height, frame rate, and sound layout for newly "
-         "created sequences."));
+  default_sequence_settings->setToolTip(tr("Resolution, frame rate and audio settings used for new sequences."));
   connect(default_sequence_settings, &QPushButton::clicked, this, &PreferencesDialog::edit_default_sequence_settings);
   general_layout->addWidget(default_sequence_settings);
 
@@ -577,8 +563,7 @@ void PreferencesDialog::setup_ui() {
   autorecovery_enabled_check = new QCheckBox(tr("Enable Auto-Recovery"), this);
   autorecovery_enabled_check->setChecked(amber::CurrentConfig.autorecovery_enabled);
   autorecovery_enabled_check->setToolTip(
-      tr("Automatically save backups of your project periodically to prevent data "
-         "loss in case of a crash."));
+      tr("Periodically save a backup copy of the open project so it can be recovered after a crash."));
   ar_grid->addWidget(autorecovery_enabled_check, 0, 0, 1, 2);
 
   ar_grid->addWidget(new QLabel(tr("Interval (minutes):"), this), 1, 0);
@@ -587,9 +572,7 @@ void PreferencesDialog::setup_ui() {
   autorecovery_interval_slider->SetMaximum(60);
   autorecovery_interval_slider->SetValue(amber::CurrentConfig.autorecovery_interval);
   autorecovery_interval_slider->setEnabled(amber::CurrentConfig.autorecovery_enabled);
-  autorecovery_interval_slider->setToolTip(
-      tr("How often the editor should automatically save a backup of your "
-         "project."));
+  autorecovery_interval_slider->setToolTip(tr("Minutes between two auto-recovery saves."));
   ar_grid->addWidget(autorecovery_interval_slider, 1, 1);
 
   ar_grid->addWidget(new QLabel(tr("Maximum Versions:"), this), 2, 0);
@@ -598,7 +581,7 @@ void PreferencesDialog::setup_ui() {
   autorecovery_max_slider->SetMaximum(20);
   autorecovery_max_slider->SetValue(amber::CurrentConfig.autorecovery_max);
   autorecovery_max_slider->setEnabled(amber::CurrentConfig.autorecovery_enabled);
-  autorecovery_max_slider->setToolTip(tr("The maximum number of auto-saved backup files to keep in storage."));
+  autorecovery_max_slider->setToolTip(tr("Maximum number of auto-recovery backups kept."));
   ar_grid->addWidget(autorecovery_max_slider, 2, 1);
 
   connect(autorecovery_enabled_check, &QCheckBox::toggled, autorecovery_interval_slider, &QWidget::setEnabled);
@@ -616,42 +599,37 @@ void PreferencesDialog::setup_ui() {
 
   QCheckBox* add_default_effects_to_clips = new QCheckBox(tr("Add Default Effects to New Clips"));
   add_default_effects_to_clips->setToolTip(
-      tr("Automatically add standard effects like position, scale, and volume "
-         "adjustments to new clips."));
+      tr("Add Transform to new video clips, and Volume and Pan to new audio clips."));
   AddBoolPair(add_default_effects_to_clips, &amber::CurrentConfig.add_default_effects_to_clips);
   behavior_tab_layout->Add(add_default_effects_to_clips);
 
   QCheckBox* auto_seek_to_beginning =
       new QCheckBox(tr("Automatically Seek to the Beginning When Playing at the End of a Sequence"));
   auto_seek_to_beginning->setToolTip(
-      tr("When playback reaches the end of the timeline, jump back to the start and "
-         "play again."));
+      tr("Pressing Play with the playhead at the end of the sequence starts playback from the beginning."));
   AddBoolPair(auto_seek_to_beginning, &amber::CurrentConfig.auto_seek_to_beginning);
   behavior_tab_layout->Add(auto_seek_to_beginning);
 
   QCheckBox* selecting_also_seeks = new QCheckBox(tr("Selecting Also Seeks"));
   selecting_also_seeks->setToolTip(
-      tr("Clicking on a clip automatically jumps the red timeline playhead to the start "
-         "of that clip."));
+      tr("Clicking a clip to select it also moves the playhead to the clicked point."));
   AddBoolPair(selecting_also_seeks, &amber::CurrentConfig.select_also_seeks);
   behavior_tab_layout->Add(selecting_also_seeks);
 
   QCheckBox* edit_tool_also_seeks = new QCheckBox(tr("Edit Tool Also Seeks"));
   edit_tool_also_seeks->setToolTip(
-      tr("Clicking with the edit/select tool on empty track space moves the playhead to "
-         "that point."));
+      tr("Clicking with the Edit tool also moves the playhead to the clicked point."));
   AddBoolPair(edit_tool_also_seeks, &amber::CurrentConfig.edit_tool_also_seeks);
   behavior_tab_layout->Add(edit_tool_also_seeks);
 
   QCheckBox* edit_tool_selects_links = new QCheckBox(tr("Edit Tool Selects Links"));
   edit_tool_selects_links->setToolTip(
-      tr("Clicking on a clip also selects any other clips that are linked to it (like "
-         "a video and its audio)."));
+      tr("Selecting with the Edit tool also selects the linked clips, such as a video clip's audio."));
   AddBoolPair(edit_tool_selects_links, &amber::CurrentConfig.edit_tool_selects_links);
   behavior_tab_layout->Add(edit_tool_selects_links);
 
   QCheckBox* seek_also_selects = new QCheckBox(tr("Seek Also Selects"));
-  seek_also_selects->setToolTip(tr("Moving the red playhead will automatically highlight the clips it passes over."));
+  seek_also_selects->setToolTip(tr("Moving the playhead selects the clips under it."));
   AddBoolPair(seek_also_selects, &amber::CurrentConfig.seek_also_selects);
   behavior_tab_layout->Add(seek_also_selects);
 
@@ -680,72 +658,62 @@ void PreferencesDialog::setup_ui() {
   }
 
   QCheckBox* seek_to_end_of_pastes = new QCheckBox(tr("Seek to the End of Pastes"));
-  seek_to_end_of_pastes->setToolTip(
-      tr("After pasting clips, the playhead will automatically jump to the end of the "
-         "newly pasted clips."));
+  seek_to_end_of_pastes->setToolTip(tr("After pasting, move the playhead to the end of the pasted clips."));
   AddBoolPair(seek_to_end_of_pastes, &amber::CurrentConfig.paste_seeks);
   behavior_tab_layout->Add(seek_to_end_of_pastes);
 
   QCheckBox* scroll_wheel_zooms = new QCheckBox(tr("Scroll Wheel Zooms"));
   scroll_wheel_zooms->setToolTip(
-      tr("Moving your mouse scroll wheel directly zooms the timeline in and out instead of "
-         "scrolling it.\n\nHold CTRL to toggle this setting."));
+      tr("The mouse wheel zooms the timeline instead of scrolling it.\n\n"
+         "Hold Ctrl to toggle this setting."));
   AddBoolPair(scroll_wheel_zooms, &amber::CurrentConfig.scroll_zooms);
   behavior_tab_layout->Add(scroll_wheel_zooms);
 
   QCheckBox* invert_timeline_scroll_axes = new QCheckBox(tr("Invert Timeline Scroll Axes"));
   invert_timeline_scroll_axes->setToolTip(
-      tr("Swap vertical and horizontal scrolling: rolling the wheel vertically "
-         "moves the timeline left/right."));
+      tr("Swap the wheel directions in the timeline: vertical wheel movement scrolls horizontally and vice "
+         "versa."));
   AddBoolPair(invert_timeline_scroll_axes, &amber::CurrentConfig.invert_timeline_scroll_axes);
   behavior_tab_layout->Add(invert_timeline_scroll_axes);
 
   QCheckBox* enable_drag_files_to_timeline = new QCheckBox(tr("Enable Drag Files to Timeline"));
   enable_drag_files_to_timeline->setToolTip(
-      tr("Drag video and audio files from outside the app straight onto a "
-         "timeline track to import them."));
+      tr("Allow dropping files from the file manager directly onto the timeline."));
   AddBoolPair(enable_drag_files_to_timeline, &amber::CurrentConfig.enable_drag_files_to_timeline);
   behavior_tab_layout->Add(enable_drag_files_to_timeline);
 
   QCheckBox* autoscale_by_default = new QCheckBox(tr("Auto-Scale By Default"));
-  autoscale_by_default->setToolTip(
-      tr("Automatically stretches or shrinks imported videos/photos to match the "
-         "sequence frame size."));
+  autoscale_by_default->setToolTip(tr("Scale new clips to fit the sequence frame."));
   AddBoolPair(autoscale_by_default, &amber::CurrentConfig.autoscale_by_default);
   behavior_tab_layout->Add(autoscale_by_default);
 
   QCheckBox* enable_seek_to_import = new QCheckBox(tr("Auto-Seek to Imported Clips"));
   enable_seek_to_import->setToolTip(
-      tr("Jumps the timeline playhead to the starting position of newly imported/added "
-         "clips."));
+      tr("After adding media to the timeline, move the playhead to the start of the added clips."));
   AddBoolPair(enable_seek_to_import, &amber::CurrentConfig.enable_seek_to_import);
   behavior_tab_layout->Add(enable_seek_to_import);
 
   QCheckBox* enable_drop_on_media_to_replace = new QCheckBox(tr("Drop Files on Media to Replace"));
   enable_drop_on_media_to_replace->setToolTip(
-      tr("Drag a new file and drop it on top of an existing clip in the media "
-         "panel to swap the source file everywhere."));
+      tr("Dropping a single file onto a footage item in the Project panel offers to replace that item's "
+         "file."));
   AddBoolPair(enable_drop_on_media_to_replace, &amber::CurrentConfig.drop_on_media_to_replace);
   behavior_tab_layout->Add(enable_drop_on_media_to_replace);
 
   QCheckBox* enable_hover_focus = new QCheckBox(tr("Enable Hover Focus"));
   enable_hover_focus->setToolTip(
-      tr("Automatically focuses a panel just by moving your mouse pointer over it without "
-         "needing to click."));
+      tr("Keyboard shortcuts go to the panel under the mouse pointer, without clicking it first."));
   AddBoolPair(enable_hover_focus, &amber::CurrentConfig.hover_focus);
   behavior_tab_layout->Add(enable_hover_focus);
 
   QCheckBox* set_name_and_marker = new QCheckBox(tr("Ask For Name When Setting Marker"));
-  set_name_and_marker->setToolTip(
-      tr("Pops up a prompt asking you to type a name whenever you create a timeline "
-         "marker."));
+  set_name_and_marker->setToolTip(tr("Ask for a name each time a marker is added."));
   AddBoolPair(set_name_and_marker, &amber::CurrentConfig.set_name_with_marker);
   behavior_tab_layout->Add(set_name_and_marker);
 
   QCheckBox* reopen_recent_project = new QCheckBox(tr("Re-open Recent Project on Startup"));
   reopen_recent_project->setToolTip(
-      tr("Automatically opens the project you were working on last time when you launch "
-         "the application."));
+      tr("On startup, open the most recent project when none is given on the command line."));
   AddBoolPair(reopen_recent_project, &amber::CurrentConfig.reopen_recent_project);
   behavior_tab_layout->Add(reopen_recent_project);
 
@@ -764,9 +732,7 @@ void PreferencesDialog::setup_ui() {
   frame_skip_step_field->setMinimum(1);
   frame_skip_step_field->setMaximum(999);
   frame_skip_step_field->setValue(amber::CurrentConfig.frame_skip_step);
-  frame_skip_step_field->setToolTip(
-      tr("Sets the number of frames the playhead will jump forward or backward when "
-         "using jump shortcuts."));
+  frame_skip_step_field->setToolTip(tr("Number of frames the playhead jumps with the frame-skip shortcuts."));
   frame_skip_layout->addWidget(frame_skip_step_field);
   frame_skip_layout->addStretch();
   behavior_tab_layout->Add(frame_skip_row);
@@ -814,9 +780,7 @@ void PreferencesDialog::setup_ui() {
   ui_style->addItem(tr("Native"), amber::styling::kNativeDarkIcons);
   ui_style->addItem(tr("Native (Light Icons)"), amber::styling::kNativeLightIcons);
   ui_style->setCurrentIndex(amber::CurrentConfig.style);
-  ui_style->setToolTip(
-      tr("Pick a beautiful dark, light, or native window theme for the editor's buttons and "
-         "backgrounds."));
+  ui_style->setToolTip(tr("Colour theme of the interface."));
   appearance_layout->addWidget(ui_style, row, 1, 1, 2);
 
   row++;
@@ -825,7 +789,7 @@ void PreferencesDialog::setup_ui() {
   // Native menu styling is only available on Windows. Environments like Ubuntu and Mac use the native menu system by
   // default
   QCheckBox* native_menus = new QCheckBox(tr("Use Native Menu Styling"));
-  native_menus->setToolTip(tr("Enable standard native window menus instead of custom-styled menus."));
+  native_menus->setToolTip(tr("Use the system menu style instead of Amber's own."));
   AddBoolPair(native_menus, &amber::CurrentConfig.use_native_menu_styling, true);
   appearance_layout->addWidget(native_menus, row, 0, 1, 3);
 
@@ -837,9 +801,7 @@ void PreferencesDialog::setup_ui() {
 
   custom_css_fn = new QLineEdit(general_tab);
   custom_css_fn->setText(amber::CurrentConfig.css_path);
-  custom_css_fn->setToolTip(
-      tr("Specify a custom styles file (.css) to design and change the colors and shapes of the "
-         "user interface."));
+  custom_css_fn->setToolTip(tr("Path to a Qt style sheet (.css) used to customise the interface."));
   appearance_layout->addWidget(custom_css_fn, row, 1);
 
   QPushButton* custom_css_browse = new QPushButton(tr("Browse"), general_tab);
@@ -855,8 +817,7 @@ void PreferencesDialog::setup_ui() {
   effect_textbox_lines_field->setMinimum(1);
   effect_textbox_lines_field->setValue(amber::CurrentConfig.effect_textbox_lines);
   effect_textbox_lines_field->setToolTip(
-      tr("Set the default height (in number of text lines) for text entry boxes "
-         "inside the effect properties."));
+      tr("Height, in lines of text, of the text boxes in the Effect Controls panel."));
   appearance_layout->addWidget(effect_textbox_lines_field, row, 1, 1, 2);
 
   row++;
@@ -865,9 +826,8 @@ void PreferencesDialog::setup_ui() {
   QCheckBox* effect_panel_shrinkable =
       new QCheckBox(tr("Allow Effect Properties panel to be smaller than its content"));
   effect_panel_shrinkable->setToolTip(
-      tr("Allow the effect settings panel to be squished smaller than its default "
-         "size, adding scrollbars.\n\nA horizontal scrollbar will appear to access "
-         "clipped content."));
+      tr("When enabled, the Effect Properties panel can be resized narrower than its content. "
+         "A horizontal scrollbar will appear to access clipped content."));
   AddBoolPair(effect_panel_shrinkable, &amber::CurrentConfig.effect_panel_shrinkable);
   appearance_layout->addWidget(effect_panel_shrinkable, row, 0, 1, 3);
 
@@ -886,31 +846,26 @@ void PreferencesDialog::setup_ui() {
   upcoming_queue_spinbox = new QDoubleSpinBox(playback_tab);
   upcoming_queue_spinbox->setValue(amber::CurrentConfig.upcoming_queue_size);
   upcoming_queue_spinbox->setToolTip(
-      tr("Amount of future video frames to pre-load in your RAM so playback runs "
-         "smoothly without freezing."));
+      tr("How far ahead of the playhead frames are decoded and kept in memory during playback.\n\n"
+         "More makes playback smoother and uses more memory."));
   memory_usage_layout->addWidget(upcoming_queue_spinbox, 0, 1);
   upcoming_queue_type = new QComboBox(playback_tab);
   upcoming_queue_type->addItem(tr("frames"));
   upcoming_queue_type->addItem(tr("seconds"));
   upcoming_queue_type->setCurrentIndex(amber::CurrentConfig.upcoming_queue_type);
-  upcoming_queue_type->setToolTip(
-      tr("Select whether upcoming pre-loaded frames are counted in frames or seconds of "
-         "duration."));
+  upcoming_queue_type->setToolTip(tr("Unit of the upcoming frame queue size."));
   memory_usage_layout->addWidget(upcoming_queue_type, 0, 2);
   memory_usage_layout->addWidget(new QLabel(tr("Previous Frame Queue:"), playback_tab), 1, 0);
   previous_queue_spinbox = new QDoubleSpinBox(playback_tab);
   previous_queue_spinbox->setValue(amber::CurrentConfig.previous_queue_size);
   previous_queue_spinbox->setToolTip(
-      tr("Amount of past video frames kept in memory so scrubbing backward is "
-         "instant."));
+      tr("How many already-shown frames are kept in memory, so stepping back doesn't decode them again."));
   memory_usage_layout->addWidget(previous_queue_spinbox, 1, 1);
   previous_queue_type = new QComboBox(playback_tab);
   previous_queue_type->addItem(tr("frames"));
   previous_queue_type->addItem(tr("seconds"));
   previous_queue_type->setCurrentIndex(amber::CurrentConfig.previous_queue_type);
-  previous_queue_type->setToolTip(
-      tr("Select whether previously loaded memory frames are counted in frames or seconds "
-         "of duration."));
+  previous_queue_type->setToolTip(tr("Unit of the previous frame queue size."));
   memory_usage_layout->addWidget(previous_queue_type, 1, 2);
   playback_tab_layout->addWidget(memory_usage_group);
   playback_tab_layout->addStretch();
@@ -930,7 +885,7 @@ void PreferencesDialog::setup_ui() {
 
   audio_output_devices = new QComboBox();
   audio_output_devices->addItem(tr("Default"), "");
-  audio_output_devices->setToolTip(tr("The speakers or headphones where the editor's sound will play."));
+  audio_output_devices->setToolTip(tr("Device used for audio playback."));
 
   // list all available audio output devices
   QList<QAudioDevice> devs = QMediaDevices::audioOutputs();
@@ -953,7 +908,7 @@ void PreferencesDialog::setup_ui() {
 
   audio_input_devices = new QComboBox();
   audio_input_devices->addItem(tr("Default"), "");
-  audio_input_devices->setToolTip(tr("The microphone or source to capture voiceovers and recording."));
+  audio_input_devices->setToolTip(tr("Device used for audio recording."));
 
   // list all available audio input devices
   devs = QMediaDevices::audioInputs();
@@ -975,9 +930,7 @@ void PreferencesDialog::setup_ui() {
   audio_tab_layout->addWidget(new QLabel(tr("Sample Rate:")), row, 0);
 
   audio_sample_rate = new QComboBox();
-  audio_sample_rate->setToolTip(
-      tr("The frequency quality of the audio engine. Higher numbers sound cleaner but use "
-         "slightly more CPU."));
+  audio_sample_rate->setToolTip(tr("Sample rate of the audio engine."));
   combobox_audio_sample_rates(audio_sample_rate);
   for (int i = 0; i < audio_sample_rate->count(); i++) {
     if (audio_sample_rate->itemData(i).toInt() == amber::CurrentConfig.audio_rate) {
@@ -997,19 +950,14 @@ void PreferencesDialog::setup_ui() {
   recordingComboBox->addItem(tr("Mono"));
   recordingComboBox->addItem(tr("Stereo"));
   recordingComboBox->setCurrentIndex(amber::CurrentConfig.recording_mode - 1);
-  recordingComboBox->setToolTip(
-      tr("Record audio in either single-channel (mono) or dual-channel (stereo) track "
-         "mode."));
+  recordingComboBox->setToolTip(tr("Record in mono or stereo."));
   audio_tab_layout->addWidget(recordingComboBox, row, 1);
 
   row++;
 
   // Audio -> Audio Scrubbing
   QCheckBox* enable_audio_scrubbing = new QCheckBox(tr("Audio Scrubbing"));
-  enable_audio_scrubbing->setToolTip(
-      tr("Play short bursts of sound while dragging the playhead so you can hear "
-         "exactly where clips start/stop.\n\nCan sound scratchy or high-pitched when "
-         "dragging very fast."));
+  enable_audio_scrubbing->setToolTip(tr("Play short snippets of audio while dragging the playhead."));
   AddBoolPair(enable_audio_scrubbing, &amber::CurrentConfig.enable_audio_scrubbing);
   audio_tab_layout->addWidget(enable_audio_scrubbing, row, 0, 1, 2);
 
