@@ -109,6 +109,12 @@ void UndoHistoryPanel::onCurrentItemChanged(QTreeWidgetItem* current) {
   // (nothing done yet) and N == the Nth command has been applied.
   // Our tree rows map 1-to-1: row 0 == initial state, row N == command N.
   if (row != amber::UndoStack.index()) {
+    // Same guard as AmberGlobal::undo()/redo(): no navigation while importing. Put the selection back on the
+    // current step (in place, signals blocked) so the panel doesn't show a state we didn't go to.
+    if (panel_timeline->importing) {
+      highlightCurrentRow();
+      return;
+    }
     in_tree_signal_ = true;
     // indexChanged → highlightCurrentRow() restyles the rows in place; no item is deleted here.
     amber::UndoStack.setIndex(row);
@@ -169,10 +175,10 @@ void UndoHistoryPanel::highlightCurrentRow() {
     const bool is_future  = (r > current_idx);
     const bool is_current = (r == current_idx);
 
-    // Dim future entries
-    const QColor text_color = is_future
-        ? QColor(Qt::gray)
-        : tree_->palette().color(QPalette::Text);
+    // Dim future entries: theme text at half alpha. Not Disabled/Text (Amber's themes set Text for every colour
+    // group, so it equals Text) nor PlaceholderText (Qt 6 keeps it independent; Amber's themes never set it).
+    QColor text_color = tree_->palette().color(QPalette::Text);
+    if (is_future) text_color.setAlpha(128);
     for (int col = 0; col < tree_->columnCount(); ++col) {
       item->setForeground(col, text_color);
     }
