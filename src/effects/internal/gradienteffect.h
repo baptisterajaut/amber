@@ -31,6 +31,13 @@ class GradientEffect : public Effect {
   GradientEffect(Clip* c, const EffectMeta* em);
   void redraw(double timecode) override;
 
+ protected:
+  // The mask follows the text effect's image, which changes without any of our own fields changing.
+  // CBA: redraws every frame while As Mask is on (one gradient fill + composite, plus two text redraws with
+  // Ignore Text Shadow). Upgrade path: redraw only when the masking text effect actually redrew, e.g. via a
+  // redraw counter bumped in Effect::process_superimpose().
+  bool AlwaysUpdate() override { return masking_; }
+
  private:
   ComboField* type_field;
   ColorField* start_color_field;
@@ -41,6 +48,9 @@ class GradientEffect : public Effect {
   DoubleField* radius_field;
   BoolField* mask_bool_field;
   BoolField* ignore_shadow_field;
+  // As Mask state at the last redraw (render thread only). A change of As Mask itself is caught by
+  // valueHasChanged(), so this is always current by the time AlwaysUpdate() matters.
+  bool masking_{false};
 
  private slots:
   void mask_toggled(bool e);

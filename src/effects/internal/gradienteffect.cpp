@@ -118,11 +118,14 @@ void GradientEffect::redraw(double timecode) {
   }
   p.end();
 
-  // If As Mask is enabled, mask with the previous text effect's alpha
-  if (mask_bool_field->GetBoolAt(timecode)) {
+  // If As Mask is enabled, mask with the nearest preceding enabled text effect's alpha. A disabled text effect
+  // isn't rendered, so its image would be stale; with no enabled text effect the plain gradient is drawn.
+  masking_ = mask_bool_field->GetBoolAt(timecode);
+  if (masking_) {
     Effect* text_effect = nullptr;
     for (const EffectPtr& eff : parent_clip->effects) {
       if (eff.get() == this) break;
+      if (!eff->IsEnabled()) continue;
       if (eff->meta->internal == EFFECT_INTERNAL_TEXT || eff->meta->internal == EFFECT_INTERNAL_RICHTEXT) {
         text_effect = eff.get();
       }
