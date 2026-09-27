@@ -280,8 +280,11 @@ void AmberGlobal::open_recent(int index) {
 }
 
 bool AmberGlobal::save_project_as() {
-  QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
-  QString default_fn = QString("New_Project-%1.ove").arg(timestamp);
+  // Offer the current file when there is one; a timestamped name only for a never-saved project.
+  QString default_fn = amber::ActiveProjectFilename;
+  if (default_fn.isEmpty()) {
+    default_fn = QString("New_Project-%1.ove").arg(QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss"));
+  }
   QString fn =
       QFileDialog::getSaveFileName(amber::MainWindow, tr("Save Project As..."), default_fn, project_file_filter);
   if (!fn.isEmpty()) {
