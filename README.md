@@ -29,7 +29,7 @@ For GPUs older than OpenGL 3.2, use [version 1.1.0](https://github.com/baptister
 
 ## Roadmap
 
-1.x is feature-complete, maintenance only. 2.0 is in active development — GPU-native effects, ShaderToy import, scopes, 3-point editing, rendering pipeline overhaul. See [ROADMAP.md](ROADMAP.md).
+1.x is the stable line: it keeps getting fixes, and new features still land there (1.6 and 1.7 brought color labels, text stroke, gradients and a unified timeline). 2.0 is in active development: GPU-native effects, ShaderToy import, scopes, 3-point editing and a rendering pipeline overhaul. See [ROADMAP.md](ROADMAP.md).
 
 ## 2.0 Preview
 
