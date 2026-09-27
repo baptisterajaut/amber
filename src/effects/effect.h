@@ -141,12 +141,15 @@ class Effect : public QObject {
   Q_OBJECT
  public:
   Effect(Clip* c, const EffectMeta* em);
+  const QImage& GetImage() const { return img; }
+  void TriggerRedraw(double timecode) { redraw(timecode); }
   ~Effect() override;
 
   Clip* parent_clip;
   const EffectMeta* meta;
   int id;
   QString name;
+  bool force_disable_shadow_rendering{false};
 
   void AddRow(EffectRow* row);
 

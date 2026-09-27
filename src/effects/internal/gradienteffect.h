@@ -39,6 +39,11 @@ class GradientEffect : public Effect {
   DoubleField* center_x_field;
   DoubleField* center_y_field;
   DoubleField* radius_field;
+  BoolField* mask_bool_field;
+  BoolField* ignore_shadow_field;
+
+ private slots:
+  void mask_toggled(bool e);
 };
 
 #endif  // GRADIENTEFFECT_H

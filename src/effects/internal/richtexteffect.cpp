@@ -201,7 +201,7 @@ void RichTextEffect::redraw(double timecode)
   img.fill(Qt::transparent);
 
   // draw software shadow
-  if (shadow_bool->GetBoolAt(timecode)) {
+  if (shadow_bool->GetBoolAt(timecode) && !force_disable_shadow_rendering) {
 
     // calculate offset using distance and angle
     double angle = shadow_angle->GetDoubleAt(timecode) * M_PI / 180.0;
