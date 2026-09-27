@@ -2223,42 +2223,42 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="215" />
         <source>1080p</source>
-        <translation />
+        <translation>1080p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="216" />
         <source>720p</source>
-        <translation />
+        <translation>720p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="217" />
         <source>480p</source>
-        <translation />
+        <translation>480p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="218" />
         <source>360p</source>
-        <translation />
+        <translation>360p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="219" />
         <source>240p</source>
-        <translation />
+        <translation>240p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="220" />
         <source>144p</source>
-        <translation />
+        <translation>144p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="221" />
         <source>NTSC (480i)</source>
-        <translation />
+        <translation>NTSC (480i)</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="222" />
         <source>PAL (576i)</source>
-        <translation />
+        <translation>PAL (576i)</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="223" />

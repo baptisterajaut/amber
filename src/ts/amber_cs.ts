@@ -159,7 +159,7 @@
     <message>
         <location filename="../ui/collapsiblewidget.cpp" line="54" />
         <source>&lt;untitled&gt;</source>
-        <translation />
+        <translation>&lt;bez názvu&gt;</translation>
     </message>
 </context>
 <context>
