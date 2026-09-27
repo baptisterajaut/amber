@@ -24,6 +24,7 @@
 #include "ui/panel.h"
 
 class QTreeWidget;
+class QTreeWidgetItem;
 
 class UndoHistoryPanel : public Panel {
   Q_OBJECT
@@ -32,20 +33,22 @@ class UndoHistoryPanel : public Panel {
   void Retranslate() override;
 
  private slots:
-  /** Rebuilds the tree to reflect the current stack contents and highlights
-   *  the active entry whenever the stack index changes. */
-  void onStackChanged();
+  /** Rebuilds the rows when commands were pushed or cleared (deferred if we're inside a tree signal). */
+  void onHistoryChanged();
 
-  /** Navigates the undo stack to the entry the user clicked. */
-  void onItemClicked();
+  /** Navigates the undo stack to the entry the user picked (mouse or keyboard). */
+  void onCurrentItemChanged(QTreeWidgetItem* current);
 
  private:
   QTreeWidget* tree_;
 
+  /** True while onCurrentItemChanged() runs, i.e. while the tree is dispatching its own signal. */
+  bool in_tree_signal_ = false;
+
   /** Rebuild the full list of rows from scratch. */
   void rebuildTree();
 
-  /** Scroll to and visually select the row that matches the current index. */
+  /** Restyle rows in place (bold current, grey undone) and select the current one, without emitting tree signals. */
   void highlightCurrentRow();
 };
 

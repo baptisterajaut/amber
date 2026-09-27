@@ -22,6 +22,7 @@
 
 #include <QHeaderView>
 #include <QLocale>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -62,12 +63,15 @@ UndoHistoryPanel::UndoHistoryPanel(QWidget* parent) : Panel(parent) {
   // Connections
   // -------------------------------------------------------------------------
 
-  // Rebuild (and re-highlight) whenever the stack changes.
-  connect(&amber::UndoStack, &QUndoStack::indexChanged,    this, &UndoHistoryPanel::onStackChanged);
-  connect(&amber::UndoStack, &QUndoStack::cleanChanged,    this, &UndoHistoryPanel::onStackChanged);
+  // Undo/redo/jump only moves the index: restyle the existing rows. Rows are rebuilt only when commands were
+  // pushed or cleared. cleanChanged isn't connected: the panel doesn't show the clean state, and Qt only emits it
+  // together with indexChanged anyway (Amber never calls setClean()).
+  connect(&amber::UndoStack, &QUndoStack::indexChanged, this, &UndoHistoryPanel::highlightCurrentRow);
+  connect(&amber::UndoStack, &TimestampedUndoStack::historyChanged, this, &UndoHistoryPanel::onHistoryChanged);
 
-  // Let the user click a row to navigate the stack.
-  connect(tree_, &QTreeWidget::itemSelectionChanged, this, &UndoHistoryPanel::onItemClicked);
+  // Let the user pick a row (click or arrow keys) to navigate the stack. Programmatic selection changes are
+  // made under a QSignalBlocker, so they never loop back into setIndex().
+  connect(tree_, &QTreeWidget::currentItemChanged, this, &UndoHistoryPanel::onCurrentItemChanged);
 
   // Populate for the current state (e.g. panel opened mid-session).
   rebuildTree();
@@ -80,32 +84,37 @@ UndoHistoryPanel::UndoHistoryPanel(QWidget* parent) : Panel(parent) {
 void UndoHistoryPanel::Retranslate() {
   setWindowTitle(tr("Undo History"));
   tree_->setHeaderLabels({tr("Action"), tr("Time")});
+  if (QTreeWidgetItem* initial = tree_->topLevelItem(0)) initial->setText(kColAction, tr("Initial State"));
 }
 
 // ---------------------------------------------------------------------------
 // Private slots
 // ---------------------------------------------------------------------------
 
-void UndoHistoryPanel::onStackChanged() {
-  // Block signals while we repopulate so currentRowChanged doesn't fire and
-  // accidentally trigger an undo-stack navigation.
-  QSignalBlocker blocker(tree_);
+void UndoHistoryPanel::onHistoryChanged() {
+  if (in_tree_signal_) {
+    // Never delete items while the tree is still dispatching a signal about them.
+    QTimer::singleShot(0, this, &UndoHistoryPanel::rebuildTree);
+    return;
+  }
   rebuildTree();
 }
 
-void UndoHistoryPanel::onItemClicked() {
-  const int row = tree_->currentIndex().row();
+void UndoHistoryPanel::onCurrentItemChanged(QTreeWidgetItem* current) {
+  if (current == nullptr) return;
+  const int row = tree_->indexOfTopLevelItem(current);
   if (row < 0) return;
 
   // QUndoStack::setIndex() uses 0-based indexing where 0 == "initial state"
   // (nothing done yet) and N == the Nth command has been applied.
   // Our tree rows map 1-to-1: row 0 == initial state, row N == command N.
   if (row != amber::UndoStack.index()) {
+    in_tree_signal_ = true;
+    // indexChanged → highlightCurrentRow() restyles the rows in place; no item is deleted here.
     amber::UndoStack.setIndex(row);
-    // update_ui is already connected to indexChanged in the constructor's
-    // QUndoStack::indexChanged → onStackChanged path, but that only repaints
-    // the panel. We also need to refresh all other panels.
+    // setIndex() bypasses AmberGlobal::undo()/redo(), which normally refresh the other panels.
     update_ui(true);
+    in_tree_signal_ = false;
   }
 }
 
@@ -114,6 +123,8 @@ void UndoHistoryPanel::onItemClicked() {
 // ---------------------------------------------------------------------------
 
 void UndoHistoryPanel::rebuildTree() {
+  // clear() and the first insert emit currentItemChanged; don't let them navigate the stack.
+  QSignalBlocker blocker(tree_);
   tree_->clear();
 
   // Row 0 — "Initial State" placeholder (no timestamp)
@@ -172,8 +183,9 @@ void UndoHistoryPanel::highlightCurrentRow() {
     item->setFont(kColAction, f);
   }
 
-  // Scroll the current entry into view and select it.
+  // Scroll the current entry into view and select it, silently (see the currentItemChanged connection).
   if (current_idx >= 0 && current_idx < total) {
+    QSignalBlocker blocker(tree_);
     QTreeWidgetItem* cur = tree_->topLevelItem(current_idx);
     tree_->setCurrentItem(cur);
     tree_->scrollToItem(cur);

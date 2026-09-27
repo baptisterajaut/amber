@@ -39,9 +39,17 @@ class TimestampedUndoStack : public QUndoStack {
   /** Total number of timestamp slots (== count() + 1 for the initial slot). */
   int timestampCount() const;
 
+ signals:
+  /** The list of commands changed (push or clear), not just the current index. */
+  void historyChanged();
+
  private:
   // Index 0 is a null sentinel for the "Initial State" entry that QUndoView
   // always shows.  Real timestamps start at index 1.
+  // CBA: parallel vector, only aligned because Amber never uses setUndoLimit(), beginMacro()/endMacro(),
+  // QUndoCommand::id()/mergeWith() or setObsolete() -- each of those drops or folds commands behind our back and
+  // would shift every later time. Upgrade path: store the timestamp with the command itself (a base command class
+  // with a created_at member, or a QHash<const QUndoCommand*, QDateTime> pruned when commands are deleted).
   QVector<QDateTime> timestamps_;
 };
 

@@ -26,6 +26,7 @@ void TimestampedUndoStack::push(QUndoCommand* cmd) {
   }
   timestamps_.append(QDateTime::currentDateTime());
   QUndoStack::push(cmd);  // base class takes ownership of cmd
+  emit historyChanged();
 }
 
 void TimestampedUndoStack::clear() {
@@ -33,6 +34,7 @@ void TimestampedUndoStack::clear() {
   timestamps_.clear();
   // Re-add the null sentinel for the initial-state placeholder.
   timestamps_.append(QDateTime());
+  emit historyChanged();
 }
 
 QDateTime TimestampedUndoStack::timestampAt(int idx) const {
