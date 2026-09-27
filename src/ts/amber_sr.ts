@@ -1094,49 +1094,59 @@
 <context>
     <name>GradientEffect</name>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="32"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="33"/>
         <source>Type</source>
         <translation>Тип</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="34"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="35"/>
         <source>Linear</source>
         <translation>Линеарно</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="35"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="36"/>
         <source>Radial</source>
         <translation>Радијално</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="38"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="39"/>
         <source>Start Color</source>
         <translation>Почетна боја</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="42"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="43"/>
         <source>End Color</source>
         <translation>Крајња боја</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="46"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="47"/>
         <source>Angle</source>
         <translation>Угао</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="52"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="53"/>
         <source>Center X</source>
         <translation>Центар X</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="58"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="59"/>
         <source>Center Y</source>
         <translation>Центар Y</translation>
     </message>
     <message>
-        <location filename="../effects/internal/gradienteffect.cpp" line="64"/>
+        <location filename="../effects/internal/gradienteffect.cpp" line="65"/>
         <source>Radius</source>
         <translation>Полупречник</translation>
+    </message>
+    <message>
+        <location filename="../effects/internal/gradienteffect.cpp" line="71"/>
+        <source>As Mask</source>
+        <translation>Као маска</translation>
+    </message>
+    <message>
+        <location filename="../effects/internal/gradienteffect.cpp" line="76"/>
+        <source>Ignore Text Shadow</source>
+        <translation>Занемари сенку текста</translation>
     </message>
 </context>
 <context>
@@ -5010,7 +5020,7 @@ More makes playback smoother and uses more memory.</source>
         <translation>Постави аутоматско скалирање</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="174"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="173"/>
         <source>%1
 Start: %2
 End: %3
@@ -5041,12 +5051,53 @@ Duration: %4</source>
         <translation>Својства</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="188"/>
+        <source>Sequence: %1</source>
+        <translation>Секвенца: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="190"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="193"/>
+        <source>Generated</source>
+        <translation>Генерисано</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="195"/>
+        <source>Source: %1</source>
+        <translation>Извор: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="200"/>
+        <source>Frozen</source>
+        <translation>Замрзнуто</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="208"/>
+        <source>%1% (Reversed)</source>
+        <translation>%1% (Обрнуто)</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="210"/>
+        <source>%1%</source>
+        <translation>%1%</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="213"/>
+        <source>Speed: %1</source>
+        <translation>Брзина: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="219"/>
+        <source>Color Label: %1</source>
+        <translation>Ознака боје: %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/timelinewidget_menu.cpp" line="245"/>
         <source>Error</source>
         <translation>Грешка</translation>
     </message>
     <message>
-        <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
+        <location filename="../ui/timelinewidget_menu.cpp" line="245"/>
         <source>Couldn&apos;t locate media wrapper for sequence.</source>
         <translation>Није могуће пронаћи медијску омотницу за секвенцу.</translation>
     </message>
@@ -5223,12 +5274,23 @@ Duration: %4</source>
 <context>
     <name>UndoHistoryPanel</name>
     <message>
-        <location filename="../panels/undohistorypanel.cpp" line="50"/>
+        <location filename="../panels/undohistorypanel.cpp" line="85"/>
         <source>Undo History</source>
         <translation>Историја поништавања</translation>
     </message>
     <message>
-        <location filename="../panels/undohistorypanel.cpp" line="51"/>
+        <location filename="../panels/undohistorypanel.cpp" line="86"/>
+        <source>Action</source>
+        <translation>Радња</translation>
+    </message>
+    <message>
+        <location filename="../panels/undohistorypanel.cpp" line="86"/>
+        <source>Time</source>
+        <translation>Време</translation>
+    </message>
+    <message>
+        <location filename="../panels/undohistorypanel.cpp" line="87"/>
+        <location filename="../panels/undohistorypanel.cpp" line="139"/>
         <source>Initial State</source>
         <translation>Почетно стање</translation>
     </message>

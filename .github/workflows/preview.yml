@@ -177,6 +177,18 @@ jobs:
         with:
           merge-multiple: true
 
+      - name: Build release notes
+        run: |
+          {
+            echo 'Rolling preview build of Amber 2.0 — updated on each `[preview]` commit to `2.0.x`.'
+            echo
+            echo '**This is pre-release software.** Expect bugs, missing features, and breaking changes.'
+            echo
+            cat WHATS_NEW_2.0.md
+            echo
+            echo "Built from ${{ github.sha }}"
+          } > release-notes.md
+
       - name: Create or update preview release
         uses: softprops/action-gh-release@v2
         with:
@@ -184,6 +196,8 @@ jobs:
           name: "Amber 2.0 Preview"
           prerelease: true
           make_latest: false
+          # body_path wins when readable; body is the fallback
+          body_path: release-notes.md
           body: |
             Rolling preview build of Amber 2.0 — updated on each `[preview]` commit to `2.0.x`.
 

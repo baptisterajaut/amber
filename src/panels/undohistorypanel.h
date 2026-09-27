@@ -23,7 +23,8 @@
 
 #include "ui/panel.h"
 
-class QUndoView;
+class QTreeWidget;
+class QTreeWidgetItem;
 
 class UndoHistoryPanel : public Panel {
   Q_OBJECT
@@ -31,8 +32,24 @@ class UndoHistoryPanel : public Panel {
   explicit UndoHistoryPanel(QWidget* parent);
   void Retranslate() override;
 
+ private slots:
+  /** Rebuilds the rows when commands were pushed or cleared (deferred if we're inside a tree signal). */
+  void onHistoryChanged();
+
+  /** Navigates the undo stack to the entry the user picked (mouse or keyboard). */
+  void onCurrentItemChanged(QTreeWidgetItem* current);
+
  private:
-  QUndoView* view_;
+  QTreeWidget* tree_;
+
+  /** True while onCurrentItemChanged() runs, i.e. while the tree is dispatching its own signal. */
+  bool in_tree_signal_ = false;
+
+  /** Rebuild the full list of rows from scratch. */
+  void rebuildTree();
+
+  /** Restyle rows in place (bold current, grey undone) and select the current one, without emitting tree signals. */
+  void highlightCurrentRow();
 };
 
 #endif  // UNDOHISTORYPANEL_H
