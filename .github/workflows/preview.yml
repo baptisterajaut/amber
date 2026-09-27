@@ -1,0 +1,197 @@
+name: 2.0 Preview
+
+on:
+  push:
+    branches: [2.0.x]
+
+permissions:
+  contents: write
+
+jobs:
+  check-trigger:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.triggered }}
+    steps:
+      - id: check
+        run: |
+          MSG=$(cat <<'COMMIT_MSG'
+          ${{ github.event.head_commit.message }}
+          COMMIT_MSG
+          )
+          if echo "$MSG" | grep -qi '\[preview\]'; then
+            echo "triggered=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "triggered=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  appimage:
+    needs: check-trigger
+    if: needs.check-trigger.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: 2.0.0-preview
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build AppImage
+        run: |
+          docker build \
+            -f packaging/linux/appimage.dockerfile \
+            --build-arg VERSION=${{ env.VERSION }} \
+            --build-arg GIT_HASH=$(git rev-parse --short HEAD) \
+            --output type=local,dest=./out \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: appimage
+          path: out/
+
+  windows:
+    needs: check-trigger
+    if: needs.check-trigger.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: 2.0.0-preview
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build NSIS installer
+        run: |
+          docker build \
+            -f packaging/windows/cross-compile.dockerfile \
+            --build-arg VERSION=${{ env.VERSION }} \
+            --build-arg GIT_HASH=$(git rev-parse --short HEAD) \
+            --target installer \
+            --output type=local,dest=. \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-package
+          path: |
+            amber-setup.exe
+            amber-portable.zip
+
+  macos:
+    needs: check-trigger
+    if: needs.check-trigger.outputs.should_build == 'true'
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: 2.0.0-preview
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: brew install qt@6 ffmpeg cmake
+
+      - name: Build
+        run: |
+          export CMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix ffmpeg)"
+          cmake -S src -B build -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH" \
+                -DGIT_HASH=$(git rev-parse --short HEAD) \
+                -DAMBER_VERSION=${{ env.VERSION }}
+          cmake --build build -j$(sysctl -n hw.ncpu)
+
+      - name: Create .app bundle
+        run: |
+          cd build
+          mkdir -p Amber.app/Contents/MacOS
+          mkdir -p Amber.app/Contents/Resources
+          cp Amber Amber.app/Contents/MacOS/Amber
+          cp ../packaging/macos/olive.icns Amber.app/Contents/Resources/amber.icns
+          cp ../LICENSE Amber.app/Contents/Resources/LICENSE
+          mkdir -p Amber.app/Contents/Effects
+          cp effects/*.xml effects/*.frag effects/*.vert Amber.app/Contents/Effects/ 2>/dev/null || true
+          mkdir -p Amber.app/Contents/ExportPresets
+          cp ../src/exportpresets/* Amber.app/Contents/ExportPresets/ 2>/dev/null || true
+          curl -sL -o /tmp/frei0r.zip \
+            "https://github.com/dyne/frei0r/releases/download/v2.5.4/frei0r-v2.5.4_osx.zip"
+          mkdir -p /tmp/frei0r && cd /tmp/frei0r && unzip -q /tmp/frei0r.zip
+          cp -r /tmp/frei0r/frei0r-*/. Amber.app/Contents/Effects/frei0r-1/ 2>/dev/null || true
+          cd "$OLDPWD"
+          cat > Amber.app/Contents/Info.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>Amber</string>
+            <key>CFBundleName</key>
+            <string>Amber</string>
+            <key>CFBundleIdentifier</key>
+            <string>org.ambervideoeditor.Amber</string>
+            <key>CFBundleVersion</key>
+            <string>${VERSION}</string>
+            <key>CFBundleShortVersionString</key>
+            <string>${VERSION}</string>
+            <key>CFBundleIconFile</key>
+            <string>amber.icns</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+          </dict>
+          </plist>
+          PLIST
+          QT_PLUGINS="$(brew --prefix qt@6)/share/qt/plugins"
+          find "$QT_PLUGINS" -name "*virtualkeyboard*" -delete 2>/dev/null || true
+          find "$QT_PLUGINS" -name "*pdf*" -delete 2>/dev/null || true
+          $(brew --prefix qt@6)/bin/macdeployqt Amber.app
+
+      - name: Create .dmg
+        run: |
+          cd build
+          sync
+          hdiutil create -volname "Amber" -srcfolder Amber.app -ov -format UDZO \
+            "Amber-${{ env.VERSION }}-${{ matrix.arch }}.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-package-${{ matrix.arch }}
+          path: build/Amber-*.dmg
+
+  release:
+    needs: [appimage, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Move rolling tag
+        run: |
+          git tag -f v2.0.0-preview
+          git push origin v2.0.0-preview --force
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+
+      - name: Create or update preview release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0.0-preview
+          name: "Amber 2.0 Preview"
+          prerelease: true
+          make_latest: false
+          body: |
+            Rolling preview build of Amber 2.0 — updated on each `[preview]` commit to `2.0.x`.
+
+            **This is pre-release software.** Expect bugs, missing features, and breaking changes.
+
+            Built from ${{ github.sha }}
+          files: |
+            Amber-*.AppImage
+            amber-setup.exe
+            amber-portable.zip
+            Amber-*.dmg
