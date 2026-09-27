@@ -170,15 +170,53 @@ void TimelineWidget::tooltip_timer_timeout() {
     if (tooltip_clip < amber::ActiveSequence->clips.size()) {
       ClipPtr c = amber::ActiveSequence->clips.at(tooltip_clip);
       if (c != nullptr) {
-        QToolTip::showText(QCursor::pos(),
-                           tr("%1\nStart: %2\nEnd: %3\nDuration: %4")
-                               .arg(c->name(),
-                                    frame_to_timecode(c->timeline_in(), amber::CurrentConfig.timecode_view,
-                                                      amber::ActiveSequence->frame_rate),
-                                    frame_to_timecode(c->timeline_out(), amber::CurrentConfig.timecode_view,
-                                                      amber::ActiveSequence->frame_rate),
-                                    frame_to_timecode(c->length(), amber::CurrentConfig.timecode_view,
-                                                      amber::ActiveSequence->frame_rate)));
+        QString text = tr("%1\nStart: %2\nEnd: %3\nDuration: %4")
+                           .arg(c->name(),
+                                frame_to_timecode(c->timeline_in(), amber::CurrentConfig.timecode_view,
+                                                  amber::ActiveSequence->frame_rate),
+                                frame_to_timecode(c->timeline_out(), amber::CurrentConfig.timecode_view,
+                                                  amber::ActiveSequence->frame_rate),
+                                frame_to_timecode(c->length(), amber::CurrentConfig.timecode_view,
+                                                  amber::ActiveSequence->frame_rate));
+
+        // Source file path (or "Generated" for titles/solids)
+        QString source;
+        if (c->media() != nullptr) {
+          if (c->media()->get_type() == MEDIA_TYPE_FOOTAGE && c->media()->to_footage() != nullptr) {
+            source = c->media()->to_footage()->url;
+          } else if (c->media()->get_type() == MEDIA_TYPE_SEQUENCE) {
+            source = tr("Sequence: %1").arg(c->media()->get_name());
+          } else {
+            source = tr("Generated");
+          }
+        } else {
+          source = tr("Generated");
+        }
+        text += "\n" + tr("Source: %1").arg(source);
+
+        // Speed (e.g. 200%, Reversed)
+        QString speed_str;
+        if (qFuzzyIsNull(c->speed().value)) {
+          speed_str = tr("Frozen");
+        } else {
+          double speed_pct = c->speed().value * 100.0;
+          if (c->reversed()) {
+            speed_str = tr("%1% (Reversed)").arg(speed_pct);
+          } else {
+            speed_str = tr("%1%").arg(speed_pct);
+          }
+        }
+        text += "\n" + tr("Speed: %1").arg(speed_str);
+
+        // Color label name
+        if (c->color_label() > 0) {
+          QString label_name = amber::GetColorLabelName(c->color_label());
+          if (!label_name.isEmpty()) {
+            text += "\n" + tr("Color Label: %1").arg(label_name);
+          }
+        }
+
+        QToolTip::showText(QCursor::pos(), text);
       }
     }
   }
