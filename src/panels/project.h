@@ -49,8 +49,6 @@ SequencePtr create_sequence_from_media(QVector<amber::timeline::MediaImportData>
 QString get_channel_layout_name(int channels, uint64_t layout);
 QString get_interlacing_name(int interlacing);
 
-class QLabel;
-
 class Project : public Panel {
   Q_OBJECT
  public:
@@ -127,12 +125,10 @@ class Project : public Panel {
 
   ProjectFilter sorter;
   SourcesCommon sources_common;
-  QLabel* placeholder_label;
 
  private slots:
   void update_view_type();
   void clear_recent_projects();
-  void update_placeholder_visibility();
 
  public slots:
   void set_icon_view();

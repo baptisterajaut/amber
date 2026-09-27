@@ -94,6 +94,11 @@ void SourceIconView::mouseDoubleClickEvent(QMouseEvent *) {
   commons_.mouseDoubleClickEvent(selectedIndexes());
 }
 
+void SourceIconView::paintEvent(QPaintEvent* event) {
+  QListView::paintEvent(event);
+  commons_.draw_empty_hint(viewport());
+}
+
 SourceIconDelegate::SourceIconDelegate(QObject *parent) :
   QStyledItemDelegate (parent)
 {
