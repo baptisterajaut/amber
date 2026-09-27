@@ -1166,7 +1166,7 @@
         <location filename="../panels/grapheditor.cpp" line="140"/>
         <source>Bezier</source>
         <translatorcomment>Same as in english</translatorcomment>
-        <translation>Bezier</translation>
+        <translation>Bézier</translation>
     </message>
     <message>
         <location filename="../panels/grapheditor.cpp" line="141"/>
@@ -1185,7 +1185,7 @@
     <message>
         <location filename="../ui/graphview.cpp" line="88"/>
         <source>Zoom to Show All</source>
-        <translation>Zommen, um alles anzuzeigen</translation>
+        <translation>Zoomen, um alles anzuzeigen</translation>
     </message>
     <message>
         <location filename="../ui/graphview.cpp" line="97"/>
@@ -1321,7 +1321,7 @@
         <location filename="../ui/keyframeview.cpp" line="67"/>
         <source>Bezier</source>
         <translatorcomment>Same as in english</translatorcomment>
-        <translation>Bezier</translation>
+        <translation>Bézier</translation>
     </message>
     <message>
         <location filename="../ui/keyframeview.cpp" line="69"/>
@@ -1653,7 +1653,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="975"/>
         <source>Rectified Waveforms</source>
-        <translation>Nachgebesserte Waveforms</translation>
+        <translation>Gleichgerichtete Wellenformen</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="976"/>
@@ -1803,7 +1803,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1041"/>
         <source>Pointer Tool: Select and move clips</source>
-        <translation>Zeiger: Clips auswählen und verschieben</translation>
+        <translation>Zeiger-Werkzeug: Clips auswählen und verschieben</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1043"/>
@@ -2037,13 +2037,13 @@
         <location filename="../ui/mainwindow.cpp" line="1030"/>
         <source>Media Viewer</source>
         <translatorcomment>Does this make sense to translate?</translatorcomment>
-        <translation>Media Viewer</translation>
+        <translation>Medien-Viewer</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1031"/>
         <source>Sequence Viewer</source>
         <translatorcomment>Does this make sense to translate?</translatorcomment>
-        <translation>Sequence Viewer</translation>
+        <translation>Sequenz-Viewer</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1032"/>
@@ -2074,7 +2074,7 @@
         <location filename="../ui/mainwindow.cpp" line="1040"/>
         <source>Pointer Tool</source>
         <translatorcomment>Does this make sense?</translatorcomment>
-        <translation>Zeiger</translation>
+        <translation>Zeiger-Werkzeug</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1042"/>
@@ -2455,7 +2455,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="265"/>
         <source>Enable/Disable</source>
-        <translation>Einblenden/Ausblenden</translation>
+        <translation>Aktivieren/Deaktivieren</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="266"/>
@@ -2465,7 +2465,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="267"/>
         <source>In/Out Points</source>
-        <translation>Ein-/Ausstiegspunkte</translation>
+        <translation>Anfangs-/Endpunkte</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="268"/>
@@ -2943,7 +2943,7 @@ Höhere Werte zeichnen detailliertere Wellenformen, benötigen aber mehr Arbeits
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="552"/>
         <source>Default Sequence Settings</source>
-        <translation>Sequenzeinstellungen auf Standard setzen</translation>
+        <translation>Standard-Sequenzeinstellungen</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="553"/>
@@ -3643,7 +3643,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../panels/project.cpp" line="356"/>
         <source>No sequence is active, please open the sequence you want to replace clips from.</source>
-        <translation>Keine Sequenz ist aktiv. Bitten öffnen Sie die Sequenz, bei der Sie Clips ersetzen möchten.</translation>
+        <translation>Keine Sequenz ist aktiv. Bitte öffnen Sie die Sequenz, bei der Sie Clips ersetzen möchten.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="364"/>
@@ -3653,7 +3653,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../panels/project.cpp" line="365"/>
         <source>You cannot insert a sequence into itself, so no clips of this media would be in this sequence.</source>
-        <translation>Sequenz kann nicht sich selbst zugewiesen werden, da es keine Medien enthalten würde.</translation>
+        <translation>Eine Sequenz kann nicht in sich selbst eingefügt werden, da sie sonst keine Clips dieses Mediums enthalten würde.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="390"/>
@@ -3742,7 +3742,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../panels/project.cpp" line="970"/>
         <source>No sequence is active, please open the sequence you want to delete clips from.</source>
-        <translation>Keine Sequenz ist aktiv. Bitten öffnen Sie die Sequenz, bei der Sie Clips löschen möchten.</translation>
+        <translation>Keine Sequenz ist aktiv. Bitte öffnen Sie die Sequenz, bei der Sie Clips löschen möchten.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="973"/>
@@ -3948,7 +3948,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="78"/>
         <source>Please select a media to replace with or click &apos;Cancel&apos;.</source>
-        <translation>Bitten wählen Sie Medien zum Ersetzen aus oder klicken Sie auf &apos;Abbrechen&apos;.</translation>
+        <translation>Bitte wählen Sie Medien zum Ersetzen aus oder klicken Sie auf &apos;Abbrechen&apos;.</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="86"/>
@@ -4081,7 +4081,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="77"/>
         <source>Shadow Softness</source>
-        <translation>Schattensoftness</translation>
+        <translation>Schattenweichheit</translation>
     </message>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="82"/>
@@ -4109,7 +4109,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../engine/sequence.cpp" line="36"/>
         <source>%1 (copy)</source>
-        <translation>%1 (kopieren)</translation>
+        <translation>%1 (Kopie)</translation>
     </message>
 </context>
 <context>
@@ -4117,7 +4117,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../effects/internal/shakeeffect.cpp" line="34"/>
         <source>Intensity</source>
-        <translation>Intentsität</translation>
+        <translation>Intensität</translation>
     </message>
     <message>
         <location filename="../effects/internal/shakeeffect.cpp" line="39"/>
@@ -4142,7 +4142,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
         <location filename="../effects/internal/solideffect.cpp" line="42"/>
         <source>Solid Color</source>
         <translatorcomment>AE and Premiere handle this in the same way</translatorcomment>
-        <translation>Solid</translation>
+        <translation>Volltonfarbe</translation>
     </message>
     <message>
         <location filename="../effects/internal/solideffect.cpp" line="43"/>
@@ -4504,7 +4504,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../effects/internal/subtitleeffect.cpp" line="81"/>
         <source>Shadow Softness</source>
-        <translation>Schattensoftness</translation>
+        <translation>Schattenweichheit</translation>
     </message>
     <message>
         <location filename="../effects/internal/subtitleeffect.cpp" line="86"/>
@@ -4700,7 +4700,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="126"/>
         <source>Shadow Softness</source>
-        <translation>Schattensoftness</translation>
+        <translation>Schattenweichheit</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="131"/>
@@ -4758,7 +4758,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="82"/>
         <source>Prepend</source>
-        <translation>Voreinstellung</translation>
+        <translation>Voranstellen</translation>
     </message>
 </context>
 <context>
@@ -4876,7 +4876,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../panels/timeline.cpp" line="1292"/>
         <source>Solid Color...</source>
-        <translation>Solid...</translation>
+        <translation>Volltonfarbe...</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1297"/>
@@ -4936,7 +4936,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../panels/timeline_ui.cpp" line="221"/>
         <source>Pointer Tool</source>
-        <translation>Pointer-Werkzeug</translation>
+        <translation>Zeiger-Werkzeug</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="222"/>
@@ -4987,7 +4987,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../panels/timeline_ui.cpp" line="231"/>
         <source>Zoom In</source>
-        <translation>Hereinzommen</translation>
+        <translation>Hereinzoomen</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="232"/>
@@ -5002,7 +5002,7 @@ Höhere Werte machen die Wiedergabe flüssiger, benötigen aber mehr Arbeitsspei
     <message>
         <location filename="../panels/timeline_ui.cpp" line="234"/>
         <source>Add title, solid, bars, etc.</source>
-        <translation>Titel, Solid, Balken, etc. Hinzufügen</translation>
+        <translation>Titel, Volltonfarbe, Balken, etc. Hinzufügen</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="420"/>
@@ -5184,7 +5184,7 @@ Dauer: %4</translation>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="796"/>
         <source>Solid Color</source>
-        <translation>Solid</translation>
+        <translation>Volltonfarbe</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="800"/>
@@ -5489,7 +5489,7 @@ Dauer: %4</translation>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="163"/>
         <source>Disable</source>
-        <translation>Ausblenden</translation>
+        <translation>Deaktivieren</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="167"/>

@@ -80,7 +80,7 @@
     <message>
         <location filename="../global/global.cpp" line="260"/>
         <source>Open Project...</source>
-        <translation>أفتح مشروع...</translation>
+        <translation>افتح مشروع...</translation>
     </message>
     <message>
         <location filename="../global/global.cpp" line="270"/>
@@ -120,12 +120,12 @@
     <message>
         <location filename="../global/global.cpp" line="436"/>
         <source>No active sequence</source>
-        <translation>لا مقاطع نشطة</translation>
+        <translation>لا تسلسل نشط</translation>
     </message>
     <message>
         <location filename="../global/global.cpp" line="437"/>
         <source>Please open the sequence to perform this action.</source>
-        <translation>يرجى فتح المتتالية لتنفيذ هذا الإجراء.</translation>
+        <translation>يرجى فتح التسلسل لتنفيذ هذا الإجراء.</translation>
     </message>
     <message>
         <location filename="../global/global.cpp" line="498"/>
@@ -263,7 +263,7 @@
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="24"/>
         <source>Name:</source>
-        <translation>اﻷسم:</translation>
+        <translation>الاسم:</translation>
     </message>
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="33"/>
@@ -317,12 +317,12 @@
     <message>
         <location filename="../effects/internal/cornerpineffect.cpp" line="30"/>
         <source>Top Left</source>
-        <translation>اعلى اليسار</translation>
+        <translation>أعلى اليسار</translation>
     </message>
     <message>
         <location filename="../effects/internal/cornerpineffect.cpp" line="34"/>
         <source>Top Right</source>
-        <translation>اعلى اليمين</translation>
+        <translation>أعلى اليمين</translation>
     </message>
     <message>
         <location filename="../effects/internal/cornerpineffect.cpp" line="38"/>
@@ -426,7 +426,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="617"/>
         <source>Save Effect Settings</source>
-        <translation>أحفظ أعدادات المؤثر</translation>
+        <translation>أحفظ إعدادات المؤثر</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="617"/>
@@ -437,7 +437,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="632"/>
         <source>Save Settings Failed</source>
-        <translation>حفظ اﻷعدادات فشل</translation>
+        <translation>حفظ الإعدادات فشل</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="632"/>
@@ -448,7 +448,7 @@
         <location filename="../effects/effect.cpp" line="640"/>
         <location filename="../effects/effect.cpp" line="647"/>
         <source>Load Effect Settings</source>
-        <translation>تحميل أعدادات المؤثر</translation>
+        <translation>تحميل إعدادات المؤثر</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="654"/>
@@ -464,7 +464,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="750"/>
         <source>This settings file doesn&apos;t match this effect.</source>
-        <translation>ملف اﻷعدادات هذا لا يطابق هذا المؤثر.</translation>
+        <translation>ملف الإعدادات هذا لا يطابق هذا المؤثر.</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="1008"/>
@@ -507,7 +507,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="487"/>
         <source>Add Video Transition</source>
-        <translation>أضف أنتقالة فيديو</translation>
+        <translation>أضف انتقالة فيديو</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="488"/>
@@ -522,7 +522,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="490"/>
         <source>Add Audio Transition</source>
-        <translation>أضف أنتقالة صوت</translation>
+        <translation>أضف انتقالة صوت</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="596"/>
@@ -594,7 +594,7 @@
     <message>
         <location filename="../ui/effectui.cpp" line="428"/>
         <source>Move &amp;Up</source>
-        <translation>حرك &amp;للاعلى</translation>
+        <translation>حرك &amp;للأعلى</translation>
     </message>
     <message>
         <location filename="../ui/effectui.cpp" line="432"/>
@@ -619,7 +619,7 @@
     <message>
         <location filename="../ui/effectui.cpp" line="460"/>
         <source>Save Settings to File</source>
-        <translation>أحفظ اﻷعدادات في ملف</translation>
+        <translation>أحفظ الإعدادات في ملف</translation>
     </message>
 </context>
 <context>
@@ -766,7 +766,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="596"/>
         <source>Entire Sequence</source>
-        <translation>كل المقطع</translation>
+        <translation>كل التسلسل</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="597"/>
@@ -1446,7 +1446,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="935"/>
         <source>&amp;Open Project</source>
-        <translation>&amp;أفتح مشروع</translation>
+        <translation>&amp;افتح مشروع</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="936"/>
@@ -1461,7 +1461,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="938"/>
         <source>Open Recent</source>
-        <translation>أفتح مؤخراً</translation>
+        <translation>افتح مؤخراً</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="939"/>
@@ -1486,7 +1486,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="943"/>
         <source>&amp;Import...</source>
-        <translation>&amp;أستيراد</translation>
+        <translation>&amp;استيراد</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="944"/>
@@ -1596,7 +1596,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="966"/>
         <source>Set/Edit Marker</source>
-        <translation>حدد/عدّل اﻹشارات</translation>
+        <translation>حدد/عدّل العلامة</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="968"/>
@@ -1636,7 +1636,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="975"/>
         <source>Rectified Waveforms</source>
-        <translation>أشكال موجية متناوبة</translation>
+        <translation>أشكال موجية مقوّمة</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="976"/>
@@ -1656,7 +1656,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="979"/>
         <source>Milliseconds</source>
-        <translation>جزء من الثانية</translation>
+        <translation>مللي ثانية</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="981"/>
@@ -1751,7 +1751,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1003"/>
         <source>Go to Start</source>
-        <translation>أذهب للبداية</translation>
+        <translation>اذهب للبداية</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1004"/>
@@ -1776,7 +1776,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1008"/>
         <source>Go to End</source>
-        <translation>أذهب للنهاية</translation>
+        <translation>اذهب للنهاية</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1010"/>
@@ -1943,22 +1943,22 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1013"/>
         <source>Go to Previous Cut</source>
-        <translation>أذهب للقطعة السابقة</translation>
+        <translation>اذهب للقطعة السابقة</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1014"/>
         <source>Go to Next Cut</source>
-        <translation>أذهب للقطعة التالية</translation>
+        <translation>اذهب للقطعة التالية</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1015"/>
         <source>Go to In Point</source>
-        <translation>أذهب لنقطة إدخال</translation>
+        <translation>اذهب لنقطة إدخال</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1016"/>
         <source>Go to Out Point</source>
-        <translation>أذهب لنقطة إخراج</translation>
+        <translation>اذهب لنقطة إخراج</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1018"/>
@@ -2013,7 +2013,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1031"/>
         <source>Sequence Viewer</source>
-        <translation>عارض المقطع</translation>
+        <translation>عارض التسلسل</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1032"/>
@@ -2151,17 +2151,17 @@
     <message>
         <location filename="../timeline/marker.cpp" line="63"/>
         <source>Set Marker</source>
-        <translation>ضع وسم</translation>
+        <translation>ضع علامة</translation>
     </message>
     <message>
         <location filename="../timeline/marker.cpp" line="65"/>
         <source>Set clip marker name:</source>
-        <translation>ضع أسم وسم المقطوعة:</translation>
+        <translation>ضع اسم علامة المقطع:</translation>
     </message>
     <message>
         <location filename="../timeline/marker.cpp" line="66"/>
         <source>Set sequence marker name:</source>
-        <translation>ضع أسم وسم المقطع:</translation>
+        <translation>ضع اسم علامة التسلسل:</translation>
     </message>
     <message>
         <location filename="../timeline/marker.cpp" line="75"/>
@@ -2228,12 +2228,12 @@
     <message>
         <location filename="../project/media.cpp" line="179"/>
         <source>Name:</source>
-        <translation>اﻷسم:</translation>
+        <translation>الاسم:</translation>
     </message>
     <message>
         <location filename="../project/media.cpp" line="180"/>
         <source>Filename:</source>
-        <translation>أسم الملف:</translation>
+        <translation>اسم الملف:</translation>
     </message>
     <message>
         <location filename="../project/media.cpp" line="120"/>
@@ -2272,7 +2272,7 @@ Video Dimensions: %2x%3
 Frame Rate: %4
 Audio Frequency: %5
 Audio Layout: %6</source>
-        <translation>اﻷسم: %1
+        <translation>الاسم: %1
 أبعاد الفيديو: %2x%3
 معدل اﻹطارات: %4
 تردد الصوت: %5
@@ -2281,7 +2281,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../project/media.cpp" line="349"/>
         <source>Name</source>
-        <translation>اﻷسم</translation>
+        <translation>الاسم</translation>
     </message>
     <message>
         <location filename="../project/media.cpp" line="351"/>
@@ -2304,7 +2304,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="53"/>
         <source>Tracks:</source>
-        <translation>المقطوعات:</translation>
+        <translation>المسارات:</translation>
     </message>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="59"/>
@@ -2351,7 +2351,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="131"/>
         <source>Name:</source>
-        <translation>اﻷسم:</translation>
+        <translation>الاسم:</translation>
     </message>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="146"/>
@@ -2380,7 +2380,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="256"/>
         <source>&amp;Sequence</source>
-        <translation>&amp;مقطع</translation>
+        <translation>&amp;تسلسل</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="257"/>
@@ -2526,7 +2526,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="326"/>
         <source>Enter the aspect ratio to use for the title/action safe area (e.g. 16:9):</source>
-        <translation>أدخل معدل النسبة لأستعماله في العنوان/الإجراء المنطقة الآمنة (كــ. 16:9):</translation>
+        <translation>أدخل معدل النسبة لاستعماله في العنوان/الإجراء المنطقة الآمنة (كــ. 16:9):</translation>
     </message>
 </context>
 <context>
@@ -2539,7 +2539,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="83"/>
         <source>New Sequence</source>
-        <translation>مقطع جديد</translation>
+        <translation>تسلسل جديد</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="111"/>
@@ -2569,42 +2569,42 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="228"/>
         <source>1080p</source>
-        <translation></translation>
+        <translation>1080p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="229"/>
         <source>720p</source>
-        <translation></translation>
+        <translation>720p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="230"/>
         <source>480p</source>
-        <translation></translation>
+        <translation>480p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="231"/>
         <source>360p</source>
-        <translation></translation>
+        <translation>360p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="232"/>
         <source>240p</source>
-        <translation></translation>
+        <translation>240p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="233"/>
         <source>144p</source>
-        <translation></translation>
+        <translation>144p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="234"/>
         <source>NTSC (480i)</source>
-        <translation></translation>
+        <translation>NTSC (480i)</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="235"/>
         <source>PAL (576i)</source>
-        <translation></translation>
+        <translation>PAL (576i)</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="236"/>
@@ -2680,7 +2680,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="320"/>
         <source>Name:</source>
-        <translation>اﻷسم:</translation>
+        <translation>الاسم:</translation>
     </message>
 </context>
 <context>
@@ -2760,7 +2760,7 @@ Audio Layout: %6</source>
         <location filename="../effects/internal/paneffect.cpp" line="29"/>
         <source>Pan</source>
         <translatorcomment>بحاجة لمتابعة</translatorcomment>
-        <translation>تسطّح</translation>
+        <translation>التوزيع</translation>
     </message>
 </context>
 <context>
@@ -2793,7 +2793,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="352"/>
         <source>Import Keyboard Shortcuts</source>
-        <translation>أستيراد أخصارات لوحة المفاتيح</translation>
+        <translation>استيراد أخصارات لوحة المفاتيح</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="374"/>
@@ -2911,7 +2911,7 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="552"/>
         <source>Default Sequence Settings</source>
-        <translation>إعدادات المتتالية الافتراضية</translation>
+        <translation>إعدادات التسلسل الافتراضية</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="553"/>
@@ -2961,12 +2961,12 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="602"/>
         <source>Add Transform to new video clips, and Volume and Pan to new audio clips.</source>
-        <translation>إضافة تأثير التحويل إلى مقاطع الفيديو الجديدة، ودرجة الصوت والتسطّح إلى مقاطع الصوت الجديدة.</translation>
+        <translation>إضافة تأثير التحويل إلى مقاطع الفيديو الجديدة، ودرجة الصوت والتوزيع إلى مقاطع الصوت الجديدة.</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="607"/>
         <source>Automatically Seek to the Beginning When Playing at the End of a Sequence</source>
-        <translation>الانتقال تلقائيًا إلى البداية عند التشغيل من نهاية المتتالية</translation>
+        <translation>الانتقال تلقائيًا إلى البداية عند التشغيل من نهاية التسلسل</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="609"/>
@@ -3145,7 +3145,7 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="709"/>
         <source>Ask For Name When Setting Marker</source>
-        <translation>أسال عن اﻷسم حين وضع المؤشر</translation>
+        <translation>اسأل عن الاسم حين وضع العلامة</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="768"/>
@@ -3185,7 +3185,7 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="475"/>
         <source>Image sequence formats:</source>
-        <translation>صيغ صور المقاطع:</translation>
+        <translation>صيغ سلاسل الصور:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="778"/>
@@ -3221,7 +3221,7 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="87"/>
         <source>Default Sequence</source>
-        <translation>المتتالية الافتراضية</translation>
+        <translation>التسلسل الافتراضي</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="413"/>
@@ -3359,7 +3359,7 @@ When off, dragging with the middle mouse button pans the timeline.</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="843"/>
         <source>Memory Usage</source>
-        <translation>أستعمال الذاكرة</translation>
+        <translation>استعمال الذاكرة</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="845"/>
@@ -3482,7 +3482,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="988"/>
         <source>Import</source>
-        <translation>أستيراد</translation>
+        <translation>استيراد</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="992"/>
@@ -3578,7 +3578,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="227"/>
         <source>Sequence</source>
-        <translation>مقطع</translation>
+        <translation>تسلسل</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="316"/>
@@ -3605,22 +3605,22 @@ More makes playback smoother and uses more memory.</source>
         <location filename="../panels/project.cpp" line="355"/>
         <location filename="../panels/project.cpp" line="969"/>
         <source>No active sequence</source>
-        <translation>لا مقاطع نشطة</translation>
+        <translation>لا تسلسل نشط</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="356"/>
         <source>No sequence is active, please open the sequence you want to replace clips from.</source>
-        <translation>لا مقطع نشط, رجاءً أفتح المقطع التي تريد أستبدال الجزء منه.</translation>
+        <translation>لا تسلسل نشط, رجاءً افتح التسلسل الذي تريد استبدال الجزء منه.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="364"/>
         <source>Active sequence selected</source>
-        <translation>مقطع نشط محدد</translation>
+        <translation>تسلسل نشط محدد</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="365"/>
         <source>You cannot insert a sequence into itself, so no clips of this media would be in this sequence.</source>
-        <translation>لا يمكنك إدراج المقطع بنفسه, لذا لا جزئيات من هذه الوسائط ستكون بهذا المقطع.</translation>
+        <translation>لا يمكنك إدراج التسلسل بنفسه, لذا لا مقاطع من هذه الوسائط ستكون بهذا التسلسل.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="390"/>
@@ -3630,7 +3630,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="390"/>
         <source>Enter new name:</source>
-        <translation>أدخل اﻷسم الجديد:</translation>
+        <translation>أدخل الاسم الجديد:</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="394"/>
@@ -3655,7 +3655,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="513"/>
         <source>The media &apos;%1&apos; is currently used in &apos;%2&apos;. Deleting it will remove all instances in the sequence. Are you sure you want to do this?</source>
-        <translation>الوسائط &apos;%1&apos; حالياً مستعملة ب &apos;%2&apos;. حذفه سوف يحذف جميع حالات المقطع. هل أنت متأكد أنك تريد فعل هذا؟</translation>
+        <translation>الوسائط &apos;%1&apos; حالياً مستعملة ب &apos;%2&apos;. حذفه سوف يحذف جميع حالات التسلسل. هل أنت متأكد أنك تريد فعل هذا؟</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="520"/>
@@ -3689,12 +3689,12 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="774"/>
         <source>Image sequence detected</source>
-        <translation>تم التعرف على مقاطع صور</translation>
+        <translation>تم التعرف على سلسلة صور</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="775"/>
         <source>The file &apos;%1&apos; appears to be part of an image sequence. Would you like to import it as such?</source>
-        <translation>الملف &apos;%1&apos; يبدو كأنه جزء من سلسلة صور. هل تريد أستيراده هكذا؟</translation>
+        <translation>الملف &apos;%1&apos; يبدو كأنه جزء من سلسلة صور. هل تريد استيراده هكذا؟</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="868"/>
@@ -3704,12 +3704,12 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="958"/>
         <source>Import media...</source>
-        <translation>أستيراد وسائط...</translation>
+        <translation>استيراد وسائط...</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="970"/>
         <source>No sequence is active, please open the sequence you want to delete clips from.</source>
-        <translation>لا مقطع نشط, رجاءً أفتح المقطع المراد حذف جزء منه.</translation>
+        <translation>لا تسلسل نشط, رجاءً افتح التسلسل المراد حذف جزء منه.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="973"/>
@@ -3795,7 +3795,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="129"/>
         <source>The file &quot;%1&quot; already exists. Do you wish to replace it?</source>
-        <translation>الملف &quot;%1&quot; موجود مسبقاً. هل ترغب بأستبداله؟</translation>
+        <translation>الملف &quot;%1&quot; موجود مسبقاً. هل ترغب باستبداله؟</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="182"/>
@@ -3884,12 +3884,12 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="37"/>
         <source>Replace clips using &quot;%1&quot;</source>
-        <translation>أستبدل المقاطع بأستعمال &quot;%1&quot;</translation>
+        <translation>استبدل المقاطع باستعمال &quot;%1&quot;</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="43"/>
         <source>Select which media you want to replace this media&apos;s clips with:</source>
-        <translation>أختار إي الوسائط تريد أستبدالها لمقاطع الوسائط هذخ مع:</translation>
+        <translation>اختار إي الوسائط تريد استبدالها لمقاطع الوسائط هذخ مع:</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="49"/>
@@ -3914,7 +3914,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="78"/>
         <source>Please select a media to replace with or click &apos;Cancel&apos;.</source>
-        <translation>رجاءً أختر الوسائط للأستبدال مع أو أنقر &apos;إلغاء&apos;.</translation>
+        <translation>رجاءً اختر الوسائط للاستبدال مع أو أنقر &apos;إلغاء&apos;.</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="86"/>
@@ -3924,7 +3924,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="87"/>
         <source>You selected the same media that you&apos;re replacing. Please select a different one or click &apos;Cancel&apos;.</source>
-        <translation>أخترت ذات الوسائط المراد أستبدالها. رجاءً أختر غيرها أو أنقر &apos;إلغاء&apos;.</translation>
+        <translation>اخترت ذات الوسائط المراد استبدالها. رجاءً اختر غيرها أو أنقر &apos;إلغاء&apos;.</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="93"/>
@@ -3934,17 +3934,17 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="94"/>
         <source>You cannot replace footage with a folder.</source>
-        <translation>لا يمكنك أستبدال اللقطات مع مجلد.</translation>
+        <translation>لا يمكنك استبدال اللقطات مع مجلد.</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="101"/>
         <source>Active sequence selected</source>
-        <translation>مقاطع نشطة محددة</translation>
+        <translation>تسلسل نشط محدد</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="102"/>
         <source>You cannot insert a sequence into itself.</source>
-        <translation>لا يسعك إدراج مقطع في نفسه.</translation>
+        <translation>لا يسعك إدراج تسلسل في نفسه.</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="111"/>
@@ -4145,7 +4145,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="122"/>
         <source>Import...</source>
-        <translation>أستيراد...</translation>
+        <translation>استيراد...</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="125"/>
@@ -4175,7 +4175,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="142"/>
         <source>Show Sequences</source>
-        <translation>أظهر المقاطع</translation>
+        <translation>أظهر التسلسلات</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="156"/>
@@ -4205,7 +4205,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="184"/>
         <source>Create Sequence With This Media</source>
-        <translation>أنشئ مقطع مع هذه الوسائط</translation>
+        <translation>أنشئ تسلسل مع هذه الوسائط</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="188"/>
@@ -4280,7 +4280,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="278"/>
         <source>You dropped a file onto &apos;%1&apos;. Would you like to replace it with the dropped file?</source>
-        <translation>أنت أوقعت ملفً على &apos;%1&apos; هل تريد أستبداله مع الملف المرمي؟</translation>
+        <translation>أنت أوقعت ملفً على &apos;%1&apos; هل تريد استبداله مع الملف المرمي؟</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="322"/>
@@ -4686,7 +4686,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="50"/>
         <source>Sequence</source>
-        <translation>مقطع</translation>
+        <translation>تسلسل</translation>
     </message>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="51"/>
@@ -4716,7 +4716,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="78"/>
         <source>Offset</source>
-        <translation>اﻷزاحة</translation>
+        <translation>الإزاحة</translation>
     </message>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="82"/>
@@ -4735,7 +4735,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/timeline.cpp" line="420"/>
         <source>Nested Sequence</source>
-        <translation>مقطع متشعب</translation>
+        <translation>تسلسل متضمّن</translation>
     </message>
     <message>
         <location filename="../panels/timeline_clipboard.cpp" line="253"/>
@@ -4957,7 +4957,7 @@ More makes playback smoother and uses more memory.</source>
         <location filename="../panels/timeline_ui.cpp" line="230"/>
         <source>Snapping</source>
         <translatorcomment>بحاجة لمتابعة</translatorcomment>
-        <translation>الساحبة</translation>
+        <translation>السحب</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="231"/>
@@ -5043,7 +5043,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="141"/>
         <source>Sequence Settings</source>
-        <translation>اﻷعدادات المقطع</translation>
+        <translation>إعدادات التسلسل</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="48"/>
@@ -5114,7 +5114,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
         <source>Couldn&apos;t locate media wrapper for sequence.</source>
-        <translation>لم يتم رصد موقع غلاف الوسائط للمقطع.</translation>
+        <translation>لم يتم رصد موقع غلاف الوسائط للتسلسل.</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="353"/>
@@ -5124,7 +5124,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="361"/>
         <source>New Sequence</source>
-        <translation>مقطع جديد</translation>
+        <translation>تسلسل جديد</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="363"/>
@@ -5310,7 +5310,7 @@ Duration: %4</source>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="174"/>
         <source>Failed to load VST plugin &quot;%1&quot;: %2</source>
-        <translation>فشب تحميل إضافة VST &quot;%1&quot;: %2</translation>
+        <translation>فشل تحميل إضافة VST &quot;%1&quot;: %2</translation>
     </message>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="187"/>
@@ -5359,7 +5359,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1088"/>
         <source>Sequence Viewer</source>
-        <translation>عارض المقطع</translation>
+        <translation>عارض التسلسل</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1089"/>
@@ -5578,7 +5578,7 @@ Duration: %4</source>
     <message>
         <location filename="../effects/transition.cpp" line="106"/>
         <source>Invalid transition</source>
-        <translation>أنتقال غير صالح</translation>
+        <translation>انتقال غير صالح</translation>
     </message>
     <message>
         <location filename="../effects/transition.cpp" line="107"/>

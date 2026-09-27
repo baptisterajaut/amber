@@ -286,7 +286,7 @@
     <message>
         <location filename="../ui/collapsiblewidget.cpp" line="54"/>
         <source>&lt;untitled&gt;</source>
-        <translation></translation>
+        <translation>&lt;bez názvu&gt;</translation>
     </message>
 </context>
 <context>
@@ -742,7 +742,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="543"/>
         <source>Bitrate (Mbps):</source>
-        <translation>Datový tok (MB/s):</translation>
+        <translation>Datový tok (Mbps):</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="630"/>
@@ -782,7 +782,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="663"/>
         <source>Bitrate (Kbps/CBR):</source>
-        <translation>Datový tok (KB/s/stálý datový tok):</translation>
+        <translation>Datový tok (Kbps/stálý datový tok):</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="514"/>
@@ -1460,7 +1460,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1048"/>
         <source>Slip Tool</source>
-        <translation>Roztočení se ztotožněním</translation>
+        <translation>Nástroj posunu obsahu</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="955"/>
@@ -1745,7 +1745,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1050"/>
         <source>Slide Tool</source>
-        <translation>Roztočení</translation>
+        <translation>Nástroj posunu klipu</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="233"/>
@@ -2010,12 +2010,12 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1049"/>
         <source>Slip Tool: Slip clip&apos;s contents</source>
-        <translation>Roztočení se ztotožněním: Posunout obsah klipu</translation>
+        <translation>Nástroj posunu obsahu: Posunout obsah klipu</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1051"/>
         <source>Slide Tool: Slide clip without changing its duration</source>
-        <translation>Roztočení: Posunout klip beze změny jeho trvání</translation>
+        <translation>Nástroj posunu klipu: Posunout klip beze změny jeho trvání</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1052"/>
@@ -2365,7 +2365,7 @@ Rozložení zvuku: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="269"/>
         <source>Nest</source>
-        <translation>Vnořovat</translation>
+        <translation>Vnořit</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="321"/>
@@ -4067,7 +4067,7 @@ Když je vypnuto, tažení prostředním tlačítkem myši posouvá časovou osu
     <message>
         <location filename="../engine/sequence.cpp" line="36"/>
         <source>%1 (copy)</source>
-        <translation>%1 (kopírovat)</translation>
+        <translation>%1 (kopie)</translation>
     </message>
 </context>
 <context>
@@ -4727,7 +4727,7 @@ Když je vypnuto, tažení prostředním tlačítkem myši posouvá časovou osu
     <message>
         <location filename="../panels/timeline_ui.cpp" line="225"/>
         <source>Slip Tool</source>
-        <translation>Roztočení se ztotožněním</translation>
+        <translation>Nástroj posunu obsahu</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="222"/>
@@ -4834,7 +4834,7 @@ Když je vypnuto, tažení prostředním tlačítkem myši posouvá časovou osu
     <message>
         <location filename="../panels/timeline_ui.cpp" line="226"/>
         <source>Slide Tool</source>
-        <translation>Roztočení</translation>
+        <translation>Nástroj posunu klipu</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="234"/>
@@ -4883,7 +4883,7 @@ Když je vypnuto, tažení prostředním tlačítkem myši posouvá časovou osu
     <message>
         <location filename="../panels/timeline.cpp" line="714"/>
         <source>Ripple Delete In/Out</source>
-        <translation>Ripple smazání vstupního/výstupního bodu</translation>
+        <translation>Vytáhnout vstupní/výstupní bod</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="714"/>
@@ -4898,7 +4898,7 @@ Když je vypnuto, tažení prostředním tlačítkem myši posouvá časovou osu
     <message>
         <location filename="../panels/timeline.cpp" line="793"/>
         <source>Ripple Delete</source>
-        <translation>Smazat s posunem</translation>
+        <translation>Vytáhnout</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="793"/>

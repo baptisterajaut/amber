@@ -464,7 +464,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="750"/>
         <source>This settings file doesn&apos;t match this effect.</source>
-        <translation>Это файлс параметрами совсем другого эффекта.</translation>
+        <translation>Это файл с параметрами совсем другого эффекта.</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="1008"/>
@@ -2550,7 +2550,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="222"/>
         <source>Preset:</source>
-        <translation>Предстановка:</translation>
+        <translation>Пресет:</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="226"/>
@@ -3174,7 +3174,7 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="475"/>
         <source>Image sequence formats:</source>
-        <translation>Форматы  изображений:</translation>
+        <translation>Форматы изображений:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="947"/>
@@ -3686,7 +3686,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="775"/>
         <source>The file &apos;%1&apos; appears to be part of an image sequence. Would you like to import it as such?</source>
-        <translation>Похоже, что файл &apos;%1&apos; яавляется частью последовательности изображений. Загрузить его как таковой?</translation>
+        <translation>Похоже, что файл &apos;%1&apos; является частью последовательности изображений. Загрузить его как таковой?</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="868"/>

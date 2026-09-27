@@ -223,7 +223,7 @@
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="280"/>
         <source>Auto-Cut Silence (Ripple Delete)</source>
-        <translation>Автоматичне вирізання тиші (видалення зі зміщенням)</translation>
+        <translation>Автоматичне вирізання тиші (видалення зі зсувом)</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="353"/>
@@ -469,7 +469,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="750"/>
         <source>This settings file doesn&apos;t match this effect.</source>
-        <translation>Цей файл налаштувань не підходить для даного ефекта.</translation>
+        <translation>Цей файл налаштувань не підходить для даного ефекту.</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="1008"/>
@@ -602,12 +602,12 @@
     <message>
         <location filename="../ui/effectui.cpp" line="428"/>
         <source>Move &amp;Up</source>
-        <translation>Перемістити В&amp;низ</translation>
+        <translation>Перемістити В&amp;гору</translation>
     </message>
     <message>
         <location filename="../ui/effectui.cpp" line="432"/>
         <source>Move &amp;Down</source>
-        <translation>Перемістити В&amp;гору</translation>
+        <translation>Перемістити В&amp;низ</translation>
     </message>
     <message>
         <location filename="../ui/effectui.cpp" line="437"/>
@@ -663,7 +663,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="433"/>
         <source>Invalid dimensions</source>
-        <translation>Некоректні розміри кадра</translation>
+        <translation>Некоректні розміри кадру</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="434"/>
@@ -706,7 +706,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="505"/>
         <source>Constant Bitrate</source>
-        <translation>Стала швидкість потока</translation>
+        <translation>Стала швидкість потоку</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="513"/>
@@ -727,7 +727,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="543"/>
         <source>Bitrate (Mbps):</source>
-        <translation>Швидкість потока (Мбіт/с):</translation>
+        <translation>Швидкість потоку (Мбіт/с):</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="547"/>
@@ -813,7 +813,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="630"/>
         <source>Compression Type:</source>
-        <translation>Тип cтискання:</translation>
+        <translation>Тип стискання:</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="641"/>
@@ -833,7 +833,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="663"/>
         <source>Bitrate (Kbps/CBR):</source>
-        <translation>Швидкість потока (Кбіт/с / CBR):</translation>
+        <translation>Швидкість потоку (Кбіт/с / CBR):</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="750"/>
@@ -933,12 +933,12 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="103"/>
         <source>could not allocate video stream</source>
-        <translation>не вдалося встановити поток відео</translation>
+        <translation>не вдалося встановити потік відео</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="113"/>
         <source>could not allocate video encoding context</source>
-        <translation>не вдалося встановити контекст кодувльника відео</translation>
+        <translation>не вдалося встановити контекст кодувальника відео</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="175"/>
@@ -968,12 +968,12 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="228"/>
         <source>could not allocate audio stream</source>
-        <translation>не вдалося встановити поток аудіо</translation>
+        <translation>не вдалося встановити потік аудіо</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="242"/>
         <source>could not allocate audio encoding context</source>
-        <translation>не вдалося встановити контекст кодувльника аудіо</translation>
+        <translation>не вдалося встановити контекст кодувальника аудіо</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="276"/>
@@ -1433,12 +1433,12 @@
     <message>
         <location filename="../project/loadthread.cpp" line="867"/>
         <source>Project Load Error</source>
-        <translation>Помилка при завантаженні проекта</translation>
+        <translation>Помилка при завантаженні проекту</translation>
     </message>
     <message>
         <location filename="../project/loadthread.cpp" line="867"/>
         <source>Error loading project: %1</source>
-        <translation>Помилка при завантаженні проекта: %1</translation>
+        <translation>Помилка при завантаженні проекту: %1</translation>
     </message>
 </context>
 <context>
@@ -1561,7 +1561,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="956"/>
         <source>&amp;Undo</source>
-        <translation>&amp;Відмінити</translation>
+        <translation>&amp;Скасувати</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="957"/>
@@ -1606,7 +1606,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="965"/>
         <source>Ripple Delete In/Out Point</source>
-        <translation>Видалити зі зміщенням точку входу/виходу</translation>
+        <translation>Видалити зі зсувом точку входу/виходу</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="966"/>
@@ -1698,7 +1698,7 @@
         <location filename="../ui/mainwindow.cpp" line="986"/>
         <source>Title/Action Safe Area</source>
         <translatorcomment>Уточнити</translatorcomment>
-        <translation>Безпечна зона титрів/ефекта</translation>
+        <translation>Безпечна зона титрів/дії</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="987"/>
@@ -2128,7 +2128,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1067"/>
         <source>Page Auto-Scroll</source>
-        <translation>Авторокручування перегортанням</translation>
+        <translation>Автопрокручування перегортанням</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1069"/>
@@ -2360,7 +2360,7 @@ Audio Layout: %6</source>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="102"/>
         <source>Alpha is Premultiplied</source>
         <translatorcomment>Уточнити</translatorcomment>
-        <translation>Альфа-значення помножено у зворотньому порядку</translation>
+        <translation>Альфа-канал попередньо помножений</translation>
     </message>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="111"/>
@@ -2414,27 +2414,27 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="258"/>
         <source>Set In Point</source>
-        <translation>Встановити точку входа</translation>
+        <translation>Встановити точку входу</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="259"/>
         <source>Set Out Point</source>
-        <translation>Встановити точку вихода</translation>
+        <translation>Встановити точку виходу</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="260"/>
         <source>Reset In Point</source>
-        <translation>Скинути точку входа</translation>
+        <translation>Скинути точку входу</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="261"/>
         <source>Reset Out Point</source>
-        <translation>Скинути точку вихода</translation>
+        <translation>Скинути точку виходу</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="262"/>
         <source>Clear In/Out Point</source>
-        <translation>Очистити точку входа/вихода</translation>
+        <translation>Очистити точку входу/виходу</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="263"/>
@@ -2501,7 +2501,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="275"/>
         <source>Duplicate</source>
-        <translation>Дюблювати</translation>
+        <translation>Дублювати</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="276"/>
@@ -2511,7 +2511,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="277"/>
         <source>Ripple Delete</source>
-        <translation>Видалити зі зміщенням</translation>
+        <translation>Видалити зі зсувом</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="278"/>
@@ -2551,7 +2551,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="326"/>
         <source>Enter the aspect ratio to use for the title/action safe area (e.g. 16:9):</source>
-        <translation>Встановіть пропорції сторін для безпечної зони титрів/ефекта (наприклад, 16:9):</translation>
+        <translation>Встановіть пропорції сторін для безпечної зони титрів/дії (наприклад, 16:9):</translation>
     </message>
 </context>
 <context>
@@ -2580,7 +2580,7 @@ Audio Layout: %6</source>
         <location filename="../dialogs/newsequencedialog.cpp" line="222"/>
         <source>Preset:</source>
         <translatorcomment>Уточнити</translatorcomment>
-        <translation>Профіль:</translation>
+        <translation>Пресет:</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="226"/>
@@ -3037,7 +3037,7 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="607"/>
         <source>Automatically Seek to the Beginning When Playing at the End of a Sequence</source>
-        <translation>Автопрокручувати на початок при відворенні з кінця послідовності</translation>
+        <translation>Автопрокручувати на початок при відтворенні з кінця послідовності</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="609"/>
@@ -3323,13 +3323,13 @@ When off, dragging with the middle mouse button pans the timeline.</source>
         <location filename="../dialogs/preferencesdialog.cpp" line="780"/>
         <source>Native</source>
         <translatorcomment>Уточнити</translatorcomment>
-        <translation>Native</translation>
+        <translation>Системна</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="781"/>
         <source>Native (Light Icons)</source>
         <translatorcomment>Уточнити</translatorcomment>
-        <translation>Native (світлі іконки)</translation>
+        <translation>Системна (світлі іконки)</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="783"/>
@@ -3340,7 +3340,7 @@ When off, dragging with the middle mouse button pans the timeline.</source>
         <location filename="../dialogs/preferencesdialog.cpp" line="791"/>
         <source>Use Native Menu Styling</source>
         <translatorcomment>Уточнити</translatorcomment>
-        <translation>Використовувати стиль меню Native</translation>
+        <translation>Використовувати системний стиль меню</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="792"/>
@@ -3574,7 +3574,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="110"/>
         <source>Undo</source>
-        <translation>Відмінити</translation>
+        <translation>Скасувати</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="116"/>
@@ -3584,7 +3584,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="127"/>
         <source>Tree View</source>
-        <translation>У вигляді таблиці</translation>
+        <translation>У вигляді дерева</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="133"/>
@@ -3641,7 +3641,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="356"/>
         <source>No sequence is active, please open the sequence you want to replace clips from.</source>
-        <translation>Немає активних послідовносте. Відкрийте послідовність в якій хочете замінити кліпи.</translation>
+        <translation>Немає активних послідовностей. Відкрийте послідовність в якій хочете замінити кліпи.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="364"/>
@@ -3742,7 +3742,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/project.cpp" line="970"/>
         <source>No sequence is active, please open the sequence you want to delete clips from.</source>
-        <translation>Немає активних послідовносте. Відкрийте послідовність з якої хочете видалити кліпи.</translation>
+        <translation>Немає активних послідовностей. Відкрийте послідовність з якої хочете видалити кліпи.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="973"/>
@@ -3783,7 +3783,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="54"/>
         <source>Half Resolution (1/2)</source>
-        <translation>Половина оригінала (1/2)</translation>
+        <translation>Половина оригіналу (1/2)</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="55"/>
@@ -3793,7 +3793,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="56"/>
         <source>Eighth Resolution (1/8)</source>
-        <translation>Восьма оригиніалу (1/8)</translation>
+        <translation>Восьма оригіналу (1/8)</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="57"/>
@@ -3937,7 +3937,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="61"/>
         <source>Cancel</source>
-        <translation>Відмінити</translation>
+        <translation>Відміна</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="77"/>
@@ -4011,7 +4011,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="43"/>
         <source>Vertical Align:</source>
-        <translation>Верктикальне вирівнювання:</translation>
+        <translation>Вертикальне вирівнювання:</translation>
     </message>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="45"/>
@@ -4193,7 +4193,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../project/sourcescommon.cpp" line="132"/>
         <source>Tree View</source>
-        <translation>У вигляді таблиці</translation>
+        <translation>У вигляді дерева</translation>
     </message>
     <message>
         <location filename="../project/sourcescommon.cpp" line="134"/>
@@ -4374,7 +4374,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/speeddialog.cpp" line="73"/>
         <source>Ripple Changes</source>
-        <translation>Змінювати зі зміщенням</translation>
+        <translation>Змінювати зі зсувом</translation>
     </message>
     <message>
         <location filename="../dialogs/speeddialog.cpp" line="80"/>
@@ -4588,7 +4588,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../ui/texteditex.cpp" line="91"/>
         <source>&amp;Edit Text</source>
-        <translation>&amp;Редагувати Текст</translation>
+        <translation>&amp;Редагувати текст</translation>
     </message>
 </context>
 <context>
@@ -4783,12 +4783,12 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="223"/>
         <source>Ripple Tool</source>
-        <translation>Монтаж зі зміщенням</translation>
+        <translation>Монтаж зі зсувом</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="224"/>
         <source>Razor Tool</source>
-        <translation>Підрізання</translation>
+        <translation>Підрізка</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="225"/>
@@ -4967,7 +4967,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/timeline.cpp" line="1309"/>
         <source>Tone...</source>
-        <translation>Звуковой сигнал…</translation>
+        <translation>Звуковий сигнал…</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1314"/>
@@ -5073,7 +5073,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="116"/>
         <source>&amp;Undo</source>
-        <translation>&amp;Відмінити</translation>
+        <translation>&amp;Скасувати</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="117"/>
@@ -5206,7 +5206,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="814"/>
         <source>Tone</source>
-        <translation>Звуковой сигнал</translation>
+        <translation>Звуковий сигнал</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="818"/>

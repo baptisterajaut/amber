@@ -187,12 +187,12 @@
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="55"/>
         <source>Release Threshold:</source>
-        <translation>Seuil de relachement :</translation>
+        <translation>Seuil de relâchement :</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="60"/>
         <source>Release Time:</source>
-        <translation>Temps de relachement :</translation>
+        <translation>Temps de relâchement :</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="67"/>
@@ -541,12 +541,12 @@
         <location filename="../effects/effectrow.cpp" line="96"/>
         <location filename="../effects/effectrow.cpp" line="100"/>
         <source>Disable Keyframes</source>
-        <translation>Désactiver les images-clés</translation>
+        <translation>Désactiver les clés</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="97"/>
         <source>Disabling keyframes will delete all current keyframes. Are you sure you want to do this?</source>
-        <translation>Désactiver les images-clés supprimera toutes les images-clés courantes. Êtes-vous sûr⋅e de vouloir cela ?</translation>
+        <translation>Désactiver les clés supprimera toutes les clés courantes. Êtes-vous sûr⋅e de vouloir cela ?</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="176"/>
@@ -1223,7 +1223,7 @@
     <message>
         <location filename="../ui/keyframenavigator.cpp" line="77"/>
         <source>Enable Keyframes</source>
-        <translation>Activer les images-clés</translation>
+        <translation>Activer les clés</translation>
     </message>
 </context>
 <context>
@@ -1359,7 +1359,7 @@
     <message>
         <location filename="../dialogs/loaddialog.cpp" line="37"/>
         <source>Loading...</source>
-        <translation>Cargement…</translation>
+        <translation>Chargement…</translation>
     </message>
     <message>
         <location filename="../dialogs/loaddialog.cpp" line="42"/>
@@ -1607,7 +1607,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="969"/>
         <source>Zoom In</source>
-        <translation>Zommer</translation>
+        <translation>Zoomer</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="970"/>
@@ -2447,7 +2447,7 @@ Canaux audio : %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="270"/>
         <source>Unnest</source>
-        <translation>Dégrouper</translation>
+        <translation>Désimbriquer</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="271"/>
@@ -2814,7 +2814,7 @@ Canaux audio : %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="394"/>
         <source>Shortcuts exported successfully</source>
-        <translation>Les raccourcis ont été exporté avec succès</translation>
+        <translation>Les raccourcis ont été exportés avec succès</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="396"/>
@@ -3980,7 +3980,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="46"/>
         <source>Center</source>
-        <translation>Centrer</translation>
+        <translation>Au centre</translation>
     </message>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="47"/>
@@ -4068,7 +4068,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
     <message>
         <location filename="../engine/sequence.cpp" line="36"/>
         <source>%1 (copy)</source>
-        <translation>%1 (copy)</translation>
+        <translation>%1 (copie)</translation>
     </message>
 </context>
 <context>
@@ -4389,7 +4389,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
         <location filename="../effects/internal/subtitleeffect.cpp" line="31"/>
         <location filename="../effects/internal/subtitleeffect.cpp" line="38"/>
         <source>Center</source>
-        <translation>Centrer</translation>
+        <translation>Au centre</translation>
     </message>
     <message>
         <location filename="../effects/internal/subtitleeffect.cpp" line="32"/>
@@ -4563,7 +4563,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="66"/>
         <source>Alignment</source>
-        <translation>Allignement</translation>
+        <translation>Alignement</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="68"/>
@@ -4574,7 +4574,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
         <location filename="../effects/internal/texteffect.cpp" line="69"/>
         <location filename="../effects/internal/texteffect.cpp" line="75"/>
         <source>Center</source>
-        <translation>Centrer</translation>
+        <translation>Au centre</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="70"/>
@@ -4784,7 +4784,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
     <message>
         <location filename="../panels/timeline.cpp" line="532"/>
         <source>Unnest Clip(s)</source>
-        <translation>Dégrouper le(s) clip(s)</translation>
+        <translation>Désimbriquer le(s) clip(s)</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="714"/>

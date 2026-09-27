@@ -273,7 +273,7 @@
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="71"/>
         <source>(multiple)</source>
-        <translation>(vários)</translation>
+        <translation>(múltiplo)</translation>
     </message>
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="92"/>
@@ -541,12 +541,12 @@
         <location filename="../effects/effectrow.cpp" line="96"/>
         <location filename="../effects/effectrow.cpp" line="100"/>
         <source>Disable Keyframes</source>
-        <translation>Desativar quadros-chave</translation>
+        <translation>Desativar keyframes</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="97"/>
         <source>Disabling keyframes will delete all current keyframes. Are you sure you want to do this?</source>
-        <translation>Desativar os quadros-chave apagará todos os quadros-chave atuais. Tem certeza que deseja fazer isso?</translation>
+        <translation>Desativar os keyframes apagará todos os keyframes atuais. Tem certeza que deseja fazer isso?</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="176"/>
@@ -584,7 +584,7 @@
     <message>
         <location filename="../ui/effectui.cpp" line="414"/>
         <source>Cu&amp;t</source>
-        <translation>C&amp;ortar</translation>
+        <translation>&amp;Recortar</translation>
     </message>
     <message>
         <location filename="../ui/effectui.cpp" line="417"/>
@@ -1223,7 +1223,7 @@
     <message>
         <location filename="../ui/keyframenavigator.cpp" line="77"/>
         <source>Enable Keyframes</source>
-        <translation>Habilitar quadros-chave</translation>
+        <translation>Habilitar keyframes</translation>
     </message>
 </context>
 <context>
@@ -2319,8 +2319,8 @@ Layout do áudio: %6</translation>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="77"/>
         <source>%n channel(s)</source>
         <translation>
+            <numerusform>Canal: %n</numerusform>
             <numerusform>Canais: %n</numerusform>
-            <numerusform></numerusform>
         </translation>
     </message>
     <message>
@@ -4561,7 +4561,7 @@ Valores mais altos tornam a reprodução mais suave e usam mais memória.</trans
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="68"/>
         <source>Left</source>
-        <translation>Esquerda</translation>
+        <translation>Para a esquerda</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="69"/>
@@ -4572,7 +4572,7 @@ Valores mais altos tornam a reprodução mais suave e usam mais memória.</trans
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="70"/>
         <source>Right</source>
-        <translation>Direita</translation>
+        <translation>Para a direita</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="71"/>
@@ -4813,7 +4813,7 @@ Valores mais altos tornam a reprodução mais suave e usam mais memória.</trans
     <message>
         <location filename="../panels/timeline.cpp" line="714"/>
         <source>Ripple Delete In/Out</source>
-        <translation>Excluir entrada/saída com ripple</translation>
+        <translation>Excluir entrada/saída em cadeia</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="714"/>
@@ -4828,7 +4828,7 @@ Valores mais altos tornam a reprodução mais suave e usam mais memória.</trans
     <message>
         <location filename="../panels/timeline.cpp" line="793"/>
         <source>Ripple Delete</source>
-        <translation>Excluir com ripple</translation>
+        <translation>Excluir em cadeia</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="793"/>
@@ -4838,7 +4838,7 @@ Valores mais altos tornam a reprodução mais suave e usam mais memória.</trans
     <message>
         <location filename="../panels/timeline.cpp" line="1075"/>
         <source>Ripple Edit</source>
-        <translation>Edição com ripple</translation>
+        <translation>Edição em cadeia</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1075"/>

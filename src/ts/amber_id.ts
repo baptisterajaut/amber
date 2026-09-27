@@ -161,7 +161,7 @@
     <message>
         <location filename="../effects/internal/audionoiseeffect.cpp" line="30"/>
         <source>Mix</source>
-        <translation></translation>
+        <translation>Campur</translation>
     </message>
 </context>
 <context>
@@ -628,7 +628,7 @@
     <message>
         <location filename="../ui/embeddedfilechooser.cpp" line="52"/>
         <source>File:</source>
-        <translation></translation>
+        <translation>File:</translation>
     </message>
 </context>
 <context>
@@ -757,7 +757,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="584"/>
         <source>Format:</source>
-        <translation></translation>
+        <translation>Format:</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="593"/>
@@ -777,7 +777,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="604"/>
         <source>Video</source>
-        <translation></translation>
+        <translation>Video</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="610"/>
@@ -813,7 +813,7 @@
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="648"/>
         <source>Audio</source>
-        <translation></translation>
+        <translation>Audio</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="657"/>
@@ -948,7 +948,7 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="199"/>
         <source>could not allocate video frame buffer (%1)</source>
-        <translation>Tidak dapat mengalokasikan video buffer (%1)</translation>
+        <translation>tidak dapat mengalokasikan video buffer (%1)</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="220"/>
@@ -978,7 +978,7 @@
     <message>
         <location filename="../rendering/exportthread.cpp" line="299"/>
         <source>could not initialize audio resampler (%1)</source>
-        <translation>Tidak dapat menginisialisasi audio resampler (%1)</translation>
+        <translation>tidak dapat menginisialisasi audio resampler (%1)</translation>
     </message>
     <message>
         <location filename="../rendering/exportthread.cpp" line="322"/>
@@ -1155,7 +1155,7 @@
     <message>
         <location filename="../panels/grapheditor.cpp" line="140"/>
         <source>Bezier</source>
-        <translation>Kurva Bezier</translation>
+        <translation>Bézier</translation>
     </message>
     <message>
         <location filename="../panels/grapheditor.cpp" line="141"/>
@@ -1307,7 +1307,7 @@
     <message>
         <location filename="../ui/keyframeview.cpp" line="67"/>
         <source>Bezier</source>
-        <translation></translation>
+        <translation>Bézier</translation>
     </message>
     <message>
         <location filename="../ui/keyframeview.cpp" line="69"/>
@@ -1335,12 +1335,12 @@
     <message>
         <location filename="../ui/labelslider.cpp" line="271"/>
         <source>&amp;Edit</source>
-        <translation></translation>
+        <translation>&amp;Edit</translation>
     </message>
     <message>
         <location filename="../ui/labelslider.cpp" line="275"/>
         <source>&amp;Reset to Default</source>
-        <translation>&amp;Kembalikan seperti Semula</translation>
+        <translation>&amp;Atur ulang ke default</translation>
     </message>
     <message>
         <location filename="../ui/labelslider.cpp" line="306"/>
@@ -1437,7 +1437,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="933"/>
         <source>&amp;File</source>
-        <translation></translation>
+        <translation>&amp;File</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="934"/>
@@ -1542,7 +1542,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="955"/>
         <source>&amp;Edit</source>
-        <translation></translation>
+        <translation>&amp;Edit</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="956"/>
@@ -1649,12 +1649,12 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="977"/>
         <source>Drop Frame</source>
-        <translation></translation>
+        <translation>Drop Frame</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="978"/>
         <source>Non-Drop Frame</source>
-        <translation></translation>
+        <translation>Non-Drop Frame</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="979"/>
@@ -1694,17 +1694,17 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="988"/>
         <source>Default</source>
-        <translation></translation>
+        <translation>Default</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="989"/>
         <source>4:3</source>
-        <translation></translation>
+        <translation>4:3</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="990"/>
         <source>16:9</source>
-        <translation></translation>
+        <translation>16:9</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="991"/>
@@ -2312,12 +2312,12 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="59"/>
         <source>Video %1: %2x%3 %4FPS</source>
-        <translation></translation>
+        <translation>Video %1: %2x%3 %4FPS</translation>
     </message>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="74"/>
         <source>Audio %1: %2Hz %3</source>
-        <translation></translation>
+        <translation>Audio %1: %2Hz %3</translation>
     </message>
     <message numerus="yes">
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="77"/>
@@ -2340,7 +2340,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="111"/>
         <source>Auto (%1)</source>
-        <translation></translation>
+        <translation>Otomatis (%1)</translation>
     </message>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="124"/>
@@ -2389,12 +2389,12 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="258"/>
         <source>Set In Point</source>
-        <translation>Set Titik Masuk</translation>
+        <translation>Atur Titik Masuk</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="259"/>
         <source>Set Out Point</source>
-        <translation>Set Titik Keluar</translation>
+        <translation>Atur Titik Keluar</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="260"/>
@@ -2554,57 +2554,57 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="222"/>
         <source>Preset:</source>
-        <translation></translation>
+        <translation>Preset:</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="226"/>
         <source>Film 4K</source>
-        <translation></translation>
+        <translation>Film 4K</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="227"/>
         <source>TV 4K (Ultra HD/2160p)</source>
-        <translation></translation>
+        <translation>TV 4K (Ultra HD/2160p)</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="228"/>
         <source>1080p</source>
-        <translation></translation>
+        <translation>1080p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="229"/>
         <source>720p</source>
-        <translation></translation>
+        <translation>720p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="230"/>
         <source>480p</source>
-        <translation></translation>
+        <translation>480p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="231"/>
         <source>360p</source>
-        <translation></translation>
+        <translation>360p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="232"/>
         <source>240p</source>
-        <translation></translation>
+        <translation>240p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="233"/>
         <source>144p</source>
-        <translation></translation>
+        <translation>144p</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="234"/>
         <source>NTSC (480i)</source>
-        <translation></translation>
+        <translation>NTSC (480i)</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="235"/>
         <source>PAL (576i)</source>
-        <translation></translation>
+        <translation>PAL (576i)</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="236"/>
@@ -2629,7 +2629,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="247"/>
         <source>Video</source>
-        <translation></translation>
+        <translation>Video</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="251"/>
@@ -2669,7 +2669,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="298"/>
         <source>Audio</source>
-        <translation></translation>
+        <translation>Audio</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="302"/>
@@ -2827,7 +2827,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="396"/>
         <source>Failed to open file for writing</source>
-        <translation>Gagal membaca file</translation>
+        <translation>Gagal menulis file</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="402"/>
@@ -2976,7 +2976,7 @@ Tata Audio: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="950"/>
         <source>Mono</source>
-        <translation></translation>
+        <translation>Mono</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="951"/>
@@ -3109,7 +3109,7 @@ Nilai lebih tinggi menggambar waveform yang lebih detail namun menggunakan lebih
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="592"/>
         <source>General</source>
-        <translation></translation>
+        <translation>Umum</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="596"/>
@@ -3419,7 +3419,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
         <location filename="../dialogs/preferencesdialog.cpp" line="887"/>
         <location filename="../dialogs/preferencesdialog.cpp" line="910"/>
         <source>Default</source>
-        <translation></translation>
+        <translation>Default</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="888"/>
@@ -3459,7 +3459,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="967"/>
         <source>Audio</source>
-        <translation></translation>
+        <translation>Audio</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="975"/>
@@ -3499,7 +3499,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="1008"/>
         <source>Keyboard</source>
-        <translation></translation>
+        <translation>Keyboard</translation>
     </message>
 </context>
 <context>
@@ -3768,12 +3768,12 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="61"/>
         <source>Format:</source>
-        <translation></translation>
+        <translation>Format:</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="64"/>
         <source>ProRes HQ</source>
-        <translation></translation>
+        <translation>ProRes HQ</translation>
     </message>
     <message>
         <location filename="../dialogs/proxydialog.cpp" line="72"/>
@@ -4110,7 +4110,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../effects/internal/solideffect.cpp" line="43"/>
         <source>SMPTE Bars</source>
-        <translation></translation>
+        <translation>SMPTE Bars</translation>
     </message>
     <message>
         <location filename="../effects/internal/solideffect.cpp" line="44"/>
@@ -4690,7 +4690,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="51"/>
         <source>Media</source>
-        <translation></translation>
+        <translation>Media</translation>
     </message>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="54"/>
@@ -4852,7 +4852,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../panels/timeline.cpp" line="417"/>
         <source>Nest Clip(s)</source>
-        <translation>Nest Klip</translation>
+        <translation>Sarangkan Klip</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="532"/>
@@ -4862,7 +4862,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../panels/timeline.cpp" line="714"/>
         <source>Ripple Delete In/Out</source>
-        <translation>Hapus Ripple Masuk/Keluar</translation>
+        <translation>Hapus dan Sesuaikan Masuk/Keluar</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="714"/>
@@ -4877,7 +4877,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../panels/timeline.cpp" line="793"/>
         <source>Ripple Delete</source>
-        <translation>Hapus Ripple</translation>
+        <translation>Hapus dan Sesuaikan</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="793"/>
@@ -4887,7 +4887,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../panels/timeline.cpp" line="1075"/>
         <source>Ripple Edit</source>
-        <translation>Edit Ripple</translation>
+        <translation>Edit Sesuaikan</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1075"/>
@@ -4912,7 +4912,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../panels/timeline.cpp" line="1297"/>
         <source>Bars...</source>
-        <translation></translation>
+        <translation>Bilah...</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1302"/>
@@ -4927,7 +4927,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../panels/timeline.cpp" line="1314"/>
         <source>Noise...</source>
-        <translation></translation>
+        <translation>Noise...</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1336"/>
@@ -5070,7 +5070,7 @@ Nilai lebih tinggi membuat pemutaran lebih mulus namun menggunakan lebih banyak 
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="67"/>
         <source>Auto-S&amp;cale</source>
-        <translation>Per&amp;besar Otomatis</translation>
+        <translation>&amp;Skala Otomatis</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="97"/>
@@ -5106,7 +5106,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
         <source>Error</source>
-        <translation></translation>
+        <translation>Kesalahan</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget_menu.cpp" line="203"/>
@@ -5272,7 +5272,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../effects/internal/transformeffect.cpp" line="80"/>
         <source>Normal</source>
-        <translation></translation>
+        <translation>Normal</translation>
     </message>
 </context>
 <context>
@@ -5328,7 +5328,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="296"/>
         <source>Plugin</source>
-        <translation></translation>
+        <translation>Plugin</translation>
     </message>
     <message>
         <location filename="../effects/internal/vsthost.cpp" line="300"/>
@@ -5427,7 +5427,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../ui/viewercontainer.cpp" line="99"/>
         <source>Add Guide</source>
-        <translation>Tambah Guide</translation>
+        <translation>Tambah Panduan</translation>
     </message>
 </context>
 <context>
@@ -5496,7 +5496,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="653"/>
         <source>Move Guide</source>
-        <translation>Pindah Guide</translation>
+        <translation>Pindah Panduan</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="908"/>
@@ -5519,7 +5519,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="987"/>
         <source>Add Guide</source>
-        <translation>Tambah Guide</translation>
+        <translation>Tambah Panduan</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="646"/>
@@ -5567,7 +5567,7 @@ Durasi: %4</translation>
     <message>
         <location filename="../effects/internal/volumeeffect.cpp" line="31"/>
         <source>Volume</source>
-        <translation></translation>
+        <translation>Volume</translation>
     </message>
 </context>
 <context>
