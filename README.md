@@ -13,7 +13,7 @@ Amber picks up where the amazing [Olive 0.1](https://github.com/olive-editor/oli
 ## Features
 
 - **Multi-track timeline** with clip splitting, ripple/rolling/slip/slide tools, transitions, and keyframe animation
-- **Smart action search** that learns your most-used commands and ranks them first over time
+- **Action search** that ranks your most-used commands first
 - **GPU-accelerated rendering** via Qt RHI (Vulkan, Metal, D3D12, OpenGL fallback) — no raw OpenGL calls in the codebase
 - **Hardware video decoding** (VAAPI, D3D11VA, VideoToolbox) — enabled by default, software fallback automatic
 - **Frei0r plugin support**

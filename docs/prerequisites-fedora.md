@@ -30,7 +30,3 @@ Once all prerequisites are installed, you can configure and build the project fr
 cmake -S src -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 ```
-
-## Wayland & GNOME Compatibility
-
-Amber includes native compatibility workarounds for running under GNOME Wayland sessions. GNOME's compositor (Mutter) does not support Server-Side Decorations (SSD). Amber automatically detects GNOME Wayland environments at startup and transparently falls back to XWayland (`xcb`) to restore native window title bars and borders.
