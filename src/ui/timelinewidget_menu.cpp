@@ -200,10 +200,14 @@ void TimelineWidget::tooltip_timer_timeout() {
           speed_str = tr("Frozen");
         } else {
           double speed_pct = c->speed().value * 100.0;
+          QString speed_pct_str = QString::number(speed_pct, 'f', 1);
+          if (speed_pct_str.endsWith(QLatin1String(".0"))) {
+            speed_pct_str.chop(2);
+          }
           if (c->reversed()) {
-            speed_str = tr("%1% (Reversed)").arg(speed_pct);
+            speed_str = tr("%1% (Reversed)").arg(speed_pct_str);
           } else {
-            speed_str = tr("%1%").arg(speed_pct);
+            speed_str = tr("%1%").arg(speed_pct_str);
           }
         }
         text += "\n" + tr("Speed: %1").arg(speed_str);
