@@ -101,8 +101,8 @@ double EffectField::InterpolateDouble(double timecode, int before_keyframe, int 
   }
 
   if (before_key.type == EFFECT_KEYFRAME_BEZIER || after_key.type == EFFECT_KEYFRAME_BEZIER) {
-    if (after_key.type == EFFECT_KEYFRAME_LINEAR) {
-      // Quadratic bezier — before is the bezier keyframe
+    if (after_key.type != EFFECT_KEYFRAME_BEZIER) {
+      // Quadratic bezier — before is the bezier keyframe (after is Linear or Hold)
       double t = quad_t_from_x(SecondsToFrame(timecode), before_key.time,
                                before_key.time + GetValidKeyframeHandlePosition(before_keyframe, true), after_key.time);
       return quad_from_t(before_dbl, before_dbl + before_key.post_handle_y, after_dbl, t);

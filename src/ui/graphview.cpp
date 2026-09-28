@@ -216,7 +216,8 @@ static QPainterPath build_segment_path(const EffectKeyframe& last_key, const Eff
   if (last_key.type == EFFECT_KEYFRAME_BEZIER && key.type == EFFECT_KEYFRAME_BEZIER) {
     path.cubicTo(QPointF(last_key_x + last_key.post_handle_x * x_zoom, last_key_y - last_key.post_handle_y * y_zoom),
                  QPointF(key_x + key.pre_handle_x * x_zoom, key_y - key.pre_handle_y * y_zoom), QPointF(key_x, key_y));
-  } else if (key.type == EFFECT_KEYFRAME_LINEAR) {
+  } else if (key.type != EFFECT_KEYFRAME_BEZIER) {
+    // last_key is the Bezier one (key is Linear or Hold)
     path.quadTo(QPointF(last_key_x + last_key.post_handle_x * x_zoom, last_key_y - last_key.post_handle_y * y_zoom),
                 QPointF(key_x, key_y));
   } else {
@@ -239,7 +240,8 @@ static void draw_curve_segment(QPainter& p, const EffectKeyframe& last_key, cons
       bezier_path.cubicTo(QPointF(last_key_x + last_post_handle * x_zoom, last_key_y - last_key.post_handle_y * y_zoom),
                           QPointF(key_x + pre_handle * x_zoom, key_y - key.pre_handle_y * y_zoom),
                           QPointF(key_x, key_y));
-    } else if (key.type == EFFECT_KEYFRAME_LINEAR) {
+    } else if (key.type != EFFECT_KEYFRAME_BEZIER) {
+      // last_key is the Bezier one (key is Linear or Hold)
       bezier_path.quadTo(QPointF(last_key_x + last_post_handle * x_zoom, last_key_y - last_key.post_handle_y * y_zoom),
                          QPointF(key_x, key_y));
     } else {

@@ -52,6 +52,11 @@ target_include_directories(amber-test-shortcutfile PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-shortcutfile PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-shortcutfile COMMAND amber-test-shortcutfile)
 
+add_executable(amber-test-keyframes test_keyframes.cpp ${AMBER_TEST_STUBS})
+target_include_directories(amber-test-keyframes PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-keyframes PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-keyframes COMMAND amber-test-keyframes)
+
 # QRhi headless smoke test
 add_executable(amber-test-rhi-smoke test_rhi_smoke.cpp ${AMBER_TEST_STUBS})
 target_include_directories(amber-test-rhi-smoke PRIVATE ${CMAKE_SOURCE_DIR})
