@@ -41,6 +41,7 @@
 #include "ui/rectangleselect.h"
 
 const double kGraphZoomSpeed = 0.05;
+const double kGraphMinZoom = 1e-4;  // set_zoom floor: mouse deltas are divided by the zoom
 const int kGraphSize = 100;
 const int kBezierHandleSize = 3;
 const int kBezierLineSize = 2;
@@ -881,8 +882,8 @@ void GraphView::set_scroll_y(int s) {
 }
 
 void GraphView::set_zoom(double xz, double yz) {
-  x_zoom = xz;
-  y_zoom = yz;
+  x_zoom = qMax(kGraphMinZoom, xz);
+  y_zoom = qMax(kGraphMinZoom, yz);
   emit zoom_changed(x_zoom, y_zoom);
 }
 

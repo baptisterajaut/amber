@@ -189,7 +189,7 @@ void MediaPropertiesDialog::accept() {
     }
 
     // set premultiplied alpha
-    f->alpha_is_premultiplied = premultiply_alpha_setting->isChecked();
+    ca->append(new SetBool(&f->alpha_is_premultiplied, premultiply_alpha_setting->isChecked()));
   }
 
   // set name

@@ -35,6 +35,7 @@ extern "C" {
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPair>
 #include <QPushButton>
 #include <QSizePolicy>
 #include <QVBoxLayout>
@@ -628,7 +629,80 @@ static bool check_sequence_references(QWidget* parent, ComboAction* ca, const QL
         }
         ca->append(new DeleteClipAction(s, k));
       }
-      if (found_ref) break;
+    }
+  }
+  return true;
+}
+
+// Collect every footage and sequence inside `folder`, recursing into subfolders.
+static void collect_folder_contents(Media* folder, QList<Media*>& out) {
+  for (int i = 0; i < folder->childCount(); i++) {
+    Media* child = folder->child(i);
+    if (child->get_type() == MEDIA_TYPE_FOLDER) {
+      collect_folder_contents(child, out);
+    } else {
+      out.append(child);
+    }
+  }
+}
+
+// A selected folder deletes everything inside it. For each such folder, find clips in surviving sequences that use
+// its contents, confirm once, and queue those clips for deletion. Media selected directly is skipped: the footage and
+// sequence checks already handled it, so no clip is queued twice.
+// Returns false if the user cancelled.
+static bool check_folder_contents_in_use(QWidget* parent, ComboAction* ca, const QList<Media*>& items,
+                                         const QList<Media*>& sequence_items, bool& redraw) {
+  // Everything this delete removes: the selection plus the contents of selected folders
+  QList<Media*> deleted = items;
+  QVector<QPair<Media*, QList<Media*>>> folders;
+  for (auto item : items) {
+    if (item->get_type() != MEDIA_TYPE_FOLDER) continue;
+    QList<Media*> contents;
+    collect_folder_contents(item, contents);
+    for (auto m : contents) {
+      if (!deleted.contains(m)) deleted.append(m);
+    }
+    folders.append(qMakePair(item, contents));
+  }
+
+  QList<Media*> handled = items;
+  for (const auto& folder : folders) {
+    QList<Media*> to_check;
+    for (auto m : folder.second) {
+      if (handled.contains(m)) continue;  // selected directly, or already scanned under a nested selected folder
+      handled.append(m);
+      to_check.append(m);
+    }
+    if (to_check.isEmpty()) continue;
+
+    QVector<QPair<Sequence*, int>> clips_in_use;
+    for (auto seq_media : sequence_items) {
+      if (deleted.contains(seq_media)) continue;  // the whole sequence goes away with this delete
+      Sequence* s = seq_media->to_sequence().get();
+      for (int k = 0; k < s->clips.size(); k++) {
+        ClipPtr c = s->clips.at(k);
+        if (c != nullptr && to_check.contains(c->media())) clips_in_use.append(qMakePair(s, k));
+      }
+    }
+    if (clips_in_use.isEmpty()) continue;
+
+    QMessageBox confirm(parent);
+    confirm.setWindowTitle(QCoreApplication::translate("Project", "Delete media in use?"));
+    confirm.setText(QCoreApplication::translate("Project",
+                                                "The folder '%1' contains media used in sequences. Deleting it will "
+                                                "remove those clips. Are you sure?")
+                        .arg(folder.first->get_name()));
+    confirm.addButton(QMessageBox::Yes);
+    QAbstractButton* cancel_button = confirm.addButton(QMessageBox::Cancel);
+    confirm.exec();
+    if (confirm.clickedButton() == cancel_button) return false;
+
+    redraw = true;
+    for (const auto& clip : clips_in_use) {
+      ca->append(new DeleteClipAction(clip.first, clip.second));
+    }
+    for (auto m : to_check) {
+      if (m->get_type() == MEDIA_TYPE_FOOTAGE) delete_clips_in_clipboard_with_media(ca, m);
     }
   }
   return true;
@@ -701,6 +775,11 @@ void Project::delete_selected_media() {
         l--;
       }
     }
+  }
+
+  if (!check_folder_contents_in_use(this, ca, items, sequence_items, redraw)) {
+    delete ca;
+    return;
   }
 
   if (!check_sequence_references(this, ca, items, sequence_items, redraw)) {

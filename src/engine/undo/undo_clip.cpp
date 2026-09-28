@@ -221,18 +221,28 @@ void ReplaceClipMediaCommand::replace(bool undo) {
     }
 
     if (undo) {
-      if (!preserve_clip_ins) {
-        c->set_clip_in(old_clip_ins.at(i));
-      }
+      c->set_clip_in(old_clip_ins.at(i));
 
       c->set_media(old_media, c->media_stream_index());
     } else {
+      // Always recorded: the preserve path below can move the in-point too
+      old_clip_ins.append(c->clip_in());
+
       if (!preserve_clip_ins) {
-        old_clip_ins.append(c->clip_in());
         c->set_clip_in(0);
       }
 
       c->set_media(new_media, c->media_stream_index());
+
+      // media_length() reads the clip's current media, so this check runs after set_media()
+      if (preserve_clip_ins) {
+        long new_length = c->media_length();
+        if (new_length > 0 && c->clip_in() + c->length() > new_length) {
+          // CBA: a clip longer than the new media still overruns at clip_in 0 — same as the unchecked path; clamp
+          // the clip length if it becomes a problem.
+          c->set_clip_in(0);
+        }
+      }
     }
 
     c->replaced = true;

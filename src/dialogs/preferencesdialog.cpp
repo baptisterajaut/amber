@@ -47,6 +47,7 @@
 #include <QVector>
 
 #include "core/path.h"
+#include "core/shortcutfile.h"
 #include "dialogs/newsequencedialog.h"
 #include "global/config.h"
 #include "global/global.h"
@@ -356,15 +357,9 @@ void PreferencesDialog::load_shortcut_file() {
       QByteArray ba = f.readAll();
       f.close();
       for (auto key_shortcut_field : key_shortcut_fields) {
-        int index = ba.indexOf(key_shortcut_field->action_name().toUtf8());
-        if (index == 0 || (index > 0 && ba.at(index - 1) == '\n')) {
-          while (index < ba.size() && ba.at(index) != '\t') index++;
-          QString ks;
-          index++;
-          while (index < ba.size() && ba.at(index) != '\n') {
-            ks.append(ba.at(index));
-            index++;
-          }
+        bool found = false;
+        QString ks = amber::find_shortcut_in_file(ba, key_shortcut_field->action_name(), &found);
+        if (found) {
           key_shortcut_field->setKeySequence(ks);
         } else {
           key_shortcut_field->reset_to_default();
