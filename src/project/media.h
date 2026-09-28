@@ -93,7 +93,7 @@ class Media {
 
   // item functions
   QList<MediaPtr> children;
-  Media* parent;
+  Media* parent = nullptr;
   QString folder_name;
   QString tooltip;
   QIcon icon;

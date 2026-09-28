@@ -193,6 +193,8 @@ void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* outpu
     construct_module();
   }
 
+  // construct_module() leaves open=false when f0r_construct is missing or returns null
+  if (!open || instance == nullptr) return;
   if (update_func_ == nullptr || set_param_func_ == nullptr) return;
 
   for (int i = 0, row_idx = 0; i < param_count; i++) {

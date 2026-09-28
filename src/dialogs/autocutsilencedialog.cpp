@@ -315,7 +315,10 @@ static void apply_ripple_delete(const QVector<SilenceSegment>& silence_segments,
 namespace {
 
 static bool clip_has_audio_preview(Clip* clip) {
-  return clip->track() >= 0 && clip->media() != nullptr && clip->media_stream()->preview_done;
+  if (clip->track() < 0 || clip->media() == nullptr) return false;
+  // media_stream() is null for nested-sequence media (Clip::media_stream only resolves footage)
+  FootageStream* ms = clip->media_stream();
+  return ms != nullptr && ms->preview_done;
 }
 
 // Process a single audio clip: analyse, collect silence segments, split at transitions.

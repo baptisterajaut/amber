@@ -169,7 +169,7 @@ void AddClipCommand::doUndo() {
       }
 
       // deselect the area occupied by this clip
-      amber::app_ctx->deselectArea(c->timeline_in(), c->timeline_out(), c->track());
+      if (amber::app_ctx) amber::app_ctx->deselectArea(c->timeline_in(), c->timeline_out(), c->track());
 
       // if the clip is open, close it
       if (c->IsOpen()) {

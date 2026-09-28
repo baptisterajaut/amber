@@ -210,10 +210,12 @@ static bool proxy_process_packet(AVPacket* packet, AVFrame* dec_frame, AVFormatC
     } else {
       avcodec_send_packet(input_streams.at(stream_index), packet);
       current_progress =
-          qCeil((double(packet->pts) / double(input_fmt_ctx->streams[packet->stream_index]->duration)) * 100);
+          qCeil((double(packet->pts) / double(input_fmt_ctx->streams[stream_index]->duration)) * 100);
     }
     av_packet_unref(packet);
-  } while (avcodec_receive_frame(input_streams.at(packet->stream_index), dec_frame) == AVERROR(EAGAIN) && !skip);
+    // passthrough streams have no decoder: keep reading instead of polling one
+  } while (!skip && (input_streams.at(stream_index) == nullptr ||
+                     avcodec_receive_frame(input_streams.at(stream_index), dec_frame) == AVERROR(EAGAIN)));
 
   return !skip;
 }

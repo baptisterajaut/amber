@@ -45,7 +45,7 @@ class Frei0rEffect : public Effect {
 
  private:
   QLibrary handle;
-  f0r_instance_t instance;
+  f0r_instance_t instance{nullptr};
   int param_count;
   f0rGetParamInfo get_param_info{nullptr};
   f0rUpdateFunc update_func_{nullptr};

@@ -223,6 +223,7 @@ void FocusFilter::delete_function() {
   } else if (panel_graph_editor->view_is_focused()) {
     panel_graph_editor->delete_selected_keys();
   } else {
+    if (amber::ActiveSequence == nullptr) return;
     panel_timeline->delete_selection(amber::ActiveSequence->selections, false);
   }
 }
