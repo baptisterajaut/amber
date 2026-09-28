@@ -1,6 +1,9 @@
+#include <QRegularExpression>
 #include <QtTest>
 
 #include "core/audio.h"
+#include "engine/cacher.h"
+#include "rendering/audio.h"
 
 class TestAudio : public QObject {
   Q_OBJECT
@@ -49,6 +52,40 @@ class TestAudio : public QObject {
     QCOMPARE(audio_scrub_id.load(), 0u);
     QCOMPARE(audio_rendering, false);
     QCOMPARE(audio_rendering_rate, 0);
+  }
+
+  void testScrubGrainSize() {
+    // 80 ms grain, rounded up to whole samples; 4 bytes per stereo S16 frame
+    QCOMPARE(scrub_grain_samples(48000), 3840);
+    QCOMPARE(scrub_grain_samples(44100), 3528);
+    QCOMPARE(scrub_grain_samples(44101), 3529);  // 3528.08 rounds up
+    QCOMPARE(scrub_grain_bytes(48000), 3840 * 4);
+  }
+
+  void testBytesToSeconds() {
+    // S16 interleaved: bytes / 2 / channels / rate
+    QCOMPARE(bytes_to_seconds(192000, 2, 48000), 1.0);
+    QCOMPARE(bytes_to_seconds(96000, 2, 48000), 0.5);
+    QCOMPARE(bytes_to_seconds(0, 2, 48000), 0.0);
+  }
+
+  void testBufferOffsetFromFrame() {
+    // No audio device and not exporting: current_audio_freq() falls back to 48000 Hz; stereo S16 = 4 bytes/frame
+    audio_ibuffer_frame.store(0);
+    QCOMPARE(get_buffer_offset_from_frame(30.0, 0), qint64(0));
+    QCOMPARE(get_buffer_offset_from_frame(30.0, 15), qint64(24000 * 4));
+    QCOMPARE(get_buffer_offset_from_frame(30.0, 30), qint64(48000 * 4));
+
+    audio_ibuffer_frame.store(10);  // offsets are relative to the buffer's first frame
+    QCOMPARE(get_buffer_offset_from_frame(30.0, 40), qint64(48000 * 4));
+    audio_ibuffer_frame.store(0);
+  }
+
+  void testBufferOffsetBeforeBufferStart() {
+    audio_ibuffer_frame.store(100);
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Invalid values passed to get_buffer_offset_from_frame"));
+    QCOMPARE(get_buffer_offset_from_frame(30.0, 50), qint64(-1));
+    audio_ibuffer_frame.store(0);
   }
 };
 

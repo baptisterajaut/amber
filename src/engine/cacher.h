@@ -877,4 +877,7 @@ class Cacher : public QThread {
   void cacheWaitForResponse();
 };
 
+// Seconds of interleaved S16 audio in `nb_bytes` (defined in cacher_audio.cpp).
+double bytes_to_seconds(qint64 nb_bytes, int nb_channels, int sample_rate);
+
 #endif  // CACHER_H

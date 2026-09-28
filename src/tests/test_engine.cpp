@@ -18,25 +18,24 @@
 
 ***/
 
-#include <QtTest>
 #include <QtMath>
+#include <QtTest>
 
-// Engine types (Clip, Sequence) cannot be compiled in isolation because they
-// depend on Cacher (FFmpeg), QRhi, Effects, Config globals, and the full render
-// pipeline.  Until the engine is refactored into an OBJECT library or its pure
-// calculation functions are extracted into core/, we test engine-equivalent logic
-// via standalone reimplementations of the key algorithms.
+#include <climits>
 
-// ---------- rescale_frame_number ----------
-// Canonical impl: rendering/renderfunctions.cpp
-//   qRound((double(framenumber) / source_frame_rate) * target_frame_rate)
-static long rescale_frame_number(long framenumber, double source_frame_rate, double target_frame_rate) {
-  return qRound((double(framenumber) / source_frame_rate) * target_frame_rate);
+#include "engine/clip.h"
+#include "project/footage.h"
+#include "rendering/renderfunctions.h"
+
+// These tests call the real engine functions (amber-engine is linked as an OBJECT library).
+
+// Clip::length() on a real, never-opened Clip (no sequence, no media).
+static long clip_length(long timeline_in, long timeline_out) {
+  Clip c(nullptr);
+  c.set_timeline_in(timeline_in);
+  c.set_timeline_out(timeline_out);
+  return c.length();
 }
-
-// ---------- clip length ----------
-// Canonical impl: Clip::length() = timeline_out_ - timeline_in_
-static long clip_length(long timeline_in, long timeline_out) { return timeline_out - timeline_in; }
 
 class TestEngine : public QObject {
   Q_OBJECT
@@ -98,6 +97,32 @@ class TestEngine : public QObject {
     long in = 1000000;
     long out = 2000000;
     QCOMPARE(clip_length(in, out), 1000000L);
+  }
+
+  // -- Footage::get_length_in_frames ----------------------------------------
+
+  void footageLengthUnknown() {
+    Footage f;
+    f.length = -1;
+    QCOMPARE(f.get_length_in_frames(30.0), 0L);
+    f.ready_lock.unlock();  // the Footage constructor locks it
+  }
+
+  void footageLengthTypical() {
+    Footage f;
+    f.length = 2 * AV_TIME_BASE;  // 2 seconds
+    QCOMPARE(f.get_length_in_frames(30.0), 60L);
+    f.speed = 0.5;  // half speed plays twice as long
+    QCOMPARE(f.get_length_in_frames(30.0), 120L);
+    f.ready_lock.unlock();
+  }
+
+  void footageLengthZeroSpeed() {
+    Footage f;
+    f.length = AV_TIME_BASE;
+    f.speed = 0.0;
+    QCOMPARE(f.get_length_in_frames(30.0), LONG_MAX);
+    f.ready_lock.unlock();
   }
 };
 

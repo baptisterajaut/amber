@@ -13,11 +13,6 @@ class TestEffects : public QObject {
     QCOMPARE(double_lerp(before, after, progress), 15.0);
   }
 
-  void doubleFieldHoldInterpolation() {
-    double before = 10.0;
-    QCOMPARE(before, 10.0);
-  }
-
   void colorInterpolation() {
     QColor before(100, 0, 0);
     QColor after(200, 100, 50);

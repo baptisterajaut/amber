@@ -57,6 +57,16 @@ target_include_directories(amber-test-keyframes PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-keyframes PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-keyframes COMMAND amber-test-keyframes)
 
+add_executable(amber-test-undo-markers test_undo_markers.cpp ${AMBER_TEST_STUBS})
+target_include_directories(amber-test-undo-markers PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-undo-markers PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-undo-markers COMMAND amber-test-undo-markers)
+
+add_executable(amber-test-clipboard test_clipboard_serializer.cpp ${AMBER_TEST_STUBS})
+target_include_directories(amber-test-clipboard PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-clipboard PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-clipboard COMMAND amber-test-clipboard)
+
 # QRhi headless smoke test
 add_executable(amber-test-rhi-smoke test_rhi_smoke.cpp ${AMBER_TEST_STUBS})
 target_include_directories(amber-test-rhi-smoke PRIVATE ${CMAKE_SOURCE_DIR})
