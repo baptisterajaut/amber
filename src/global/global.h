@@ -443,6 +443,12 @@ class AmberGlobal : public QObject {
    */
   bool changed_since_last_autorecovery{false};
 
+  /**
+   * @brief Set when the user accepts the auto-recovery prompt at startup, so finished_initialize() doesn't replace
+   * the recovered project with the most recent one.
+   */
+  bool autorecovery_loaded_{false};
+
   ProjectIO* project_io_;
 
  private slots:

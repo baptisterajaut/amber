@@ -107,6 +107,7 @@ void AmberGlobal::check_for_autorecovery_file() {
                                  "was detected. Would you like to open it?"),
                               QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes) {
       enable_load_project_on_init = false;
+      autorecovery_loaded_ = true;
       OpenProjectWorker(ar_filename, true);
     }
   }
@@ -333,8 +334,9 @@ void AmberGlobal::open_export_dialog() {
 }
 
 void AmberGlobal::finished_initialize() {
-  // If no project was passed on the command line and the user opted in, re-open the most recent project.
-  if (!enable_load_project_on_init && amber::CurrentConfig.reopen_recent_project &&
+  // If no project was passed on the command line and the user opted in, re-open the most recent project —
+  // unless the user just chose to load the auto-recovery file.
+  if (!enable_load_project_on_init && !autorecovery_loaded_ && amber::CurrentConfig.reopen_recent_project &&
       !amber::project_io->recentProjects().isEmpty()) {
     QString recent_path = amber::project_io->recentProjects().first();
     if (QFileInfo::exists(recent_path)) {

@@ -613,11 +613,13 @@ void ExportDialog::setup_ui() {
 
   videoGridLayout->addWidget(new QLabel(tr("Width:"), this), 1, 0, 1, 1);
   widthSpinbox = new QSpinBox(videoGroupbox);
+  widthSpinbox->setMinimum(2);
   widthSpinbox->setMaximum(16777216);
   videoGridLayout->addWidget(widthSpinbox, 1, 1, 1, 1);
 
   videoGridLayout->addWidget(new QLabel(tr("Height:"), this), 2, 0, 1, 1);
   heightSpinbox = new QSpinBox(videoGroupbox);
+  heightSpinbox->setMinimum(2);
   heightSpinbox->setMaximum(16777216);
   videoGridLayout->addWidget(heightSpinbox, 2, 1, 1, 1);
 

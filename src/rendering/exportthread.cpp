@@ -30,6 +30,7 @@ extern "C" {
 
 #include <QApplication>
 #include <QDateTime>
+#include <QFile>
 #include <QPainter>
 #include <QtMath>
 
@@ -360,6 +361,7 @@ bool ExportThread::SetupContainer() {
     export_error = tr("could not open output file (%1)").arg(QString::number(ret));
     return false;
   }
+  container_opened_ = true;
 
   return true;
 }
@@ -496,19 +498,21 @@ void ExportThread::FlushEncoders() {
   if (params_.audio_enabled) Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
 }
 
-void ExportThread::Export() {
+// Returns true only when the file was fully written. False on any failure and on interrupt (an interrupt does not
+// set export_error, so export_error alone can't tell).
+bool ExportThread::Export() {
   QByteArray ba = params_.filename.toUtf8();
   c_filename = qstrdup(ba.constData());
 
-  if (!SetupContainer()) return;
-  if (!SetupVideo()) return;
-  if (!SetupAudio()) return;
+  if (!SetupContainer()) return false;
+  if (!SetupVideo()) return false;
+  if (!SetupAudio()) return false;
 
   ret = avformat_write_header(fmt_ctx, nullptr);
   if (ret < 0) {
     qCritical() << "Could not write output file header." << ret;
     export_error = tr("could not write output file header (%1)").arg(QString::number(ret));
-    return;
+    return false;
   }
 
   long file_audio_samples = 0;
@@ -529,10 +533,10 @@ void ExportThread::Export() {
   // from another thread".
   close_active_clips(seq_);
 
-  if (interrupt_ || !frames_ok) return;
+  if (interrupt_ || !frames_ok) return false;
 
-  if (!FlushSwrAudio(file_audio_samples)) return;
-  if (interrupt_) return;
+  if (!FlushSwrAudio(file_audio_samples)) return false;
+  if (interrupt_) return false;
 
   FlushEncoders();
 
@@ -541,10 +545,11 @@ void ExportThread::Export() {
   if (ret < 0) {
     qCritical() << "Could not write output file trailer." << ret;
     export_error = tr("could not write output file trailer (%1)").arg(QString::number(ret));
-    return;
+    return false;
   }
 
   emit ProgressChanged(100, 0);
+  return true;
 }
 
 void ExportThread::Cleanup() {
@@ -605,13 +610,19 @@ void ExportThread::run() {
   // Lock mutex (used for thread synchronizations)
   mutex.lock();
 
-  // Run export function (which will return if there's a failure)
-  Export();
+  // Run export function (returns false on failure and on interrupt)
+  bool succeeded = Export();
 
   mutex.unlock();
 
   // Clean up anything that was allocated in Export() (whether it succeeded or not)
   Cleanup();
+
+  // Don't leave a truncated file behind. Cleanup() has already closed the AVIO handle, which Windows needs before
+  // the file can be deleted.
+  if (!succeeded && container_opened_) {
+    QFile::remove(params_.filename);
+  }
 
 #ifdef __GLIBC__
   // Return freed heap pages to the OS. Export churns through many short-lived

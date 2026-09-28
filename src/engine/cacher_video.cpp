@@ -286,8 +286,9 @@ void Cacher::cacheVideoDynamicClip() {
     }
   }
 
+  int seek_retrieve_code = 0;
   if (need_seek) {
-    cacheVideoSeekToTarget(target_pts, second_pts, decoded_frame, seeked_to_zero);
+    seek_retrieve_code = cacheVideoSeekToTarget(target_pts, second_pts, decoded_frame, seeked_to_zero);
     have_existing_frame_to_use = true;
     stats.frames_greater_than_target = 0;
     stats.latest_pts = INT64_MIN;
@@ -316,6 +317,8 @@ void Cacher::cacheVideoDynamicClip() {
     if (!have_existing_frame_to_use) {
       retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
     } else {
+      // The seek already decoded this frame: carry its status too (EOF / error), not a blanket success
+      retrieve_code = seek_retrieve_code;
       have_existing_frame_to_use = false;
     }
 

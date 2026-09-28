@@ -97,7 +97,7 @@ class ExportThread : public QThread {
   bool SetupVideo();
   bool SetupAudio();
   bool SetupContainer();
-  void Export();
+  bool Export();
   void Cleanup();
   bool EncodeVideoFrame(RenderThread* renderer, double timecode_secs);
   bool EncodeAudioFrames(long& file_audio_samples, double timecode_secs);
@@ -136,6 +136,7 @@ class ExportThread : public QThread {
   QMutex mutex;
   QWaitCondition waitCond;
   bool render_complete_{false};
+  bool container_opened_{false};  // avio_open succeeded: a file exists at params_.filename
 
   QString export_error;
 
