@@ -175,8 +175,14 @@ void RenderThread::run() {
 
       if (!rhi_) {
         qCritical() << "Failed to create QRhi with any backend";
+        // Still signal the waiter (ExportThread blocks until ready()); it checks rhi_failed(). The viewer only
+        // repaints the empty frame it already had.
+        rhi_failed_ = true;
+        emit ready();
         continue;
       }
+      // A later retry succeeded: clear the flag so a stale failure doesn't linger for rhi_failed() callers
+      rhi_failed_ = false;
       qInfo() << "QRhi initialized, backend:" << rhi_->backendName()
               << "driver:" << rhi_->driverInfo().deviceName;
 
@@ -458,6 +464,8 @@ void RenderThread::start_render(Sequence* s,
 }
 
 bool RenderThread::did_texture_fail() { return texture_failed; }
+
+bool RenderThread::rhi_failed() const { return rhi_failed_.load(); }
 
 void RenderThread::cancel() {
   running = false;

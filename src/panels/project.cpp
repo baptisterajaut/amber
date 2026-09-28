@@ -618,14 +618,21 @@ void Project::delete_selected_media() {
       }
     }
 
+    // Sequences removed by this delete: selected directly, or inside a selected folder (recursively)
+    QList<Media*> found_sequences;
+    get_all_media_from_table(items, found_sequences, MEDIA_TYPE_SEQUENCE);
+    QList<Media*> deleted_sequences;
+    for (auto m : found_sequences) {
+      if (!deleted_sequences.contains(m)) deleted_sequences.append(m);  // folder and child both selected
+    }
+
     // Check if any sequence being deleted is referenced by other sequences
-    for (int i = 0; i < items.size(); i++) {
-      Media* item = items.at(i);
-      if (item->get_type() != MEDIA_TYPE_SEQUENCE) continue;
+    for (int i = 0; i < deleted_sequences.size(); i++) {
+      Media* item = deleted_sequences.at(i);
 
       for (int j = 0; j < sequence_items.size(); j++) {
         Media* seq_media = sequence_items.at(j);
-        if (items.contains(seq_media)) continue;  // also being deleted, skip
+        if (deleted_sequences.contains(seq_media)) continue;  // also being deleted, skip
 
         Sequence* s = seq_media->to_sequence().get();
         for (int k = 0; k < s->clips.size(); k++) {
@@ -657,6 +664,7 @@ void Project::delete_selected_media() {
       }
     }
 
+    bool active_sequence_closed = false;
     for (auto item : items) {
       ca->append(new DeleteMediaCommand(item->parentItem()->get_shared_ptr(item)));
 
@@ -665,8 +673,9 @@ void Project::delete_selected_media() {
 
         Sequence* s = item->to_sequence().get();
 
-        if (s == amber::ActiveSequence.get()) {
+        if (s == amber::ActiveSequence.get() && !active_sequence_closed) {
           ca->append(new ChangeSequenceAction(nullptr));
+          active_sequence_closed = true;
         }
 
         if (s == panel_footage_viewer->seq.get()) {
@@ -679,6 +688,35 @@ void Project::delete_selected_media() {
             if (c != nullptr && c->media() == item) {
               panel_footage_viewer->set_media(nullptr);
               break;
+            }
+          }
+        }
+      } else if (item->get_type() == MEDIA_TYPE_FOLDER) {
+        // A folder takes its contents with it: same cleanup for the sequences and footage inside it
+        QList<Media*> folder{item};
+        QList<Media*> contents;
+        get_all_media_from_table(folder, contents);
+        for (auto m : contents) {
+          if (m->get_type() == MEDIA_TYPE_SEQUENCE) {
+            redraw = true;
+
+            Sequence* s = m->to_sequence().get();
+
+            if (s == amber::ActiveSequence.get() && !active_sequence_closed) {
+              ca->append(new ChangeSequenceAction(nullptr));
+              active_sequence_closed = true;
+            }
+
+            if (s == panel_footage_viewer->seq.get()) {
+              panel_footage_viewer->set_media(nullptr);
+            }
+          } else if (m->get_type() == MEDIA_TYPE_FOOTAGE && panel_footage_viewer->seq != nullptr) {
+            for (int j = 0; j < panel_footage_viewer->seq->clips.size(); j++) {
+              ClipPtr c = panel_footage_viewer->seq->clips.at(j);
+              if (c != nullptr && c->media() == m) {
+                panel_footage_viewer->set_media(nullptr);
+                break;
+              }
             }
           }
         }

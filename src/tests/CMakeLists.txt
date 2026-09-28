@@ -87,3 +87,12 @@ add_executable(amber-test-timeline-layout
 target_include_directories(amber-test-timeline-layout PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-timeline-layout PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-timeline-layout COMMAND amber-test-timeline-layout)
+
+add_executable(amber-test-shortcutfile
+  test_shortcutfile.cpp
+  ${CMAKE_SOURCE_DIR}/core/shortcutfile.cpp
+  ${CMAKE_SOURCE_DIR}/core/shortcutfile.h
+)
+target_include_directories(amber-test-shortcutfile PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-shortcutfile PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-shortcutfile COMMAND amber-test-shortcutfile)

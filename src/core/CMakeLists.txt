@@ -10,6 +10,8 @@ target_sources(${OLIVE_TARGET} PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/math.h
   ${CMAKE_CURRENT_SOURCE_DIR}/path.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/path.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/shortcutfile.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/shortcutfile.h
   ${CMAKE_CURRENT_SOURCE_DIR}/style.h
   ${CMAKE_CURRENT_SOURCE_DIR}/selection.h
   ${CMAKE_CURRENT_SOURCE_DIR}/guide.h

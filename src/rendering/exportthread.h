@@ -94,7 +94,7 @@ private:
   bool SetupVideo();
   bool SetupAudio();
   bool SetupContainer();
-  void Export();
+  bool Export();
   void Cleanup();
 
   std::atomic<bool> interrupt_;
@@ -126,6 +126,7 @@ private:
   QMutex mutex;
   QWaitCondition waitCond;
   bool render_complete_{false};
+  bool container_opened_{false};  // avio_open succeeded: a file exists at params_.filename
 
   QString export_error;
 
