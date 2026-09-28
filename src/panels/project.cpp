@@ -708,27 +708,35 @@ static bool check_folder_contents_in_use(QWidget* parent, ComboAction* ca, const
   return true;
 }
 
-// Add delete commands for each item and handle viewer/sequence cleanup.
+// Add delete commands for each item and handle viewer/sequence cleanup. A deleted folder takes its contents with it,
+// so the open sequence / footage viewer is also closed when it lives (at any depth) inside a deleted folder.
 static void append_delete_commands(ComboAction* ca, const QList<Media*>& items, bool& redraw) {
+  bool closed_active = false;  // folder and its sequence may both be selected: close the active sequence once
   for (auto item : items) {
     ca->append(new DeleteMediaCommand(item->parentItem()->get_shared_ptr(item)));
 
-    if (item->get_type() == MEDIA_TYPE_SEQUENCE) {
-      redraw = true;
-      Sequence* s = item->to_sequence().get();
-      if (s == amber::ActiveSequence.get()) {
-        ca->append(new ChangeSequenceAction(nullptr));
-      }
-      if (s == panel_footage_viewer->seq.get()) {
-        panel_footage_viewer->set_media(nullptr);
-      }
-    } else if (item->get_type() == MEDIA_TYPE_FOOTAGE) {
-      if (panel_footage_viewer->seq != nullptr) {
-        for (int j = 0; j < panel_footage_viewer->seq->clips.size(); j++) {
-          ClipPtr c = panel_footage_viewer->seq->clips.at(j);
-          if (c != nullptr && c->media() == item) {
-            panel_footage_viewer->set_media(nullptr);
-            break;
+    QList<Media*> affected{item};
+    if (item->get_type() == MEDIA_TYPE_FOLDER) collect_folder_contents(item, affected);
+
+    for (auto m : affected) {
+      if (m->get_type() == MEDIA_TYPE_SEQUENCE) {
+        redraw = true;
+        Sequence* s = m->to_sequence().get();
+        if (!closed_active && s == amber::ActiveSequence.get()) {
+          ca->append(new ChangeSequenceAction(nullptr));
+          closed_active = true;
+        }
+        if (s == panel_footage_viewer->seq.get()) {
+          panel_footage_viewer->set_media(nullptr);
+        }
+      } else if (m->get_type() == MEDIA_TYPE_FOOTAGE) {
+        if (panel_footage_viewer->seq != nullptr) {
+          for (int j = 0; j < panel_footage_viewer->seq->clips.size(); j++) {
+            ClipPtr c = panel_footage_viewer->seq->clips.at(j);
+            if (c != nullptr && c->media() == m) {
+              panel_footage_viewer->set_media(nullptr);
+              break;
+            }
           }
         }
       }
