@@ -373,6 +373,10 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
       waitCond.wait(&mutex);
     }
     if (interrupt_) return false;
+    if (renderer->rhi_failed()) {
+      export_error = tr("Could not initialize the GPU renderer.");
+      return false;
+    }
   } while (renderer->did_texture_fail());
 
   if (interrupt_) return false;

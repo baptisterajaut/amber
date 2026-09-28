@@ -20,6 +20,8 @@
 
 #include "mediaiconservice.h"
 
+#include <QThread>
+
 const int kThrobberLimit = 20;
 const int kThrobberSize = 50;
 
@@ -37,7 +39,20 @@ MediaIconService::MediaIconService() {
   throbber_pixmap_ = QPixmap(":/icons/throbber.png");
 }
 
-void MediaIconService::SetMediaIcon(Media *media, int icon_type) {
+namespace {
+
+// True if `m` is currently in the project tree under `parent`. Only dereferences nodes that are in the tree.
+bool media_in_tree(Media* parent, Media* m) {
+  for (int i = 0; i < parent->childCount(); i++) {
+    Media* child = parent->child(i);
+    if (child == m || media_in_tree(child, m)) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+void MediaIconService::StopThrobberFor(Media* media) {
   // if this icon is already part of the throbber animation loop, remove it
   if (throbber_items_.contains(media)) {
     throbber_lock_.lock();
@@ -52,6 +67,31 @@ void MediaIconService::SetMediaIcon(Media *media, int icon_type) {
       QMetaObject::invokeMethod(&throbber_animator_, "stop", Qt::QueuedConnection);
     }
   }
+}
+
+void MediaIconService::SetMediaIcon(Media *media, int icon_type) {
+  if (QThread::currentThread() != thread()) {
+    // PreviewGenerator / LoadThread call this from their own thread, but the project model, its views and the
+    // throbber list are GUI-thread only: re-dispatch. Media isn't a QObject, so a MediaPtr keeps it alive meanwhile.
+    Media* parent = media->parentItem();
+    MediaPtr keep_alive = (parent != nullptr) ? parent->get_shared_ptr(media) : MediaPtr();
+    QMetaObject::invokeMethod(
+        this,
+        [this, media, keep_alive, icon_type] {
+          // Removed from the project (or never found): ProjectModel::set_icon would build an index from a stale
+          // row, so only drop it from the throbber loop. `media` is compared here, never dereferenced.
+          if (keep_alive == nullptr || !media_in_tree(amber::project_model.get_root(), media)) {
+            StopThrobberFor(media);
+            emit IconChanged();
+            return;
+          }
+          SetMediaIcon(media, icon_type);
+        },
+        Qt::QueuedConnection);
+    return;
+  }
+
+  StopThrobberFor(media);
 
   switch (icon_type) {
   case ICON_TYPE_VIDEO:

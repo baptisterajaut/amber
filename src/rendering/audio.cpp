@@ -185,8 +185,11 @@ qint64 get_buffer_offset_from_frame(double framerate, long frame) {
 AudioSenderThread::AudioSenderThread() { connect(this, &QThread::finished, this, &QObject::deleteLater); }
 
 void AudioSenderThread::stop() {
+  // Set the flag under the lock run() waits with, so the wake can't land between its check and its wait
+  lock.lock();
   close = true;
   cond.wakeAll();
+  lock.unlock();
   wait();
 }
 
@@ -214,7 +217,7 @@ void AudioSenderThread::run() {
   send_audio_to_output(0, audio_ibuffer_size);
 
   lock.lock();
-  while (true) {
+  while (!close) {
     cond.wait(&lock);
     if (close) {
       break;

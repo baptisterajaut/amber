@@ -61,6 +61,8 @@ class RenderThread : public QThread {
   void start_render(Sequence* s, int playback_speed, const QString& save = nullptr, void* pixels = nullptr,
                     int pixel_linesize = 0, int idivider = 0, bool scrubbing = false);
   bool did_texture_fail();
+  // True once QRhi creation has failed. ready() is still emitted then, so a waiting ExportThread wakes up.
+  bool rhi_failed() const;
   void cancel();
   void wait_until_paused();
 
@@ -132,6 +134,7 @@ class RenderThread : public QThread {
   bool texture_failed{false};
   bool scrubbing_{false};
   bool running{true};
+  std::atomic<bool> rhi_failed_{false};
   QString save_fn;
   void* pixel_buffer{nullptr};
   int pixel_buffer_linesize{0};

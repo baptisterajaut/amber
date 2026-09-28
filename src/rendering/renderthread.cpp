@@ -236,7 +236,16 @@ void RenderThread::run() {
     queued = false;
 
     if (rhi_ == nullptr) {
-      if (!try_create_rhi()) continue;
+      if (!try_create_rhi()) {
+        // Still signal the waiter (ExportThread blocks until ready()); it checks rhi_failed(). The viewer only
+        // repaints the empty frame it already had.
+        rhi_failed_ = true;
+        emit ready();
+        continue;
+      }
+      // A later retry succeeded (e.g. environment changed between calls): clear the flag so a stale failure
+      // doesn't linger for callers checking rhi_failed() after this point.
+      rhi_failed_ = false;
     }
 
     ensure_render_buffers();
@@ -444,6 +453,8 @@ void RenderThread::start_render(Sequence* s, int playback_speed, const QString& 
 }
 
 bool RenderThread::did_texture_fail() { return texture_failed; }
+
+bool RenderThread::rhi_failed() const { return rhi_failed_.load(); }
 
 void RenderThread::cancel() {
   running = false;

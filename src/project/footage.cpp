@@ -46,8 +46,10 @@ Footage::~Footage() {
 }
 
 void Footage::reset() {
-  if (preview_gen != nullptr) {
-    preview_gen->cancel();
+  // Load once: the generator thread clears preview_gen when it finishes
+  PreviewGenerator* gen = preview_gen.load();
+  if (gen != nullptr) {
+    gen->cancel();
   }
   video_tracks.clear();
   audio_tracks.clear();

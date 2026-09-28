@@ -46,6 +46,7 @@ signals:
 private slots:
   void AnimationUpdate();
 private:
+  void StopThrobberFor(Media* media);
   int throbber_animation_frame_;
   QVector<Media*> throbber_items_;
   QTimer throbber_animator_;
