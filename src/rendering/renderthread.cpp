@@ -201,8 +201,8 @@ void RenderThread::run() {
 
     if (rhi_ != nullptr) {
       // Recreate buffers if sequence size or divider changed
-      int target_w = seq->width / divider_;
-      int target_h = seq->height / divider_;
+      int target_w = qMax(1, seq->width / divider_);
+      int target_h = qMax(1, seq->height / divider_);
       if (target_w != tex_width || target_h != tex_height) {
         delete_buffers();
         tex_width = target_w;
@@ -273,8 +273,8 @@ const char* RenderThread::get_frame_data(int buffer_index) const {
   return buf.isEmpty() ? nullptr : buf.constData();
 }
 
-int RenderThread::get_frame_width() const { return tex_width; }
-int RenderThread::get_frame_height() const { return tex_height; }
+int RenderThread::get_frame_width(int buffer_index) const { return cpu_frame_w_[buffer_index]; }
+int RenderThread::get_frame_height(int buffer_index) const { return cpu_frame_h_[buffer_index]; }
 
 void RenderThread::paint() {
   int active_idx = front_buffer_switcher ? 0 : 1;
@@ -350,6 +350,8 @@ void RenderThread::paint() {
 
     QByteArray& dst = cpu_frame_[active_idx];
     dst = readback.data;
+    cpu_frame_w_[active_idx] = readback.pixelSize.width();
+    cpu_frame_h_[active_idx] = readback.pixelSize.height();
   }
 
   active_mutex.unlock();

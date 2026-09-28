@@ -234,13 +234,13 @@ void NewSequenceDialog::setup_ui() {
 
   videoLayout->addWidget(new QLabel(tr("Width:"), this), 0, 0, 1, 1);
   width_numeric = new QSpinBox(videoGroupBox);
-  width_numeric->setMaximum(9999);
+  width_numeric->setRange(1, 9999);
   width_numeric->setValue(amber::CurrentConfig.default_sequence_width);
   videoLayout->addWidget(width_numeric, 0, 2, 1, 2);
 
   videoLayout->addWidget(new QLabel(tr("Height:"), this), 1, 0, 1, 2);
   height_numeric = new QSpinBox(videoGroupBox);
-  height_numeric->setMaximum(9999);
+  height_numeric->setRange(1, 9999);
   height_numeric->setValue(amber::CurrentConfig.default_sequence_height);
   videoLayout->addWidget(height_numeric, 1, 2, 1, 2);
 

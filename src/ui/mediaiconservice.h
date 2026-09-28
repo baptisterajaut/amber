@@ -41,12 +41,14 @@ public:
   MediaIconService();
 public slots:
   void SetMediaIcon(Media* media, int icon_type);
+public:
+  // GUI thread only
+  void StopThrobberFor(Media* media);
 signals:
   void IconChanged();
 private slots:
   void AnimationUpdate();
 private:
-  void StopThrobberFor(Media* media);
   int throbber_animation_frame_;
   QVector<Media*> throbber_items_;
   QTimer throbber_animator_;

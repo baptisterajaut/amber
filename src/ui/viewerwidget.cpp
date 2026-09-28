@@ -1018,8 +1018,8 @@ QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
 
   // Frame size is read under the front-buffer lock, like render() does
   const char* data = renderer->get_frame_data(idx);
-  int fw = renderer->get_frame_width();
-  int fh = renderer->get_frame_height();
+  int fw = renderer->get_frame_width(idx);
+  int fh = renderer->get_frame_height(idx);
   if (data == nullptr || fw <= 0 || fh <= 0) {
     return QColor();
   }
@@ -1049,8 +1049,8 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
   frame_lock->lock();
 
   const char* frame_data = renderer->get_frame_data(buf_idx);
-  int fw = renderer->get_frame_width();
-  int fh = renderer->get_frame_height();
+  int fw = renderer->get_frame_width(buf_idx);
+  int fh = renderer->get_frame_height(buf_idx);
   bool has_frame = (frame_data != nullptr && fw > 0 && fh > 0 && viewer->seq != nullptr);
 
   QRhiResourceUpdateBatch *u = rhi_->nextResourceUpdateBatch();
