@@ -1012,20 +1012,20 @@ QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
   int video_x = qRound(widget_x * double(viewer->seq->width) / double(width()));
   int video_y = qRound(widget_y * double(viewer->seq->height) / double(height()));
 
-  int fw = renderer->get_frame_width();
-  int fh = renderer->get_frame_height();
-
-  video_x = qBound(0, video_x, fw - 1);
-  video_y = qBound(0, video_y, fh - 1);
-
   int idx = renderer->front_buffer_index();
   QMutex* mutex = renderer->get_texture_mutex(idx);
   QMutexLocker lock(mutex);
 
+  // Frame size is read under the front-buffer lock, like render() does
   const char* data = renderer->get_frame_data(idx);
-  if (data == nullptr) {
+  int fw = renderer->get_frame_width();
+  int fh = renderer->get_frame_height();
+  if (data == nullptr || fw <= 0 || fh <= 0) {
     return QColor();
   }
+
+  video_x = qBound(0, video_x, fw - 1);
+  video_y = qBound(0, video_y, fh - 1);
 
   // RGBA8888, no Y-flip — readBackTexture() is top-to-bottom on all backends
   int offset = (video_y * fw + video_x) * 4;

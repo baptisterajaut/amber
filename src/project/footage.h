@@ -25,6 +25,7 @@ extern "C" {
   #include <libavformat/avformat.h>
 }
 
+#include <atomic>
 #include <memory>
 #include <QString>
 #include <QVector>
@@ -88,7 +89,7 @@ struct Footage {
   QString proxy_path;
 
   // thumbnail/waveform generation
-  PreviewGenerator* preview_gen;
+  std::atomic<PreviewGenerator*> preview_gen;
   QMutex ready_lock;
 
   // in/out points
