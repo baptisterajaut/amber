@@ -324,9 +324,9 @@ void Viewer::go_to_start() {
 }
 
 void Viewer::go_to_end() {
-  if (seq != nullptr){
-  	  int real_end_frame = seq->getEndFrame();
-  	  seek(real_end_frame-1);
+  if (seq != nullptr) {
+    int real_end_frame = seq->getEndFrame();
+    seek(real_end_frame - 1);
   }
 }
 
