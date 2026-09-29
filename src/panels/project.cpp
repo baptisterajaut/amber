@@ -622,11 +622,6 @@ void Project::delete_selected_media() {
 
   // remove
   if (remove) {
-    panel_graph_editor->set_row(nullptr);
-    panel_effect_controls->Clear(true);
-
-    if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
-
     // remove media and parents
     for (auto parent : parents) {
       for (int l = 0; l < items.size(); l++) {
@@ -682,6 +677,12 @@ void Project::delete_selected_media() {
         }
       }
     }
+
+    // Past the last prompt: clear the UI only now, so a cancelled delete leaves it untouched
+    panel_graph_editor->set_row(nullptr);
+    panel_effect_controls->Clear(true);
+
+    if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
 
     // Drop clipboard clips of every footage or sequence going away (nested-sequence clips included)
     QList<Media*> deleted_media;
