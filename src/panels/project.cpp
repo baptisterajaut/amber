@@ -491,12 +491,14 @@ void Project::SetToolbarVisible(bool visible) { toolbar_widget->setVisible(visib
 
 bool Project::IsProjectWidget(QObject* child) { return (child == tree_view || child == icon_view); }
 
-bool delete_clips_in_clipboard_with_media(ComboAction* ca, Media* m) {
+// Remove every clipboard clip whose media is in `media`, in one pass: each RemoveClipsFromClipboard stores a raw
+// index, so all removals must be counted against the same running offset (never call this twice per ComboAction).
+bool delete_clips_in_clipboard_with_media(ComboAction* ca, const QList<Media*>& media) {
   int delete_count = 0;
   if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
     for (int i = 0; i < clipboard.size(); i++) {
       ClipPtr c = std::static_pointer_cast<Clip>(clipboard.at(i));
-      if (c->media() == m) {
+      if (c->media() != nullptr && media.contains(c->media())) {
         ca->append(new RemoveClipsFromClipboard(i - delete_count));
         delete_count++;
       }
@@ -681,20 +683,10 @@ void Project::delete_selected_media() {
       }
     }
 
-    // Drop clipboard clips of every footage going away, in a single pass: RemoveClipsFromClipboard is
-    // index-based, so per-footage passes would compute indices against a clipboard that hasn't shrunk yet
-    if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
-      QList<Media*> deleted_footage;
-      get_all_media_from_table(items, deleted_footage, MEDIA_TYPE_FOOTAGE);
-      int removed = 0;
-      for (int i = 0; i < clipboard.size(); i++) {
-        ClipPtr c = std::static_pointer_cast<Clip>(clipboard.at(i));
-        if (deleted_footage.contains(c->media())) {
-          ca->append(new RemoveClipsFromClipboard(i - removed));
-          removed++;
-        }
-      }
-    }
+    // Drop clipboard clips of every footage or sequence going away (nested-sequence clips included)
+    QList<Media*> deleted_media;
+    get_all_media_from_table(items, deleted_media, -1);
+    delete_clips_in_clipboard_with_media(ca, deleted_media);
 
     bool active_sequence_closed = false;
     for (auto item : items) {
@@ -1086,10 +1078,9 @@ void Project::delete_clips_using_selected_media() {
         }
       }
     }
-    for (const auto& item : items) {
-      Media* m = item_to_media(item);
-      if (delete_clips_in_clipboard_with_media(ca, m)) deleted = true;
-    }
+    QList<Media*> selected_media;
+    for (const auto& item : items) selected_media.append(item_to_media(item));
+    if (delete_clips_in_clipboard_with_media(ca, selected_media)) deleted = true;
     if (deleted) {
       amber::UndoStack.push(ca);
       update_ui(true);
