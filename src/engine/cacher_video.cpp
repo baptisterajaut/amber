@@ -132,10 +132,13 @@ void Cacher::CacheVideoWorker() {
       }
     }
 
+    // Carries the seek's own retrieve status (EOF/error) into the first pass of the decode
+    // loop below, instead of that pass assuming a blanket success for the reused frame.
+    int seek_retrieve_code = 0;
+
     if (need_seek) {
       // we need to seek to retrieve this frame
 
-      int retrieve_code;
       int64_t seek_ts = target_pts;
       int64_t zero = 0;
 
@@ -154,14 +157,14 @@ void Cacher::CacheVideoWorker() {
         avcodec_flush_buffers(codecCtx);
         av_seek_frame(formatCtx, clip->media_stream_index(), seek_ts, AVSEEK_FLAG_BACKWARD);
 
-        retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
+        seek_retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
 
         //qDebug() << "Target:" << target_pts << "Seek:" << seek_ts << "Frame:" << decoded_frame->pts;
 
         seek_ts = qMax(zero, seek_ts - second_pts);
 
         have_existing_frame_to_use = true;
-      } while (retrieve_code >= 0
+      } while (seek_retrieve_code >= 0
               && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts)
               && !seeked_to_zero);
 
@@ -249,6 +252,8 @@ void Cacher::CacheVideoWorker() {
         if (!have_existing_frame_to_use) {
           retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
         } else {
+          // The seek already decoded this frame: carry its status too (EOF / error), not a blanket success
+          retrieve_code = seek_retrieve_code;
           have_existing_frame_to_use = false;
         }
 

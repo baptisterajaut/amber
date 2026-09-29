@@ -311,7 +311,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="661" />
         <source>This settings file doesn't match this effect.</source>
-        <translation>Это файлс параметрами совсем другого эффекта.</translation>
+        <translation>Это файл с параметрами совсем другого эффекта.</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="981" />
@@ -2204,7 +2204,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="209" />
         <source>Preset:</source>
-        <translation>Предстановка:</translation>
+        <translation>Пресет:</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="213" />
@@ -2734,7 +2734,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="553" />
         <source>Image sequence formats:</source>
-        <translation>Форматы  изображений:</translation>
+        <translation>Форматы изображений:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="944" />
@@ -3105,7 +3105,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/project.cpp" line="837" />
         <source>The file '%1' appears to be part of an image sequence. Would you like to import it as such?</source>
-        <translation>Похоже, что файл '%1' яавляется частью последовательности изображений. Загрузить его как таковой?</translation>
+        <translation>Похоже, что файл &apos;%1&apos; является частью последовательности изображений. Загрузить его как таковой?</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="978" />

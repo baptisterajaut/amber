@@ -131,7 +131,7 @@
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="15" />
         <source>Multiple Clip Properties</source>
-        <translation>Својства više исјечака</translation>
+        <translation>Својства више клипова</translation>
     </message>
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="24" />
@@ -146,7 +146,7 @@
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="71" />
         <source>(multiple)</source>
-        <translation>(više)</translation>
+        <translation>(више)</translation>
     </message>
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="92" />
@@ -426,7 +426,7 @@
     <message>
         <location filename="../ui/effectui.cpp" line="227" />
         <source>%1 (multiple)</source>
-        <translation>%1 (više)</translation>
+        <translation>%1 (више)</translation>
     </message>
     <message>
         <location filename="../ui/effectui.cpp" line="463" />
@@ -1809,7 +1809,7 @@
     <message>
         <location filename="../timeline/marker.cpp" line="65" />
         <source>Set clip marker name:</source>
-        <translation>Постави назив ознаке исечка:</translation>
+        <translation>Постави назив ознаке клипа:</translation>
     </message>
     <message>
         <location filename="../timeline/marker.cpp" line="66" />
@@ -1977,7 +1977,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="92" />
         <source>Conform to Frame Rate:</source>
-        <translation>Прилагоди броју сличица:</translation>
+        <translation>Прилагоди оквирној стопи:</translation>
     </message>
     <message>
         <location filename="../dialogs/mediapropertiesdialog.cpp" line="102" />
@@ -2630,7 +2630,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="726" />
         <source>Auto-Seek to Imported Clips</source>
-        <translation>Аутоматски тражи увезене исечке</translation>
+        <translation>Аутоматски тражи увезене клипове</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="759" />
@@ -3872,7 +3872,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/texteditdialog.cpp" line="71" />
         <source>Normal</source>
-        <translation>Нормалнo</translation>
+        <translation>Нормално</translation>
     </message>
     <message>
         <location filename="../dialogs/texteditdialog.cpp" line="72" />
@@ -4042,7 +4042,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="51" />
         <source>Timecode</source>
-        <translation>Timekод</translation>
+        <translation>Временски код</translation>
     </message>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="53" />
@@ -4140,7 +4140,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/timeline.cpp" line="332" />
         <source>Add Transition</source>
-        <translation>Додај транзицију</translation>
+        <translation>Додај прелаз</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="381" />
@@ -4519,7 +4519,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="1288" />
         <source>Add Transition</source>
-        <translation>Додај транзицију</translation>
+        <translation>Додај прелаз</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="1291" />
@@ -4605,7 +4605,7 @@ Duration: %4</source>
     <message>
         <location filename="../effects/internal/transformeffect.cpp" line="88" />
         <source>Normal</source>
-        <translation>Нормалнo</translation>
+        <translation>Нормално</translation>
     </message>
 </context>
 <context>

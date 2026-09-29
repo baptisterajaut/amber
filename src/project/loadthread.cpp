@@ -91,7 +91,9 @@ void LoadThread::load_effect(QXmlStreamReader& stream, Clip* c) {
         }
       }
 
-      if (sharing_clip == nullptr) {
+      // The shared transition lives on the partner clip's opposite side; a corrupt file can leave that side empty
+      if (sharing_clip == nullptr || (tag == "opening" && sharing_clip->closing_transition == nullptr) ||
+          (tag == "closing" && sharing_clip->opening_transition == nullptr)) {
         qWarning() << "Failed to link shared transition. Project may be corrupt.";
       } else if (tag == "opening") {
         c->opening_transition = (sharing_clip->closing_transition);

@@ -50,8 +50,9 @@ public:
 
   // CPU bridge: pixel data read back after compositing
   const char* get_frame_data(int buffer_index) const;
-  int get_frame_width() const;
-  int get_frame_height() const;
+  // Size of the pixels held by that buffer; read under get_texture_mutex(buffer_index), like the data
+  int get_frame_width(int buffer_index) const;
+  int get_frame_height(int buffer_index) const;
 
   Effect* gizmos{nullptr};
   void paint();
@@ -66,6 +67,8 @@ public:
                     int idivider = 0,
                     bool scrubbing = false);
   bool did_texture_fail();
+  // True once QRhi creation has failed. ready() is still emitted then, so a waiting ExportThread wakes up.
+  bool rhi_failed() const;
   void cancel();
   void wait_until_paused();
 
@@ -132,12 +135,15 @@ private:
   bool texture_failed{false};
   bool scrubbing_{false};
   bool running{true};
+  std::atomic<bool> rhi_failed_{false};
   QString save_fn;
   void* pixel_buffer{nullptr};
   int pixel_buffer_linesize{0};
 
   // CPU bridge: double-buffered pixel readback
   QByteArray cpu_frame_[2];
+  int cpu_frame_w_[2]{0, 0}; // size of cpu_frame_[i], written with it under its buffer mutex
+  int cpu_frame_h_[2]{0, 0};
 };
 
 #endif // RENDERTHREAD_H

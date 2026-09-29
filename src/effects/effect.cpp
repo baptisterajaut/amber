@@ -756,7 +756,7 @@ void Effect::open() {
     qWarning() << "Tried to open an effect that was already open";
     close();
   }
-  if (amber::CurrentRuntimeConfig.shaders_are_enabled && (Flags() & ShaderFlag)) {
+  if (amber::CurrentRuntimeConfig.shaders_are_enabled && (Flags() & (ShaderFlag | ClipShaderFlag))) {
     validate_meta_path();
     if (!vertPath.isEmpty()) {
       vertexShader_ = bakeOrLoadCached(meta->path + "/" + vertPath, QShader::VertexStage);

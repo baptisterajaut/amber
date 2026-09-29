@@ -29,6 +29,7 @@
 #include "core/path.h"
 #include "global/debug.h"
 
+#include <QCoreApplication>
 #include <QPainter>
 #include <QPixmap>
 #include <QtMath>
@@ -42,6 +43,7 @@ QSemaphore sem(5); // only 5 preview generators can run at one time
 PreviewGenerator::PreviewGenerator(Media* i) :
   QThread(nullptr)
 {
+  moveToThread(QCoreApplication::instance()->thread()); // deleteLater must run on the GUI loop (LoadThread has none)
   fmt_ctx_ = (nullptr);
   media_ = (i);
   retrieve_duration_ = (false);
@@ -806,6 +808,8 @@ void PreviewGenerator::run() {
 void PreviewGenerator::cancel() {
   cancelled_ = true;
   wait();
+  // finalize_media()/invalidate_media() skip the icon when cancelled: drop the throbber entry here
+  if (amber::media_icon_service) amber::media_icon_service->StopThrobberFor(media_);
 }
 
 void PreviewGenerator::AnalyzeMedia(Media *m)

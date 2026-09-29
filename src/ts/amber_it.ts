@@ -100,7 +100,7 @@
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="124" />
         <source>Auto-Cut Silence</source>
-        <translation>Taglio automatico silenzio</translation>
+        <translation>Taglio automatico del silenzio</translation>
     </message>
 </context>
 <context>
@@ -146,7 +146,7 @@
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="71" />
         <source>(multiple)</source>
-        <translation>(multiple)</translation>
+        <translation>(multiplo)</translation>
     </message>
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="92" />
@@ -388,12 +388,12 @@
         <location filename="../effects/effectrow.cpp" line="100" />
         <location filename="../effects/effectrow.cpp" line="105" />
         <source>Disable Keyframes</source>
-        <translation>Disabilita fotogrammi chiave</translation>
+        <translation>Disabilita keyframe</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="101" />
         <source>Disabling keyframes will delete all current keyframes. Are you sure you want to do this?</source>
-        <translation>Disabilitare i fotogrammi chiave eliminerà tutti quelli attualmente esistenti. Sei sicuro di volerlo fare?</translation>
+        <translation>Disabilitare i keyframe eliminerà tutti quelli attualmente esistenti. Sei sicuro di volerlo fare?</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="181" />
@@ -426,7 +426,7 @@
     <message>
         <location filename="../ui/effectui.cpp" line="227" />
         <source>%1 (multiple)</source>
-        <translation>%1 (multiple)</translation>
+        <translation>%1 (multiplo)</translation>
     </message>
     <message>
         <location filename="../ui/effectui.cpp" line="463" />
@@ -1023,7 +1023,7 @@
     <message>
         <location filename="../ui/keyframenavigator.cpp" line="77" />
         <source>Enable Keyframes</source>
-        <translation>Abilita fotogrammi chiave</translation>
+        <translation>Abilita keyframe</translation>
     </message>
 </context>
 <context>
@@ -1491,7 +1491,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="1016" />
         <source>Toggle Mirror</source>
-        <translation>Attiva/Disattiva specchio</translation>
+        <translation>Commuta specchio</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1018" />
@@ -2205,7 +2205,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="209" />
         <source>Preset:</source>
-        <translation>Preimpostazioni:</translation>
+        <translation>Preset:</translation>
     </message>
     <message>
         <location filename="../dialogs/newsequencedialog.cpp" line="213" />
@@ -2411,7 +2411,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../effects/internal/paneffect.cpp" line="32" />
         <source>Pan</source>
-        <translation>Trasla</translation>
+        <translation>Bilanciamento</translation>
     </message>
 </context>
 <context>
@@ -2691,7 +2691,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="955" />
         <source>Audio Scrubbing</source>
-        <translation>Audio attivo durante il trascinamento cursore</translation>
+        <translation>Audio attivo durante il trascinamento della testina</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="730" />
@@ -3012,7 +3012,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../panels/project.cpp" line="342" />
         <source>Replace Media</source>
-        <translation>Sostituisci media</translation>
+        <translation>Rimpiazza media</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="349" />
@@ -3349,7 +3349,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="111" />
         <source>Replace Clip Media</source>
-        <translation>Sostituisci media clip</translation>
+        <translation>Rimpiazza media clip</translation>
     </message>
 </context>
 <context>
@@ -3950,7 +3950,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="70" />
         <source>Left</source>
-        <translation>A sinistra</translation>
+        <translation>Verso sinistra</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="71" />
@@ -3961,7 +3961,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="72" />
         <source>Right</source>
-        <translation>A destra</translation>
+        <translation>Verso destra</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="73" />
@@ -4162,7 +4162,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="646" />
         <source>Ripple Delete In/Out</source>
-        <translation>Elimina ingresso/uscita con scorrimento</translation>
+        <translation>Elimina ingresso/uscita a catena</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="646" />
@@ -4177,7 +4177,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="686" />
         <source>Ripple Delete</source>
-        <translation>Elimina con scorrimento</translation>
+        <translation>Elimina a catena</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="686" />
@@ -4187,7 +4187,7 @@ Disposizione audio: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="960" />
         <source>Ripple Edit</source>
-        <translation>Modifica con scorrimento</translation>
+        <translation>Modifica a catena</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="960" />
@@ -4586,7 +4586,7 @@ Durata: %4</translation>
     <message>
         <location filename="../effects/internal/transformeffect.cpp" line="53" />
         <source>Scale</source>
-        <translation>Scalatura</translation>
+        <translation>Scala</translation>
     </message>
     <message>
         <location filename="../effects/internal/transformeffect.cpp" line="63" />

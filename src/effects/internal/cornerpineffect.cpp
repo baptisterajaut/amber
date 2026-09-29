@@ -25,7 +25,7 @@
 #include "global/debug.h"
 
 CornerPinEffect::CornerPinEffect(Clip* c, const EffectMeta *em) : Effect(c, em) {
-  SetFlags(Effect::CoordsFlag | Effect::ShaderFlag);
+  SetFlags(Effect::CoordsFlag | Effect::ClipShaderFlag);
 
   EffectRow* top_left = new EffectRow(this, tr("Top Left"));
   top_left_x = new DoubleField(top_left, "topleftx");
@@ -82,10 +82,13 @@ void CornerPinEffect::process_coords(double timecode, GLTextureCoords &coords, i
 }
 
 void CornerPinEffect::process_shader(double timecode, GLTextureCoords &coords, int, QByteArray& uboData, QSize) {
+  // Called by render_clip_to_backbuffer with the clip's final coords (ClipShaderFlag).
   // CornerPin UBO layout at binding 1 (shared between vert and frag):
-  // vec2 p0 (offset 0), vec2 p1 (offset 8), vec2 p2 (offset 16), vec2 p3 (offset 24), bool perspective (offset 32)
+  // vec2 p0 (offset 0), vec2 p1 (offset 8), vec2 p2 (offset 16), vec2 p3 (offset 24), bool perspective (offset 32),
+  // vec2 t_bl (offset 40), vec2 t_br (offset 48), vec2 t_tl (offset 56), vec2 t_tr (offset 64)
   int ubo_size = qMax(fragUboSize(), vertUboSize());
   if (uboData.size() < ubo_size) uboData.resize(ubo_size);
+  if (uboData.size() < 72) return;  // shaders not baked, nothing to fill
 
   float p0[2] = {float(coords.vertexBottomLeftX), float(coords.vertexBottomLeftY)};
   float p1[2] = {float(coords.vertexBottomRightX), float(coords.vertexBottomRightY)};
@@ -98,6 +101,15 @@ void CornerPinEffect::process_shader(double timecode, GLTextureCoords &coords, i
   memcpy(uboData.data() + 16, p2, 8);
   memcpy(uboData.data() + 24, p3, 8);
   memcpy(uboData.data() + 32, &persp, 4);
+
+  float t_bl[2] = {float(coords.textureBottomLeftX), float(coords.textureBottomLeftY)};
+  float t_br[2] = {float(coords.textureBottomRightX), float(coords.textureBottomRightY)};
+  float t_tl[2] = {float(coords.textureTopLeftX), float(coords.textureTopLeftY)};
+  float t_tr[2] = {float(coords.textureTopRightX), float(coords.textureTopRightY)};
+  memcpy(uboData.data() + 40, t_bl, 8);
+  memcpy(uboData.data() + 48, t_br, 8);
+  memcpy(uboData.data() + 56, t_tl, 8);
+  memcpy(uboData.data() + 64, t_tr, 8);
 }
 
 void CornerPinEffect::gizmo_draw(double, GLTextureCoords &coords) {
