@@ -21,12 +21,15 @@
 #include "effect.h"
 #include <cmath>
 
+#include <rhi/qshaderbaker.h>
 #include <QApplication>
 #include <QCheckBox>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileDialog>
+#include <QFloat16>
 #include <QGridLayout>
+#include <QLocale>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
@@ -34,13 +37,16 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QtMath>
-#include <QLocale>
-#include <rhi/qshaderbaker.h>
 
-#include "global/config.h"
-#include "global/debug.h"
 #include "core/math.h"
 #include "core/path.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
+#include "engine/undo/undo.h"
+#include "engine/undo/undostack.h"
+#include "fields/filefield.h"
+#include "global/config.h"
+#include "global/debug.h"
 #include "panels/effectcontrols.h"
 #include "panels/grapheditor.h"
 #include "panels/panels.h"
@@ -48,16 +54,11 @@
 #include "panels/timeline.h"
 #include "panels/viewer.h"
 #include "project/clipboard.h"
-#include "engine/clip.h"
-#include "engine/sequence.h"
+#include "rendering/renderthread.h"
 #include "transition.h"
 #include "ui/collapsiblewidget.h"
 #include "ui/mainwindow.h"
 #include "ui/viewerwidget.h"
-#include "engine/undo/undo.h"
-#include "engine/undo/undostack.h"
-#include "rendering/renderthread.h"
-#include "fields/filefield.h"
 
 #include "effects/internal/audionoiseeffect.h"
 #include "effects/internal/cornerpineffect.h"
@@ -797,6 +798,11 @@ void Effect::close() {
     qWarning() << "Tried to close an effect that was already closed";
   }
   delete_texture();
+  if (lutTex_) {
+    RenderThread::DeferRhiResourceDeletion(lutTex_);
+    lutTex_ = nullptr;
+  }
+  loadedLutPath_.clear();
   vertexShader_ = {};
   fragmentShader_ = {};
   uniformEntries_.clear();
@@ -836,8 +842,7 @@ EffectPtr Effect::copy(Clip* c) {
   return copy;
 }
 
-void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData,
-                            QSize renderSize) {
+void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData, QSize renderSize) {
   if (uboData.size() < fragUboSize_) uboData.resize(fragUboSize_);
 
   // Use actual FBO/render size for resolution uniforms (shaders that use gl_FragCoord need this
@@ -1089,9 +1094,7 @@ FileField* Effect::findLutField() {
   return lutField_;
 }
 
-bool Effect::needsLut() {
-  return findLutField() != nullptr;
-}
+bool Effect::needsLut() { return findLutField() != nullptr; }
 
 QString Effect::currentLutPath(double timecode) {
   FileField* f = findLutField();
@@ -1187,8 +1190,7 @@ Lut3D loadCubeFile(const QString& path) {
     float g = QLocale::c().toFloat(parts[1], &ok1);
     float b = QLocale::c().toFloat(parts[2], &ok2);
 
-    if (!ok0 || !ok1 || !ok2 ||
-        !std::isfinite(r) || !std::isfinite(g) || !std::isfinite(b)) {
+    if (!ok0 || !ok1 || !ok2 || !std::isfinite(r) || !std::isfinite(g) || !std::isfinite(b)) {
       qWarning() << "LUT file has invalid or non-finite value:" << path;
       return Lut3D();
     }
@@ -1205,15 +1207,15 @@ Lut3D loadCubeFile(const QString& path) {
 
   const size_t expected = static_cast<size_t>(lut.size) * lut.size * lut.size * 3;
   if (lut.data.size() != expected) {
-    qWarning() << "LUT file row count does not match declared size (truncated or oversized):" << path
-               << "expected" << expected << "got" << lut.data.size();
+    qWarning() << "LUT file row count does not match declared size (truncated or oversized):" << path << "expected"
+               << expected << "got" << lut.data.size();
     return Lut3D();
   }
 
   return lut;
 }
 
-} // namespace
+}  // namespace
 QRhiTexture* Effect::process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& lutPath) {
   if (lutPath != loadedLutPath_) {
     Lut3D lut = lutPath.isEmpty() ? Lut3D() : loadCubeFile(lutPath);
@@ -1228,27 +1230,54 @@ QRhiTexture* Effect::process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QS
 
     int texW = lutSize_ * lutSize_;
     int texH = lutSize_;
-    QByteArray pixels;
-    pixels.resize(texW * texH * 4);
-    auto* out = reinterpret_cast<uint8_t*>(pixels.data());
 
-    for (int b = 0; b < lutSize_; b++) {
-      for (int g = 0; g < lutSize_; g++) {
-        for (int r = 0; r < lutSize_; r++) {
-          int srcIdx = (b * lutSize_ * lutSize_ + g * lutSize_ + r) * 3;
-          int dstX = b * lutSize_ + r;
-          int dstY = g;
-          int dstIdx = (dstY * texW + dstX) * 4;
-          out[dstIdx + 0] = uint8_t(qBound(0.0f, lut.data[srcIdx + 0], 1.0f) * 255.0f);
-          out[dstIdx + 1] = uint8_t(qBound(0.0f, lut.data[srcIdx + 1], 1.0f) * 255.0f);
-          out[dstIdx + 2] = uint8_t(qBound(0.0f, lut.data[srcIdx + 2], 1.0f) * 255.0f);
-          out[dstIdx + 3] = 255;
+    // RGBA16F keeps LUT entries at full precision; RGBA8 would round every
+    // entry to 8 bits before interpolation, which shows up as banding in the
+    // smooth gradients LUTs are typically applied to.
+    bool use_fp16 = rhi->isTextureFormatSupported(QRhiTexture::RGBA16F);
+    QRhiTexture::Format tex_format = use_fp16 ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8;
+
+    QByteArray pixels;
+    if (use_fp16) {
+      pixels.resize(texW * texH * 4 * sizeof(qfloat16));
+      auto* out = reinterpret_cast<qfloat16*>(pixels.data());
+
+      for (int b = 0; b < lutSize_; b++) {
+        for (int g = 0; g < lutSize_; g++) {
+          for (int r = 0; r < lutSize_; r++) {
+            int srcIdx = (b * lutSize_ * lutSize_ + g * lutSize_ + r) * 3;
+            int dstX = b * lutSize_ + r;
+            int dstY = g;
+            int dstIdx = (dstY * texW + dstX) * 4;
+            out[dstIdx + 0] = qfloat16(qBound(0.0f, lut.data[srcIdx + 0], 1.0f));
+            out[dstIdx + 1] = qfloat16(qBound(0.0f, lut.data[srcIdx + 1], 1.0f));
+            out[dstIdx + 2] = qfloat16(qBound(0.0f, lut.data[srcIdx + 2], 1.0f));
+            out[dstIdx + 3] = qfloat16(1.0f);
+          }
+        }
+      }
+    } else {
+      pixels.resize(texW * texH * 4);
+      auto* out = reinterpret_cast<uint8_t*>(pixels.data());
+
+      for (int b = 0; b < lutSize_; b++) {
+        for (int g = 0; g < lutSize_; g++) {
+          for (int r = 0; r < lutSize_; r++) {
+            int srcIdx = (b * lutSize_ * lutSize_ + g * lutSize_ + r) * 3;
+            int dstX = b * lutSize_ + r;
+            int dstY = g;
+            int dstIdx = (dstY * texW + dstX) * 4;
+            out[dstIdx + 0] = uint8_t(qBound(0.0f, lut.data[srcIdx + 0], 1.0f) * 255.0f);
+            out[dstIdx + 1] = uint8_t(qBound(0.0f, lut.data[srcIdx + 1], 1.0f) * 255.0f);
+            out[dstIdx + 2] = uint8_t(qBound(0.0f, lut.data[srcIdx + 2], 1.0f) * 255.0f);
+            out[dstIdx + 3] = 255;
+          }
         }
       }
     }
 
     RenderThread::DeferRhiResourceDeletion(lutTex_);
-    lutTex_ = rhi->newTexture(QRhiTexture::RGBA8, QSize(texW, texH));
+    lutTex_ = rhi->newTexture(tex_format, QSize(texW, texH));
     lutTex_->create();
 
     QRhiTextureSubresourceUploadDescription desc(pixels.constData(), pixels.size());

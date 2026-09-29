@@ -240,14 +240,15 @@ class Effect : public QObject {
 
   static EffectPtr Create(Clip* c, const EffectMeta* em);
   static const EffectMeta* GetInternalMeta(int internal_id, int type);
-public:
+
+ public:
   bool needsLut();
   QString currentLutPath(double timecode);
   QString loadedLutPath() const { return loadedLutPath_; }
   QRhiTexture* currentLutTexture() const { return lutTex_; }
   QRhiTexture* process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& lutPath);
 
-private:
+ private:
   FileField* findLutField();
 
   FileField* lutField_{nullptr};
@@ -255,7 +256,6 @@ private:
   QRhiTexture* lutTex_{nullptr};
   QString loadedLutPath_;
   int lutSize_{0};
-//======================================================  
  public slots:
   void FieldChanged();
   void SetEnabled(bool b);

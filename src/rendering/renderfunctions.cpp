@@ -29,10 +29,10 @@ extern "C" {
 #include <QScreen>
 #include <utility>
 
-#include "engine/clip.h"
-#include "engine/sequence.h"
 #include "effects/effect.h"
 #include "effects/transition.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
 #include "project/footage.h"
 #include "project/media.h"
 
@@ -354,8 +354,7 @@ static ClipRhiResources* get_or_create_clip_resources(Clip* c, QRhi* rhi, int wi
     for (int j = 0; j < fbo_count; j++) {
       res->tex[j] = rhi->newTexture(QRhiTexture::RGBA8, QSize(width, height), 1, QRhiTexture::RenderTarget);
       res->tex[j]->create();
-      res->rt[j] = rhi->newTextureRenderTarget(
-          {res->tex[j]}, QRhiTextureRenderTarget::PreserveColorContents);
+      res->rt[j] = rhi->newTextureRenderTarget({res->tex[j]}, QRhiTextureRenderTarget::PreserveColorContents);
       if (j == 0) {
         res->rpd = res->rt[j]->newCompatibleRenderPassDescriptor();
       }
@@ -411,16 +410,16 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
         if (e->needsLut()) {
           QString lutPath = e->currentLutPath(timecode);
           if (lutPath != e->loadedLutPath()) {
-            // Upload only happens when the file actually changed — same one-shot
-            // idea as your loadedLutPath_ check inside process_lut() itself
+            // Upload only happens when the file actually changed — mirrors the
+            // loadedLutPath_ check inside process_lut() itself
             QRhiResourceUpdateBatch* lutUpload = params.rhi->nextResourceUpdateBatch();
             lutTexture = e->process_lut(params.rhi, lutUpload, lutPath);
-        
+
             // Submit the upload via a throwaway pass into the SAME target the
             // upcoming rhi_blit call is about to fully overwrite anyway — mirrors
             // exactly how the SuperimposeFlag branch below submits its own texture
             // upload (see the "Submit upload in a dummy pass" comment further down)
-            QColor clearColor(0, 0, 0, 0);        
+            QColor clearColor(0, 0, 0, 0);
             params.cb->beginPass(res->rt[fbo_switcher], clearColor, {1.0f, 0}, lutUpload);
             params.cb->endPass();
           } else {
@@ -436,9 +435,8 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
 
           // Blit through effect shader into the next FBO (skip clipSpaceCorr — intermediate pass)
           rhi_blit(params, res->rt[fbo_switcher], res->rpd, composite_texture, e->vertexShader(), e->fragmentShader(),
-                blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()),
-                lutTexture ? 2 : 1, lutTexture, nullptr,
-                /*skipClipSpaceCorr=*/true);          
+                   blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()), lutTexture ? 2 : 1, lutTexture, nullptr,
+                   /*skipClipSpaceCorr=*/true);
           composite_texture = res->tex[fbo_switcher];
           fbo_switcher = !fbo_switcher;
         }
@@ -475,12 +473,12 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
           // Copy composite to fbo if not already there (fullscreen opaque blit overwrites all pixels,
           // so PreserveColorContents is harmless — stale data from previous frames is replaced)
           if (composite_texture != res->tex[0] && composite_texture != res->tex[1]) {
-            rhi_blit_passthrough(params, res->rt[!fbo_switcher], res->rpd, composite_texture,
-                                 1.0f, /*skipClipSpaceCorr=*/true);
+            rhi_blit_passthrough(params, res->rt[!fbo_switcher], res->rpd, composite_texture, 1.0f,
+                                 /*skipClipSpaceCorr=*/true);
           }
           // Overlay superimpose with alpha blending (PreserveColorContents keeps the composite)
-          rhi_blit_srcover(params, res->rt[!fbo_switcher], res->rpd, superimpose_texture,
-                           1.0f, /*skipClipSpaceCorr=*/true);
+          rhi_blit_srcover(params, res->rt[!fbo_switcher], res->rpd, superimpose_texture, 1.0f,
+                           /*skipClipSpaceCorr=*/true);
           composite_texture = res->tex[!fbo_switcher];
         }
       }
