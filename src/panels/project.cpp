@@ -798,11 +798,6 @@ void Project::delete_selected_media() {
     }
   }
 
-  panel_graph_editor->set_row(nullptr);
-  panel_effect_controls->Clear(true);
-
-  if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
-
   // Remove skipped parents from the delete list
   for (auto parent : parents) {
     for (int l = 0; l < items.size(); l++) {
@@ -822,6 +817,12 @@ void Project::delete_selected_media() {
     delete ca;
     return;
   }
+
+  // Past the last prompt: clear the UI only now, so a cancelled delete leaves it untouched
+  panel_graph_editor->set_row(nullptr);
+  panel_effect_controls->Clear(true);
+
+  if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
 
   append_delete_commands(ca, items, redraw);
   amber::UndoStack.push(ca);
