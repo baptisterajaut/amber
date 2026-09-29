@@ -90,12 +90,12 @@
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="54" />
         <source>Release Threshold:</source>
-        <translation>Seuil de relachement :</translation>
+        <translation>Seuil de relâchement :</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="59" />
         <source>Release Time:</source>
-        <translation>Temps de relachement :</translation>
+        <translation>Temps de relâchement :</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="124" />
@@ -388,12 +388,12 @@
         <location filename="../effects/effectrow.cpp" line="100" />
         <location filename="../effects/effectrow.cpp" line="105" />
         <source>Disable Keyframes</source>
-        <translation>Désactiver les images-clés</translation>
+        <translation>Désactiver les clés</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="101" />
         <source>Disabling keyframes will delete all current keyframes. Are you sure you want to do this?</source>
-        <translation>Désactiver les images-clés supprimera toutes les images-clés courantes. Êtes-vous sûr⋅e de vouloir cela ?</translation>
+        <translation>Désactiver les clés supprimera toutes les clés courantes. Êtes-vous sûr⋅e de vouloir cela ?</translation>
     </message>
     <message>
         <location filename="../effects/effectrow.cpp" line="181" />
@@ -1022,7 +1022,7 @@
     <message>
         <location filename="../ui/keyframenavigator.cpp" line="77" />
         <source>Enable Keyframes</source>
-        <translation>Activer les images-clés</translation>
+        <translation>Activer les clés</translation>
     </message>
 </context>
 <context>
@@ -1158,7 +1158,7 @@
     <message>
         <location filename="../dialogs/loaddialog.cpp" line="37" />
         <source>Loading...</source>
-        <translation>Cargement…</translation>
+        <translation>Chargement…</translation>
     </message>
     <message>
         <location filename="../dialogs/loaddialog.cpp" line="42" />
@@ -1366,7 +1366,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="988" />
         <source>Zoom In</source>
-        <translation>Zommer</translation>
+        <translation>Zoomer</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="989" />
@@ -2101,7 +2101,7 @@ Canaux audio : %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="273" />
         <source>Unnest</source>
-        <translation>Dégrouper</translation>
+        <translation>Désimbriquer</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="274" />
@@ -2470,7 +2470,7 @@ Canaux audio : %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="470" />
         <source>Shortcuts exported successfully</source>
-        <translation>Les raccourcis ont été exporté avec succès</translation>
+        <translation>Les raccourcis ont été exportés avec succès</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="472" />
@@ -3380,7 +3380,7 @@ Canaux audio : %6</translation>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="37" />
         <source>Center</source>
-        <translation>Centrer</translation>
+        <translation>Au centre</translation>
     </message>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="38" />
@@ -3453,7 +3453,7 @@ Canaux audio : %6</translation>
     <message>
         <location filename="../engine/sequence.cpp" line="36" />
         <source>%1 (copy)</source>
-        <translation>%1 (copy)</translation>
+        <translation>%1 (copie)</translation>
     </message>
 </context>
 <context>
@@ -3943,7 +3943,7 @@ Canaux audio : %6</translation>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="68" />
         <source>Alignment</source>
-        <translation>Allignement</translation>
+        <translation>Alignement</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="70" />
@@ -3954,7 +3954,7 @@ Canaux audio : %6</translation>
         <location filename="../effects/internal/texteffect.cpp" line="71" />
         <location filename="../effects/internal/texteffect.cpp" line="77" />
         <source>Center</source>
-        <translation>Centrer</translation>
+        <translation>Au centre</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="72" />
@@ -4155,7 +4155,7 @@ Canaux audio : %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="459" />
         <source>Unnest Clip(s)</source>
-        <translation>Dégrouper le(s) clip(s)</translation>
+        <translation>Désimbriquer le(s) clip(s)</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="646" />

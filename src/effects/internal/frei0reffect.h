@@ -42,7 +42,7 @@ public:
   void refresh() override;
 private:
   QLibrary handle;
-  f0r_instance_t instance;
+  f0r_instance_t instance{nullptr};
   int param_count;
   f0rGetParamInfo get_param_info;
   void destruct_module();

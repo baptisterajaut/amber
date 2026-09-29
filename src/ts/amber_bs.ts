@@ -151,7 +151,7 @@
     <message>
         <location filename="../dialogs/clippropertiesdialog.cpp" line="92" />
         <source>Edit Clip Properties</source>
-        <translation>Uredi svojstva klipa</translation>
+        <translation>Uredi svojstva isječka</translation>
     </message>
 </context>
 <context>
@@ -354,7 +354,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="515" />
         <source>Add Video Transition</source>
-        <translation>Dodaj video prelaz</translation>
+        <translation>Dodaj video tranziciju</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="516" />
@@ -369,7 +369,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="518" />
         <source>Add Audio Transition</source>
-        <translation>Dodaj audio prelaz</translation>
+        <translation>Dodaj audio tranziciju</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="588" />
@@ -2079,7 +2079,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../ui/menuhelper.cpp" line="269" />
         <source>Clip</source>
-        <translation>Klip</translation>
+        <translation>Isječak</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="270" />
@@ -2568,12 +2568,12 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="684" />
         <source>Snap Playhead to Last Frame of Outgoing Clip</source>
-        <translation>Poveži glavu reprodukcije na posljednji okvir izlaznog klipa</translation>
+        <translation>Poveži glavu reprodukcije na posljednji okvir izlaznog isječka</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="685" />
         <source>When snapping the playhead to a clip boundary, show the last frame of the outgoing clip instead of the first frame of the incoming clip</source>
-        <translation>Pri hvatanju glave reprodukcije na granicu klipa, prikaži posljednji okvir izlaznog klipa umjesto prvog okvira ulaznog</translation>
+        <translation>Pri hvatanju glave reprodukcije na granicu isječka, prikaži posljednji okvir izlaznog isječka umjesto prvog okvira ulaznog</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="693" />
@@ -2598,7 +2598,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="699" />
         <source>Hold this key while seeking to invert the snap-to-outgoing-clip behavior</source>
-        <translation>Držite ovu tipku dok tražite da biste invertirali ponašanje hvatanja na izlazni klip</translation>
+        <translation>Držite ovu tipku dok tražite da biste invertirali ponašanje hvatanja na izlazni isječak</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="705" />
@@ -3119,7 +3119,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/project.cpp" line="993" />
         <source>Delete Clips</source>
-        <translation>Obriši klipove</translation>
+        <translation>Obriši isječke</translation>
     </message>
 </context>
 <context>
@@ -3345,7 +3345,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="111" />
         <source>Replace Clip Media</source>
-        <translation>Zamijeni medij klipa</translation>
+        <translation>Zamijeni medij isječka</translation>
     </message>
 </context>
 <context>
@@ -4148,7 +4148,7 @@ Audio Layout: %6</source>
     <message>
         <location filename="../panels/timeline.cpp" line="381" />
         <source>Nest Clip(s)</source>
-        <translation>Ugnjezdi klip(ove)</translation>
+        <translation>Ugnijezdi klip(ove)</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="459" />
@@ -4512,7 +4512,7 @@ Duration: %4</source>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="1281" />
         <source>Create Clip</source>
-        <translation>Kreiraj klip</translation>
+        <translation>Kreiraj isječak</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="1284" />
@@ -4696,7 +4696,7 @@ Duration: %4</source>
     <message>
         <location filename="../panels/viewer.cpp" line="498" />
         <source>Add Recorded Clip</source>
-        <translation>Dodaj snimljeni klip</translation>
+        <translation>Dodaj snimljeni isječak</translation>
     </message>
     <message>
         <location filename="../panels/viewer.cpp" line="569" />
@@ -4882,7 +4882,7 @@ Duration: %4</source>
     <message>
         <location filename="../effects/transition.cpp" line="118" />
         <source>No candidate for transition '%1'. This transition may be corrupt. Try reinstalling it or Amber.</source>
-        <translation>Nema kandidata za prijelaz '%1'. Ovaj prijelaz može biti oštećen. Pokušajte ga ponovo instalirati ili Amber.</translation>
+        <translation>Nema kandidata za tranziciju &apos;%1&apos;. Ova tranzicija može biti oštećena. Pokušajte je ponovo instalirati ili Amber.</translation>
     </message>
 </context>
 </TS>

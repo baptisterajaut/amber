@@ -965,7 +965,7 @@
         <location filename="../panels/grapheditor.cpp" line="142" />
         <source>Bezier</source>
         <translatorcomment>Same as in english</translatorcomment>
-        <translation>Bezier</translation>
+        <translation>Bézier</translation>
     </message>
     <message>
         <location filename="../panels/grapheditor.cpp" line="143" />
@@ -984,7 +984,7 @@
     <message>
         <location filename="../ui/graphview.cpp" line="88" />
         <source>Zoom to Show All</source>
-        <translation>Zommen, um alles anzuzeigen</translation>
+        <translation>Zoomen, um alles anzuzeigen</translation>
     </message>
     <message>
         <location filename="../ui/graphview.cpp" line="97" />
@@ -1120,7 +1120,7 @@
         <location filename="../ui/keyframeview.cpp" line="70" />
         <source>Bezier</source>
         <translatorcomment>Same as in english</translatorcomment>
-        <translation>Bezier</translation>
+        <translation>Bézier</translation>
     </message>
     <message>
         <location filename="../ui/keyframeview.cpp" line="72" />
@@ -1412,7 +1412,7 @@
     <message>
         <location filename="../ui/mainwindow.cpp" line="994" />
         <source>Rectified Waveforms</source>
-        <translation>Nachgebesserte Waveforms</translation>
+        <translation>Gleichgerichtete Wellenformen</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="995" />
@@ -1691,13 +1691,13 @@
         <location filename="../ui/mainwindow.cpp" line="1049" />
         <source>Media Viewer</source>
         <translatorcomment>Does this make sense to translate?</translatorcomment>
-        <translation>Media Viewer</translation>
+        <translation>Medien-Viewer</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1050" />
         <source>Sequence Viewer</source>
         <translatorcomment>Does this make sense to translate?</translatorcomment>
-        <translation>Sequence Viewer</translation>
+        <translation>Sequenz-Viewer</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1051" />
@@ -1728,7 +1728,7 @@
         <location filename="../ui/mainwindow.cpp" line="1059" />
         <source>Pointer Tool</source>
         <translatorcomment>Does this make sense?</translatorcomment>
-        <translation>Zeiger</translation>
+        <translation>Zeiger-Werkzeug</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1060" />
@@ -2109,7 +2109,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="268" />
         <source>Enable/Disable</source>
-        <translation>Einblenden/Ausblenden</translation>
+        <translation>Aktivieren/Deaktivieren</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="269" />
@@ -2119,7 +2119,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../ui/menuhelper.cpp" line="270" />
         <source>In/Out Points</source>
-        <translation>Ein-/Ausstiegspunkte</translation>
+        <translation>Anfangs-/Endpunkte</translation>
     </message>
     <message>
         <location filename="../ui/menuhelper.cpp" line="271" />
@@ -2557,7 +2557,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="615" />
         <source>Default Sequence Settings</source>
-        <translation>Sequenzeinstellungen auf Standard setzen</translation>
+        <translation>Standard-Sequenzeinstellungen</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="622" />
@@ -3061,7 +3061,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../panels/project.cpp" line="350" />
         <source>No sequence is active, please open the sequence you want to replace clips from.</source>
-        <translation>Keine Sequenz ist aktiv. Bitten öffnen Sie die Sequenz, bei der Sie Clips ersetzen möchten.</translation>
+        <translation>Keine Sequenz ist aktiv. Bitte öffnen Sie die Sequenz, bei der Sie Clips ersetzen möchten.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="358" />
@@ -3071,7 +3071,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../panels/project.cpp" line="359" />
         <source>You cannot insert a sequence into itself, so no clips of this media would be in this sequence.</source>
-        <translation>Sequenz kann nicht sich selbst zugewiesen werden, da es keine Medien enthalten würde.</translation>
+        <translation>Eine Sequenz kann nicht in sich selbst eingefügt werden, da sie sonst keine Clips dieses Mediums enthalten würde.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="384" />
@@ -3156,7 +3156,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../panels/project.cpp" line="990" />
         <source>No sequence is active, please open the sequence you want to delete clips from.</source>
-        <translation>Keine Sequenz ist aktiv. Bitten öffnen Sie die Sequenz, bei der Sie Clips löschen möchten.</translation>
+        <translation>Keine Sequenz ist aktiv. Bitte öffnen Sie die Sequenz, bei der Sie Clips löschen möchten.</translation>
     </message>
     <message>
         <location filename="../panels/project.cpp" line="993" />
@@ -3353,7 +3353,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="78" />
         <source>Please select a media to replace with or click 'Cancel'.</source>
-        <translation>Bitten wählen Sie Medien zum Ersetzen aus oder klicken Sie auf 'Abbrechen'.</translation>
+        <translation>Bitte wählen Sie Medien zum Ersetzen aus oder klicken Sie auf &apos;Abbrechen&apos;.</translation>
     </message>
     <message>
         <location filename="../dialogs/replaceclipmediadialog.cpp" line="86" />
@@ -3481,7 +3481,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="68" />
         <source>Shadow Softness</source>
-        <translation>Schattensoftness</translation>
+        <translation>Schattenweichheit</translation>
     </message>
     <message>
         <location filename="../effects/internal/richtexteffect.cpp" line="73" />
@@ -3494,7 +3494,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../engine/sequence.cpp" line="36" />
         <source>%1 (copy)</source>
-        <translation>%1 (kopieren)</translation>
+        <translation>%1 (Kopie)</translation>
     </message>
 </context>
 <context>
@@ -3502,7 +3502,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../effects/internal/shakeeffect.cpp" line="37" />
         <source>Intensity</source>
-        <translation>Intentsität</translation>
+        <translation>Intensität</translation>
     </message>
     <message>
         <location filename="../effects/internal/shakeeffect.cpp" line="42" />
@@ -3527,7 +3527,7 @@ Audio Layout: %6</translation>
         <location filename="../effects/internal/solideffect.cpp" line="44" />
         <source>Solid Color</source>
         <translatorcomment>AE and Premiere handle this in the same way</translatorcomment>
-        <translation>Solid</translation>
+        <translation>Volltonfarbe</translation>
     </message>
     <message>
         <location filename="../effects/internal/solideffect.cpp" line="45" />
@@ -4075,7 +4075,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="122" />
         <source>Shadow Softness</source>
-        <translation>Schattensoftness</translation>
+        <translation>Schattenweichheit</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="127" />
@@ -4133,7 +4133,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../effects/internal/timecodeeffect.cpp" line="85" />
         <source>Prepend</source>
-        <translation>Voreinstellung</translation>
+        <translation>Voranstellen</translation>
     </message>
 </context>
 <context>
@@ -4247,7 +4247,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../panels/timeline.cpp" line="1232" />
         <source>Solid Color...</source>
-        <translation>Solid...</translation>
+        <translation>Volltonfarbe...</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="1237" />
@@ -4302,7 +4302,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="229" />
         <source>Pointer Tool</source>
-        <translation>Pointer-Werkzeug</translation>
+        <translation>Zeiger-Werkzeug</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="230" />
@@ -4348,7 +4348,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="238" />
         <source>Zoom In</source>
-        <translation>Hereinzommen</translation>
+        <translation>Hereinzoomen</translation>
     </message>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="239" />
@@ -4363,7 +4363,7 @@ Audio Layout: %6</translation>
     <message>
         <location filename="../panels/timeline_ui.cpp" line="241" />
         <source>Add title, solid, bars, etc.</source>
-        <translation>Titel, Solid, Balken, etc. Hinzufügen</translation>
+        <translation>Titel, Volltonfarbe, Balken, etc. Hinzufügen</translation>
     </message>
     <message>
         <location filename="../panels/timeline.cpp" line="386" />
@@ -4545,7 +4545,7 @@ Dauer: %4</translation>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="812" />
         <source>Solid Color</source>
-        <translation>Solid</translation>
+        <translation>Volltonfarbe</translation>
     </message>
     <message>
         <location filename="../ui/timelinewidget.cpp" line="817" />
@@ -4812,7 +4812,7 @@ Dauer: %4</translation>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="148" />
         <source>Disable</source>
-        <translation>Ausblenden</translation>
+        <translation>Deaktivieren</translation>
     </message>
     <message>
         <location filename="../ui/viewerwidget.cpp" line="152" />

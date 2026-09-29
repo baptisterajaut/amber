@@ -1,10 +1,15 @@
 #version 440
+// Shared with cornerpin.vert, keep both declarations identical.
 layout(std140, binding = 1) uniform CornerPinParams {
     vec2 p0;
     vec2 p1;
     vec2 p2;
     vec2 p3;
     bool perspective;
+    vec2 t_bl;
+    vec2 t_br;
+    vec2 t_tl;
+    vec2 t_tr;
 };
 layout(binding = 2) uniform sampler2D tex;
 layout(location = 0) in vec2 q;
@@ -22,30 +27,30 @@ void main(void) {
 	if (perspective) {
 		fragColor = texture(tex, vTexCoord);
 	} else {
+		// inverse bilinear: find (u, v) with q = u*b1 + v*b2 + u*v*b3, v = 0 on the p0/p1 edge
 		float A = Wedge2D(b2, b3);
 		float B = Wedge2D(b3, q) - Wedge2D(b1, b2);
 		float C = Wedge2D(b1, q);
 
-		vec2 uv;
-
-		// solve for v
+		float v;
 		if (abs(A) < 0.001) {
-			uv.y = -C/B;
+			v = -C/B;
 		} else {
-			float discrim = B*B - 4.0*A*C;
-			uv.y = 0.5 * (-B + sqrt(discrim)) / A;
+			// the valid root depends on the quad's winding, take the one inside the quad
+			float root = sqrt(max(B*B - 4.0*A*C, 0.0));
+			v = 0.5 * (-B + root) / A;
+			if (v < -0.001 || v > 1.001) v = 0.5 * (-B - root) / A;
 		}
 
-		// solve for u
-		vec2 denom = b1 + uv.y * b3;
+		vec2 denom = b1 + v * b3;
+		float u;
 		if (abs(denom.x) > abs(denom.y)) {
-			uv.x = (q.x - b2.x * uv.y) / denom.x;
+			u = (q.x - b2.x * v) / denom.x;
 		} else {
-			uv.x = (q.y - b2.y * uv.y) / denom.y;
+			u = (q.y - b2.y * v) / denom.y;
 		}
 
-		uv.y = 1.0 - uv.y;
-
+		vec2 uv = mix(mix(t_bl, t_br, u), mix(t_tl, t_tr, u), v);
 		fragColor = texture(tex, uv);
 	}
 }
