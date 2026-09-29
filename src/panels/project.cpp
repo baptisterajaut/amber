@@ -505,6 +505,14 @@ bool delete_clips_in_clipboard_with_media(ComboAction* ca, Media* m) {
   return (delete_count > 0);
 }
 
+// True if a folder containing m (at any depth) is also in the list
+static bool has_selected_ancestor(Media* m, const QList<Media*>& items) {
+  for (Media* p = m->parentItem(); p != nullptr; p = p->parentItem()) {
+    if (items.contains(p)) return true;
+  }
+  return false;
+}
+
 void Project::delete_selected_media() {
   ComboAction* ca = new ComboAction(tr("Delete Media"));
   QModelIndexList selected_items = get_current_selected();
@@ -533,7 +541,18 @@ void Project::delete_selected_media() {
       Media* item = media_items.at(i);
       Footage* media = item->to_footage();
       bool confirm_delete = false;
+
+      // Sequences deleted along with this media don't count as uses. Recomputed per footage, as a Skip changes
+      // what gets deleted (items gains siblings, parents lists folders that are spared).
+      QList<Media*> remaining_items;
+      for (auto m : items) {
+        if (!parents.contains(m)) remaining_items.append(m);
+      }
+      QList<Media*> doomed_sequences;
+      get_all_media_from_table(remaining_items, doomed_sequences, MEDIA_TYPE_SEQUENCE);
+
       for (int j = 0; j < sequence_items.size(); j++) {
+        if (doomed_sequences.contains(sequence_items.at(j))) continue;
         Sequence* s = sequence_items.at(j)->to_sequence().get();
         for (int k = 0; k < s->clips.size(); k++) {
           ClipPtr c = s->clips.at(k);
@@ -555,9 +574,10 @@ void Project::delete_selected_media() {
                 confirm_delete = true;
                 redraw = true;
               } else if (confirm.clickedButton() == skip_button) {
-                // remove media item and any folders containing it from the remove list
+                // remove media item and any folders containing it from the remove list, stopping at the first
+                // folder that isn't being deleted (never climb to the root and re-add the whole top level)
                 Media* parent = item;
-                while (parent != nullptr) {
+                while (parent != nullptr && (items.contains(parent) || has_selected_ancestor(parent, items))) {
                   parents.append(parent);
 
                   // re-add item's siblings
@@ -594,9 +614,6 @@ void Project::delete_selected_media() {
             }
           }
         }
-      }
-      if (confirm_delete) {
-        delete_clips_in_clipboard_with_media(ca, item);
       }
     }
   }
@@ -664,8 +681,26 @@ void Project::delete_selected_media() {
       }
     }
 
+    // Drop clipboard clips of every footage going away, in a single pass: RemoveClipsFromClipboard is
+    // index-based, so per-footage passes would compute indices against a clipboard that hasn't shrunk yet
+    if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
+      QList<Media*> deleted_footage;
+      get_all_media_from_table(items, deleted_footage, MEDIA_TYPE_FOOTAGE);
+      int removed = 0;
+      for (int i = 0; i < clipboard.size(); i++) {
+        ClipPtr c = std::static_pointer_cast<Clip>(clipboard.at(i));
+        if (deleted_footage.contains(c->media())) {
+          ca->append(new RemoveClipsFromClipboard(i - removed));
+          removed++;
+        }
+      }
+    }
+
     bool active_sequence_closed = false;
     for (auto item : items) {
+      // Already removed with its selected parent folder, whose branch below also does its cleanup
+      if (has_selected_ancestor(item, items)) continue;
+
       ca->append(new DeleteMediaCommand(item->parentItem()->get_shared_ptr(item)));
 
       if (item->get_type() == MEDIA_TYPE_SEQUENCE) {
