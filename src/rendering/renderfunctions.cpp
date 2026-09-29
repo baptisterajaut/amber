@@ -540,9 +540,10 @@ static QVector<Clip*> collect_active_clips(Sequence* s, long playhead, ComposeSe
 
 // Render a clip's textured quad into the back buffer with the given MVP transform.
 // Uses dedicated per-pass buffers to avoid QRhi dynamic buffer sharing hazards.
-static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture* textureID,
-                                      const GLTextureCoords& coords, const QMatrix4x4& clip_mvp,
-                                      QRhiTextureRenderTarget* back_target1, QRhiRenderPassDescriptor* back_rpd) {
+// clip_shader: an enabled effect with ClipShaderFlag and baked shaders (Corner Pin), or nullptr for passthrough.
+static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture* textureID, GLTextureCoords& coords,
+                                      const QMatrix4x4& clip_mvp, QRhiTextureRenderTarget* back_target1,
+                                      QRhiRenderPassDescriptor* back_rpd, Effect* clip_shader, double timecode) {
   if (!params.rhi) {
     qWarning() << "render_clip_to_backbuffer: params.rhi is null";
     return;
@@ -572,7 +573,17 @@ static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture
       float(coords.textureBottomRightY),
   };
 
-  float colorMult[4] = {1, 1, 1, 1};
+  // Fragment-side UBO at binding 1: colorMult for passthrough, or the effect's own params
+  // (shared with its vertex stage) when a clip shader replaces the passthrough pair.
+  QByteArray clipParams;
+  if (clip_shader) {
+    clipParams.resize(qMax(clip_shader->fragUboSize(), clip_shader->vertUboSize()));
+    clipParams.fill(0);
+    clip_shader->process_shader(timecode, coords, 0, clipParams);
+  } else {
+    float colorMult[4] = {1, 1, 1, 1};
+    clipParams = QByteArray(reinterpret_cast<const char*>(colorMult), sizeof(colorMult));
+  }
 
   // Dedicated buffers per pass — QRhi dynamic buffers are NOT snapshotted at
   // record time (all blit helpers also use per-pass buffers for the same reason).
@@ -580,20 +591,29 @@ static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture
   clipVbuf->create();
   QRhiBuffer* clipVertUbo = params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
   clipVertUbo->create();
-  QRhiBuffer* clipFragUbo = params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
+  QRhiBuffer* clipFragUbo =
+      params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, quint32(clipParams.size()));
   clipFragUbo->create();
+
+  QRhiShaderResourceBinding::StageFlags paramStages = QRhiShaderResourceBinding::FragmentStage;
+  if (clip_shader) paramStages |= QRhiShaderResourceBinding::VertexStage;
 
   QRhiShaderResourceBindings* srb = params.rhi->newShaderResourceBindings();
   srb->setBindings({
       QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, clipVertUbo),
-      QRhiShaderResourceBinding::uniformBuffer(1, QRhiShaderResourceBinding::FragmentStage, clipFragUbo),
+      QRhiShaderResourceBinding::uniformBuffer(1, paramStages, clipFragUbo),
       QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, textureID, params.sampler),
   });
   srb->create();
 
   QRhiGraphicsPipeline* pipeline = params.rhi->newGraphicsPipeline();
-  pipeline->setShaderStages(
-      {{QRhiShaderStage::Vertex, params.passthroughVert}, {QRhiShaderStage::Fragment, params.passthroughFrag}});
+  if (clip_shader) {
+    pipeline->setShaderStages({{QRhiShaderStage::Vertex, clip_shader->vertexShader()},
+                               {QRhiShaderStage::Fragment, clip_shader->fragmentShader()}});
+  } else {
+    pipeline->setShaderStages(
+        {{QRhiShaderStage::Vertex, params.passthroughVert}, {QRhiShaderStage::Fragment, params.passthroughFrag}});
+  }
   QRhiVertexInputLayout inputLayout;
   inputLayout.setBindings({{4 * sizeof(float)}});
   inputLayout.setAttributes({
@@ -617,7 +637,7 @@ static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture
   QRhiResourceUpdateBatch* u = params.rhi->nextResourceUpdateBatch();
   u->updateDynamicBuffer(clipVbuf, 0, sizeof(quad_verts), quad_verts);
   u->updateDynamicBuffer(clipVertUbo, 0, 64, corrected_clip_mvp.constData());
-  u->updateDynamicBuffer(clipFragUbo, 0, 16, colorMult);
+  u->updateDynamicBuffer(clipFragUbo, 0, quint32(clipParams.size()), clipParams.constData());
 
   QSize sz = back_target1->pixelSize();
   QColor clearColor(0, 0, 0, 0);
@@ -851,7 +871,19 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
   }
 
   // Render clip into back buffer with clip_mvp transform
-  render_clip_to_backbuffer(params, textureID, coords, clip_mvp, back_target1, back_rpd);
+  // The last enabled clip-shader effect draws the clip instead of the passthrough pair.
+  // CBA: only one applies; stacking two Corner Pins would need their homographies composed.
+  Effect* clip_shader = nullptr;
+  if (amber::CurrentRuntimeConfig.shaders_are_enabled) {
+    for (const auto& effect : c->effects) {
+      Effect* e = effect.get();
+      if (!e || !e->IsEnabled() || !(e->Flags() & Effect::ClipShaderFlag)) continue;
+      e->startEffect();  // effects added to an already open clip are opened (and their shaders baked) lazily
+      if (e->is_glsl_linked()) clip_shader = e;
+    }
+  }
+
+  render_clip_to_backbuffer(params, textureID, coords, clip_mvp, back_target1, back_rpd, clip_shader, timecode);
 
   // Composite foreground (clip in back_tex1) onto main target using SrcOver blending.
   // The main target has PreserveColorContents, so existing content is the background.

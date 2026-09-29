@@ -491,18 +491,28 @@ void Project::SetToolbarVisible(bool visible) { toolbar_widget->setVisible(visib
 
 bool Project::IsProjectWidget(QObject* child) { return (child == tree_view || child == icon_view); }
 
-bool delete_clips_in_clipboard_with_media(ComboAction* ca, Media* m) {
+// Remove every clipboard clip whose media is in `media`, in one pass: each RemoveClipsFromClipboard stores a raw
+// index, so all removals must be counted against the same running offset (never call this twice per ComboAction).
+bool delete_clips_in_clipboard_with_media(ComboAction* ca, const QList<Media*>& media) {
   int delete_count = 0;
   if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
     for (int i = 0; i < clipboard.size(); i++) {
       ClipPtr c = std::static_pointer_cast<Clip>(clipboard.at(i));
-      if (c->media() == m) {
+      if (c->media() != nullptr && media.contains(c->media())) {
         ca->append(new RemoveClipsFromClipboard(i - delete_count));
         delete_count++;
       }
     }
   }
   return (delete_count > 0);
+}
+
+// True if a folder containing m (at any depth) is also in the list
+static bool has_selected_ancestor(Media* m, const QList<Media*>& items) {
+  for (Media* p = m->parentItem(); p != nullptr; p = p->parentItem()) {
+    if (items.contains(p)) return true;
+  }
+  return false;
 }
 
 void Project::delete_selected_media() {
@@ -533,7 +543,18 @@ void Project::delete_selected_media() {
       Media* item = media_items.at(i);
       Footage* media = item->to_footage();
       bool confirm_delete = false;
+
+      // Sequences deleted along with this media don't count as uses. Recomputed per footage, as a Skip changes
+      // what gets deleted (items gains siblings, parents lists folders that are spared).
+      QList<Media*> remaining_items;
+      for (auto m : items) {
+        if (!parents.contains(m)) remaining_items.append(m);
+      }
+      QList<Media*> doomed_sequences;
+      get_all_media_from_table(remaining_items, doomed_sequences, MEDIA_TYPE_SEQUENCE);
+
       for (int j = 0; j < sequence_items.size(); j++) {
+        if (doomed_sequences.contains(sequence_items.at(j))) continue;
         Sequence* s = sequence_items.at(j)->to_sequence().get();
         for (int k = 0; k < s->clips.size(); k++) {
           ClipPtr c = s->clips.at(k);
@@ -555,9 +576,10 @@ void Project::delete_selected_media() {
                 confirm_delete = true;
                 redraw = true;
               } else if (confirm.clickedButton() == skip_button) {
-                // remove media item and any folders containing it from the remove list
+                // remove media item and any folders containing it from the remove list, stopping at the first
+                // folder that isn't being deleted (never climb to the root and re-add the whole top level)
                 Media* parent = item;
-                while (parent != nullptr) {
+                while (parent != nullptr && (items.contains(parent) || has_selected_ancestor(parent, items))) {
                   parents.append(parent);
 
                   // re-add item's siblings
@@ -595,19 +617,11 @@ void Project::delete_selected_media() {
           }
         }
       }
-      if (confirm_delete) {
-        delete_clips_in_clipboard_with_media(ca, item);
-      }
     }
   }
 
   // remove
   if (remove) {
-    panel_graph_editor->set_row(nullptr);
-    panel_effect_controls->Clear(true);
-
-    if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
-
     // remove media and parents
     for (auto parent : parents) {
       for (int l = 0; l < items.size(); l++) {
@@ -618,14 +632,21 @@ void Project::delete_selected_media() {
       }
     }
 
+    // Sequences removed by this delete: selected directly, or inside a selected folder (recursively)
+    QList<Media*> found_sequences;
+    get_all_media_from_table(items, found_sequences, MEDIA_TYPE_SEQUENCE);
+    QList<Media*> deleted_sequences;
+    for (auto m : found_sequences) {
+      if (!deleted_sequences.contains(m)) deleted_sequences.append(m);  // folder and child both selected
+    }
+
     // Check if any sequence being deleted is referenced by other sequences
-    for (int i = 0; i < items.size(); i++) {
-      Media* item = items.at(i);
-      if (item->get_type() != MEDIA_TYPE_SEQUENCE) continue;
+    for (int i = 0; i < deleted_sequences.size(); i++) {
+      Media* item = deleted_sequences.at(i);
 
       for (int j = 0; j < sequence_items.size(); j++) {
         Media* seq_media = sequence_items.at(j);
-        if (items.contains(seq_media)) continue;  // also being deleted, skip
+        if (deleted_sequences.contains(seq_media)) continue;  // also being deleted, skip
 
         Sequence* s = seq_media->to_sequence().get();
         for (int k = 0; k < s->clips.size(); k++) {
@@ -657,7 +678,22 @@ void Project::delete_selected_media() {
       }
     }
 
+    // Past the last prompt: clear the UI only now, so a cancelled delete leaves it untouched
+    panel_graph_editor->set_row(nullptr);
+    panel_effect_controls->Clear(true);
+
+    if (amber::ActiveSequence != nullptr) amber::ActiveSequence->selections.clear();
+
+    // Drop clipboard clips of every footage or sequence going away (nested-sequence clips included)
+    QList<Media*> deleted_media;
+    get_all_media_from_table(items, deleted_media, -1);
+    delete_clips_in_clipboard_with_media(ca, deleted_media);
+
+    bool active_sequence_closed = false;
     for (auto item : items) {
+      // Already removed with its selected parent folder, whose branch below also does its cleanup
+      if (has_selected_ancestor(item, items)) continue;
+
       ca->append(new DeleteMediaCommand(item->parentItem()->get_shared_ptr(item)));
 
       if (item->get_type() == MEDIA_TYPE_SEQUENCE) {
@@ -665,8 +701,9 @@ void Project::delete_selected_media() {
 
         Sequence* s = item->to_sequence().get();
 
-        if (s == amber::ActiveSequence.get()) {
+        if (s == amber::ActiveSequence.get() && !active_sequence_closed) {
           ca->append(new ChangeSequenceAction(nullptr));
+          active_sequence_closed = true;
         }
 
         if (s == panel_footage_viewer->seq.get()) {
@@ -679,6 +716,35 @@ void Project::delete_selected_media() {
             if (c != nullptr && c->media() == item) {
               panel_footage_viewer->set_media(nullptr);
               break;
+            }
+          }
+        }
+      } else if (item->get_type() == MEDIA_TYPE_FOLDER) {
+        // A folder takes its contents with it: same cleanup for the sequences and footage inside it
+        QList<Media*> folder{item};
+        QList<Media*> contents;
+        get_all_media_from_table(folder, contents);
+        for (auto m : contents) {
+          if (m->get_type() == MEDIA_TYPE_SEQUENCE) {
+            redraw = true;
+
+            Sequence* s = m->to_sequence().get();
+
+            if (s == amber::ActiveSequence.get() && !active_sequence_closed) {
+              ca->append(new ChangeSequenceAction(nullptr));
+              active_sequence_closed = true;
+            }
+
+            if (s == panel_footage_viewer->seq.get()) {
+              panel_footage_viewer->set_media(nullptr);
+            }
+          } else if (m->get_type() == MEDIA_TYPE_FOOTAGE && panel_footage_viewer->seq != nullptr) {
+            for (int j = 0; j < panel_footage_viewer->seq->clips.size(); j++) {
+              ClipPtr c = panel_footage_viewer->seq->clips.at(j);
+              if (c != nullptr && c->media() == m) {
+                panel_footage_viewer->set_media(nullptr);
+                break;
+              }
             }
           }
         }
@@ -1013,10 +1079,9 @@ void Project::delete_clips_using_selected_media() {
         }
       }
     }
-    for (const auto& item : items) {
-      Media* m = item_to_media(item);
-      if (delete_clips_in_clipboard_with_media(ca, m)) deleted = true;
-    }
+    QList<Media*> selected_media;
+    for (const auto& item : items) selected_media.append(item_to_media(item));
+    if (delete_clips_in_clipboard_with_media(ca, selected_media)) deleted = true;
     if (deleted) {
       amber::UndoStack.push(ca);
       update_ui(true);

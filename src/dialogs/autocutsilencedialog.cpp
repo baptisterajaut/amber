@@ -182,8 +182,10 @@ AutoCutSilenceDialog::CutResult AutoCutSilenceDialog::cut_silence() {
     Clip* clip = amber::ActiveSequence->clips.at(j).get();
 
     // Check if this clip is an audio footage clip
+    // media_stream() is null for nested-sequence media (only resolves footage streams)
     if (clip->track() >= 0
         && clip->media() != nullptr
+        && clip->media_stream() != nullptr
         && clip->media_stream()->preview_done) { // TODO provide warning for preview not being done
 
       any_audio_processed = true;

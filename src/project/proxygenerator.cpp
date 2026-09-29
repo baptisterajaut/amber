@@ -276,7 +276,10 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
 
       // free packet allocated by av_read_frame
       av_packet_unref(packet);
-    } while ((recfr_ret = avcodec_receive_frame(input_streams.at(packet->stream_index), dec_frame)) == AVERROR(EAGAIN) && !skip);
+      // passthrough streams have no decoder: keep reading instead of polling one, and use the
+      // index captured before unref (packet->stream_index is reset by av_packet_unref)
+    } while (!skip && (input_streams.at(stream_index) == nullptr ||
+                        (recfr_ret = avcodec_receive_frame(input_streams.at(stream_index), dec_frame)) == AVERROR(EAGAIN)));
 
     // error/eof handling - cancel while loop
     if (read_ret < 0 || skip) {

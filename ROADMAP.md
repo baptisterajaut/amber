@@ -95,6 +95,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Color correction tool (scopes — waveform, vectorscope, histogram)
 - Subtitle editor — dedicated floating window for bulk subtitle editing (import is shipped in 1.5.0, this is the full editing UI)
 - **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
+- **LUT loader** — apply a `.cube` 3D LUT as a shader effect (3D texture lookup) with an intensity control blending with the original. Needed for log footage.
 - **Layered media import (SVG / XCF / KRA / PSD)** — import layered source files as a media type, with each top-level layer/group exposed as a separately animatable clip on its own track (Photoshop → After Effects-style workflow). v1: SVG only (`<g>` groups via Qt's `QSvgRenderer`, already linked). v2: GIMP `.xcf` and Krita `.kra` (KRA = ZIP of merged-layer PNGs, easy; XCF needs a parser — possibly via `libgimp` or a Qt port). PSD via QImage plugin. Per-layer transparency + blend mode preserved. SVG keeps vector-precision at any zoom. (#52)
 
 ### Editing features (continued)
@@ -110,6 +111,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 
 ### Editing features
 - Track mute/solo/lock with track headers (per-track header controls showing V1/A1 labels, show/hide for video, mute/solo for audio + skip logic in compose_sequence) (#12)
+- **Per-track volume and pan** — simple mixer controls in the track headers, next to mute/solo. Applied in the audio mix, not as a clip effect.
 - Linked clip vertical drag — V+A clips move together across tracks when dragging a linked pair, standard NLE behavior (#12)
 - Layout presets (Default, 3-Point Editing, Color)
 - Color labels on media in project panel (field exists on Clip, needs UI on Media)
@@ -147,6 +149,7 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 - **Per-codec options panel** — generalize the export dialog so each codec declares its own parameter set instead of one-off field additions. Concrete asks driving the redesign (#58): x264/x265 `-preset` (veryslow→ultrafast), SVT-AV1 (preset −2..13, CRF 0..63), rav1e (`-speed` −1..10, `-qp` 0..255), libaom-av1, AV1 2-pass encoding, average-bitrate as a compression mode for x264/x265/SVT-AV1/rav1e, FLAC compression levels, `+faststart` movflag for MOV-family containers (MP4/MOV/3GPP/FLV), per-codec pixel format filtering.
 - Render queue — non-modal export with queue UI, continue editing during render
 - Batch export — multi-sequence export in one operation
+- **Master loudness on export** — optional loudness normalization (EBU R128 `loudnorm`, e.g. −14 LUFS for YouTube) and brickwall limiter (`alimiter`) on the final mix. The export audio path uses libswresample only today, so this adds a small libavfilter graph before the encoder.
 
 ### UI polish
 - **Welcome screen** — QDialog at startup with recent projects + new project with sequence templates.
@@ -169,3 +172,4 @@ Features that require major architectural work or are outside the current scope.
 - **2.5D motion tracker** — point/planar tracking with compositing integration. Requires optical flow or feature matching (CPU-bound). (#12)
 - **AI-based video upscaling** — model-driven upscale (Real-ESRGAN, Anime4K class). Conflicts with Amber's lightweight footprint (sub-3 MB binary, ~70 MB idle RAM) — would pull in PyTorch/ONNX/ncnn runtime. Realistically a separate companion tool that pre-processes media into an upscaled file Amber imports normally, rather than an in-app effect. (#53)
 - **Track-based alpha mask** — extension of the 2.0 image-source Alpha Mask: use a clip on the adjacent track as a dynamic alpha source (animated masks, video-as-mask). Requires reordering `compose_sequence()` so the mask clip renders into its own buffer without being drawn to the final target, plus a per-clip "is-mask" flag, plus edge-case handling (mask not active at playhead, effects on the mask, dimension mismatch). Revisit if demand confirms after 2.0 ships. (#61)
+- **Sequence and master effect stacks** — effects applied to a whole sequence or to the master output instead of per clip. Olive 0.1 has no track or bus objects to hang them on. Until then: nest the sequence and apply the effects to the nested clip.

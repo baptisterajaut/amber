@@ -41,6 +41,9 @@ public:
   MediaIconService();
 public slots:
   void SetMediaIcon(Media* media, int icon_type);
+public:
+  // GUI thread only
+  void StopThrobberFor(Media* media);
 signals:
   void IconChanged();
 private slots:

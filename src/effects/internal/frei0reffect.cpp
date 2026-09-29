@@ -164,6 +164,10 @@ void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *outpu
     construct_module();
   }
 
+  // construct_module() leaves open=false (and instance untouched/null) when f0r_construct
+  // is missing or returns null
+  if (!open || instance == nullptr) return;
+
   f0rUpdateFunc update_func = reinterpret_cast<f0rUpdateFunc>(handle.resolve("f0r_update"));
   if (update_func == nullptr) return;
 
@@ -235,6 +239,7 @@ void Frei0rEffect::destruct_module() {
     if (destruct != nullptr) destruct(instance);
 
     open = false;
+    instance = nullptr;
   }
 }
 
