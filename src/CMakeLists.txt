@@ -449,6 +449,8 @@ set(OLIVE_EFFECTS
   effects/shaders/invert.xml
   effects/shaders/lumakey.frag
   effects/shaders/lumakey.xml
+  effects/shaders/lut.frag
+  effects/shaders/lut.xml
   effects/shaders/noise.frag
   effects/shaders/noise.xml
   effects/shaders/pixelate.frag
