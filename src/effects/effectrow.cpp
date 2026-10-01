@@ -20,8 +20,6 @@
 
 #include "effectrow.h"
 
-#include <QHBoxLayout>
-#include <QPushButton>
 
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"

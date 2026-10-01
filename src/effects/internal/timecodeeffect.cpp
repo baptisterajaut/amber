@@ -20,24 +20,14 @@
 
 #include "timecodeeffect.h"
 
-#include <QGridLayout>
-#include <QLabel>
-#include <QTextEdit>
 #include <QPainter>
 #include <QPainterPath>
-#include <QPushButton>
-#include <QColorDialog>
 #include <QFontDatabase>
-#include <QComboBox>
-#include <QWidget>
 #include <QtMath>
 #include <QDebug>
 
 #include "engine/clip.h"
 #include "engine/sequence.h"
-#include "ui/comboboxex.h"
-#include "ui/colorbutton.h"
-#include "ui/fontcombobox.h"
 #include "global/config.h"
 
 TimecodeEffect::TimecodeEffect(Clip* c, const EffectMeta* em) :

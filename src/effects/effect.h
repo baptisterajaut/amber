@@ -24,16 +24,12 @@
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
 #include <QColor>
-#include <QGridLayout>
-#include <QLabel>
 #include <QMouseEvent>
 #include <QMutex>
 #include <QObject>
-#include <QPushButton>
 #include <QString>
 #include <QThread>
 #include <QVector>
-#include <QWidget>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <memory>

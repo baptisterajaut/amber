@@ -1,7 +1,7 @@
 #include "project/clipboard_serializer.h"
 
-#include <QApplication>
 #include <QClipboard>
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QMimeData>
@@ -91,13 +91,13 @@ void parse_effect_into_clip(QXmlStreamReader& stream, Clip* c) {
     EffectPtr ve(new VoidEffect(c, effect_name));
     ve->SetEnabled(effect_enabled);
     ve->load(stream);
-    ve->moveToThread(QApplication::instance()->thread());
+    ve->moveToThread(QCoreApplication::instance()->thread());
     c->effects.append(ve);
   } else {
     EffectPtr e(Effect::Create(c, meta));
     e->SetEnabled(effect_enabled);
     e->load(stream);
-    e->moveToThread(QApplication::instance()->thread());
+    e->moveToThread(QCoreApplication::instance()->thread());
     c->effects.append(e);
   }
 }
@@ -285,7 +285,7 @@ bool deserialize_clipboard_from_xml(const QByteArray& xml, QVector<MediaPtr>& im
       EffectPtr e(Effect::Create(nullptr, meta));
       e->SetEnabled(effect_enabled);
       e->load(stream);
-      e->moveToThread(QApplication::instance()->thread());
+      e->moveToThread(QCoreApplication::instance()->thread());
       clipboard.append(e);
     }
   }

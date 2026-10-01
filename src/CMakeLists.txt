@@ -204,9 +204,8 @@ set_target_properties(amber-engine PROPERTIES AUTOMOC ON AUTORCC ON)
 target_compile_definitions(amber-engine PUBLIC ${AMBER_DEFINITIONS})
 
 target_link_libraries(amber-engine PUBLIC
-  $<$<NOT:$<BOOL:${AMBER_TARGET_WINDOWS}>>:OpenGL::GL>
   Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::Widgets Qt6::Multimedia
-  Qt6::OpenGL Qt6::OpenGLWidgets Qt6::ShaderToolsPrivate Qt6::Svg
+  Qt6::OpenGLWidgets Qt6::ShaderToolsPrivate
   FFMPEG::avutil FFMPEG::avcodec FFMPEG::avformat FFMPEG::avfilter
   FFMPEG::swscale FFMPEG::swresample
   $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
@@ -445,6 +444,8 @@ endif()
 
 target_link_libraries(${AMBER_TARGET} PRIVATE
   amber-engine
+  $<$<NOT:$<BOOL:${AMBER_TARGET_WINDOWS}>>:OpenGL::GL>
+  Qt6::OpenGL Qt6::Svg
   $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
 )
 

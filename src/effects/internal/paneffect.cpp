@@ -20,8 +20,6 @@
 
 #include "paneffect.h"
 
-#include <QGridLayout>
-#include <QLabel>
 #include <QtMath>
 #include <cmath>
 

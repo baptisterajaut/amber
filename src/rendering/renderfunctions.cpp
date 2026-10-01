@@ -24,7 +24,6 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
-#include <QApplication>
 #include <QDebug>
 #include <QScreen>
 #include <utility>

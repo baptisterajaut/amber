@@ -22,15 +22,11 @@
 #include <cmath>
 
 #include <rhi/qshaderbaker.h>
-#include <QApplication>
-#include <QCheckBox>
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFloat16>
-#include <QGridLayout>
 #include <QLocale>
-#include <QMenu>
-#include <QPainter>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QXmlStreamReader>

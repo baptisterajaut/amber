@@ -25,14 +25,9 @@
 #include <QVector>
 
 class Effect;
-class QGridLayout;
 class EffectField;
-class QLabel;
-class QPushButton;
 class ComboAction;
-class QHBoxLayout;
 class KeyframeNavigator;
-class ClickableLabel;
 
 #include "effectfields.h"
 

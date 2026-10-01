@@ -23,6 +23,7 @@
 
 #include <QDialog>
 #include <QComboBox>
+#include <QLabel>
 #include <QSpinBox>
 #include <QLineEdit>
 

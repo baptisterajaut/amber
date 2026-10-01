@@ -20,12 +20,6 @@
 
 #include "transformeffect.h"
 
-#include <QWidget>
-#include <QLabel>
-#include <QGridLayout>
-#include <QSpinBox>
-#include <QCheckBox>
-#include <QComboBox>
 #include <QMouseEvent>
 
 #include "engine/clip.h"

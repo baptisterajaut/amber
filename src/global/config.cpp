@@ -23,6 +23,7 @@
 #include <QFile>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
+#include <QtMath>
 
 #include "core/appcontext.h"
 
@@ -289,3 +290,76 @@ void Config::save(QString path) {
 RuntimeConfig::RuntimeConfig()
 
     = default;
+
+QString frame_to_timecode(long f, int view, double frame_rate) {
+  if (view == amber::kTimecodeFrames) {
+    return QString::number(f);
+  }
+
+  // return timecode
+  int hours = 0;
+  int mins = 0;
+  int secs = 0;
+  int frames = 0;
+  QString token = ":";
+
+  if ((view == amber::kTimecodeDrop || view == amber::kTimecodeMilliseconds) && frame_rate_is_droppable(frame_rate)) {
+    // CONVERT A FRAME NUMBER TO DROP FRAME TIMECODE
+    // Code by David Heidelberger, adapted from Andrew Duncan, further adapted for Olive by Olive Team
+    // Given an int called framenumber and a double called framerate
+    // Framerate should be 29.97, 59.94, or 23.976, otherwise the calculations will be off.
+
+    int d;
+    int m;
+
+    int dropFrames =
+        qRound(frame_rate *
+               .066666);  // Number of frames to drop on the minute marks is the nearest integer to 6% of the framerate
+    int framesPerHour = qRound(frame_rate * 60 * 60);  // Number of frqRound64ames in an hour
+    int framesPer24Hours = framesPerHour * 24;         // Number of frames in a day - timecode rolls over after 24 hours
+    int framesPer10Minutes = qRound(frame_rate * 60 * 10);         // Number of frames per ten minutes
+    int framesPerMinute = (qRound(frame_rate) * 60) - dropFrames;  // Number of frames per minute is the round of the
+                                                                   // framerate * 60 minus the number of dropped frames
+
+    // If framenumber is greater than 24 hrs, next operation will rollover clock
+    f = f % framesPer24Hours;  // % is the modulus operator, which returns a remainder. a % b = the remainder of a/b
+
+    d = f / framesPer10Minutes;  // \ means integer division, which is a/b without a remainder. Some languages you could
+                                 // use floor(a/b)
+    m = f % framesPer10Minutes;
+
+    // In the original post, the next line read m>1, which only worked for 29.97. Jean-Baptiste Mardelle correctly
+    // pointed out that m should be compared to dropFrames.
+    if (m > dropFrames) {
+      f = f + (dropFrames * 9 * d) + dropFrames * ((m - dropFrames) / framesPerMinute);
+    } else {
+      f = f + dropFrames * 9 * d;
+    }
+
+    int frRound = qRound(frame_rate);
+    frames = f % frRound;
+    secs = (f / frRound) % 60;
+    mins = ((f / frRound) / 60) % 60;
+    hours = (((f / frRound) / 60) / 60);
+
+    token = ";";
+  } else {
+    // non-drop timecode
+
+    int int_fps = qRound(frame_rate);
+    hours = f / (3600 * int_fps);
+    mins = f / (60 * int_fps) % 60;
+    secs = f / int_fps % 60;
+    frames = f % int_fps;
+  }
+  if (view == amber::kTimecodeMilliseconds) {
+    return QString::number((hours * 3600000) + (mins * 60000) + (secs * 1000) + qCeil(frames * 1000 / frame_rate));
+  }
+  return QString(QString::number(hours).rightJustified(2, '0') + ":" + QString::number(mins).rightJustified(2, '0') +
+                 ":" + QString::number(secs).rightJustified(2, '0') + token +
+                 QString::number(frames).rightJustified(2, '0'));
+}
+
+bool frame_rate_is_droppable(double rate) {
+  return (qFuzzyCompare(rate, 23.976) || qFuzzyCompare(rate, 29.97) || qFuzzyCompare(rate, 59.94));
+}

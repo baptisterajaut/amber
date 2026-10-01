@@ -38,7 +38,7 @@ extern "C" {
 #include "global/config.h"
 #include "global/debug.h"
 #include "projectmodel.h"
-#include "ui/colorlabel.h"
+#include "core/colorlabel.h"
 #include "ui/icons.h"
 
 QString get_interlacing_name(int interlacing) {

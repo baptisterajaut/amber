@@ -34,8 +34,8 @@
 #include "project/previewgenerator.h"
 #include "rendering/renderfunctions.h"
 
+#include <QCoreApplication>
 #include <QFile>
-#include <QTreeWidgetItem>
 
 LoadThread::LoadThread(const QString& filename, bool autorecovery)
     : filename_(filename),
@@ -106,14 +106,14 @@ static void load_effect_create(QXmlStreamReader& stream, Clip* c, const EffectMe
     EffectPtr e = meta ? EffectPtr(Effect::Create(c, meta)) : EffectPtr(new VoidEffect(c, effect_name));
     e->SetEnabled(effect_enabled);
     e->load(stream);
-    e->moveToThread(QApplication::instance()->thread());
+    e->moveToThread(QCoreApplication::instance()->thread());
     c->effects.append(e);
   } else {
     TransitionPtr t = Transition::Create(c, nullptr, meta);
     if (effect_length > -1) t->set_length(effect_length);
     t->SetEnabled(effect_enabled);
     t->load(stream);
-    t->moveToThread(QApplication::instance()->thread());
+    t->moveToThread(QCoreApplication::instance()->thread());
     if (type == kTransitionOpening) {
       c->opening_transition = t;
     } else {

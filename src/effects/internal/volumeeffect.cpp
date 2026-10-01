@@ -21,11 +21,7 @@
 #include "volumeeffect.h"
 
 #include <stdint.h>
-#include <QGridLayout>
-#include <QLabel>
 #include <QtMath>
-
-#include "ui/collapsiblewidget.h"
 
 VolumeEffect::VolumeEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   EffectRow* volume_row = new EffectRow(this, tr("Volume"));

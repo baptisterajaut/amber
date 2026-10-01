@@ -5,9 +5,9 @@
 #include <QTextDocument>
 #include <QtMath>
 
+#include "core/blur.h"
 #include "engine/clip.h"
 #include "rendering/renderthread.h"
-#include "ui/blur.h"
 
 SubtitleEffect::SubtitleEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   SetFlags(Effect::SuperimposeFlag);
@@ -208,7 +208,7 @@ void SubtitleEffect::DrawSubtitleShadow(QPainter& p, QTextDocument& td, const QR
   int blur_softness = qFloor(shadow_softness_field_->GetDoubleAt(timecode));
   if (blur_softness > 0) {
     p.end();
-    amber::ui::blur(img, img.rect(), blur_softness, true);
+    amber::blur(img, img.rect(), blur_softness, true);
     p.begin(&img);
     p.setRenderHint(QPainter::Antialiasing);
     p.translate(translate_x + sx, translate_y + sy);

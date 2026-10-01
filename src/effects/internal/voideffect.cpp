@@ -21,7 +21,6 @@
 #include "voideffect.h"
 
 #include <QXmlStreamReader>
-#include <QLabel>
 #include <QFile>
 
 #include "global/debug.h"

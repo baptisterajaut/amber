@@ -20,8 +20,6 @@
 
 #include "shakeeffect.h"
 
-#include <QGridLayout>
-#include <QLabel>
 #include <QtMath>
 
 #include "engine/clip.h"

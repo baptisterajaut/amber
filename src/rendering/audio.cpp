@@ -28,10 +28,10 @@
 #include "rendering/recordingtap.h"
 #include "rendering/renderfunctions.h"
 
-#include <QApplication>
 #include <QAudioDevice>
 #include <QAudioSink>
 #include <QAudioSource>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QMediaDevices>
@@ -96,7 +96,7 @@ void init_audio() {
   QAudioDevice info = get_audio_device(true);
 
   audio_output = new QAudioSink(info, audio_format);
-  audio_output->moveToThread(QApplication::instance()->thread());
+  audio_output->moveToThread(QCoreApplication::instance()->thread());
 
   // Cap the device-side buffer at ~100ms (default is 250ms+, backend-dependent).
   // Audio already pushed into the device keeps playing across pause/play/seek; with a
@@ -445,7 +445,7 @@ bool start_recording(const QString& project_filename) {
   recording_tap = new RecordingTap(&output_recording, audio_format.channelCount(),
                                    audio_format.bytesPerSample() * 8);
   recording_tap->open(QIODevice::WriteOnly);
-  QObject::connect(recording_tap, &RecordingTap::peaksAvailable, qApp,
+  QObject::connect(recording_tap, &RecordingTap::peaksAvailable, QCoreApplication::instance(),
                    [](const QVector<double>& peaks) {
                      if (amber::app_ctx) amber::app_ctx->setAudioMonitorValues(peaks);
                    },

@@ -20,28 +20,15 @@
 
 #include "texteffect.h"
 
-#include <QColorDialog>
-#include <QComboBox>
 #include <QFontDatabase>
-#include <QGridLayout>
-#include <QLabel>
-#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
-#include <QPushButton>
-#include <QTextEdit>
-#include <QWidget>
 #include <QtMath>
 
+#include "core/blur.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "global/config.h"
-#include "ui/blur.h"
-#include "ui/collapsiblewidget.h"
-#include "ui/colorbutton.h"
-#include "ui/comboboxex.h"
-#include "ui/fontcombobox.h"
-#include "ui/labelslider.h"
 
 TextEffect::TextEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   SetFlags(Effect::SuperimposeFlag);
@@ -213,7 +200,7 @@ void TextEffect::DrawShadow(QPainter& p, const QPainterPath& path, double timeco
   p.drawPath(shadow_path);
 
   int blurSoftness = qFloor(shadow_softness->GetDoubleAt(timecode));
-  if (blurSoftness > 0) amber::ui::blur(img, img.rect(), blurSoftness, true);
+  if (blurSoftness > 0) amber::blur(img, img.rect(), blurSoftness, true);
 }
 
 void TextEffect::DrawOutline(QPainter& p, const QPainterPath& path, double timecode) {

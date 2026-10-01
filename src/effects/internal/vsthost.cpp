@@ -24,7 +24,6 @@
 
 #include <QDialog>
 #include <QFile>
-#include <QPushButton>
 #include <QWindow>
 #include <QXmlStreamWriter>
 

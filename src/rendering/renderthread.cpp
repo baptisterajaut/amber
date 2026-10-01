@@ -20,7 +20,6 @@
 
 #include "renderthread.h"
 
-#include <QApplication>
 #include <QDateTime>
 #include <QDebug>
 #include <QFile>

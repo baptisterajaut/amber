@@ -28,10 +28,8 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 
-#include <QApplication>
 #include <QDateTime>
 #include <QFile>
-#include <QPainter>
 #include <QtMath>
 
 #include "core/appcontext.h"

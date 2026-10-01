@@ -20,7 +20,6 @@
 
 #include "solideffect.h"
 
-#include <QComboBox>
 #include <QImage>
 #include <QPainter>
 #include <QVariant>
