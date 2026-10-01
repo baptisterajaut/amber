@@ -1,6 +1,8 @@
 #ifndef TEST_APPCONTEXT_STUB_H
 #define TEST_APPCONTEXT_STUB_H
 
+#include <QIcon>
+
 #include "core/appcontext.h"
 
 class TestAppContext : public AppContext {
@@ -25,11 +27,15 @@ class TestAppContext : public AppContext {
   void setModified(bool) override {}
   void updateUi(bool) override {}
   int showMessage(const QString&, const QString&, int) override { return 0; }
-  bool showQuestion(const QString&, const QString&) override { return false; }
+  bool showQuestion(const QString&, const QString&, bool) override { return false; }
   QString showSaveFileDialog(const QString&, const QString&) override { return {}; }
   QString showOpenFileDialog(const QString&, const QString&) override { return {}; }
   void clearViewerMedia() override {}
   QWidget* getMainWindow() override { return nullptr; }
+  void addRecentProject(const QString&) override {}
+  void setMediaIcon(Media*, int) override {}
+  void stopMediaThrobber(Media*) override {}
+  QIcon mediaTypeIcon(int) override { return {}; }
 };
 
 #endif  // TEST_APPCONTEXT_STUB_H

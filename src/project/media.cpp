@@ -31,6 +31,7 @@ extern "C" {
 #include <QPainter>
 #include <QBrush>
 
+#include "core/appcontext.h"
 #include "engine/sequence.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
@@ -39,7 +40,6 @@ extern "C" {
 #include "global/debug.h"
 #include "projectmodel.h"
 #include "core/colorlabel.h"
-#include "ui/icons.h"
 
 QString get_interlacing_name(int interlacing) {
   switch (interlacing) {
@@ -91,7 +91,6 @@ void Media::set_footage(FootagePtr f) {
 }
 
 void Media::set_sequence(SequencePtr s) {
-  set_icon(amber::icon::MediaSequence);
   type = MEDIA_TYPE_SEQUENCE;
   object = VoidPtr(s);
   if (s != nullptr) {
@@ -103,7 +102,6 @@ void Media::set_folder() {
   if (folder_name.isEmpty()) {
     folder_name = QCoreApplication::translate("Media", "New Folder");
   }
-  set_icon(amber::icon::MediaFolder);
   type = MEDIA_TYPE_FOLDER;
   object = nullptr;
 }
@@ -336,6 +334,9 @@ QVariant Media::data(int column, int role) {
           if (f->video_tracks.size() > 0 && f->video_tracks.at(0).preview_done) {
             base_icon = QIcon(QPixmap::fromImage(f->video_tracks.at(0).video_preview));
           }
+        } else if (amber::app_ctx != nullptr) {
+          // Folder/sequence icons are UI resources: the UI maps the item type to its icon
+          base_icon = amber::app_ctx->mediaTypeIcon(get_type());
         }
         if (amber::CurrentConfig.show_color_labels && color_label_ > 0) {
           QPixmap px = base_icon.pixmap(32, 32);

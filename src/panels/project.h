@@ -40,10 +40,6 @@
 
 #include "ui/sourcetable.h"
 
-#define LOAD_TYPE_VERSION 69
-#define LOAD_TYPE_URL 70
-#define LOAD_TYPE_PREVIEW_RES 71
-
 SequencePtr create_sequence_from_media(QVector<amber::timeline::MediaImportData>& media_list);
 
 QString get_channel_layout_name(int channels, uint64_t layout);

@@ -85,17 +85,47 @@ AmberGlobal::AmberGlobal()
       panel_project->save_project(true);
     }
   });
+
+  // UI refresh for project state changes. The state lives in ProjectIO and is changed there, by UI and engine code
+  // alike; these handlers run once per change. Direct connections keep the refresh synchronous with the change, as it
+  // was when the setters below did it inline.
+  connect(
+      project_io_, &ProjectIO::projectFilenameChanged, this,
+      [](const QString& path) {
+        amber::ActiveProjectFilename = path;
+
+        // update main window title to reflect new project filename
+        if (amber::MainWindow != nullptr) amber::MainWindow->updateTitle();
+      },
+      Qt::DirectConnection);
+
+  connect(
+      project_io_, &ProjectIO::modifiedChanged, this,
+      [this](bool modified) {
+        if (amber::MainWindow == nullptr) return;
+        amber::MainWindow->setWindowModified(modified);
+        changed_since_last_autorecovery = modified;
+      },
+      Qt::DirectConnection);
+
+  connect(
+      project_io_, &ProjectIO::sequenceChanged, this,
+      [](SequencePtr) {
+        panel_graph_editor->set_row(nullptr);
+        panel_effect_controls->Clear(true);
+        panel_sequence_viewer->set_main_sequence();
+        panel_sequence_viewer->update_preview_res_label();
+        panel_timeline->update_sequence();
+        panel_timeline->setFocus();
+      },
+      Qt::DirectConnection);
 }
 
 const QString& AmberGlobal::get_project_file_filter() { return project_file_filter; }
 
 void AmberGlobal::update_project_filename(const QString& s) {
-  // set filename to s
-  amber::ActiveProjectFilename = s;
+  // UI refresh (amber::ActiveProjectFilename, window title) happens in the projectFilenameChanged handler
   project_io_->setProjectFilename(s);
-
-  // update main window title to reflect new project filename
-  if (amber::MainWindow != nullptr) amber::MainWindow->updateTitle();
 }
 
 void AmberGlobal::check_for_autorecovery_file() {
@@ -132,10 +162,8 @@ void AmberGlobal::set_rendering_state(bool rendering) {
 }
 
 void AmberGlobal::set_modified(bool modified) {
+  // UI refresh happens in the modifiedChanged handler
   project_io_->setModified(modified);
-  if (amber::MainWindow == nullptr) return;
-  amber::MainWindow->setWindowModified(modified);
-  changed_since_last_autorecovery = modified;
 }
 
 bool AmberGlobal::is_modified() { return project_io_->isModified(); }
@@ -386,37 +414,17 @@ void AmberGlobal::open_preferences() {
   pd.exec();
 }
 
-void AmberGlobal::set_sequence(SequencePtr s, bool record_history) {
-  project_io_->setSequence(s, record_history);
-
-  panel_graph_editor->set_row(nullptr);
-  panel_effect_controls->Clear(true);
-  panel_sequence_viewer->set_main_sequence();
-  panel_sequence_viewer->update_preview_res_label();
-  panel_timeline->update_sequence();
-  panel_timeline->setFocus();
-}
+// UI refresh for the three functions below happens in the sequenceChanged handler
+void AmberGlobal::set_sequence(SequencePtr s, bool record_history) { project_io_->setSequence(s, record_history); }
 
 void AmberGlobal::go_back_sequence() {
   if (!project_io_->canGoBack()) return;
   project_io_->goBackSequence();
-
-  panel_graph_editor->set_row(nullptr);
-  panel_effect_controls->Clear(true);
-  panel_sequence_viewer->set_main_sequence();
-  panel_timeline->update_sequence();
-  panel_timeline->setFocus();
 }
 
 void AmberGlobal::go_to_sequence_level(int index) {
   if (index < 0 || index >= project_io_->sequenceHistory().size()) return;
   project_io_->goToSequenceLevel(index);
-
-  panel_graph_editor->set_row(nullptr);
-  panel_effect_controls->Clear(true);
-  panel_sequence_viewer->set_main_sequence();
-  panel_timeline->update_sequence();
-  panel_timeline->setFocus();
 }
 
 bool AmberGlobal::can_go_back() const { return project_io_->canGoBack(); }

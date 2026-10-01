@@ -39,6 +39,14 @@ DebugDialog::DebugDialog(QWidget *parent) : QDialog(parent) {
   layout->addWidget(textEdit);
 
   Retranslate();
+
+  // The log only refreshes while visible; showEvent() catches up when the dialog is shown
+  connect(
+      debug_log_notifier(), &DebugLogNotifier::messageLogged, this,
+      [this]() {
+        if (isVisible()) update_log();
+      },
+      Qt::QueuedConnection);
 }
 
 void DebugDialog::Retranslate()

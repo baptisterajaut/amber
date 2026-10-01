@@ -185,6 +185,7 @@ add_library(amber-engine OBJECT
   project/footage.cpp project/footage.h
   project/loadthread.cpp project/loadthread.h
   project/media.cpp project/media.h
+  project/previewgenerator.cpp project/previewgenerator.h
   project/projectelements.h
   project/projectmodel.cpp project/projectmodel.h
   # global/ (config/projectio/debug)
@@ -250,7 +251,6 @@ set(UI_SOURCES
   panels/undohistorypanel.cpp panels/undohistorypanel.h
   panels/timeline.cpp panels/timeline_clipboard.cpp panels/timeline_layout.cpp panels/timeline_layout.h panels/timeline_splitting.cpp panels/timeline_ui.cpp panels/timeline.h
   panels/viewer.cpp panels/viewer.h
-  project/previewgenerator.cpp project/previewgenerator.h
   project/projectfilter.cpp project/projectfilter.h
   project/proxygenerator.cpp project/proxygenerator.h
   project/sourcescommon.cpp project/sourcescommon.h

@@ -20,14 +20,13 @@
 
 #include "previewgenerator.h"
 
+#include "core/appcontext.h"
 #include "core/path.h"
+#include "engine/sequence.h"
 #include "global/config.h"
 #include "global/debug.h"
-#include "panels/project.h"
-#include "panels/viewer.h"
 #include "project/footage.h"
 #include "project/media.h"
-#include "ui/mediaiconservice.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -35,7 +34,6 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QSemaphore>
-#include <QTreeWidgetItem>
 #include <QtMath>
 
 QSemaphore sem(5);  // only 5 preview generators can run at one time
@@ -59,7 +57,7 @@ PreviewGenerator::PreviewGenerator(Media* i) : QThread(nullptr) {
   connect(this, &QThread::finished, this, &QObject::deleteLater);
 
   // set up throbber animation
-  amber::media_icon_service->SetMediaIcon(media_, ICON_TYPE_LOADING);
+  if (amber::app_ctx) amber::app_ctx->setMediaIcon(media_, ICON_TYPE_LOADING);
 
   start(QThread::LowPriority);
 }
@@ -228,13 +226,13 @@ void PreviewGenerator::finalize_media() {
       invalidate_media(tr("Failed to find any valid video/audio streams"));
     } else if (!footage_->video_tracks.isEmpty() && !contains_still_image_) {
       // VIDEO
-      amber::media_icon_service->SetMediaIcon(media_, ICON_TYPE_VIDEO);
+      if (amber::app_ctx) amber::app_ctx->setMediaIcon(media_, ICON_TYPE_VIDEO);
     } else if (!footage_->audio_tracks.isEmpty()) {
       // AUDIO
-      amber::media_icon_service->SetMediaIcon(media_, ICON_TYPE_AUDIO);
+      if (amber::app_ctx) amber::app_ctx->setMediaIcon(media_, ICON_TYPE_AUDIO);
     } else {
       // IMAGE
-      amber::media_icon_service->SetMediaIcon(media_, ICON_TYPE_IMAGE);
+      if (amber::app_ctx) amber::app_ctx->setMediaIcon(media_, ICON_TYPE_IMAGE);
     }
 
     if (footage_is_ready) {
@@ -251,7 +249,7 @@ void PreviewGenerator::finalize_media() {
 
 void PreviewGenerator::invalidate_media(const QString& error_msg) {
   media_->update_tooltip(error_msg);
-  amber::media_icon_service->SetMediaIcon(media_, ICON_TYPE_ERROR);
+  if (amber::app_ctx) amber::app_ctx->setMediaIcon(media_, ICON_TYPE_ERROR);
   footage_->invalid = true;
   footage_->ready_lock.unlock();
 }
@@ -783,7 +781,7 @@ void PreviewGenerator::cancel() {
   cancelled_ = true;
   wait();
   // finalize_media()/invalidate_media() skip the icon when cancelled: drop the throbber entry here
-  if (amber::media_icon_service) amber::media_icon_service->StopThrobberFor(media_);
+  if (amber::app_ctx) amber::app_ctx->stopMediaThrobber(media_);
 }
 
 void PreviewGenerator::AnalyzeMedia(Media* m) {

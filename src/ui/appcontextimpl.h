@@ -24,12 +24,16 @@ class AppContextImpl : public AppContext {
   void setModified(bool modified) override;
   void updateUi(bool modified) override;
   int showMessage(const QString& title, const QString& text, int type) override;
-  bool showQuestion(const QString& title, const QString& text) override;
+  bool showQuestion(const QString& title, const QString& text, bool warning) override;
   QString showSaveFileDialog(const QString& title, const QString& filter) override;
   QString showOpenFileDialog(const QString& title, const QString& filter) override;
   void clearViewerMedia() override;
   QWidget* getMainWindow() override;
   void clearGraphEditorIfRow(EffectRow* row) override;
+  void addRecentProject(const QString& filename) override;
+  void setMediaIcon(Media* media, int icon_type) override;
+  void stopMediaThrobber(Media* media) override;
+  QIcon mediaTypeIcon(int media_type) override;
 };
 
 #endif  // UI_APPCONTEXTIMPL_H

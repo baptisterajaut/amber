@@ -22,7 +22,6 @@
 #define LOADTHREAD_H
 
 #include <QDir>
-#include <QMessageBox>
 #include <QMutex>
 #include <QPair>
 #include <QThread>
@@ -41,13 +40,13 @@ class LoadThread : public QThread {
  public slots:
   void cancel();
  signals:
-  void start_question(const QString& title, const QString& text, int buttons);
+  void start_question(const QString& title, const QString& text);
   void success();
   void error();
   void report_progress(int p);
   void found_invalid_footage(QVector<QPair<Media*, Footage*>> invalid);
  private slots:
-  void question_func(const QString& title, const QString& text, int buttons);
+  void question_func(const QString& title, const QString& text);
   void error_func();
   void success_func();
 
@@ -86,7 +85,7 @@ class LoadThread : public QThread {
   void read_next_start_element(QXmlStreamReader& stream);
   void update_current_element_count(QXmlStreamReader& stream);
 
-  void show_message(const QString& title, const QString& body, int buttons);
+  void show_message(const QString& title, const QString& body);
 
   SequencePtr open_seq;
   QVector<Media*> loaded_media_items;
@@ -114,7 +113,8 @@ class LoadThread : public QThread {
   bool question_answered_{false};
   bool xml_error;
 
-  QMessageBox::StandardButton question_btn;
+  // Answer to the last show_message() question: true = Yes
+  bool question_answer_{false};
 };
 
 #endif  // LOADTHREAD_H

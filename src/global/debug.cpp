@@ -26,12 +26,16 @@
 #include <QDir>
 #include <QMutex>
 
-#include "dialogs/debugdialog.h"
-
 QString debug_info;
 QMutex debug_mutex;
 QFile debug_file;
 QTextStream debug_stream;
+
+DebugLogNotifier* debug_log_notifier() {
+  // CBA: intentionally leaked so logging during static destruction never touches a destroyed object
+  static auto* notifier = new DebugLogNotifier();
+  return notifier;
+}
 
 void open_debug_file() {
   QDir debug_dir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
@@ -100,9 +104,7 @@ void debug_message_handler(QtMsgType type, const QMessageLogContext &context, co
   debug_info.append(QString("<font color='%1'><b>[%2]</b> %3 (%4:%5, %6)</font><br>")
                      .arg(fontColor, msgTag, localMsg, context.file, QString::number(context.line), context.function));
   fflush(stderr);
-  if (amber::DebugDialog != nullptr && amber::DebugDialog->isVisible()) {
-    QMetaObject::invokeMethod(amber::DebugDialog, "update_log", Qt::QueuedConnection);
-  }
+  emit debug_log_notifier()->messageLogged();
   debug_mutex.unlock();
 }
 

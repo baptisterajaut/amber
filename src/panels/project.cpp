@@ -425,37 +425,14 @@ void Project::new_sequence() {
 }
 
 MediaPtr Project::create_sequence_internal(ComboAction* ca, SequencePtr s, bool open, Media* parent) {
-  MediaPtr item = std::make_shared<Media>();
-  item->set_sequence(s);
-
-  if (ca != nullptr) {
-    ca->append(new AddMediaCommand(item, parent));
-
-    if (open) {
-      ca->append(new ChangeSequenceAction(s));
-    }
-
-  } else {
-    amber::project_model.appendChild(parent, item);
-
-    if (open) {
-      amber::Global->set_sequence(s);
-    }
-  }
-
-  return item;
+  return amber::create_sequence_item(ca, s, open, parent);
 }
 
 QString Project::get_file_name_from_path(const QString& path) { return path.mid(path.lastIndexOf('/') + 1); }
 
 bool Project::is_focused() { return tree_view->hasFocus() || icon_view->hasFocus(); }
 
-MediaPtr Project::create_folder_internal(QString name) {
-  MediaPtr item = std::make_shared<Media>();
-  item->set_folder();
-  item->set_name(name);
-  return item;
-}
+MediaPtr Project::create_folder_internal(QString name) { return amber::create_folder_item(name); }
 
 Media* Project::item_to_media(const QModelIndex& index) {
   return static_cast<Media*>(sorter.mapToSource(index).internalPointer());

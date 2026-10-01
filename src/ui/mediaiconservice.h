@@ -25,15 +25,8 @@
 #include <QTimer>
 #include <QMutex>
 
+#include "core/appcontext.h"  // IconType
 #include "project/media.h"
-
-enum IconType {
-  ICON_TYPE_VIDEO,
-  ICON_TYPE_AUDIO,
-  ICON_TYPE_IMAGE,
-  ICON_TYPE_LOADING,
-  ICON_TYPE_ERROR
-};
 
 class MediaIconService : public QObject {
   Q_OBJECT

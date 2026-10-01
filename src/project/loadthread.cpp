@@ -21,11 +21,10 @@
 #include "loadthread.h"
 
 #include "core/appcontext.h"
-#include "global/global.h"
-
-#include "panels/panels.h"
+#include "global/projectio.h"
 
 #include "project/projectelements.h"
+#include "project/projectmodel.h"
 
 #include "effects/effectloaders.h"
 #include "effects/internal/voideffect.h"
@@ -36,6 +35,10 @@
 
 #include <QCoreApplication>
 #include <QFile>
+
+#define LOAD_TYPE_VERSION 69
+#define LOAD_TYPE_URL 70
+#define LOAD_TYPE_PREVIEW_RES 71
 
 LoadThread::LoadThread(const QString& filename, bool autorecovery)
     : filename_(filename),
@@ -173,9 +176,9 @@ void LoadThread::update_current_element_count(QXmlStreamReader& stream) {
   }
 }
 
-void LoadThread::show_message(const QString& title, const QString& body, int buttons) {
+void LoadThread::show_message(const QString& title, const QString& body) {
   question_answered_ = false;
-  emit start_question(title, body, buttons);
+  emit start_question(title, body);
   while (!question_answered_) {
     waitCond.wait(&mutex);
   }
@@ -278,7 +281,7 @@ void LoadThread::parse_clip_links(QXmlStreamReader& stream, Clip* c) {
 }
 
 void LoadThread::parse_folder(QXmlStreamReader& stream) {
-  MediaPtr folder = panel_project->create_folder_internal(nullptr);
+  MediaPtr folder = amber::create_folder_item(QString());
   folder->temp_id2 = 0;
   for (int j = 0; j < stream.attributes().size(); j++) {
     const QXmlStreamAttribute& attr = stream.attributes().at(j);
@@ -558,10 +561,9 @@ bool LoadThread::correct_clip_links(SequencePtr s) {
 
         show_message(tr("Invalid Clip Link"),
                      tr("This project contains an invalid clip link. It may be corrupt. Would you like "
-                        "to continue loading it?"),
-                     QMessageBox::Yes | QMessageBox::No);
+                        "to continue loading it?"));
 
-        if (question_btn == QMessageBox::No) {
+        if (!question_answer_) {
           s.reset();
           return false;
         }
@@ -593,7 +595,7 @@ bool LoadThread::parse_sequence(QXmlStreamReader& stream, const QStringView& chi
 
   if (!correct_clip_links(s)) return false;
 
-  MediaPtr m = panel_project->create_sequence_internal(nullptr, s, false, parent);
+  MediaPtr m = amber::create_sequence_item(nullptr, s, false, parent);
   if (m) {
     m->set_color_label(color_label);
   }
@@ -610,9 +612,8 @@ bool LoadThread::handle_scalar_load_type(QXmlStreamReader& stream, int type) {
     if (proj_version < amber::kMinimumSaveVersion || proj_version > amber::kSaveVersion) {
       show_message(tr("Version Mismatch"),
                    tr("This project was saved in a different version of Amber and may not be fully compatible with "
-                      "this version. Would you like to attempt loading it anyway?"),
-                   QMessageBox::Yes | QMessageBox::No);
-      if (question_btn == QMessageBox::No) {
+                      "this version. Would you like to attempt loading it anyway?"));
+      if (!question_answer_) {
         show_err = false;
         return false;
       }
@@ -852,10 +853,9 @@ void LoadThread::cancel() {
   mutex.unlock();
 }
 
-void LoadThread::question_func(const QString& title, const QString& text, int buttons) {
+void LoadThread::question_func(const QString& title, const QString& text) {
   mutex.lock();
-  question_btn = QMessageBox::warning(amber::app_ctx->getMainWindow(), title, text,
-                                      static_cast<enum QMessageBox::StandardButton>(buttons));
+  question_answer_ = amber::app_ctx->showQuestion(title, text, true);
   question_answered_ = true;
   waitCond.wakeAll();
   mutex.unlock();
@@ -886,13 +886,13 @@ void LoadThread::success_func() {
       counter++;
     }
 
-    amber::Global->update_project_filename(orig_filename);
+    amber::project_io->setProjectFilename(orig_filename);
   } else {
-    panel_project->add_recent_project(filename_);
+    amber::app_ctx->addRecentProject(filename_);
   }
 
-  amber::Global->set_modified(autorecovery_);
+  amber::project_io->setModified(autorecovery_);
   if (open_seq != nullptr) {
-    amber::Global->set_sequence(open_seq);
+    amber::project_io->setSequence(open_seq);
   }
 }

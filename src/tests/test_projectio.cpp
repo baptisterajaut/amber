@@ -28,12 +28,16 @@ class StubAppContext : public AppContext {
   void setModified(bool) override {}
   void updateUi(bool) override {}
   int showMessage(const QString&, const QString&, int) override { return 0; }
-  bool showQuestion(const QString&, const QString&) override { return true; }
+  bool showQuestion(const QString&, const QString&, bool) override { return true; }
   QString showSaveFileDialog(const QString&, const QString&) override { return {}; }
   QString showOpenFileDialog(const QString&, const QString&) override { return {}; }
   void clearViewerMedia() override {}
   QWidget* getMainWindow() override { return nullptr; }
   void clearGraphEditorIfRow(EffectRow*) override {}
+  void addRecentProject(const QString&) override {}
+  void setMediaIcon(Media*, int) override {}
+  void stopMediaThrobber(Media*) override {}
+  QIcon mediaTypeIcon(int) override { return {}; }
 };
 
 class TestProjectIO : public QObject {

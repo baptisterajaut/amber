@@ -20,7 +20,7 @@
 
 #include "undo_timeline.h"
 
-#include "global/global.h"
+#include "global/projectio.h"
 #include "project/footage.h"
 #include "project/media.h"
 #include "engine/clip.h"
@@ -66,20 +66,20 @@ ChangeSequenceAction::ChangeSequenceAction(SequencePtr s) {
 }
 
 void ChangeSequenceAction::doUndo() {
-  if (!amber::Global) {
-    qWarning() << "ChangeSequenceAction::doUndo: Global is null";
+  if (!amber::project_io) {
+    qWarning() << "ChangeSequenceAction::doUndo: project_io is null";
     return;
   }
-  amber::Global->set_sequence(old_sequence);
+  amber::project_io->setSequence(old_sequence);
 }
 
 void ChangeSequenceAction::doRedo() {
-  if (!amber::Global) {
-    qWarning() << "ChangeSequenceAction::doRedo: Global is null";
+  if (!amber::project_io) {
+    qWarning() << "ChangeSequenceAction::doRedo: project_io is null";
     return;
   }
   old_sequence = amber::ActiveSequence;
-  amber::Global->set_sequence(new_sequence);
+  amber::project_io->setSequence(new_sequence);
 }
 
 SetTimelineInOutCommand::SetTimelineInOutCommand(Sequence* s, bool enabled, long in, long out) {
@@ -205,8 +205,8 @@ void EditSequenceCommand::update() {
     }
   }
 
-  if (amber::ActiveSequence == seq && amber::Global) {
-    amber::Global->set_sequence(seq);
+  if (amber::ActiveSequence == seq && amber::project_io) {
+    amber::project_io->setSequence(seq);
   }
 }
 

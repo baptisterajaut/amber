@@ -25,6 +25,8 @@
 
 #include "project/media.h"
 
+class ComboAction;
+
 class ProjectModel : public QAbstractItemModel
 {
   Q_OBJECT
@@ -64,6 +66,19 @@ private:
 
 namespace amber {
 extern ProjectModel project_model;
+
+/**
+ * @brief Create a folder item. It is not added to project_model.
+ */
+MediaPtr create_folder_item(const QString& name);
+
+/**
+ * @brief Create an item wrapping sequence s, to live under parent (nullptr = root)
+ *
+ * With an undo action, adding the item (and opening the sequence if open is true) is appended to ca. Without one, the
+ * item is appended to project_model immediately and, if open is true, the sequence becomes the active sequence.
+ */
+MediaPtr create_sequence_item(ComboAction* ca, SequencePtr s, bool open, Media* parent);
 }
 
 #endif // PROJECTMODEL_H

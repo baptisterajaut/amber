@@ -22,6 +22,21 @@
 #define DEBUG_H
 
 #include <QDebug>
+#include <QObject>
+
+/**
+ * @brief Notifies listeners (e.g. the debug log dialog) that a message was appended to get_debug_str()
+ *
+ * messageLogged() is emitted from whichever thread logged the message, with the log mutex held. Listeners must connect
+ * with Qt::QueuedConnection (a direct slot that logs would deadlock).
+ */
+class DebugLogNotifier : public QObject {
+  Q_OBJECT
+signals:
+  void messageLogged();
+};
+
+DebugLogNotifier* debug_log_notifier();
 
 void debug_message_handler(QtMsgType type, const QMessageLogContext &context, const QString &msg);
 const QString& get_debug_str();

@@ -1,13 +1,17 @@
 #include "appcontextimpl.h"
 
 #include "global/global.h"
+#include "global/projectio.h"
 #include "panels/effectcontrols.h"
 #include "panels/grapheditor.h"
 #include "panels/panels.h"
 #include "panels/project.h"
 #include "panels/timeline.h"
 #include "panels/viewer.h"
+#include "project/media.h"
 #include "ui/audiomonitor.h"
+#include "ui/icons.h"
+#include "ui/mediaiconservice.h"
 #include "ui/viewerwidget.h"
 
 #include <QFileDialog>
@@ -121,7 +125,10 @@ int AppContextImpl::showMessage(const QString& title, const QString& text, int t
   return box.exec();
 }
 
-bool AppContextImpl::showQuestion(const QString& title, const QString& text) {
+bool AppContextImpl::showQuestion(const QString& title, const QString& text, bool warning) {
+  if (warning) {
+    return QMessageBox::warning(amber::MainWindow, title, text, QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes;
+  }
   return QMessageBox::question(nullptr, title, text, QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes;
 }
 
@@ -148,4 +155,24 @@ void AppContextImpl::clearGraphEditorIfRow(EffectRow* row) {
   if (panel_graph_editor != nullptr && panel_graph_editor->get_row() == row) {
     panel_graph_editor->set_row(nullptr);
   }
+}
+
+void AppContextImpl::addRecentProject(const QString& filename) { amber::project_io->addRecentProject(filename); }
+
+void AppContextImpl::setMediaIcon(Media* media, int icon_type) {
+  if (amber::media_icon_service) amber::media_icon_service->SetMediaIcon(media, icon_type);
+}
+
+void AppContextImpl::stopMediaThrobber(Media* media) {
+  if (amber::media_icon_service) amber::media_icon_service->StopThrobberFor(media);
+}
+
+QIcon AppContextImpl::mediaTypeIcon(int media_type) {
+  switch (media_type) {
+    case MEDIA_TYPE_SEQUENCE:
+      return amber::icon::MediaSequence;
+    case MEDIA_TYPE_FOLDER:
+      return amber::icon::MediaFolder;
+  }
+  return QIcon();
 }

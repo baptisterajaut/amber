@@ -80,8 +80,8 @@ class TestRenderHarness {
   // (e.g. a committed .mp4 fixture). The harness owns the MediaPtr+FootagePtr —
   // they live until the harness is destroyed (or clear_owned_media() is called).
   //
-  // PreviewGenerator::AnalyzeMedia is a no-op in the test build (test_ui_stubs.cpp),
-  // so we populate Footage::url + Footage::ready=true + a single FootageStream
+  // No probe runs here (PreviewGenerator::AnalyzeMedia is never called), so we
+  // populate Footage::url + Footage::ready=true + a single FootageStream
   // directly. The cacher opens the file via FFmpeg and reads the actual streams;
   // it does not depend on prior analysis.
   Media* import_video_media(const QString& path, int width, int height, double frame_rate);

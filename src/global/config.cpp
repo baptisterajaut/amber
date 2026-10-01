@@ -21,6 +21,7 @@
 #include "config.h"
 
 #include <QFile>
+#include <QRegularExpression>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QtMath>
@@ -290,6 +291,65 @@ void Config::save(QString path) {
 RuntimeConfig::RuntimeConfig()
 
     = default;
+
+long timecode_to_frame(const QString& s, int view, double frame_rate) {
+  QList<QString> list = s.split(QRegularExpression("[:;]"));
+
+  if (view == amber::kTimecodeFrames || (list.size() == 1 && view != amber::kTimecodeMilliseconds)) {
+    return s.toLong();
+  }
+
+  int frRound = qRound(frame_rate);
+  int hours, minutes, seconds, frames;
+
+  if (view == amber::kTimecodeMilliseconds) {
+    long milliseconds = s.toLong();
+
+    hours = milliseconds / 3600000;
+    milliseconds -= (hours * 3600000);
+    minutes = milliseconds / 60000;
+    milliseconds -= (minutes * 60000);
+    seconds = milliseconds / 1000;
+    milliseconds -= (seconds * 1000);
+    frames = qRound64((milliseconds * 0.001) * frame_rate);
+
+    seconds = qRound64(seconds * frame_rate);
+    minutes = qRound64(minutes * frame_rate * 60);
+    hours = qRound64(hours * frame_rate * 3600);
+  } else {
+    hours = ((list.size() > 0) ? list.at(0).toInt() : 0) * frRound * 3600;
+    minutes = ((list.size() > 1) ? list.at(1).toInt() : 0) * frRound * 60;
+    seconds = ((list.size() > 2) ? list.at(2).toInt() : 0) * frRound;
+    frames = (list.size() > 3) ? list.at(3).toInt() : 0;
+  }
+
+  int f = (frames + seconds + minutes + hours);
+
+  if ((view == amber::kTimecodeDrop || view == amber::kTimecodeMilliseconds) && frame_rate_is_droppable(frame_rate)) {
+    // return drop
+    int d;
+    int m;
+
+    int dropFrames =
+        qRound(frame_rate *
+               .066666);  // Number of frames to drop on the minute marks is the nearest integer to 6% of the framerate
+    int framesPer10Minutes = qRound(frame_rate * 60 * 10);         // Number of frames per ten minutes
+    int framesPerMinute = (qRound(frame_rate) * 60) - dropFrames;  // Number of frames per minute is the round of the
+                                                                   // framerate * 60 minus the number of dropped frames
+
+    d = f / framesPer10Minutes;
+    f -= dropFrames * 9 * d;
+
+    m = f % framesPer10Minutes;
+
+    if (m > dropFrames) {
+      f -= (dropFrames * ((m - dropFrames) / framesPerMinute));
+    }
+  }
+
+  // return non-drop
+  return f;
+}
 
 QString frame_to_timecode(long f, int view, double frame_rate) {
   if (view == amber::kTimecodeFrames) {

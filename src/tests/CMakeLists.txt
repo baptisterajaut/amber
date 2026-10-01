@@ -113,3 +113,10 @@ target_include_directories(amber-test-effects-gpu PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_definitions(amber-test-effects-gpu PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(amber-test-effects-gpu PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-effects-gpu COMMAND amber-test-effects-gpu)
+
+# Headless project loading — LoadThread on a hand-written .ove, no UI code linked beyond test_ui_stubs.cpp
+add_executable(amber-test-loadthread test_loadthread.cpp ${AMBER_TEST_STUBS})
+target_include_directories(amber-test-loadthread PRIVATE ${CMAKE_SOURCE_DIR})
+target_compile_definitions(amber-test-loadthread PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(amber-test-loadthread PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-loadthread COMMAND amber-test-loadthread)

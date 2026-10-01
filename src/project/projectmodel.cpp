@@ -21,10 +21,41 @@
 #include "projectmodel.h"
 
 #include "core/appcontext.h"
+#include "engine/undo/undo.h"
 #include "global/debug.h"
+#include "global/projectio.h"
 #include "project/media.h"
 
 ProjectModel amber::project_model;
+
+MediaPtr amber::create_folder_item(const QString& name) {
+  MediaPtr item = std::make_shared<Media>();
+  item->set_folder();
+  item->set_name(name);
+  return item;
+}
+
+MediaPtr amber::create_sequence_item(ComboAction* ca, SequencePtr s, bool open, Media* parent) {
+  MediaPtr item = std::make_shared<Media>();
+  item->set_sequence(s);
+
+  if (ca != nullptr) {
+    ca->append(new AddMediaCommand(item, parent));
+
+    if (open) {
+      ca->append(new ChangeSequenceAction(s));
+    }
+
+  } else {
+    project_model.appendChild(parent, item);
+
+    if (open) {
+      project_io->setSequence(s);
+    }
+  }
+
+  return item;
+}
 
 ProjectModel::ProjectModel(QObject *parent) : QAbstractItemModel(parent), root_item_(nullptr) { make_root(); }
 
