@@ -427,6 +427,25 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
     ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
     QMatrix4x4 blitMvp;
     blitMvp.ortho(-1, 1, -1, 1, -1, 1);
+    QRhiTexture* lutTexture = nullptr;
+    if (e->needsLut()) {
+      QString lutPath = e->currentLutPath(timecode);
+      if (lutPath != e->loadedLutPath()) {
+        // Upload only happens when the file actually changed, mirroring the
+        // loadedLutPath_ check inside process_lut() itself
+        QRhiResourceUpdateBatch* lutUpload = params.rhi->nextResourceUpdateBatch();
+        lutTexture = e->process_lut(params.rhi, lutUpload, lutPath);
+
+        // Submit the upload via a throwaway pass into the same target the upcoming
+        // rhi_blit is about to fully overwrite anyway, the way apply_superimpose_effect
+        // submits its own texture upload
+        QColor clearColor(0, 0, 0, 0);
+        params.cb->beginPass(res->rt[fbo_switcher], clearColor, {1.0f, 0}, lutUpload);
+        params.cb->endPass();
+      } else {
+        lutTexture = e->currentLutTexture();
+      }
+    }
 
     for (int i = 0; i < e->getIterations(); i++) {
       QByteArray uboData;
@@ -434,7 +453,7 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
       uboData.fill(0);
       e->process_shader(timecode, coords, i, uboData, res->tex[0]->pixelSize());
       rhi_blit(params, res->rt[fbo_switcher], res->rpd, composite_texture, e->vertexShader(), e->fragmentShader(),
-               blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()), 1, nullptr, nullptr,
+               blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()), lutTexture ? 2 : 1, lutTexture, nullptr,
                /*skipClipSpaceCorr=*/true);
       composite_texture = res->tex[fbo_switcher];
       fbo_switcher = !fbo_switcher;
