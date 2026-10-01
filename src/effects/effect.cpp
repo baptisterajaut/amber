@@ -56,6 +56,10 @@
 #include "engine/undo/undostack.h"
 #include "rendering/renderthread.h"
 
+#include "effects/internal/audiobpfiltereffect.h"
+#ifndef NORNNOISE
+	#include "effects/internal/audiornnoiseeffect.h"
+#endif
 #include "effects/internal/audionoiseeffect.h"
 #include "effects/internal/cornerpineffect.h"
 #include "effects/internal/fillleftrighteffect.h"
@@ -111,6 +115,12 @@ EffectPtr Effect::Create(Clip* c, const EffectMeta* em) {
         return std::make_shared<SolidEffect>(c, em);
       case EFFECT_INTERNAL_NOISE:
         return std::make_shared<AudioNoiseEffect>(c, em);
+#ifndef NORNNOISE        
+      case EFFECT_INTERNAL_RNNOISE:
+        return std::make_shared<AudioRNNoiseEffect>(c, em);
+#endif        
+      case EFFECT_INTERNAL_BPFILTER:
+        return std::make_shared<AudioBpFilterEffect>(c, em);
       case EFFECT_INTERNAL_VOLUME:
         return std::make_shared<VolumeEffect>(c, em);
       case EFFECT_INTERNAL_PAN:
@@ -1065,3 +1075,4 @@ qint16 mix_audio_sample(qint16 a, qint16 b) {
   mixed_sample = qMax(qMin(mixed_sample, static_cast<qint32>(INT16_MAX)), static_cast<qint32>(INT16_MIN));
   return static_cast<qint16>(mixed_sample);
 }
+
