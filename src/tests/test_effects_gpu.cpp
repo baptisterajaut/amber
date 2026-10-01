@@ -1,4 +1,4 @@
-#include <QApplication>
+#include <QGuiApplication>
 #include <QSet>
 #include <QSurfaceFormat>
 #include <QTest>
@@ -2155,7 +2155,7 @@ int main(int argc, char* argv[]) {
   fmt.setRenderableType(QSurfaceFormat::OpenGL);
   QSurfaceFormat::setDefaultFormat(fmt);
 
-  QApplication app(argc, argv);
+  QGuiApplication app(argc, argv);
   TestEffectsGpu test;
   return QTest::qExec(&test, argc, argv);
 }

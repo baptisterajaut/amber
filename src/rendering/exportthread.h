@@ -146,4 +146,17 @@ class ExportThread : public QThread {
   void wake();
 };
 
+// Engine side of an export, around ExportThread::start(). GUI thread only: the GL fallback surface and the
+// autorecovery timer belong to it. UI work (pausing playback, moving the viewer's playhead) stays with the caller.
+//
+// prepare_export() puts the audio path in rendering mode at the export sample rate (which also stops autorecovery and
+// freezes the viewer), moves seq's playhead to the export start and aligns the audio buffer with it, closes seq's open
+// clips so the export reopens them, saves an autorecovery file if there are unsaved changes, and on the OpenGL backend
+// hands the thread a GL fallback surface created here. Returns that surface (null on other backends): pass it to
+// finish_export() once the thread has finished.
+QOffscreenSurface* prepare_export(ExportThread* thread, Sequence* seq, const ExportParams& params);
+
+// Leaves rendering mode (restarting autorecovery), clears the audio buffer and deletes gl_surface.
+void finish_export(QOffscreenSurface* gl_surface);
+
 #endif  // EXPORTTHREAD_H

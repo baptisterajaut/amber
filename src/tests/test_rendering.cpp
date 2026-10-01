@@ -1,5 +1,5 @@
 #include <rhi/qrhi.h>
-#include <QApplication>
+#include <QGuiApplication>
 #include <QOffscreenSurface>
 #include <QTest>
 
@@ -99,7 +99,7 @@ void TestRendering::rhiClearAndReadback() {
 }
 
 int main(int argc, char* argv[]) {
-  QApplication app(argc, argv);
+  QGuiApplication app(argc, argv);
   TestRendering test;
   return QTest::qExec(&test, argc, argv);
 }

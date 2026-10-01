@@ -162,8 +162,6 @@ void AppContextImpl::clearViewerMedia() {
   }
 }
 
-QWidget* AppContextImpl::getMainWindow() { return amber::MainWindow; }
-
 QWindow* AppContextImpl::getMainWindowHandle() {
   return amber::MainWindow != nullptr ? amber::MainWindow->windowHandle() : nullptr;
 }

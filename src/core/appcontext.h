@@ -10,7 +10,6 @@ class EffectRow;
 class Effect;
 class Media;
 class QIcon;
-class QWidget;
 class QWindow;
 using MediaPtr = std::shared_ptr<Media>;
 
@@ -48,7 +47,6 @@ class AppContext {
   virtual QString showSaveFileDialog(const QString& title, const QString& filter) = 0;
   virtual QString showOpenFileDialog(const QString& title, const QString& filter) = 0;
   virtual void clearViewerMedia() = 0;
-  virtual QWidget* getMainWindow() = 0;
   // Native window of the main window (transient parent for engine-owned windows); null if none
   virtual QWindow* getMainWindowHandle() = 0;
   virtual void clearGraphEditorIfRow(EffectRow* row) = 0;

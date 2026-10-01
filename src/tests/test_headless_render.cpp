@@ -1,0 +1,460 @@
+// Headless export: loads a hand-written .ove with LoadThread (one video clip and one audio clip, of a Y4M and a WAV the
+// test writes), exports it to .mp4 through prepare_export() + ExportThread exactly as the editor's export dialog does,
+// and decodes the result with FFmpeg.
+//
+// Why not tests/fixtures/t1_yuv_input.mp4: it holds a single frame lasting 33333 us, which Amber's frame math
+// (Footage::get_length_in_frames(), floor(0.99999) at 30 fps) counts as 0 frames, so a clip of it is never active.
+//
+// Proof that the engine renders on its own: this target links amber-engine, Qt Gui and Qt Test only -- no QtWidgets,
+// no UI sources, no stub file, a QGuiApplication, HeadlessAppContext, and no sound device (init_audio() never runs).
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
+}
+
+#include <QElapsedTimer>
+#include <QFile>
+#include <QGuiApplication>
+#include <QPointer>
+#include <QSurfaceFormat>
+#include <QTemporaryDir>
+#include <QTest>
+#include <QtEndian>
+#include <QtMath>
+
+#include "core/headlessappcontext.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
+#include "global/config.h"
+#include "global/projectio.h"
+#include "project/footage.h"
+#include "project/loadthread.h"
+#include "project/media.h"
+#include "project/previewgenerator.h"
+#include "project/projectmodel.h"
+#include "rendering/exportthread.h"
+
+namespace {
+
+constexpr int kSize = 64;      // source and sequence are 64x64
+constexpr double kFps = 30.0;  // source and sequence frame rate
+constexpr long kClipOut = 10;  // both clips span frames [0, 10)
+// Source frames: two more than the clip uses, as a duration of exactly N frames can come out a hair short in
+// AV_TIME_BASE and floor to N - 1 frames (see the header comment)
+constexpr int kSourceFrames = 12;
+constexpr int kAudioRate = 48000;
+
+// kSourceFrames frames of an 8x8-pixel black/white checkerboard (limited range), YUV 4:2:0, as a Y4M stream
+QByteArray checkerboard_y4m() {
+  QByteArray luma(kSize * kSize, Qt::Uninitialized);
+  for (int y = 0; y < kSize; y++) {
+    for (int x = 0; x < kSize; x++) {
+      luma[y * kSize + x] = char(((x / 8 + y / 8) % 2 == 0) ? 235 : 16);
+    }
+  }
+  const QByteArray chroma(kSize * kSize / 2, char(128));  // U and V planes, 32x32 each
+  QByteArray y4m = QByteArray("YUV4MPEG2 W") + QByteArray::number(kSize) + " H" + QByteArray::number(kSize) + " F" +
+                   QByteArray::number(int(kFps)) + ":1 Ip A1:1 C420jpeg\n";
+  for (int i = 0; i < kSourceFrames; i++) {
+    y4m += "FRAME\n";
+    y4m += luma;
+    y4m += chroma;
+  }
+  return y4m;
+}
+
+// 1 s of a 440 Hz stereo sine at half scale, S16 PCM
+QByteArray sine_wav() {
+  const int frames = kAudioRate;
+  QByteArray pcm(frames * 4, Qt::Uninitialized);
+  for (int i = 0; i < frames; i++) {
+    qint16 v = qint16(qRound(16384.0 * qSin(2.0 * M_PI * 440.0 * i / kAudioRate)));
+    qToLittleEndian(v, pcm.data() + i * 4);
+    qToLittleEndian(v, pcm.data() + i * 4 + 2);
+  }
+  QByteArray wav;
+  auto u32 = [&wav](quint32 x) {
+    char b[4];
+    qToLittleEndian(x, b);
+    wav.append(b, 4);
+  };
+  auto u16 = [&wav](quint16 x) {
+    char b[2];
+    qToLittleEndian(x, b);
+    wav.append(b, 2);
+  };
+  wav.append("RIFF");
+  u32(36 + pcm.size());
+  wav.append("WAVEfmt ");
+  u32(16);
+  u16(1);  // PCM
+  u16(2);  // channels
+  u32(kAudioRate);
+  u32(kAudioRate * 4);  // byte rate
+  u16(4);               // block align
+  u16(16);              // bits per sample
+  wav.append("data");
+  u32(pcm.size());
+  wav.append(pcm);
+  return wav;
+}
+
+// Same layout Project::save_project() writes: footage 1 (video) and 2 (audio) in folder 1, the open sequence at the
+// root. Loop mode 2 (clamp) holds the fixture's single frame for the clip's whole length.
+QString fixture(const QString& url, const QString& video, const QString& audio) {
+  return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <version>%1</version>
+    <url>%2</url>
+    <folders>
+        <folder id="1" name="Bin" parent="0"/>
+    </folders>
+    <media>
+        <footage id="1" folder="1" name="video" url="%3"/>
+        <footage id="2" folder="1" name="audio" url="%4"/>
+    </media>
+    <sequences>
+        <sequence id="1" folder="0" name="Export" width="%5" height="%5" framerate="%6" afreq="%7" alayout="3"
+                  open="1">
+            <clip id="0" enabled="1" name="video" clipin="0" in="0" out="%8" track="-1" r="128" g="128" b="192"
+                  autoscale="1" type="0" media="1" stream="0" speed="1" maintainpitch="0" reverse="0" loop="2">
+                <linked></linked>
+            </clip>
+            <clip id="1" enabled="1" name="audio" clipin="0" in="0" out="%8" track="0" r="128" g="192" b="128"
+                  autoscale="1" type="0" media="2" stream="0" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+            </clip>
+        </sequence>
+    </sequences>
+</project>
+)")
+      .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), video.toHtmlEscaped(), audio.toHtmlEscaped(),
+           QString::number(kSize), QString::number(kFps, 'f', 10), QString::number(kAudioRate),
+           QString::number(kClipOut));
+}
+
+// RGBA8 copy of a decoded video frame (BT.601 through swscale's defaults, same for source and output)
+QByteArray to_rgba(const AVFrame* f) {
+  QByteArray out(f->width * f->height * 4, Qt::Uninitialized);
+  SwsContext* sws = sws_getContext(f->width, f->height, AVPixelFormat(f->format), f->width, f->height, AV_PIX_FMT_RGBA,
+                                   SWS_BILINEAR, nullptr, nullptr, nullptr);
+  uint8_t* dst[4] = {reinterpret_cast<uint8_t*>(out.data()), nullptr, nullptr, nullptr};
+  int dst_linesize[4] = {f->width * 4, 0, 0, 0};
+  sws_scale(sws, f->data, f->linesize, 0, f->height, dst, dst_linesize);
+  sws_freeContext(sws);
+  return out;
+}
+
+struct Decoded {
+  bool ok = false;
+  bool has_video = false;
+  bool has_audio = false;
+  int video_frames = 0;
+  int width = 0;
+  int height = 0;
+  QByteArray first_rgba;
+  int audio_rate = 0;
+  int audio_channels = 0;
+  long audio_samples = 0;  // per channel
+  double audio_peak = 0;   // max |sample|, 0..1
+};
+
+void read_audio_frame(const AVFrame* f, Decoded& d) {
+  const int ch = f->ch_layout.nb_channels;
+  for (int c = 0; c < ch; c++) {
+    for (int i = 0; i < f->nb_samples; i++) {
+      double v = 0;
+      switch (f->format) {
+        case AV_SAMPLE_FMT_FLTP:
+          v = reinterpret_cast<const float*>(f->extended_data[c])[i];
+          break;
+        case AV_SAMPLE_FMT_FLT:
+          v = reinterpret_cast<const float*>(f->extended_data[0])[i * ch + c];
+          break;
+        case AV_SAMPLE_FMT_S16P:
+          v = reinterpret_cast<const qint16*>(f->extended_data[c])[i] / 32768.0;
+          break;
+        case AV_SAMPLE_FMT_S16:
+          v = reinterpret_cast<const qint16*>(f->extended_data[0])[i * ch + c] / 32768.0;
+          break;
+        default:
+          return;  // unexpected format: peak stays 0 and the test fails on it
+      }
+      d.audio_peak = qMax(d.audio_peak, qAbs(v));
+    }
+  }
+  d.audio_samples += f->nb_samples;
+}
+
+// Decode every frame of the first video and first audio stream of a file
+Decoded decode_file(const QString& path) {
+  Decoded d;
+  AVFormatContext* fmt = nullptr;
+  QByteArray p = path.toUtf8();
+  if (avformat_open_input(&fmt, p.constData(), nullptr, nullptr) < 0) return d;
+  if (avformat_find_stream_info(fmt, nullptr) < 0) {
+    avformat_close_input(&fmt);
+    return d;
+  }
+
+  int vi = av_find_best_stream(fmt, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+  int ai = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+  AVCodecContext* vctx = nullptr;
+  AVCodecContext* actx = nullptr;
+  auto open_dec = [fmt](int index) -> AVCodecContext* {
+    const AVCodec* codec = avcodec_find_decoder(fmt->streams[index]->codecpar->codec_id);
+    if (codec == nullptr) return nullptr;
+    AVCodecContext* ctx = avcodec_alloc_context3(codec);
+    avcodec_parameters_to_context(ctx, fmt->streams[index]->codecpar);
+    if (avcodec_open2(ctx, codec, nullptr) < 0) avcodec_free_context(&ctx);
+    return ctx;
+  };
+  if (vi >= 0) vctx = open_dec(vi);
+  if (ai >= 0) actx = open_dec(ai);
+  d.has_video = vctx != nullptr;
+  d.has_audio = actx != nullptr;
+  if (actx != nullptr) {
+    d.audio_rate = actx->sample_rate;
+    d.audio_channels = actx->ch_layout.nb_channels;
+  }
+
+  AVPacket* pkt = av_packet_alloc();
+  AVFrame* frame = av_frame_alloc();
+  auto drain = [&](AVCodecContext* ctx, bool video) {
+    while (avcodec_receive_frame(ctx, frame) == 0) {
+      if (video) {
+        if (d.video_frames == 0) {
+          d.width = frame->width;
+          d.height = frame->height;
+          d.first_rgba = to_rgba(frame);
+        }
+        d.video_frames++;
+      } else {
+        read_audio_frame(frame, d);
+      }
+      av_frame_unref(frame);
+    }
+  };
+  while (av_read_frame(fmt, pkt) >= 0) {
+    if (vctx != nullptr && pkt->stream_index == vi) {
+      avcodec_send_packet(vctx, pkt);
+      drain(vctx, true);
+    } else if (actx != nullptr && pkt->stream_index == ai) {
+      avcodec_send_packet(actx, pkt);
+      drain(actx, false);
+    }
+    av_packet_unref(pkt);
+  }
+  if (vctx != nullptr) {
+    avcodec_send_packet(vctx, nullptr);
+    drain(vctx, true);
+  }
+  if (actx != nullptr) {
+    avcodec_send_packet(actx, nullptr);
+    drain(actx, false);
+  }
+
+  av_frame_free(&frame);
+  av_packet_free(&pkt);
+  avcodec_free_context(&vctx);
+  avcodec_free_context(&actx);
+  avformat_close_input(&fmt);
+  d.ok = true;
+  return d;
+}
+
+}  // namespace
+
+class TestHeadlessRender : public QObject {
+  Q_OBJECT
+
+ private:
+  HeadlessAppContext ctx_;
+  ProjectIO* pio_ = nullptr;
+  QTemporaryDir dir_;
+
+ private slots:
+  void initTestCase() {
+    QVERIFY(dir_.isValid());
+    // Probe thumbnails, shader cache and anything else under the standard paths stay in the temp dir (test mode
+    // would write to ~/.qttest)
+    qputenv("XDG_DATA_HOME", dir_.filePath("data").toUtf8());
+    qputenv("XDG_CACHE_HOME", dir_.filePath("cache").toUtf8());
+    qputenv("XDG_CONFIG_HOME", dir_.filePath("config").toUtf8());
+    amber::app_ctx = &ctx_;
+    pio_ = new ProjectIO();
+    amber::project_io = pio_;
+    // What main() resolves the backend to on Linux; the render thread then uses the GL fallback surface that
+    // prepare_export() creates on this thread
+    amber::CurrentRuntimeConfig.rhi_backend = RhiBackend::OpenGL;
+    amber::CurrentConfig.hardware_decoding = false;
+  }
+
+  void cleanupTestCase() {
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    amber::project_io = nullptr;
+    delete pio_;
+    amber::app_ctx = nullptr;
+  }
+
+  void exportsLoadedProject() {
+    QElapsedTimer timer;
+    timer.start();
+
+    // --- Fixture: Y4M + WAV + .ove
+    const QString video = dir_.filePath("checkerboard.y4m");
+    {
+      QFile f(video);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(checkerboard_y4m());
+    }
+    const QString audio = dir_.filePath("tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("export.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+
+    // --- Load (worker thread + this event loop, as the app does), then wait for both media probes
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    QCOMPARE(seq->clips.size(), 2);
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      QVERIFY(!f->invalid);
+      // The clip must be active on every frame it spans
+      QVERIFY2(c->media_length() >= kClipOut, qPrintable(QString("media length %1").arg(c->media_length())));
+    }
+    QCOMPARE(seq->getEndFrame(), kClipOut);
+
+    // --- Export, the way ExportDialog::launch_export_thread() / export_thread_finished() do it
+    ExportParams params;
+    params.filename = dir_.filePath("out.mp4");
+    params.video_enabled = true;
+    params.video_codec = AV_CODEC_ID_MPEG4;  // native libavcodec encoder, in every FFmpeg build
+    params.video_width = kSize;
+    params.video_height = kSize;
+    params.video_frame_rate = kFps;
+    params.video_compression_type = COMPRESSION_TYPE_CBR;
+    params.video_bitrate = 2.0;  // Mbps
+    params.audio_enabled = true;
+    params.audio_codec = AV_CODEC_ID_AAC;  // native too
+    params.audio_sampling_rate = kAudioRate;
+    params.audio_bitrate = 128;  // kbps
+    params.start_frame = 0;
+    params.end_frame = seq->getEndFrame();
+    VideoCodecParams vparams;
+    vparams.pix_fmt = AV_PIX_FMT_YUV420P;
+    vparams.threads = 0;
+
+    auto* et = new ExportThread(seq.get(), params, vparams);
+    bool finished = false;
+    connect(et, &QThread::finished, this, [&finished]() { finished = true; });
+    QOffscreenSurface* surface = prepare_export(et, seq.get(), params);
+    QVERIFY(surface != nullptr);
+    et->start();
+    // ExportThread's render and audio wake-ups are queued to this thread: QTRY keeps the event loop running
+    QTRY_VERIFY_WITH_TIMEOUT(finished, 60000);
+    et->wait();
+    finish_export(surface);
+    const QString error = et->GetError();
+    const bool interrupted = et->WasInterrupted();
+    delete et;
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(!interrupted);
+    QVERIFY(QFileInfo::exists(params.filename));
+
+    // --- Decode the export and the source
+    Decoded out = decode_file(params.filename);
+    Decoded src = decode_file(video);
+    QVERIFY(out.ok);
+    QVERIFY(src.ok);
+    QVERIFY(out.has_video);
+    QVERIFY(src.video_frames >= 1);
+
+    // ExportThread::EncodeAllFrames() renders while playhead <= end_frame: the editor's export includes end_frame,
+    // one frame past the last clip, so a 10-frame sequence gives 11 frames
+    const long expected_frames = params.end_frame - params.start_frame + 1;
+    QCOMPARE(long(out.video_frames), expected_frames);
+    QCOMPARE(out.width, kSize);
+    QCOMPARE(out.height, kSize);
+
+    // First frame vs source first frame (8x8 checkerboard), through YUV->RGB on the GPU, RGB->YUV420P
+    // and MPEG-4 compression: compare the mean per-channel difference, and every block centre must keep its colour
+    QCOMPARE(out.first_rgba.size(), src.first_rgba.size());
+    QVERIFY(uchar(out.first_rgba[(4 * kSize + 4) * 4]) > 200);  // block (0,0) white
+    QVERIFY(uchar(out.first_rgba[(4 * kSize + 12) * 4]) < 55);  // block (1,0) black
+    double sum = 0;
+    int max_centre_delta = 0;
+    for (int i = 0; i < out.first_rgba.size(); i += 4) {
+      for (int ch = 0; ch < 3; ch++) {
+        sum += qAbs(int(uchar(out.first_rgba[i + ch])) - int(uchar(src.first_rgba[i + ch])));
+      }
+    }
+    for (int by = 0; by < 8; by++) {
+      for (int bx = 0; bx < 8; bx++) {
+        const int off = ((by * 8 + 4) * kSize + bx * 8 + 4) * 4;
+        for (int ch = 0; ch < 3; ch++) {
+          max_centre_delta =
+              qMax(max_centre_delta, qAbs(int(uchar(out.first_rgba[off + ch])) - int(uchar(src.first_rgba[off + ch]))));
+        }
+      }
+    }
+    const double mean_delta = sum / (kSize * kSize * 3);
+    qInfo("first frame: mean |delta| = %.2f, max |delta| at block centres = %d", mean_delta, max_centre_delta);
+    QVERIFY2(mean_delta < 16.0, qPrintable(QString("mean delta %1").arg(mean_delta)));
+    QVERIFY2(max_centre_delta < 48, qPrintable(QString("max centre delta %1").arg(max_centre_delta)));
+
+    // Audio: the clip's sine made it into the file although no sound device was ever opened
+    QVERIFY(out.has_audio);
+    QCOMPARE(out.audio_rate, kAudioRate);
+    QCOMPARE(out.audio_channels, 2);
+    // EncodeAudioFrames() encodes up to the start of the last exported frame, in whole encoder frames (1024 samples
+    // for AAC): at least end_frame / fps seconds
+    const long expected_samples = qRound64((params.end_frame - params.start_frame) / kFps * kAudioRate);
+    qInfo("audio: %ld samples per channel (expected >= %ld), peak %.3f", out.audio_samples, expected_samples,
+          out.audio_peak);
+    QVERIFY(out.audio_samples >= expected_samples);
+    QVERIFY2(out.audio_peak > 0.25, qPrintable(QString("audio peak %1").arg(out.audio_peak)));
+
+    qInfo("load + export + decode: %lld ms", timer.elapsed());
+  }
+};
+
+int main(int argc, char* argv[]) {
+  qputenv("QT_QPA_PLATFORM", "offscreen");
+
+  // OpenGL 3.2 core so the OpenGL QRhi gets GLSL 150 (the .qsb shaders' GL target); see test_effects_gpu.cpp
+  QSurfaceFormat fmt;
+  fmt.setVersion(3, 2);
+  fmt.setProfile(QSurfaceFormat::CoreProfile);
+  fmt.setRenderableType(QSurfaceFormat::OpenGL);
+  QSurfaceFormat::setDefaultFormat(fmt);
+
+  QGuiApplication app(argc, argv);
+  TestHeadlessRender test;
+  return QTest::qExec(&test, argc, argv);
+}
+
+#include "test_headless_render.moc"

@@ -34,7 +34,9 @@ extern "C" {
 
 #include "core/appcontext.h"
 #include "engine/sequence.h"
+#include "global/config.h"
 #include "global/debug.h"
+#include "global/projectio.h"
 #include "rendering/audio.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
@@ -526,7 +528,7 @@ bool ExportThread::Export() {
   delete renderer;
 
   // Clean up clip state.  Rendering state (audio_rendering flag + autorecovery
-  // timer) is restored on the main thread in ExportDialog::export_thread_finished
+  // timer) is restored on the main thread by finish_export()
   // — starting a QTimer from this thread triggers "Timers cannot be started
   // from another thread".
   close_active_clips(seq_);
@@ -600,10 +602,10 @@ void ExportThread::Cleanup() {
 }
 
 void ExportThread::run() {
-  // Pause/seek/audio_rendering_rate are set on the main thread in
-  // ExportDialog before start() — calling UI methods (pausePlayback,
-  // seekPlayhead) from this thread would trigger widget repaints on the
-  // wrong thread, crashing the OpenGL backend.
+  // Playhead/audio_rendering_rate are set on the main thread by
+  // prepare_export() before start(), pause/seek by the caller — calling UI
+  // methods (pausePlayback, seekPlayhead) from this thread would trigger widget
+  // repaints on the wrong thread, crashing the OpenGL backend.
 
   // Lock mutex (used for thread synchronizations)
   mutex.lock();
@@ -653,4 +655,35 @@ void ExportThread::wake() {
   render_complete_ = true;
   waitCond.wakeAll();
   mutex.unlock();
+}
+
+QOffscreenSurface* prepare_export(ExportThread* thread, Sequence* seq, const ExportParams& params) {
+  if (params.audio_enabled) audio_rendering_rate = params.audio_sampling_rate;
+  amber::project_io->setRenderingState(true);
+
+  // EncodeAllFrames() renders from the playhead up to end_frame
+  if (seq != nullptr) seq->playhead = params.start_frame;
+
+  // Align the audio ring buffer origin with the export start frame so EncodeAudioFrames reads real samples
+  // from offset 0 instead of silence (fixes silent audio on In/Out range exports — GitHub issue #25).
+  if (params.audio_enabled) clear_audio_ibuffer(params.start_frame);
+
+  close_active_clips(seq);
+  amber::project_io->saveAutorecoveryFile();
+
+  // Pre-create a GL fallback surface on the GUI thread (avoids "QWindow outside gui thread" on Wayland)
+  QOffscreenSurface* gl_surface = nullptr;
+  if (amber::CurrentRuntimeConfig.rhi_backend == RhiBackend::OpenGL) {
+    gl_surface = QRhiGles2InitParams::newFallbackSurface();
+    thread->setGlFallbackSurface(gl_surface);
+  }
+  return gl_surface;
+}
+
+void finish_export(QOffscreenSurface* gl_surface) {
+  amber::project_io->setRenderingState(false);
+  clear_audio_ibuffer();
+
+  // The export thread has finished, so its renderer no longer uses the surface
+  delete gl_surface;
 }

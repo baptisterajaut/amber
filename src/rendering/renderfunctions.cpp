@@ -469,7 +469,8 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
 // Returns true if the clip is active; sets texture_failed on not-ready footage.
 static bool activate_footage_clip(Clip* c, long playhead, bool& texture_failed, int& audio_track_count) {
   Footage* m = c->media()->to_footage();
-  if (m->invalid || (c->track() >= 0 && !is_audio_device_set())) return false;
+  // Audio clips only open with a sound device, except during an export, which reads their audio itself
+  if (m->invalid || (c->track() >= 0 && !is_audio_device_set() && !audio_rendering)) return false;
   if (!m->ready) {
     texture_failed = true;
     return false;

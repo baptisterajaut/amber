@@ -1,5 +1,5 @@
 #include <rhi/qrhi.h>
-#include <QApplication>
+#include <QGuiApplication>
 #include <QOffscreenSurface>
 #include <QTest>
 
@@ -59,9 +59,9 @@ void TestRhiSmoke::canCreateTexture() {
   delete surface;
 }
 
-// QApplication needed for QRhi GL context
+// QGuiApplication needed for QRhi GL context
 int main(int argc, char* argv[]) {
-  QApplication app(argc, argv);
+  QGuiApplication app(argc, argv);
   TestRhiSmoke test;
   return QTest::qExec(&test, argc, argv);
 }

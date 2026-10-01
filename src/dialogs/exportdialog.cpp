@@ -46,9 +46,7 @@ extern "C" {
 #include "global/config.h"
 #include "global/global.h"
 #include "panels/panels.h"
-#include "rendering/audio.h"
 #include "rendering/exportthread.h"
-#include "rendering/renderfunctions.h"
 #include "ui/mainwindow.h"
 #include "ui/viewerwidget.h"
 
@@ -259,14 +257,11 @@ void ExportDialog::export_thread_finished() {
                           QMessageBox::Ok);
   }
 
-  // Restore rendering state on the main thread (ExportThread can't do this —
-  // set_rendering_state(false) starts autorecovery_timer, a QTimer owned by
-  // the main thread, which triggers "Timers cannot be started from another
-  // thread" if called from ExportThread).
-  amber::Global->set_rendering_state(false);
-
-  // Clear audio buffer
-  clear_audio_ibuffer();
+  // Restore rendering state, clear the audio buffer and free the GL fallback surface, on the main thread
+  // (ExportThread can't do this — leaving rendering mode starts the autorecovery timer, a QTimer owned by the main
+  // thread, which triggers "Timers cannot be started from another thread" if called from ExportThread).
+  finish_export(export_gl_surface_);
+  export_gl_surface_ = nullptr;
 
   // Re-enable/disable UI widgets based on the rendering state
   prep_ui_for_render(false);
@@ -284,10 +279,6 @@ void ExportDialog::export_thread_finished() {
 
   // Free the export thread
   export_thread_->deleteLater();
-
-  // Free the GL fallback surface (must be deleted on GUI thread — we're on it)
-  delete export_gl_surface_;
-  export_gl_surface_ = nullptr;
 
   // If the export succeeded, close the dialog
   if (succeeded) {
@@ -395,12 +386,6 @@ ExportParams ExportDialog::build_export_params(const QString& filename) const {
 void ExportDialog::launch_export_thread(const ExportParams& params) {
   export_thread_ = new ExportThread(amber::ActiveSequence.get(), params, vcodec_params, this);
 
-  // Pre-create a GL fallback surface on the GUI thread (avoids "QWindow outside gui thread" on Wayland)
-  if (amber::CurrentRuntimeConfig.rhi_backend == RhiBackend::OpenGL) {
-    export_gl_surface_ = QRhiGles2InitParams::newFallbackSurface();
-    export_thread_->setGlFallbackSurface(export_gl_surface_);
-  }
-
   connect(export_thread_, &QThread::finished, this, &ExportDialog::export_thread_finished);
   connect(export_thread_, &ExportThread::ProgressChanged, this, &ExportDialog::update_progress_bar);
   connect(renderCancel, &QPushButton::clicked, export_thread_, &ExportThread::Interrupt);
@@ -408,21 +393,17 @@ void ExportDialog::launch_export_thread(const ExportParams& params) {
   panel_effect_controls->Clear();
 
   if (panel_sequence_viewer != nullptr) panel_sequence_viewer->pause();
-  if (params.audio_enabled) audio_rendering_rate = params.audio_sampling_rate;
-
-  amber::Global->set_rendering_state(true);
   pre_export_playhead_ = amber::ActiveSequence ? amber::ActiveSequence->playhead : 0;
 
+  // Rendering state, playhead, audio buffer, clips, autorecovery save and GL fallback surface
+  export_gl_surface_ = prepare_export(export_thread_, amber::ActiveSequence.get(), params);
+
+  // Show the export start in the UI. Rendering mode keeps the viewer from drawing, and prepare_export() already reset
+  // the audio buffer to the start frame, so no scrub audio reset here (it would re-clear the buffer).
   if (panel_sequence_viewer != nullptr && panel_sequence_viewer->seq != nullptr) {
-    panel_sequence_viewer->seek(params.start_frame);
+    panel_sequence_viewer->seek(params.start_frame, false);
   }
 
-  // Align the audio ring buffer origin with the export start frame so EncodeAudioFrames reads real samples
-  // from offset 0 instead of silence (fixes silent audio on In/Out range exports — GitHub issue #25).
-  if (params.audio_enabled) clear_audio_ibuffer(params.start_frame);
-
-  close_active_clips(amber::ActiveSequence.get());
-  amber::Global->save_autorecovery_file();
   prep_ui_for_render(true);
   total_export_time_start = QDateTime::currentMSecsSinceEpoch();
   export_thread_->start();

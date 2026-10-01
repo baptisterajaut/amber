@@ -1,45 +1,14 @@
 #include <QtTest>
 
-#include "core/appcontext.h"
 #include "core/audio.h"
+#include "core/headlessappcontext.h"
 #include "engine/sequence.h"
 #include "global/projectio.h"
 
 Q_DECLARE_METATYPE(SequencePtr)
 
-class StubAppContext : public AppContext {
- public:
-  void refreshViewer() override {}
-  void refreshEffectControls() override {}
-  void updateKeyframes() override {}
-  void clearEffectControls(bool) override {}
-  void refreshTimeline() override {}
-  void deselectArea(long, long, int) override {}
-  void seekPlayhead(long) override {}
-  void pausePlayback() override {}
-  void setGraphEditorRow(EffectRow*) override {}
-  bool isPlaying() override { return false; }
-  bool isEffectSelected(Effect*) override { return false; }
-  void setAudioMonitorValues(const QVector<double>&) override {}
-  QVector<Media*> listAllSequences() override { return {}; }
-  void processFileList(QStringList&, bool, MediaPtr, Media*) override {}
-  bool isToolbarVisible() override { return false; }
-  bool isModified() override { return false; }
-  void setModified(bool) override {}
-  void updateUi(bool) override {}
-  int showMessage(const QString&, const QString&, int) override { return 0; }
-  bool showQuestion(const QString&, const QString&, bool) override { return true; }
-  QString showSaveFileDialog(const QString&, const QString&) override { return {}; }
-  QString showOpenFileDialog(const QString&, const QString&) override { return {}; }
-  void clearViewerMedia() override {}
-  QWidget* getMainWindow() override { return nullptr; }
-  QWindow* getMainWindowHandle() override { return nullptr; }
-  void clearGraphEditorIfRow(EffectRow*) override {}
-  void addRecentProject(const QString&) override {}
-  void setMediaIcon(Media*, int) override {}
-  void stopMediaThrobber(Media*) override {}
-  QIcon mediaTypeIcon(int) override { return {}; }
-};
+// Questions are answered Yes; nothing in these tests shows a message
+class StubAppContext : public HeadlessAppContext {};
 
 class TestProjectIO : public QObject {
   Q_OBJECT

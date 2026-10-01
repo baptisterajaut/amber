@@ -1,6 +1,5 @@
 #include "tests/test_render_harness.h"
 
-#include <QApplication>
 #include <QFile>
 #include <QOffscreenSurface>
 #include <QTest>

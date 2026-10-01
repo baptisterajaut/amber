@@ -12,6 +12,8 @@ target_sources(amber-engine PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/shortcutfile.h
   ${CMAKE_CURRENT_SOURCE_DIR}/appcontext.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/appcontext.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/headlessappcontext.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/headlessappcontext.h
   ${CMAKE_CURRENT_SOURCE_DIR}/math.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/math.h
   ${CMAKE_CURRENT_SOURCE_DIR}/path.cpp
