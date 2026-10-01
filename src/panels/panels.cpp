@@ -128,10 +128,12 @@ void free_panels() {
 }
 
 void scroll_to_frame_internal(QScrollBar* bar, long frame, double zoom, int area_width) {
-  if (bar->value() == bar->minimum() || bar->value() == bar->maximum()) {
-    return;
-  }
-
+  // A scrollbar with no range (maximum() == 0) has nothing to scroll, so bail
+  // out. The previous check instead bailed whenever the scrollbar's value
+  // was already at its minimum or maximum — which meant pressing HOME or END
+  // while already at an extreme silently did nothing, since that's exactly
+  // the state those actions put the scrollbar in.
+  if (bar->maximum() == 0) return;
   int screen_point = getScreenPointFromFrame(zoom, frame) - bar->value();
   int min_x = area_width * 0.1;
   int max_x = area_width - min_x;
