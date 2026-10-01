@@ -181,6 +181,7 @@ add_library(amber-engine OBJECT
   # project/ (data model only)
   project/clipboard.cpp project/clipboard.h
   project/clipboard_serializer.cpp project/clipboard_serializer.h
+  project/deletionplan.cpp project/deletionplan.h
   project/footage.cpp project/footage.h
   project/loadthread.cpp project/loadthread.h
   project/media.cpp project/media.h

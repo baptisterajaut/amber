@@ -56,6 +56,7 @@ extern "C" {
 #include "panels.h"
 #include "panels/effectcontrols.h"
 #include "project/clipboard.h"
+#include "project/deletionplan.h"
 #include "project/previewgenerator.h"
 #include "project/projectfilter.h"
 #include "project/sourcescommon.h"
@@ -493,17 +494,17 @@ bool Project::IsProjectWidget(QObject* child) { return (child == tree_view || ch
 // Remove every clipboard clip whose media is in `media`, in one pass: each RemoveClipsFromClipboard stores a raw
 // index, so all removals must be counted against the same running offset (never call this twice per ComboAction).
 bool delete_clips_in_clipboard_with_media(ComboAction* ca, const QList<Media*>& media) {
-  int delete_count = 0;
+  QVector<Media*> clipboard_media;
   if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
     for (int i = 0; i < clipboard.size(); i++) {
-      ClipPtr c = std::static_pointer_cast<Clip>(clipboard.at(i));
-      if (c->media() != nullptr && media.contains(c->media())) {
-        ca->append(new RemoveClipsFromClipboard(i - delete_count));
-        delete_count++;
-      }
+      clipboard_media.append(std::static_pointer_cast<Clip>(clipboard.at(i))->media());
     }
   }
-  return (delete_count > 0);
+  const QVector<int> positions = amber::clipboard_removal_positions(clipboard_media, media);
+  for (int pos : positions) {
+    ca->append(new RemoveClipsFromClipboard(pos));
+  }
+  return !positions.isEmpty();
 }
 
 // Confirm whether a footage item should be deleted when it's in use.
@@ -529,67 +530,6 @@ static int confirm_footage_delete(QWidget* parent, Media* item, Sequence* s, int
   return -1;
 }
 
-// True if a folder above `item` (at any depth) is also in `items`.
-static bool has_selected_ancestor(Media* item, const QList<Media*>& items) {
-  for (Media* p = item->parentItem(); p != nullptr; p = p->parentItem()) {
-    if (items.contains(p)) return true;
-  }
-  return false;
-}
-
-// Handle the "skip" action: add item and the ancestor folders being deleted with it to the parents exclusion list,
-// and re-add the other children of each so they still get deleted. The walk stops at the first ancestor that isn't
-// being deleted (never the hidden root), so nothing outside the delete is touched.
-static void skip_media_item(Media* item, QList<Media*>& items, QVector<Media*>& parents) {
-  Media* parent = item;
-  while (parent != nullptr && (items.contains(parent) || has_selected_ancestor(parent, items))) {
-    parents.append(parent);
-    for (int m = 0; m < parent->childCount(); m++) {
-      Media* child = parent->child(m);
-      bool found = false;
-      for (auto existing : items) {
-        if (existing == child) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        items.append(child);
-      }
-    }
-    parent = parent->parentItem();
-  }
-}
-
-// Collect every footage and sequence inside `folder`, recursing into subfolders.
-static void collect_folder_contents(Media* folder, QList<Media*>& out) {
-  for (int i = 0; i < folder->childCount(); i++) {
-    Media* child = folder->child(i);
-    if (child->get_type() == MEDIA_TYPE_FOLDER) {
-      collect_folder_contents(child, out);
-    } else {
-      out.append(child);
-    }
-  }
-}
-
-// Everything the delete currently removes: `items` plus the contents of selected folders, minus what a Skip kept
-// (`kept`: the skipped footage and its ancestor folders, which leave `items` only after the footage checks).
-static QList<Media*> collect_deleted_media(const QList<Media*>& items, const QVector<Media*>& kept) {
-  QList<Media*> deleted;
-  for (auto item : items) {
-    if (kept.contains(item)) continue;
-    if (!deleted.contains(item)) deleted.append(item);
-    if (item->get_type() != MEDIA_TYPE_FOLDER) continue;
-    QList<Media*> contents;
-    collect_folder_contents(item, contents);
-    for (auto m : contents) {
-      if (!deleted.contains(m)) deleted.append(m);
-    }
-  }
-  return deleted;
-}
-
 // Check all footage items and confirm deletion with the user for those in use.
 // Returns false if the user aborted the whole delete operation.
 static bool check_footage_in_use(QWidget* parent, ComboAction* ca, QList<Media*>& items,
@@ -604,7 +544,7 @@ static bool check_footage_in_use(QWidget* parent, ComboAction* ca, QList<Media*>
     Media* item = media_items.at(i);
     bool confirm_delete = false;
     // Recomputed per footage: a previous Skip may have changed what gets deleted
-    QList<Media*> deleted = collect_deleted_media(items, parents);
+    QList<Media*> deleted = amber::collect_deleted_media(items, parents);
 
     for (int j = 0; j < sequence_items.size(); j++) {
       if (deleted.contains(sequence_items.at(j))) continue;  // the whole sequence goes away with this delete
@@ -619,7 +559,7 @@ static bool check_footage_in_use(QWidget* parent, ComboAction* ca, QList<Media*>
             confirm_delete = true;
             redraw = true;
           } else if (choice == 0) {
-            skip_media_item(item, items, parents);
+            amber::skip_media_item(item, items, parents);
             j = sequence_items.size();
             k = s->clips.size();
           } else {
@@ -639,7 +579,7 @@ static bool check_footage_in_use(QWidget* parent, ComboAction* ca, QList<Media*>
 // Returns false if the user cancelled.
 static bool check_sequence_references(QWidget* parent, ComboAction* ca, const QList<Media*>& items,
                                       const QList<Media*>& sequence_items, bool& redraw) {
-  QList<Media*> deleted = collect_deleted_media(items, {});
+  QList<Media*> deleted = amber::collect_deleted_media(items, {});
   for (int i = 0; i < items.size(); i++) {
     Media* item = items.at(i);
     if (item->get_type() != MEDIA_TYPE_SEQUENCE) continue;
@@ -682,12 +622,12 @@ static bool check_sequence_references(QWidget* parent, ComboAction* ca, const QL
 static bool check_folder_contents_in_use(QWidget* parent, ComboAction* ca, const QList<Media*>& items,
                                          const QList<Media*>& sequence_items, bool& redraw) {
   // Everything this delete removes: the selection plus the contents of selected folders
-  QList<Media*> deleted = collect_deleted_media(items, {});
+  QList<Media*> deleted = amber::collect_deleted_media(items, {});
   QVector<QPair<Media*, QList<Media*>>> folders;
   for (auto item : items) {
     if (item->get_type() != MEDIA_TYPE_FOLDER) continue;
     QList<Media*> contents;
-    collect_folder_contents(item, contents);
+    amber::collect_folder_contents(item, contents);
     folders.append(qMakePair(item, contents));
   }
 
@@ -737,11 +677,11 @@ static void append_delete_commands(ComboAction* ca, const QList<Media*>& items, 
   bool closed_active = false;  // folder and its sequence may both be selected: close the active sequence once
   for (auto item : items) {
     // Its selected ancestor folder's command already removes it; a second command would detach it from that folder
-    if (has_selected_ancestor(item, items)) continue;
+    if (amber::has_selected_ancestor(item, items)) continue;
     ca->append(new DeleteMediaCommand(item->parentItem()->get_shared_ptr(item)));
 
     QList<Media*> affected{item};
-    if (item->get_type() == MEDIA_TYPE_FOLDER) collect_folder_contents(item, affected);
+    if (item->get_type() == MEDIA_TYPE_FOLDER) amber::collect_folder_contents(item, affected);
 
     for (auto m : affected) {
       if (m->get_type() == MEDIA_TYPE_SEQUENCE) {
@@ -769,7 +709,7 @@ static void append_delete_commands(ComboAction* ca, const QList<Media*>& items, 
   }
 
   // Every deleted footage or sequence drops its clipboard clips (nested-sequence clips included), prompted or not
-  delete_clips_in_clipboard_with_media(ca, collect_deleted_media(items, {}));
+  delete_clips_in_clipboard_with_media(ca, amber::collect_deleted_media(items, {}));
 }
 
 void Project::delete_selected_media() {

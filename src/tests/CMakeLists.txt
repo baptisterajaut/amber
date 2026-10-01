@@ -67,6 +67,11 @@ target_include_directories(amber-test-clipboard PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-clipboard PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-clipboard COMMAND amber-test-clipboard)
 
+add_executable(amber-test-deletion-plan test_deletion_plan.cpp ${AMBER_TEST_STUBS})
+target_include_directories(amber-test-deletion-plan PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-deletion-plan PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-deletion-plan COMMAND amber-test-deletion-plan)
+
 # QRhi headless smoke test
 add_executable(amber-test-rhi-smoke test_rhi_smoke.cpp ${AMBER_TEST_STUBS})
 target_include_directories(amber-test-rhi-smoke PRIVATE ${CMAKE_SOURCE_DIR})
