@@ -29,6 +29,7 @@ class AppContextImpl : public AppContext {
   QString showOpenFileDialog(const QString& title, const QString& filter) override;
   void clearViewerMedia() override;
   QWidget* getMainWindow() override;
+  QWindow* getMainWindowHandle() override;
   void clearGraphEditorIfRow(EffectRow* row) override;
   void addRecentProject(const QString& filename) override;
   void setMediaIcon(Media* media, int icon_type) override;

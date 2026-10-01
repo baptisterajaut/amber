@@ -32,6 +32,7 @@ class TestAppContext : public AppContext {
   QString showOpenFileDialog(const QString&, const QString&) override { return {}; }
   void clearViewerMedia() override {}
   QWidget* getMainWindow() override { return nullptr; }
+  QWindow* getMainWindowHandle() override { return nullptr; }
   void addRecentProject(const QString&) override {}
   void setMediaIcon(Media*, int) override {}
   void stopMediaThrobber(Media*) override {}

@@ -11,6 +11,7 @@ class Effect;
 class Media;
 class QIcon;
 class QWidget;
+class QWindow;
 using MediaPtr = std::shared_ptr<Media>;
 
 // Project panel icon state of a footage item, set by the media probe (PreviewGenerator)
@@ -48,6 +49,8 @@ class AppContext {
   virtual QString showOpenFileDialog(const QString& title, const QString& filter) = 0;
   virtual void clearViewerMedia() = 0;
   virtual QWidget* getMainWindow() = 0;
+  // Native window of the main window (transient parent for engine-owned windows); null if none
+  virtual QWindow* getMainWindowHandle() = 0;
   virtual void clearGraphEditorIfRow(EffectRow* row) = 0;
   // Record a project file the user opened in the recent projects list (persisted; headless code must not touch it)
   virtual void addRecentProject(const QString& filename) = 0;

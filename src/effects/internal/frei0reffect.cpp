@@ -24,9 +24,9 @@
 
 #include <QDir>
 #include <QHash>
-#include <QMessageBox>
 #include <QMutex>
 
+#include "core/appcontext.h"
 #include "engine/clip.h"
 
 using f0rConstructFunc = f0r_instance_t (*)(unsigned int width, unsigned int height);
@@ -53,16 +53,16 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta* em)
 
   if (!handle.load()) {
     QString dll_error = handle.errorString();
-    QMessageBox::critical(nullptr, tr("Error loading Frei0r plugin"),
-                          tr("Failed to load Frei0r plugin \"%1\": %2").arg(dll_fn, dll_error));
+    amber::app_ctx->showMessage(tr("Error loading Frei0r plugin"),
+                                tr("Failed to load Frei0r plugin \"%1\": %2").arg(dll_fn, dll_error), 3);
 
     return;
   }
 
   f0rInitFunc init = reinterpret_cast<f0rInitFunc>(handle.resolve("f0r_init"));
   if (init == nullptr) {
-    QMessageBox::critical(nullptr, tr("Error loading Frei0r plugin"),
-                          tr("Symbol f0r_init not found in \"%1\"").arg(dll_fn));
+    amber::app_ctx->showMessage(tr("Error loading Frei0r plugin"),
+                                tr("Symbol f0r_init not found in \"%1\"").arg(dll_fn), 3);
     return;
   }
   {
@@ -81,8 +81,8 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta* em)
   f0r_plugin_info_t info;
   f0rGetPluginInfo info_func = reinterpret_cast<f0rGetPluginInfo>(handle.resolve("f0r_get_plugin_info"));
   if (info_func == nullptr) {
-    QMessageBox::critical(nullptr, tr("Error loading Frei0r plugin"),
-                          tr("Symbol f0r_get_plugin_info not found in \"%1\"").arg(dll_fn));
+    amber::app_ctx->showMessage(tr("Error loading Frei0r plugin"),
+                                tr("Symbol f0r_get_plugin_info not found in \"%1\"").arg(dll_fn), 3);
     return;
   }
   info_func(&info);

@@ -14,8 +14,10 @@
 #include "ui/mediaiconservice.h"
 #include "ui/viewerwidget.h"
 
+#include <QApplication>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QThread>
 #include "ui/mainwindow.h"
 
 void AppContextImpl::refreshViewer() {
@@ -116,13 +118,24 @@ void AppContextImpl::setModified(bool modified) { amber::Global->set_modified(mo
 
 void AppContextImpl::updateUi(bool modified) { update_ui(modified); }
 
-int AppContextImpl::showMessage(const QString& title, const QString& text, int type) {
+static int exec_message_box(const QString& title, const QString& text, int type) {
   QMessageBox box;
   box.setWindowTitle(title);
   box.setText(text);
   box.setIcon(static_cast<QMessageBox::Icon>(type));
   box.addButton(QMessageBox::Ok);
   return box.exec();
+}
+
+int AppContextImpl::showMessage(const QString& title, const QString& text, int type) {
+  if (QThread::currentThread() != qApp->thread()) {
+    // Off the GUI thread (e.g. an effect constructed by LoadThread): widgets must not be created here and the caller
+    // must not block on the user, so show the box later on the GUI thread and return as if OK was clicked.
+    QMetaObject::invokeMethod(
+        qApp, [title, text, type]() { exec_message_box(title, text, type); }, Qt::QueuedConnection);
+    return QMessageBox::Ok;
+  }
+  return exec_message_box(title, text, type);
 }
 
 bool AppContextImpl::showQuestion(const QString& title, const QString& text, bool warning) {
@@ -150,6 +163,10 @@ void AppContextImpl::clearViewerMedia() {
 }
 
 QWidget* AppContextImpl::getMainWindow() { return amber::MainWindow; }
+
+QWindow* AppContextImpl::getMainWindowHandle() {
+  return amber::MainWindow != nullptr ? amber::MainWindow->windowHandle() : nullptr;
+}
 
 void AppContextImpl::clearGraphEditorIfRow(EffectRow* row) {
   if (panel_graph_editor != nullptr && panel_graph_editor->get_row() == row) {

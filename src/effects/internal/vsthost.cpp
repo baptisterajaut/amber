@@ -22,12 +22,13 @@
 
 // adapted from http://teragonaudio.com/article/How-to-make-your-own-VST-host.html
 
-#include <QDialog>
+#include <QCloseEvent>
 #include <QFile>
 #include <QWindow>
 #include <QXmlStreamWriter>
 
 #include <cstring>
+#include <functional>
 
 #include "core/appcontext.h"
 #include "global/debug.h"
@@ -109,7 +110,7 @@ intptr_t hostCallback(AEffect* effect, int32_t opcode, int32_t index, intptr_t v
     case audioMasterIOChanged:
       return 1;
     case audioMasterSizeWindow:
-      // would need a back-pointer from AEffect to VSTHost to resize the dialog
+      // would need a back-pointer from AEffect to VSTHost to resize the editor window
       return 0;
     case audioMasterGetSampleRate:
       return current_audio_freq();
@@ -202,6 +203,7 @@ void VSTHost::freePlugin() {
     data_cache.clear();
     modulePtr.unload();
     plugin = nullptr;
+    editor_open_ = false;  // its editor went with it
   }
 #if defined(Q_OS_LINUX)
   if (x11_display_ && x11_window_) {
@@ -265,13 +267,33 @@ void VSTHost::processAudio(long numFrames) {
   plugin->processReplacing(plugin, inputs, outputs, numFrames);
 }
 
-void VSTHost::CreateDialogIfNull() {
-  if (dialog == nullptr) {
-    dialog = new QDialog(amber::app_ctx->getMainWindow());
-    dialog->setWindowTitle(tr("VST Plugin"));
-    dialog->setAttribute(Qt::WA_NativeWindow, true);
-    dialog->setWindowFlags(dialog->windowFlags() | Qt::MSWindowsFixedSizeDialogHint);
-    connect(dialog, &QDialog::finished, this, &VSTHost::uncheck_show_button);
+namespace {
+
+// Host window for the plugin editor. A user close only hides it (like the QDialog it replaces): an accepted
+// QCloseEvent makes QWindow destroy the native window while the plugin's editor is still attached to it.
+class VSTEditorWindow : public QWindow {
+ public:
+  std::function<void()> on_close;
+
+ protected:
+  void closeEvent(QCloseEvent* event) override {
+    event->ignore();
+    hide();
+    if (on_close) on_close();
+  }
+};
+
+}  // namespace
+
+void VSTHost::CreateEditorWindowIfNull() {
+  if (editor_window_ == nullptr) {
+    auto* window = new VSTEditorWindow();
+    window->setTitle(tr("VST Plugin"));
+    window->setFlags(Qt::Dialog | Qt::MSWindowsFixedSizeDialogHint);
+    // Stays on top of the main window and is centered on it when first shown, as the parented QDialog was
+    window->setTransientParent(amber::app_ctx->getMainWindowHandle());
+    window->on_close = [this]() { uncheck_show_button(); };
+    editor_window_ = window;
   }
 }
 
@@ -325,6 +347,14 @@ EffectPtr VSTHost::copy(Clip* c) {
 }
 
 VSTHost::~VSTHost() {
+  // Only ever created on Windows/macOS. Close the plugin's editor before its host window goes away; the plugin itself
+  // is closed afterwards by freePlugin().
+  if (editor_window_ != nullptr) {
+    if (plugin != nullptr && editor_open_) HideInterface();
+    delete editor_window_;
+    editor_window_ = nullptr;
+  }
+
   for (int channel = 0; channel < CHANNEL_COUNT; channel++) {
     delete[] inputs[channel];
     delete[] outputs[channel];
@@ -493,6 +523,7 @@ void VSTHost::StartIdleTimer() {
 void VSTHost::HideInterface() {
   if (idle_timer) idle_timer->stop();
   dispatcher(plugin, effEditClose, 0, 0, nullptr, 0);
+  editor_open_ = false;
 #if defined(Q_OS_LINUX)
   if (x11_display_ && x11_window_) {
     auto dpy = static_cast<Display*>(x11_display_);
@@ -500,7 +531,7 @@ void VSTHost::HideInterface() {
     XSync(dpy, False);
   }
 #else
-  if (dialog) dialog->hide();
+  if (editor_window_) editor_window_->hide();
 #endif
 }
 
@@ -516,10 +547,10 @@ bool VSTHost::ShowInterfacePlatform() {
   XMapRaised(dpy, static_cast<Window>(x11_window_));
   XSync(dpy, False);
   dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(x11_window_), 0);
-#else  // Windows, macOS, Haiku — use QDialog
-  CreateDialogIfNull();
-  dialog->show();
-  WId nativeWin = dialog->winId();
+#else  // Windows, macOS, Haiku — use a native QWindow
+  CreateEditorWindowIfNull();
+  editor_window_->show();
+  WId nativeWin = editor_window_->winId();
 #if defined(Q_OS_WIN)
   dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<HWND>(nativeWin), 0);
 #elif defined(Q_OS_MACOS)
@@ -528,6 +559,7 @@ bool VSTHost::ShowInterfacePlatform() {
   dispatcher(plugin, effEditOpen, 0, 0, reinterpret_cast<void*>(nativeWin), 0);
 #endif
 #endif  // Q_OS_LINUX
+  editor_open_ = true;
   return true;
 }
 
@@ -559,8 +591,11 @@ void VSTHost::change_plugin() {
 
 #if !defined(Q_OS_LINUX)
       if (eRect != nullptr && eRect->right > eRect->left && eRect->bottom > eRect->top) {
-        CreateDialogIfNull();
-        dialog->setFixedSize(eRect->right - eRect->left, eRect->bottom - eRect->top);
+        CreateEditorWindowIfNull();
+        const QSize editor_size(eRect->right - eRect->left, eRect->bottom - eRect->top);
+        editor_window_->setMinimumSize(editor_size);
+        editor_window_->setMaximumSize(editor_size);
+        editor_window_->resize(editor_size);
       }
 #endif
 

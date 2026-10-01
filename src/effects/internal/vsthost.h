@@ -21,7 +21,6 @@
 #ifndef VSTHOSTWIN_H
 #define VSTHOSTWIN_H
 
-#include <QDialog>
 #include <QLibrary>
 #include <QTimer>
 
@@ -31,6 +30,8 @@
 // Plugin's dispatcher function
 using dispatcherFuncPtr = intptr_t (*)(AEffect* effect, int32_t opCode, int32_t index, int32_t value, void* ptr,
                                        float opt);
+
+class QWindow;
 
 class VSTHost : public Effect {
   Q_OBJECT
@@ -63,10 +64,12 @@ class VSTHost : public Effect {
   void suspendPlugin();
   bool canPluginDo(char* canDoString);
   void processAudio(long numFrames);
-  void CreateDialogIfNull();
+  void CreateEditorWindowIfNull();
   float** inputs;
   float** outputs;
-  QDialog* dialog{nullptr};
+  // Native host window for the plugin editor (Windows/macOS; Linux uses x11_window_)
+  QWindow* editor_window_{nullptr};
+  bool editor_open_{false};  // effEditOpen sent and not yet matched by effEditClose
   QByteArray data_cache;
 
   void send_data_cache_to_plugin();

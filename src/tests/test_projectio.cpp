@@ -33,6 +33,7 @@ class StubAppContext : public AppContext {
   QString showOpenFileDialog(const QString&, const QString&) override { return {}; }
   void clearViewerMedia() override {}
   QWidget* getMainWindow() override { return nullptr; }
+  QWindow* getMainWindowHandle() override { return nullptr; }
   void clearGraphEditorIfRow(EffectRow*) override {}
   void addRecentProject(const QString&) override {}
   void setMediaIcon(Media*, int) override {}
