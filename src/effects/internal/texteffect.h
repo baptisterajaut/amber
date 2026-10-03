@@ -31,6 +31,7 @@ class TextEffect : public Effect {
 public:
   TextEffect(Clip* c, const EffectMeta *em);
   void redraw(double timecode) override;
+  virtual bool AlwaysUpdate();  
 private slots:
   void outline_enable(bool);
   void shadow_enable(bool);
@@ -39,6 +40,13 @@ private:
 
   StringField* text_val;
   DoubleField* size_val;
+  
+  DoubleField* reveal_val;
+  BoolField* animate_in_bool;
+  DoubleField* animate_stagger;
+  DoubleField* animate_duration;
+  DoubleField* animate_rise;
+  
   ColorField* set_color_button;
   FontField* set_font_combobox;
   ComboField* halign_field;
