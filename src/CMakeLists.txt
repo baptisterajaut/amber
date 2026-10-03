@@ -443,6 +443,8 @@ set(OLIVE_EFFECTS
   effects/shaders/flip.xml
   effects/shaders/gaussianblur.frag
   effects/shaders/gaussianblur.xml
+  effects/shaders/highlightcircle.frag
+  effects/shaders/highlightcircle.xml
   effects/shaders/huesatbri.frag
   effects/shaders/huesatbri.xml
   effects/shaders/invert.frag
@@ -457,6 +459,8 @@ set(OLIVE_EFFECTS
   effects/shaders/pixelate.xml
   effects/shaders/posterize.frag
   effects/shaders/posterize.xml
+  effects/shaders/privacy_mask.frag
+  effects/shaders/privacy_mask.xml
   effects/shaders/radialblur.frag
   effects/shaders/radialblur.xml
   effects/shaders/ripple.frag
@@ -469,6 +473,8 @@ set(OLIVE_EFFECTS
   effects/shaders/tile.xml
   effects/shaders/toonify.frag
   effects/shaders/toonify.xml
+  effects/shaders/sharpen.frag
+  effects/shaders/sharpen.xml
   effects/shaders/turbulentdisplacement.frag
   effects/shaders/turbulentdisplacement.xml
   effects/shaders/vignette.frag

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Privacy Censorship Mask" category="Stylize">
+	<row name="Mask Center">
+		<field type="double" default="50" min="0" max="100" id="centerX"/>
+		<field type="double" default="50" min="0" max="100" id="centerY"/>
+	</row>
+	<row name="Radius Size">
+		<field type="double" default="15" min="0" max="100" id="maskRadius"/>
+	</row>
+	<row name="Edge Softness">
+		<field type="double" default="30" min="0" max="100" id="maskSoftness"/>
+	</row>
+	<row name="Censorship Intensity">
+		<field type="double" default="20" min="1" max="100" id="intensity"/>
+	</row>
+	<row name="Pixelate Mosaic Mode">
+		<field type="bool" default="false" id="pixelateMode"/>
+	</row>
+	<shader vert="common.vert" frag="privacy_mask.frag"/>
+</effect>
