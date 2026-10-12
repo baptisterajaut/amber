@@ -89,7 +89,6 @@ void AudioRNNoiseEffect::process_audio(double timecode_start, double timecode_en
   // buffers no longer correspond to what's about to be fed in.
   const double kEpsilon = 1e-9;
   if (expected_next_timecode_ >= 0.0 && std::abs(timecode_start - expected_next_timecode_) > kEpsilon) {
-    printf("Audio state reset, diff=%f, eps=%f\n", std::abs(timecode_start - expected_next_timecode_), kEpsilon);
     reset_state();
   }
   expected_next_timecode_ = timecode_end;
