@@ -54,86 +54,86 @@ void load_internal_effects() {
 
   em.name = "Volume";
   em.internal = EFFECT_INTERNAL_VOLUME;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Pan";
   em.internal = EFFECT_INTERNAL_PAN;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "VST Plugin 2.x";
   em.internal = EFFECT_INTERNAL_VST;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Tone";
   em.internal = EFFECT_INTERNAL_TONE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Noise";
   em.internal = EFFECT_INTERNAL_NOISE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Fill Left/Right";
   em.internal = EFFECT_INTERNAL_FILLLEFTRIGHT;
-  effects.append(em);
+  effects.push_back(em);
 
   em.subtype = EFFECT_TYPE_VIDEO;
 
   em.name = "Transform";
   em.category = "Distort";
   em.internal = EFFECT_INTERNAL_TRANSFORM;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Corner Pin";
   em.internal = EFFECT_INTERNAL_CORNERPIN;
-  effects.append(em);
+  effects.push_back(em);
 
   /*em.name = "Mask";
   em.internal = EFFECT_INTERNAL_MASK;
-  effects.append(em);*/
+  effects.push_back(em);*/
 
   em.name = "Shake";
   em.internal = EFFECT_INTERNAL_SHAKE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Text";
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_TEXT;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Rich Text";
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_RICHTEXT;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Timecode";
   em.internal = EFFECT_INTERNAL_TIMECODE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Solid";
   em.internal = EFFECT_INTERNAL_SOLID;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Subtitle";
   em.internal = EFFECT_INTERNAL_SUBTITLE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Gradient";
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_GRADIENT;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Timer";
   em.internal = EFFECT_INTERNAL_TIMER;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Progress Bar";
   em.internal = EFFECT_INTERNAL_PROGRESSBAR;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Drop Shadow";
   em.category = "Stylize";
   em.internal = EFFECT_INTERNAL_DROPSHADOW;
-  effects.append(em);
+  effects.push_back(em);
 
   // internal transitions
   em.type = EFFECT_TYPE_TRANSITION;
@@ -141,31 +141,38 @@ void load_internal_effects() {
 
   em.name = "Cross Dissolve";
   em.internal = TRANSITION_INTERNAL_CROSSDISSOLVE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.subtype = EFFECT_TYPE_AUDIO;
 
   em.name = "Linear Fade";
   em.internal = TRANSITION_INTERNAL_LINEARFADE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Exponential Fade";
   em.internal = TRANSITION_INTERNAL_EXPONENTIALFADE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Logarithmic Fade";
   em.internal = TRANSITION_INTERNAL_LOGARITHMICFADE;
-  effects.append(em);
+  effects.push_back(em);
 }
 
 void load_shader_effects_worker(const QString& effects_path) {
   QDir effects_dir(effects_path);
   if (effects_dir.exists()) {
-    QList<QString> entries = effects_dir.entryList(QStringList("*.xml"), QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
+    QList<QString> entries = effects_dir.entryList(QStringList({"*.xml", "*.shadertoy"}),
+                                                   QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
     for (const auto & entrie : entries) {
       QString entry_path = effects_dir.filePath(entrie);
-      if (QFileInfo(entry_path).isDir()) {
+      QFileInfo entry_info(entry_path);
+      if (entry_info.isDir()) {
         load_shader_effects_worker(entry_path);
+      } else if (entry_info.suffix().compare(QLatin1String("shadertoy"), Qt::CaseInsensitive) == 0) {
+        // A sibling <name>.xml is this shader's descriptor (sidecar), registered by the XML branch
+        if (!QFileInfo::exists(effects_dir.filePath(entry_info.completeBaseName() + ".xml"))) {
+          register_shadertoy_effect(entry_info.absoluteFilePath());
+        }
       } else {
         QFile file(effects_path + "/" + entrie);
         if (!file.open(QIODevice::ReadOnly)) {
@@ -195,7 +202,7 @@ void load_shader_effects_worker(const QString& effects_path) {
               em.filename = file.fileName();
               em.path = effects_path;
               em.internal = -1;
-              effects.append(em);
+              effects.push_back(em);
             } else {
               qCritical() << "Invalid effect found in" << entrie;
             }
@@ -208,6 +215,27 @@ void load_shader_effects_worker(const QString& effects_path) {
       }
     }
   }
+}
+
+const EffectMeta* register_shadertoy_effect(const QString& file) {
+  // Readers that iterate `effects` without effects_loaded_mutex (GetInternalMeta, get_meta_from_name from paste) run
+  // on the UI thread, the import dialog's thread, so they can't race this push_back; validate_meta_path (render
+  // thread) returns before iterating for a meta with a path, which every shader effect has.
+  QFileInfo info(file);
+  const QString name = info.completeBaseName();
+  for (const auto& em : effects) {
+    if (em.category == QLatin1String("ShaderToy") && em.name == name) return &em;
+  }
+  EffectMeta em;
+  em.type = EFFECT_TYPE_EFFECT;
+  em.subtype = EFFECT_TYPE_VIDEO;
+  em.name = name;
+  em.category = QStringLiteral("ShaderToy");
+  em.filename = info.absoluteFilePath();
+  em.path = info.absolutePath();
+  em.internal = -1;
+  effects.push_back(em);
+  return &effects.back();
 }
 
 void load_shader_effects() {
@@ -255,7 +283,7 @@ void load_frei0r_effects_worker(const QString& dir, EffectMeta& em, QVector<QStr
 
               loaded_names.append(em.name);
 
-              effects.append(em);
+              effects.push_back(em);
             }
           }
           effect.unload();

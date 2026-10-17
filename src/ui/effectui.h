@@ -40,6 +40,9 @@ class EffectUI : public CollapsibleWidget {
   QVector<KeyframeNavigator*> keyframe_navigators_;
   QVector<QPushButton*> row_reset_buttons_;
   QPushButton* effect_reset_button_;
+  QLabel* shader_error_icon_;  // shown while the effect's shader failed to preprocess or bake
+
+  void UpdateShaderError();
 
  private slots:
   void show_context_menu(const QPoint&);

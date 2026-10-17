@@ -257,6 +257,35 @@ class TestLoadThread : public QObject {
 #endif
   }
 
+  // A project referencing a ShaderToy effect whose .shadertoy isn't installed loads it as a Missing Effect, which
+  // saves back what it read (name, enabled, field values), so the project survives a round trip on that machine
+  void missingShaderToyEffectSavesBack() {
+    QString path = write_fixture(
+        "shadertoy.ove", amber::kSaveVersion, QString(),
+        R"(<effect name="ShaderToy/Missing" enabled="1"><row><field id="speed" value="2.5"/></row></effect>)");
+    bool succeeded = false;
+    int failed = 0;  // error() emissions
+    run_load(path, false, &succeeded, &failed);
+    QVERIFY(succeeded);
+    QVERIFY(!failed);
+    QVERIFY(amber::ActiveSequence != nullptr);
+    QCOMPARE(amber::ActiveSequence->clips.size(), 1);
+    QCOMPARE(amber::ActiveSequence->clips.at(0)->effects.size(), 1);
+    Effect* e = amber::ActiveSequence->clips.at(0)->effects.at(0).get();
+    QCOMPARE(e->name, QStringLiteral("ShaderToy/Missing"));
+    QCOMPARE(e->row(0)->name(), QStringLiteral("Missing Effect"));
+
+    QByteArray saved;
+    {
+      QXmlStreamWriter w(&saved);
+      w.writeStartElement("effect");
+      e->save(w);
+      w.writeEndElement();
+    }
+    QVERIFY2(saved.contains(R"(name="ShaderToy/Missing")"), saved.constData());
+    QVERIFY2(saved.contains(R"(<field id="speed" value="2.5")"), saved.constData());
+  }
+
   // Importing a project with Frei0r effects into the open one shows them too; a project without any leaves them hidden
   void frei0rImportShowsFrei0rEffects() {
     QString plain = write_fixture("plain.ove", amber::kSaveVersion, QString(),
@@ -522,7 +551,7 @@ class TestLoadThread : public QObject {
   // A VST plugin path set by a project load or a paste (a field change, as LoadFieldElement does) only loads when
   // trusted. The paths don't exist: a load attempt shows up as one "failed to load" message, no attempt as none.
   void vstPluginLoadsOnlyTrustedPaths() {
-    if (effects.isEmpty()) load_internal_effects();
+    if (effects.empty()) load_internal_effects();
     const EffectMeta* meta = get_meta_from_name("VST Plugin 2.x");
     QVERIFY(meta != nullptr);
     const QString dir = dir_.filePath("no-such-dir");

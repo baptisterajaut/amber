@@ -56,7 +56,7 @@ TestRenderHarness::TestRenderHarness(QRhi::Implementation backend) {
   // 5. Effects registry (internal + XML). Call the loaders synchronously to
   //    avoid the EffectInit background thread (and to skip Frei0r discovery
   //    side effects that we don't need here).
-  if (effects.isEmpty()) {
+  if (effects.empty()) {
     load_internal_effects();
     load_shader_effects();
   }
@@ -313,7 +313,7 @@ EffectPtr TestRenderHarness::attach_xml_effect(Clip* clip, const QString& effect
 }
 
 EffectPtr TestRenderHarness::attach_xml_shader(Clip* clip, const QString& name) {
-  for (int i = 0; i < effects.size(); ++i) {
+  for (int i = 0; i < int(effects.size()); ++i) {
     // Skip internal effects. The audio Noise registers with name "Noise" and
     // internal=EFFECT_INTERNAL_NOISE (>= 0); the XML shader Noise has
     // internal == -1. Without this filter the audio one wins.

@@ -24,6 +24,7 @@
 #include <rhi/qshaderbaker.h>
 #include <QCoreApplication>
 #include <QCryptographicHash>
+#include <QDateTime>
 #include <QDir>
 #include <QFloat16>
 #include <QLocale>
@@ -37,6 +38,7 @@
 #include "core/curves.h"
 #include "core/math.h"
 #include "core/path.h"
+#include "core/shadertoy.h"
 #include "effects/fields/curvefield.h"
 #include "effects/fields/filefield.h"
 #include "engine/clip.h"
@@ -69,7 +71,7 @@
 #include "effects/internal/volumeeffect.h"
 #include "effects/internal/vsthost.h"
 
-QVector<EffectMeta> effects;
+std::deque<EffectMeta> effects;
 
 namespace {
 
@@ -192,11 +194,30 @@ void WriteFieldUboValue(EffectField* field, double timecode, const UniformEntry&
   }
 }
 
-// Write built-in automatic uniforms (resolution, time, iteration) into uboData.
+// Write built-in automatic uniforms (resolution, time, iteration, the ShaderToy inputs) into uboData.
 void WriteAutoUniforms(const QVector<UniformEntry>& entries, double timecode, int iteration, float resW, float resH,
-                       QByteArray& uboData) {
+                       double fps, QByteArray& uboData) {
   for (const auto& entry : entries) {
-    if (entry.name == QLatin1String("resolution")) {
+    if (entry.name == QLatin1String("iResolution") || entry.name == QLatin1String("iChannelResolution")) {
+      // iChannelResolution[0] only (the array's first vec3), [1..3] stay zero
+      float res[3] = {resW, resH, 1.0f};
+      memcpy(uboData.data() + entry.offset, res, qMin(entry.size, 12));
+    } else if (entry.name == QLatin1String("iTime")) {
+      float v = float(timecode);
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("iTimeDelta")) {
+      float v = fps > 0 ? float(1.0 / fps) : 0.0f;
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("iFrame")) {
+      int v = qRound(timecode * fps);
+      memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("iDate")) {
+      // Wall clock, as on ShaderToy: an export of a shader reading it isn't reproducible
+      const QDateTime now = QDateTime::currentDateTime();
+      float v[4] = {float(now.date().year()), float(now.date().month() - 1), float(now.date().day()),
+                    float(now.time().msecsSinceStartOfDay() / 1000.0)};
+      memcpy(uboData.data() + entry.offset, v, qMin(entry.size, 16));
+    } else if (entry.name == QLatin1String("resolution")) {
       float res[2] = {resW, resH};
       memcpy(uboData.data() + entry.offset, res, qMin(entry.size, 8));
     } else if (entry.name == QLatin1String("resolution_x")) {
@@ -228,6 +249,54 @@ void WriteFieldUniforms(Effect* effect, const QVector<UniformEntry>& entries, do
       }
     }
   }
+}
+
+const QString kBuiltinVert = QStringLiteral(":/internalshaders/common.vert");
+
+bool IsShaderToyPath(const QString& path) { return path.endsWith(QLatin1String(".shadertoy"), Qt::CaseInsensitive); }
+
+// The fields that become uniforms of a .shadertoy effect, in field order (the types WriteFieldUboValue writes)
+QVector<amber::shadertoy::Param> ShaderToyParams(Effect* effect) {
+  QVector<amber::shadertoy::Param> params;
+  for (int r = 0; r < effect->row_count(); r++) {
+    EffectRow* erow = effect->row(r);
+    for (int j = 0; j < erow->FieldCount(); j++) {
+      EffectField* field = erow->Field(j);
+      if (field->id().isEmpty()) continue;
+      switch (field->type()) {
+        case EffectField::EFFECT_FIELD_DOUBLE:
+          params.append({field->id(), QStringLiteral("float")});
+          break;
+        case EffectField::EFFECT_FIELD_BOOL:
+          params.append({field->id(), QStringLiteral("bool")});
+          break;
+        case EffectField::EFFECT_FIELD_COMBO:
+          params.append({field->id(), QStringLiteral("int")});
+          break;
+        case EffectField::EFFECT_FIELD_COLOR:
+          params.append({field->id(), QStringLiteral("vec3")});
+          break;
+        default:
+          break;
+      }
+    }
+  }
+  return params;
+}
+
+QShader BakeShaderToyFile(const QString& path, const QVector<amber::shadertoy::Param>& params, QString* error) {
+  QFile src(path);
+  if (!src.open(QIODevice::ReadOnly)) {
+    qWarning() << "Failed to open shader source:" << path;
+    *error = QCoreApplication::translate("Effect", "Failed to open %1").arg(path);
+    return {};
+  }
+  const QString glsl = amber::shadertoy::to_amber_glsl(QString::fromUtf8(src.readAll()), params, error);
+  if (glsl.isEmpty()) {
+    qWarning() << "ShaderToy shader rejected:" << path << *error;
+    return {};
+  }
+  return Effect::bakeSource(glsl.toUtf8(), QShader::FragmentStage, error);
 }
 
 }  // namespace
@@ -314,7 +383,14 @@ Effect::Effect(Clip* c, const EffectMeta* em)
     name = em->name;
 
     if (!em->filename.isEmpty() && em->internal == -1) {
-      parseEffectXml();
+      if (IsShaderToyPath(em->filename)) {
+        // A bare .shadertoy (no sidecar XML): no rows, frag relative to the meta's folder, the built-in vertex shader
+        SetFlags(ShaderFlag);
+        fragPath = QFileInfo(em->filename).fileName();
+        vertPath = kBuiltinVert;
+      } else {
+        parseEffectXml();
+      }
     }
   }
 }
@@ -490,6 +566,14 @@ void Effect::parseShaderElement(QXmlStreamReader& reader) {
       setIterations(attr.value().toInt());
     } else if (attr.name() == QLatin1String("original")) {
       needsOriginal_ = (attr.value() == QLatin1String("1"));
+    }
+  }
+  if (IsShaderToyPath(fragPath)) {
+    if (vertPath.isEmpty()) vertPath = kBuiltinVert;
+    if (iterations != 1 || needsOriginal_) {
+      qWarning() << "Effect" << name << "has a .shadertoy frag: iterations and original are ignored";
+      iterations = 1;
+      needsOriginal_ = false;
     }
   }
 }
@@ -824,16 +908,21 @@ void Effect::validate_meta_path() {
   }
 }
 
-QShader Effect::bakeOrLoadCached(const QString& path, QShader::Stage stage) {
-  QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/shaders";
-  QDir().mkpath(cacheDir);
-
+QShader Effect::bakeOrLoadCached(const QString& path, QShader::Stage stage, QString* error) {
   QFile src(path);
   if (!src.open(QIODevice::ReadOnly)) {
     qWarning() << "Failed to open shader source:" << path;
+    if (error) *error = QCoreApplication::translate("Effect", "Failed to open %1").arg(path);
     return {};
   }
-  QByteArray source = src.readAll();
+  QShader result = bakeSource(src.readAll(), stage, error);
+  if (!result.isValid()) qWarning() << "Shader bake failed:" << path;
+  return result;
+}
+
+QShader Effect::bakeSource(const QByteArray& source, QShader::Stage stage, QString* error) {
+  QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/shaders";
+  QDir().mkpath(cacheDir);
 
   QByteArray hashBytes = QCryptographicHash::hash(source, QCryptographicHash::Sha1);
   QString hash = hashBytes.toHex();
@@ -858,7 +947,8 @@ QShader Effect::bakeOrLoadCached(const QString& path, QShader::Stage stage) {
   });
   QShader result = baker.bake();
   if (!result.isValid()) {
-    qWarning() << "Shader bake failed:" << path << baker.errorMessage();
+    qWarning() << "Shader bake failed:" << baker.errorMessage();
+    if (error) *error = baker.errorMessage();
     return {};
   }
 
@@ -877,8 +967,11 @@ void Effect::open() {
   }
   if (amber::CurrentRuntimeConfig.shaders_are_enabled && (Flags() & (ShaderFlag | ClipShaderFlag))) {
     validate_meta_path();
+    // A path starting with ":/" is a built-in resource (the .shadertoy default vertex shader)
+    auto resolve = [this](const QString& p) { return p.startsWith(QLatin1String(":/")) ? p : meta->path + "/" + p; };
+    QString vert_error, frag_error;
     if (!vertPath.isEmpty()) {
-      vertexShader_ = bakeOrLoadCached(meta->path + "/" + vertPath, QShader::VertexStage);
+      vertexShader_ = bakeOrLoadCached(resolve(vertPath), QShader::VertexStage, &vert_error);
       if (vertexShader_.isValid()) {
         QShaderDescription desc = vertexShader_.description();
         for (const auto& block : desc.uniformBlocks()) {
@@ -893,7 +986,9 @@ void Effect::open() {
       }
     }
     if (!fragPath.isEmpty()) {
-      fragmentShader_ = bakeOrLoadCached(meta->path + "/" + fragPath, QShader::FragmentStage);
+      fragmentShader_ = IsShaderToyPath(fragPath)
+                            ? BakeShaderToyFile(resolve(fragPath), ShaderToyParams(this), &frag_error)
+                            : bakeOrLoadCached(resolve(fragPath), QShader::FragmentStage, &frag_error);
       if (fragmentShader_.isValid()) {
         QShaderDescription desc = fragmentShader_.description();
         for (const auto& block : desc.uniformBlocks()) {
@@ -907,8 +1002,23 @@ void Effect::open() {
         }
       }
     }
+    setShaderError(vert_error.isEmpty() ? frag_error : vert_error);
   }
   isOpen = true;
+}
+
+QString Effect::shaderError() const {
+  QMutexLocker lock(&shader_error_mutex_);
+  return shader_error_;
+}
+
+void Effect::setShaderError(const QString& error) {
+  {
+    QMutexLocker lock(&shader_error_mutex_);
+    if (shader_error_ == error) return;
+    shader_error_ = error;
+  }
+  emit ShaderErrorChanged();
 }
 
 void Effect::close() {
@@ -973,7 +1083,8 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QB
   float resW = renderSize.isValid() ? float(renderSize.width()) : float(parent_clip->media_width());
   float resH = renderSize.isValid() ? float(renderSize.height()) : float(parent_clip->media_height());
 
-  WriteAutoUniforms(uniformEntries_, timecode, iteration, resW, resH, uboData);
+  const double fps = (parent_clip && parent_clip->sequence) ? parent_clip->sequence->frame_rate : 0.0;
+  WriteAutoUniforms(uniformEntries_, timecode, iteration, resW, resH, fps, uboData);
   WriteFieldUniforms(this, uniformEntries_, timecode, uboData);
   for (const auto& entry : uniformEntries_) {
     if (entry.name == QLatin1String("lutSize")) {

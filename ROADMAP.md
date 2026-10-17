@@ -39,26 +39,28 @@ Internal C++ effects (Transform, Text, Solid, Timecode) stay as-is — they use 
 
 Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto community standard for GPU effects, with thousands of filters, generators, and transitions available at shadertoy.com.
 
-**How it works:** ShaderToy shaders use a fixed entry point (`void mainImage(out vec4 fragColor, in vec2 fragCoord)`) with standard uniforms. Amber preprocesses them at load time into GLSL 440 compatible with QShaderBaker: injects the UBO declaration, sampler bindings, and a `main()` wrapper. The compiled `.qsb` is disk-cached — recompilation only on source change.
+**Done in 2.0 (v1 scope):** a `.shadertoy` file (the shader's "Image" tab, as is) in an effects folder appears under the *ShaderToy* category of the add-effect menu, or *Add Video Effect > Import ShaderToy Shader...* takes a name and a pasted source, compiles it (errors keep the dialog open) and writes it to the user effects folder. A failed compile shows a warning icon on the effect strip with the baker message, and the effect renders as a no-op.
+
+**How it works:** ShaderToy shaders use a fixed entry point (`void mainImage(out vec4 fragColor, in vec2 fragCoord)`) with standard uniforms. At bake time Amber turns the file into the GLSL 440 an XML shader effect would ship (`core/shadertoy`): injects the UBO declaration, the `iChannel0` binding and a `main()` wrapper, blanks `#version`/`precision`/the copied input declarations, and routes the texture reads through flipping helpers. The compiled `.qsb` is disk-cached — recompilation only on source change.
 
 **Standard uniforms mapped automatically:**
-- `iChannel0` → clip input texture
-- `iResolution` → sequence dimensions (`vec3(w, h, 1.0)`)
-- `iTime` → clip timecode in seconds
-- `iFrame` → frame index
-- `iTimeDelta` → `1 / frame_rate`
-- `iDate`, `iMouse` → provided, usable
+- `iChannel0` → clip input texture (unpremultiplied for the shader)
+- `iResolution`, `iChannelResolution[0]` → the clip texture size (`vec3(w, h, 1.0)`; reduced during half-res scrub), so `fragCoord / iResolution.xy` is the `iChannel0` uv
+- `iTime` → clip timecode in seconds (clip-local: trimming the head continues the animation)
+- `iFrame` → frame index, `iTimeDelta` → `1 / frame_rate`
+- `iDate` → wall clock (an export reading it isn't reproducible), `iMouse` → 0
 
-**Backend portability:** ShaderToy shaders receive `fragCoord` as `vTexCoord × iResolution.xy` in the generated wrapper — not raw `gl_FragCoord` — which avoids the Y-axis flip difference between Vulkan/Metal/D3D (top-left origin) and OpenGL (bottom-left origin).
+**Backend portability:** the wrapper derives `fragCoord` from the texture coordinate (y flipped to ShaderToy's y-up) — not raw `gl_FragCoord` — and the `iChannel0` reads are flipped the same way, so a passthrough is an exact identity on every backend.
 
-**To use:** Drop a `.shadertoy` file into the effects folder — it appears in the effect list under the *ShaderToy* category. Or paste directly via *Effects → Import ShaderToy shader*. Compilation errors surface as a warning indicator on the effect strip with the baker error message.
+**Alpha:** the shader's alpha is ignored; the output keeps the clip's alpha (`rgb × a, a`), so nothing leaks onto the tracks below. A ShaderToy shader can't create or move alpha in v1.
 
-**Custom parameters:** By default a ShaderToy effect has no user-facing sliders — standard uniforms are automatic. To expose parameters, add a minimal XML sidecar declaring `<field>` entries; those become slider rows in the Effect Controls panel, same as built-in shader effects.
+**Custom parameters:** By default a ShaderToy effect has no user-facing sliders — standard uniforms are automatic. To expose parameters, add a sibling `<name>.xml` sidecar (a normal effect XML whose `<shader frag="<name>.shadertoy"/>`) declaring `<field>` entries; those become uniforms and slider rows in the Effect Controls panel, same as built-in shader effects.
 
-**v1 scope (2.0):** Single-pass, single-input (`iChannel0`) shaders. Out of scope for 2.0:
+**v1 scope (2.0):** Single-pass, single-input (`iChannel0`) shaders. Projects reference the effect by name, the `.shadertoy` must travel with a shared `.ove`. Out of scope for 2.0:
 - Multi-pass shaders (ShaderToy Buffer A/B/C/D) — requires persistent textures across frames
 - `iChannel1–3` media assignment — requires UI to assign sources and extra sampler bindings
 - Audio FFT input (`iChannel` of type audio)
+- `textureGrad`/`textureGather`/`texture*Offset`/`textureProj` on `iChannel0` (rejected with a message: the flip can't be applied)
 
 ### New built-in effects
 - Gradient generator — linear/radial with multi-stop color ramp, applicable to solids and text (#21)

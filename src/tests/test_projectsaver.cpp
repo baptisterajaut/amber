@@ -166,7 +166,7 @@ class TestProjectSaver : public QObject {
     // transition into a row-less VoidEffect and the round trip compares nothing
     qputenv("AMBER_EFFECTS_PATH", QByteArray(SOURCE_DIR "/effects/shaders"));
     amber::CurrentConfig = {};
-    if (effects.isEmpty()) {
+    if (effects.empty()) {
       load_internal_effects();
       load_shader_effects();
     }
