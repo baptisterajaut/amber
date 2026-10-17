@@ -2,8 +2,9 @@ find_package(Qt6 REQUIRED COMPONENTS Test)
 
 # All test targets link amber-engine which provides core, engine, effects,
 # rendering, project, and global sources via OBJECT library. amber-engine
-# references no UI symbol and pulls no QtWidgets, so no test links UI code, except amber-test-scopewidget which
-# compiles the self-contained ui/scopewidget.cpp (QPainter drawing over core/scopes) into its own executable.
+# references no UI symbol and pulls no QtWidgets, so no test links UI code, except amber-test-scopewidget and
+# amber-test-curveeditor, which compile the self-contained ui/scopewidget.cpp (QPainter drawing over core/scopes) and
+# ui/curveeditor.cpp (over core/curves) into their own executables.
 
 add_executable(amber-tests test_math.cpp)
 target_include_directories(amber-tests PRIVATE ${CMAKE_SOURCE_DIR})
@@ -25,6 +26,11 @@ target_include_directories(amber-test-scopes PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-scopes PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-scopes COMMAND amber-test-scopes)
 
+add_executable(amber-test-curves test_curves.cpp)
+target_include_directories(amber-test-curves PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-curves PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-curves COMMAND amber-test-curves)
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 add_executable(amber-test-scopewidget test_scopewidget.cpp ${CMAKE_SOURCE_DIR}/ui/scopewidget.cpp)
 target_include_directories(amber-test-scopewidget PRIVATE ${CMAKE_SOURCE_DIR})
@@ -32,6 +38,14 @@ target_link_libraries(amber-test-scopewidget PRIVATE amber-engine Qt6::Widgets Q
 set_target_properties(amber-test-scopewidget PROPERTIES AUTOMOC ON)
 add_test(NAME amber-test-scopewidget COMMAND amber-test-scopewidget)
 set_tests_properties(amber-test-scopewidget PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Same pattern: the self-contained ui/curveeditor.cpp (QWidget over core/curves) driven with QTest mouse events
+add_executable(amber-test-curveeditor test_curveeditor.cpp ${CMAKE_SOURCE_DIR}/ui/curveeditor.cpp)
+target_include_directories(amber-test-curveeditor PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-curveeditor PRIVATE amber-engine Qt6::Widgets Qt6::Test)
+set_target_properties(amber-test-curveeditor PROPERTIES AUTOMOC ON)
+add_test(NAME amber-test-curveeditor COMMAND amber-test-curveeditor)
+set_tests_properties(amber-test-curveeditor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(amber-test-timer-format test_timer_format.cpp)
 target_include_directories(amber-test-timer-format PRIVATE ${CMAKE_SOURCE_DIR})

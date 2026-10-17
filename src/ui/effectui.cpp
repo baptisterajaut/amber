@@ -105,6 +105,9 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr) {
       layout_->addWidget(widget, i, column, 1, field->GetColumnSpan());
 
       column += field->GetColumnSpan();
+
+      // A curve editor is a tall square: its row's label sits at its top, by the channel buttons
+      if (field->type() == EffectField::EFFECT_FIELD_CURVE) layout_->setAlignment(row_label, Qt::AlignTop);
     }
 
     // Find maximum column to place keyframe controls
@@ -137,7 +140,7 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr) {
       btn->setFlat(true);
       btn->setToolTip(tr("Reset to Default"));
       btn->setVisible(false);
-      layout_->addWidget(btn, i, reset_column);
+      layout_->addWidget(btn, i, reset_column, layout_->itemAtPosition(i, 0)->alignment());
 
       int row_index = i;
       connect(btn, &QPushButton::clicked, this, [this, row_index]() { ResetRow(row_index); });
@@ -213,10 +216,11 @@ void EffectUI::AddAdditionalEffect(Effect* e) {
     AttachKeyframeNavigationToRow(e->row(i), keyframe_navigators_.at(i));
 
     for (int j = 0; j < row->FieldCount(); j++) {
-      // Attach existing field widget to this effect's field
-      QWidget* existing_widget = Widget(i, j);
+      // Attach the existing widget to this effect's own field, through a wrapper of its own (owned by this EffectUI,
+      // like field_widgets_): the shown value stays the first effect's, edits reach every effect
       if (i < field_widgets_.size() && j < field_widgets_[i].size() && field_widgets_[i][j]) {
-        field_widgets_[i][j]->CreateWidget(existing_widget);
+        EffectFieldWidget* fw = EffectFieldWidget::Create(e->row(i)->Field(j), this);
+        if (fw != nullptr) fw->CreateWidget(Widget(i, j));
       }
     }
   }

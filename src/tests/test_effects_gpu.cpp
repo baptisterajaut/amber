@@ -14,6 +14,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
+#include "core/curves.h"
 #include "effects/effect.h"
 #include "effects/internal/srtparser.h"
 #include "effects/internal/subtitleeffect.h"
@@ -188,6 +189,14 @@ class TestEffectsGpu : public QObject {
   void denoiseKeepsHardEdge();
   void denoiseBilateralWeights();
   void denoiseIgnoresTransparentTaps();
+
+  // Curves (256 x 1 curve texture at binding 3).
+  void curvesIdentityPassthrough();
+  void curvesMasterMidPoint();
+  void curvesRedEndpointToCyan();
+  void curvesLumaDarkenKeepsRatio();
+  void curvesLiftedBlackStaysNeutral();
+  void curvesUploadOnlyOnChange();
 
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
@@ -507,6 +516,8 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
   h_->attach_xml_shader(c, "Box Blur");
   h_->attach_xml_shader(c, "Hue/Saturation/Brightness");
   h_->attach_xml_shader(c, "Glow");  // original="1" on a ping-pong input: copy into the lazy ClipRhiResources::orig
+  // Curve texture at binding 3: created and uploaded once
+  h_->attach_xml_shader(c, "Curves");
   check_steady(seq.get(), 5, 1, "generator", frame0);
   if (QTest::currentTestFailed()) return;
   // Textures aren't counted above: the snapshot target must be created once, then reused
@@ -3392,6 +3403,13 @@ void TestEffectsGpu::colorShadersKeepTransparentClipTransparent() {
       {"Colorize", [this](Effect* e) { h_->set_field_double(e, 2, 0, 50.0); }},             // lightness 50
       {"Glow", [](Effect*) {}},  // defaults: bright pass of zeros is zero, a = max(0, max(rgb)) = 0
       {"Denoise", [this](Effect* e) { h_->set_field_double(e, 1, 0, 100.0); }},  // strength 100
+      {"Curves",
+       [this](Effect* e) {  // lifted blacks on the master and the luma curve
+         amber::curves::CurveSet s = amber::curves::identity();
+         s.channels[amber::curves::kRgb] = {{0, 60}, {255, 255}};
+         s.channels[amber::curves::kLuma] = {{0, 40}, {255, 255}};
+         h_->set_field_string(e, 0, 0, amber::curves::serialize(s));
+       }},
   };
 
   auto make_bottom = [this](Sequence* seq) {
@@ -3727,6 +3745,107 @@ void TestEffectsGpu::denoiseIgnoresTransparentTaps() {
   Rgba px = pixel_at(pixels, 64, 16, 32);
   QVERIFY2(qAbs(px.r - 60) <= 4 && qAbs(px.g - 60) <= 4 && qAbs(px.b - 60) <= 4,
            qPrintable(QString("expected ~(60,60,60), got (%1,%2,%3)").arg(px.r).arg(px.g).arg(px.b)));
+}
+
+// ---------------------------------------------------------------------------
+// Curves
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Canonical curves string with one channel replaced (row 0 field 0 of curves.xml is the curve field)
+QString curves_with(amber::curves::Channel ch, amber::curves::Curve points) {
+  amber::curves::CurveSet s = amber::curves::identity();
+  s.channels[ch] = points;
+  return amber::curves::serialize(s);
+}
+
+}  // namespace
+
+void TestEffectsGpu::curvesIdentityPassthrough() {
+  // Identity curves: every 8-bit channel lands on its own texel centre, luma scales by Y'/Y = 1
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Curves");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/1),
+           qPrintable(QString("expected identity Curves passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::curvesMasterMidPoint() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
+  EffectPtr fx = h_->attach_xml_shader(c, "Curves");
+  h_->set_field_string(fx.get(), 0, 0, curves_with(amber::curves::kRgb, {{0, 0}, {128, 192}, {255, 255}}));
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 192) <= 1 && qAbs(mid.g - 192) <= 1 && qAbs(mid.b - 192) <= 1,
+           qPrintable(QString("expected (192,192,192), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::curvesRedEndpointToCyan() {
+  // Red curve's right endpoint pulled down to 0: the red channel is 0 everywhere, white turns cyan
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 255, 255));
+  EffectPtr fx = h_->attach_xml_shader(c, "Curves");
+  h_->set_field_string(fx.get(), 0, 0, curves_with(amber::curves::kRed, {{0, 0}, {255, 0}}));
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r <= 1 && mid.g >= 254 && mid.b >= 254,
+           qPrintable(QString("expected (0,255,255), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::curvesLumaDarkenKeepsRatio() {
+  // Luma mid point 128 -> 64 on (160,100,60): darker, but scaled, so R:G:B stays 160:100:60
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(160, 100, 60));
+  EffectPtr fx = h_->attach_xml_shader(c, "Curves");
+  h_->set_field_string(fx.get(), 0, 0, curves_with(amber::curves::kLuma, {{0, 0}, {128, 64}, {255, 255}}));
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  const QString got = QString("got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b);
+  QVERIFY2(mid.r < 140 && mid.g > 0 && mid.b > 0, qPrintable("expected darker, " + got));
+  QVERIFY2(qAbs(double(mid.r) / mid.g - 1.6) < 0.07 && qAbs(double(mid.g) / mid.b - 100.0 / 60.0) < 0.1,
+           qPrintable("expected R:G:B = 160:100:60, " + got));
+}
+
+void TestEffectsGpu::curvesLiftedBlackStaysNeutral() {
+  // Luma left endpoint lifted to 40 on a near-black reddish (6,1,1): near black the lift is a shift, not a scale
+  // (a scale by Y'/Y ~ 20 would give a saturated ~(120,20,20)), so the result stays close to grey
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(6, 1, 1));
+  EffectPtr fx = h_->attach_xml_shader(c, "Curves");
+  h_->set_field_string(fx.get(), 0, 0, curves_with(amber::curves::kLuma, {{0, 40}, {255, 255}}));
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  const int lo = qMin(mid.r, qMin(mid.g, mid.b));
+  const int hi = qMax(mid.r, qMax(mid.g, mid.b));
+  QVERIFY2(lo >= 30 && hi - lo <= 25,
+           qPrintable(QString("expected a lifted near-grey, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::curvesUploadOnlyOnChange() {
+  // The curve texture is uploaded on first use and then only when the curves string changes
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
+  EffectPtr fx = h_->attach_xml_shader(c, "Curves");
+  for (int f = 0; f < 3; f++) QVERIFY(!h_->render_frame(seq.get(), f).isEmpty());
+  QCOMPARE(fx->curveUploadCount(), 1);
+  h_->set_field_string(fx.get(), 0, 0, curves_with(amber::curves::kRgb, {{0, 0}, {128, 192}, {255, 255}}));
+  for (int f = 3; f < 6; f++) QVERIFY(!h_->render_frame(seq.get(), f).isEmpty());
+  QCOMPARE(fx->curveUploadCount(), 2);
+  h_->assert_pixel(h_->render_frame(seq.get(), 6), 64, 32, 32, QColor(192, 192, 192), 1);
 }
 
 // Phase 4 — only test that exercises the YUV decode path (yuv2rgb.frag.qsb).

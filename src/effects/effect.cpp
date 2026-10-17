@@ -34,8 +34,10 @@
 #include <QtMath>
 
 #include "core/appcontext.h"
+#include "core/curves.h"
 #include "core/math.h"
 #include "core/path.h"
+#include "effects/fields/curvefield.h"
 #include "effects/fields/filefield.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
@@ -79,7 +81,7 @@ constexpr FieldTypeEntry kFieldTypes[] = {
     {"DOUBLE", EffectField::EFFECT_FIELD_DOUBLE}, {"BOOL", EffectField::EFFECT_FIELD_BOOL},
     {"COLOR", EffectField::EFFECT_FIELD_COLOR},   {"COMBO", EffectField::EFFECT_FIELD_COMBO},
     {"FONT", EffectField::EFFECT_FIELD_FONT},     {"STRING", EffectField::EFFECT_FIELD_STRING},
-    {"FILE", EffectField::EFFECT_FIELD_FILE},
+    {"FILE", EffectField::EFFECT_FIELD_FILE},     {"CURVE", EffectField::EFFECT_FIELD_CURVE},
 };
 
 int FieldTypeFromString(const QString& type_str) {
@@ -450,20 +452,25 @@ void Effect::parseFieldElement(QXmlStreamReader& reader, EffectRow* row) {
     case EffectField::EFFECT_FIELD_FILE:
       ParseStringDefaultField(row, id, attributes, "filename", true);
       break;
+    case EffectField::EFFECT_FIELD_CURVE:
+      new CurveField(row, id);
+      break;
   }
 }
 
 void Effect::parseRowElement(QXmlStreamReader& reader) {
   QString row_name;
+  bool keyframable = true;
   for (const auto& attr : reader.attributes()) {
     if (attr.name() == QLatin1String("name")) {
       row_name = attr.value().toString();
-      break;
+    } else if (attr.name() == QLatin1String("keyframable")) {
+      keyframable = (attr.value() != QLatin1String("0"));
     }
   }
   if (row_name.isEmpty()) return;
 
-  EffectRow* row = new EffectRow(this, row_name);
+  EffectRow* row = new EffectRow(this, row_name, true, keyframable);
   while (!reader.atEnd() && !(reader.name() == QLatin1String("row") && reader.isEndElement())) {
     reader.readNext();
     if (reader.name() == QLatin1String("field") && reader.isStartElement()) {
@@ -507,9 +514,9 @@ void Effect::parseEffectXml() {
 
   effect_file.close();
 
-  // The LUT and the original input both sit at binding 3
-  if (needsOriginal_ && needsLut()) {
-    qWarning() << "Effect" << name << "uses a LUT, ignoring original=\"1\" (both need texture binding 3)";
+  // The LUT, the curve texture and the original input all sit at binding 3
+  if (needsOriginal_ && (needsLut() || needsCurveTexture())) {
+    qWarning() << "Effect" << name << "uses a LUT or curves, ignoring original=\"1\" (both need texture binding 3)";
     needsOriginal_ = false;
   }
 }
@@ -914,6 +921,11 @@ void Effect::close() {
     lutTex_ = nullptr;
   }
   loadedLutPath_.clear();
+  if (curveTex_) {
+    RenderThread::DeferRhiResourceDeletion(curveTex_);
+    curveTex_ = nullptr;
+  }
+  uploadedCurves_.clear();
   vertexShader_ = {};
   fragmentShader_ = {};
   uniformEntries_.clear();
@@ -1331,4 +1343,43 @@ QRhiTexture* Effect::process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QS
     loadedLutPath_ = lutPath;
   }
   return lutTex_;
+}
+
+CurveField* Effect::findCurveField() {
+  if (curveFieldSearched_) return curveField_;
+  curveFieldSearched_ = true;
+  for (int i = 0; i < row_count() && curveField_ == nullptr; i++) {
+    EffectRow* r = row(i);
+    for (int j = 0; j < r->FieldCount(); j++) {
+      if (r->Field(j)->type() == EffectField::EFFECT_FIELD_CURVE) {
+        curveField_ = static_cast<CurveField*>(r->Field(j));
+        break;
+      }
+    }
+  }
+  return curveField_;
+}
+
+bool Effect::needsCurveTexture() { return findCurveField() != nullptr; }
+
+QRhiTexture* Effect::process_curve_texture(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode) {
+  CurveField* f = findCurveField();
+  if (f == nullptr) return nullptr;
+  const QString curves = f->GetValueAt(timecode).toString();
+  if (curveTex_ == nullptr) {
+    // 256 x 1 RGBA8 (R/G/B = channel curves after the master, A = luma), sampled at texel centres with the
+    // shared linear sampler
+    curveTex_ = rhi->newTexture(QRhiTexture::RGBA8, QSize(256, 1));
+    curveTex_->create();
+    uploadedCurves_.clear();
+  } else if (curves == uploadedCurves_) {
+    return curveTex_;
+  }
+  const QByteArray lut = amber::curves::build_lut(amber::curves::parse(curves));
+  QRhiTextureSubresourceUploadDescription desc(lut.constData(), lut.size());
+  desc.setSourceSize(QSize(256, 1));
+  u->uploadTexture(curveTex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+  uploadedCurves_ = curves;
+  curveUploads_++;
+  return curveTex_;
 }

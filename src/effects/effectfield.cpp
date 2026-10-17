@@ -147,6 +147,7 @@ QVariant EffectField::GetValueAt(double timecode) {
     case EFFECT_FIELD_COMBO:
     case EFFECT_FIELD_FONT:
     case EFFECT_FIELD_FILE:
+    case EFFECT_FIELD_CURVE:
       persistent_data_ = keyframes.at(before_keyframe).data;
       break;
     default:
