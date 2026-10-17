@@ -153,6 +153,7 @@ class Viewer : public Panel {
   QString panel_name;
   double minimum_zoom{1.0};
   bool playing_in_to_out;
+  bool loop_wrap_{false};  // inside the loop's pause() + play(): playback goes on, the frame rate window too
   long last_playhead;
   void set_zoom_value(double d);
   void set_sb_max();

@@ -82,7 +82,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 - Waveform + histogram scopes — done in 2.0: Scopes panel (Window > Scopes, hidden by default) with luma waveform, RGB parade, histogram and vectorscope of the sequence viewer's frame, computed on the CPU from the viewer's readback (`core/scopes`, `panels/scopespanel`, `ui/scopewidget`)
 - Pixel sampler
 - Enhanced audio monitor
-- FPS counter overlay
+- FPS counter overlay — done in 2.0: View > Show Frame Rate (off by default) labels the sequence viewer's top-left corner during playback with the displayed rate over the last second and the sequence rate (`29.7 / 29.97 fps`), red when a full second averages below 95% of the sequence rate. Counts the frames the viewer painted that show a new sequence frame, so frames dropped between two paints and playback-timer re-renders of the same frame don't count (`core/fpsmeter`, `amber-test-fps-meter`)
 
 ### Editing features
 - Track mute/solo/lock with track headers (per-track header controls showing V1/A1 labels, show/hide for video, mute/solo for audio + skip logic in compose_sequence) (#12)

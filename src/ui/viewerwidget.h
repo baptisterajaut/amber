@@ -22,6 +22,7 @@
 #define VIEWERWIDGET_H
 
 #include <rhi/qrhi.h>
+#include <QElapsedTimer>
 #include <QMatrix4x4>
 #include <QMutex>
 #include <QRhiWidget>
@@ -29,6 +30,7 @@
 #include <QTimer>
 #include <QWaitCondition>
 
+#include "core/fpsmeter.h"
 #include "core/guide.h"
 #include "core/scrubresolution.h"
 #include "effects/effect.h"
@@ -83,6 +85,10 @@ class ViewerWidget : public QRhiWidget {
   // so we don't trigger a full RHI re-render.
   void update_overlay();
 
+  // Playback stopped: empties the frame rate window, so the next play never averages across the pause, and hides
+  // the label (no new frame repaints the overlay after a pause)
+  void reset_frame_rate();
+
  signals:
   void colorPicked(const QColor& color);
   void colorPickCancelled();
@@ -107,6 +113,9 @@ class ViewerWidget : public QRhiWidget {
   void draw_title_safe_area(QPainter& p);
   void draw_guides(QPainter& p);
   void draw_gizmos(QPainter& p);
+  // View > Show Frame Rate: true while the label is due (sequence viewer, playing)
+  bool frame_rate_shown() const;
+  void draw_frame_rate(QPainter& p);
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
   void move_gizmos(QMouseEvent* event, bool done);
   // Body of frame_update(); with_audio = false skips the audio scrub grain
@@ -169,6 +178,12 @@ class ViewerWidget : public QRhiWidget {
   amber::ScrubResolution scrub_res_;
   QTimer settle_timer_;
   int last_requested_divider_{1};  // divider of the last viewer render requested, reused by the retries and checked by the settle
+  // Frame rate overlay: displayed frames, timed when render() takes in a newly published one (serial changed) that
+  // shows another sequence frame (playhead changed)
+  amber::FpsMeter fps_meter_;
+  QElapsedTimer fps_clock_;
+  quint64 fps_last_serial_{0};
+  long fps_last_playhead_{-1};
  public slots:
   void queue_repaint();
 

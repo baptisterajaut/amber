@@ -1,6 +1,7 @@
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include "core/headlessappcontext.h"
 #include "global/config.h"
 
 class TestConfig : public QObject {
@@ -34,6 +35,21 @@ class TestConfig : public QObject {
         "  <ShowFrei0rEffects>1</ShowFrei0rEffects>\n</Configuration>\n");
     QCOMPARE(cfg.preview_resolution_divider, 2);
     QVERIFY(cfg.show_frei0r_effects);
+  }
+
+  void showFrameRateRoundTrips() {
+    QTemporaryDir dir;
+    const QString path = dir.filePath("config.xml");
+    Config saved;
+    QVERIFY(!saved.show_frame_rate);  // off by default
+    saved.show_frame_rate = true;
+    HeadlessAppContext ctx;
+    amber::app_ctx = &ctx;  // save() asks it for the project toolbar state
+    saved.save(path);
+    amber::app_ctx = nullptr;
+    Config loaded;
+    loaded.load(path);
+    QVERIFY(loaded.show_frame_rate);
   }
 };
 

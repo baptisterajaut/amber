@@ -334,6 +334,8 @@ void RenderThread::paint() {
   gizmo_selection_ = gizmos;
   params.gizmos = gizmos;
 
+  // CBA: latched apart from compose_sequence()'s own read; a playhead write in between labels the frame one off
+  const long rendered_playhead = seq->playhead;
   amber::rendering::compose_sequence(params);
   gizmos = params.gizmos;  // nulled by compose_sequence if clip wasn't rendered
 
@@ -378,6 +380,7 @@ void RenderThread::paint() {
     last_timing_.serial++;
     last_timing_.gpu_ms = gpu_ns / 1e6;
     last_timing_.divider = render_divider_;
+    last_timing_.playhead = rendered_playhead;
   }
 
   // readBackTexture() returns top-to-bottom data on all backends (both OpenGL

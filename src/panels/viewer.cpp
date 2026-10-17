@@ -399,6 +399,8 @@ void Viewer::pause(bool clear_buffer) {
   set_playpause_icon(true);
   playback_updater.stop();
   playback_speed = 0;
+  // Here, not on the next paint: a play can follow before any frame is painted. Not on a loop wrap: playback goes on
+  if (amber::CurrentConfig.show_frame_rate && !loop_wrap_) viewer_widget->reset_frame_rate();
 
   // Flush audio buffer on pause to prevent stale samples from playing
   if (clear_buffer) {
@@ -880,9 +882,11 @@ void Viewer::check_playback_end() {
       if (amber::CurrentConfig.loop) {
         // play() pauses a playing viewer first, which resets the speed to 1x: keep 2x/3x across the wrap
         int speed = playback_speed;
+        loop_wrap_ = true;  // play()'s seek to the in point pauses again
         pause();
         playback_speed = speed;
         play();
+        loop_wrap_ = false;
       } else if (playing_in_to_out) {
         pause();
       }
