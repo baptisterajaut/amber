@@ -236,7 +236,9 @@ void AmberGlobal::LoadProject(const QString& fn, bool autorecovery, bool import)
   connect(lt, &LoadThread::error, ld, [ended]() { *ended = true; });
   // An import failing must not clear the project it was being imported into
   if (!import) {
-    connect(lt, &LoadThread::error, this, &AmberGlobal::new_project);
+    // ClearProject(), not new_project(): no "Project Already Empty" box over the error, no save prompt for the partial
+    // project, and the file name is always dropped so a later save can't overwrite the file that failed to load
+    connect(lt, &LoadThread::error, this, &AmberGlobal::ClearProject);
   }
   connect(lt, &LoadThread::report_progress, ld, &LoadDialog::setValue);
   connect(lt, &LoadThread::found_invalid_footage, this, [](QVector<QPair<Media*, Footage*>> invalid) {
