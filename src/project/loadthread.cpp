@@ -183,7 +183,7 @@ void LoadThread::read_next_start_element(QXmlStreamReader& stream) {
 }
 
 void LoadThread::update_current_element_count(QXmlStreamReader& stream) {
-  if (is_element(stream)) {
+  if (counting_progress_ && is_element(stream)) {
     current_element_count++;
     report_progress((current_element_count * 100) / total_element_count);
   }
@@ -641,7 +641,12 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
           amber::CurrentConfig.preview_resolution_divider = div;
         }
       } else {
-        while (!cancelled_ && !stream.atEnd() && !(stream.name() == root_search && stream.isEndElement())) {
+        // Progress counts elements inside the phase's own collection only: every phase rescans the file from the
+        // start, so counting what the root search passes over counted elements again (and the whole file when an
+        // optional element like <previewresolution> is missing)
+        counting_progress_ = true;
+        bool ok = true;
+        while (ok && !cancelled_ && !stream.atEnd() && !(stream.name() == root_search && stream.isEndElement())) {
           read_next(stream);
           if (stream.name() == child_search && stream.isStartElement()) {
             switch (type) {
@@ -652,12 +657,13 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
                 parse_footage(stream, child_search);
                 break;
               case MEDIA_TYPE_SEQUENCE:
-                if (!parse_sequence(stream, child_search)) return false;
+                ok = parse_sequence(stream, child_search);
                 break;
             }
           }
         }
-        if (cancelled_) return false;
+        counting_progress_ = false;
+        if (!ok || cancelled_) return false;
       }
       break;
     }
