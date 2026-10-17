@@ -12,11 +12,11 @@ Amber inherits Olive 0.1's greatest strength: everything is where you expect it.
 ### 1.6.0 — Quality-of-life
 
 - ~~Auto Cut Silence ripple delete + configurable gap between clips, feedback dialogs when no cuts produced~~
-- Track Select Tool — new timeline tool, selects all clips from click point rightward on the track (Shift = all tracks) (#15)
-- Shift+Arrow multi-frame skip — bind Shift+Left/Right as alias for Jump Backward/Forward (existing `Ctrl+[`/`Ctrl+]`, configurable step in preferences) (#15)
+- ~~Track Select Tool — new timeline tool, selects all clips from click point rightward on the track (Shift = all tracks) (#15)~~ — shipped in v1.6.0
+- ~~Shift+Arrow multi-frame skip — bind Shift+Left/Right as alias for Jump Backward/Forward (existing `Ctrl+[`/`Ctrl+]`, configurable step in preferences) (#15)~~ — shipped in v1.6.0
 - **Canvas Painter for viewer overlays (Qt 6.11)** — replace QPainter with Qt Canvas Painter (GPU-accelerated 2D on QRhi, 2-10x faster) for title-safe, guides, gizmos. Drop-in API swap, same drawing logic. Tech preview — API may shift in 6.12.
 - **Callback-based audio I/O (Qt 6.11)** — `QAudioSink::start()` now accepts a callback for real-time audio processing, replacing QIODevice push/pull. Adopt for audio monitoring and scrub playback — cleaner, lower latency.
-- **Bold timecodes** — increase font weight on timecode displays (viewer, effect controls). Trivial QSS/font change. (#12)
+- ~~**Bold timecodes** — increase font weight on timecode displays (viewer, effect controls). Trivial QSS/font change. (#12)~~ — shipped in v1.6.0
 - **PipeWire Bluetooth audio** — Qt 6.11 ships a new PipeWire backend. Test if Bluetooth sink enumeration works; if so, remove the `QT_AUDIO_BACKEND=pulseaudio` workaround in `main.cpp`.
 
 
