@@ -212,7 +212,7 @@ target_compile_definitions(amber-engine PUBLIC ${AMBER_DEFINITIONS})
 # No Qt6::Widgets / Qt6::OpenGLWidgets here: engine code must build without the QtWidgets include paths (the UI
 # lives in UI_SOURCES below and goes through amber::app_ctx).
 target_link_libraries(amber-engine PUBLIC
-  Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::Multimedia Qt6::ShaderToolsPrivate
+  Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::Multimedia Qt6::ShaderToolsPrivate Qt6::Svg
   FFMPEG::avutil FFMPEG::avcodec FFMPEG::avformat FFMPEG::avfilter
   FFMPEG::swscale FFMPEG::swresample
   $<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${X11_FOUND}>>:${X11_LIBRARIES}>
@@ -320,6 +320,8 @@ set(AMBER_RESOURCES
 set(AMBER_EFFECTS
   effects/shaders/alphaadjust.frag
   effects/shaders/alphaadjust.xml
+  effects/shaders/alpha_mask.frag
+  effects/shaders/alpha_mask.xml
   effects/shaders/boxblur.frag
   effects/shaders/boxblur.xml
   effects/shaders/bulge.frag

@@ -418,7 +418,16 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
       params.cb->resourceUpdate(curveUpload);  // between passes: process_effect never runs inside one
     }
 
-    // original="1": the effect's input at binding 3 in every pass (never together with a LUT, see parseEffectXml).
+    // Alpha Mask: the decoded image at binding 3 (never with a LUT, curves or original="1", see parseEffectXml), with
+    // a decode and upload only when the file changed (an empty batch otherwise)
+    if (e->needsMask()) {
+      QRhiResourceUpdateBatch* maskUpload = params.rhi->nextResourceUpdateBatch();
+      extraTexture = e->process_mask(params.rhi, maskUpload, e->currentMaskPath(timecode));
+      params.cb->resourceUpdate(maskUpload);  // between passes: process_effect never runs inside one
+    }
+
+    // original="1": the effect's input at binding 3 in every pass (never with another binding 3 user, see
+    // parseEffectXml).
     // A ping-pong input gets overwritten by the passes (and would be a feedback loop as their target), so it is
     // copied first; any other input (decoder/superimpose texture, ...) is left untouched by the passes.
     // CBA: one snapshot per clip, two such effects on a clip re-copy in turn (each one's passes finish first).

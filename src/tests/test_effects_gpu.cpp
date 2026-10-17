@@ -1,4 +1,5 @@
 #include <QGuiApplication>
+#include <QRegularExpression>
 #include <QSet>
 #include <QSurfaceFormat>
 #include <QTemporaryDir>
@@ -211,6 +212,18 @@ class TestEffectsGpu : public QObject {
   void curvesLumaDarkenKeepsRatio();
   void curvesLiftedBlackStaysNeutral();
   void curvesUploadOnlyOnChange();
+
+  // Alpha Mask (image file at binding 3).
+  void alphaMaskNoFileIsIdentity();
+  void alphaMaskTopHalfStretch();
+  void alphaMaskInvert();
+  void alphaMaskLuminance();
+  void alphaMaskOpacity();
+  void alphaMaskFeather();
+  void alphaMaskFitAndFill();
+  void alphaMaskPositionScale();
+  void alphaMaskSvg();
+  void alphaMaskUnreadableFile();
 
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
@@ -3871,6 +3884,226 @@ void TestEffectsGpu::curvesUploadOnlyOnChange() {
   for (int f = 3; f < 6; f++) QVERIFY(!h_->render_frame(seq.get(), f).isEmpty());
   QCOMPARE(fx->curveUploadCount(), 2);
   h_->assert_pixel(h_->render_frame(seq.get(), 6), 64, 32, 32, QColor(192, 192, 192), 1);
+}
+
+// ---------------------------------------------------------------------------
+// Alpha Mask (image file at binding 3). The clip is opaque white, so the readback's rgb is 255 x the mask value
+// (premultiplied, alpha forced to 255). Rows of alpha_mask.xml: 0 file, 1 channel, 2 fit, 3 position (x, y),
+// 4 scale, 5 feather, 6 invert, 7 opacity.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A w x h mask, `top` above row h / 2 and `bottom` from it down
+QImage split_mask(int w, int h, QColor top, QColor bottom) {
+  QImage img(w, h, QImage::Format_RGBA8888);
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) img.setPixelColor(x, y, y < h / 2 ? top : bottom);
+  }
+  return img;
+}
+
+QString save_mask(const QTemporaryDir& dir, const QString& name, const QImage& img) {
+  const QString path = dir.filePath(name);
+  return img.save(path) ? path : QString();
+}
+
+// Opaque white Solid on a 64 x 64 sequence with an Alpha Mask of `path` on top
+Effect* add_masked_white(TestRenderHarness* h, Sequence* seq, const QString& path) {
+  Clip* c = h->add_generator_clip(seq, -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h->set_field_color(c->effects[1].get(), 2, 0, QColor(Qt::white));
+  EffectPtr fx = h->attach_xml_shader(c, "Alpha Mask");
+  h->set_field_string(fx.get(), 0, 0, path);
+  return fx.get();
+}
+
+// The mask value at (x, y) as the readback shows it, 0..255
+inline int mask_value(const QByteArray& pixels, int x, int y) { return pixel_at(pixels, 64, x, y).r; }
+
+// Every pixel of rows [y0, y1] is within `tolerance` of `expected`
+bool rows_are(const QByteArray& pixels, int y0, int y1, int expected, int tolerance, QString* where) {
+  for (int y = y0; y <= y1; y++) {
+    for (int x = 0; x < 64; x++) {
+      if (qAbs(mask_value(pixels, x, y) - expected) > tolerance) {
+        *where = QString("(%1,%2)=%3, expected %4").arg(x).arg(y).arg(mask_value(pixels, x, y)).arg(expected);
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+void TestEffectsGpu::alphaMaskNoFileIsIdentity() {
+  // No file: a passthrough, also with Invert on (ticking Invert before picking a file must not blank the clip)
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), QString());
+  h_->assert_solid_color(h_->render_frame(seq.get(), 0), 64, 64, QColor(Qt::white), 1);
+  h_->set_field_bool(fx, 6, 0, true);
+  h_->assert_solid_color(h_->render_frame(seq.get(), 1), 64, 64, QColor(Qt::white), 1);
+}
+
+void TestEffectsGpu::alphaMaskTopHalfStretch() {
+  // A 32 x 32 mask, top half opaque: the clip's top half is kept, its bottom half fully transparent. Upside down on a
+  // backend whose texture rows or UVs disagree with the clip's.
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", split_mask(32, 32, QColor(255, 255, 255, 255), QColor(0, 0, 0, 0)));
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_masked_white(h_.get(), seq.get(), path);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QString where;
+  QVERIFY2(rows_are(pixels, 0, 28, 255, 1, &where), qPrintable("top half: " + where));
+  QVERIFY2(rows_are(pixels, 35, 63, 0, 1, &where), qPrintable("bottom half: " + where));
+}
+
+void TestEffectsGpu::alphaMaskInvert() {
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", split_mask(32, 32, QColor(255, 255, 255, 255), QColor(0, 0, 0, 0)));
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  h_->set_field_bool(fx, 6, 0, true);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QString where;
+  QVERIFY2(rows_are(pixels, 0, 28, 0, 1, &where), qPrintable("top half: " + where));
+  QVERIFY2(rows_are(pixels, 35, 63, 255, 1, &where), qPrintable("bottom half: " + where));
+}
+
+void TestEffectsGpu::alphaMaskLuminance() {
+  // Opaque white over opaque black: the alpha channel is 1 everywhere, the luminance one splits like the top-half mask
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", split_mask(32, 32, QColor(Qt::white), QColor(Qt::black)));
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  // Alpha channel first, then Luminance
+  h_->assert_solid_color(h_->render_frame(seq.get(), 0), 64, 64, QColor(Qt::white), 1);
+  h_->set_field_combo(fx, 1, 0, 1);
+  QByteArray pixels = h_->render_frame(seq.get(), 1);
+  QString where;
+  QVERIFY2(rows_are(pixels, 0, 28, 255, 1, &where), qPrintable("top half: " + where));
+  QVERIFY2(rows_are(pixels, 35, 63, 0, 1, &where), qPrintable("bottom half: " + where));
+}
+
+void TestEffectsGpu::alphaMaskOpacity() {
+  // Opacity 50: the masked-out half keeps half its alpha, the kept half stays whole
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", split_mask(32, 32, QColor(255, 255, 255, 255), QColor(0, 0, 0, 0)));
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  h_->set_field_double(fx, 7, 0, 50.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QString where;
+  QVERIFY2(rows_are(pixels, 0, 28, 255, 1, &where), qPrintable("top half: " + where));
+  QVERIFY2(rows_are(pixels, 35, 63, 128, 2, &where), qPrintable("bottom half: " + where));
+}
+
+void TestEffectsGpu::alphaMaskFeather() {
+  // Feather 8 on the top-half mask: down a column the edge at y = 32 becomes a monotone ramp over about 16 px, never
+  // a hard step (the unfeathered edge drops 255 in about 2 px)
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", split_mask(32, 32, QColor(255, 255, 255, 255), QColor(0, 0, 0, 0)));
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  h_->set_field_double(fx, 5, 0, 8.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(mask_value(pixels, 32, 16) >= 254);
+  QVERIFY(mask_value(pixels, 32, 48) <= 1);
+  int intermediate = 0;
+  for (int y = 17; y <= 48; y++) {
+    const int prev = mask_value(pixels, 32, y - 1);
+    const int cur = mask_value(pixels, 32, y);
+    QVERIFY2(cur <= prev + 1, qPrintable(QString("ramp not monotone at y=%1: %2 then %3").arg(y).arg(prev).arg(cur)));
+    QVERIFY2(prev - cur <= 64, qPrintable(QString("hard step at y=%1: %2 then %3").arg(y).arg(prev).arg(cur)));
+    if (cur > 10 && cur < 245) intermediate++;
+  }
+  QVERIFY2(intermediate >= 8, qPrintable(QString("ramp too short: %1 intermediate rows").arg(intermediate)));
+}
+
+void TestEffectsGpu::alphaMaskFitAndFill() {
+  // A fully opaque 2:1 mask on the square clip: Fit letterboxes it (rows 16..47 kept, the bands hidden), Fill covers
+  // the clip
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", split_mask(64, 32, QColor(Qt::white), QColor(Qt::white)));
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  h_->set_field_combo(fx, 2, 0, 1);  // Fit
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QString where;
+  QVERIFY2(rows_are(pixels, 0, 14, 0, 1, &where), qPrintable("top band: " + where));
+  QVERIFY2(rows_are(pixels, 17, 46, 255, 1, &where), qPrintable("letterboxed mask: " + where));
+  QVERIFY2(rows_are(pixels, 49, 63, 0, 1, &where), qPrintable("bottom band: " + where));
+  h_->set_field_combo(fx, 2, 0, 2);  // Fill
+  h_->assert_solid_color(h_->render_frame(seq.get(), 1), 64, 64, QColor(Qt::white), 1);
+}
+
+void TestEffectsGpu::alphaMaskPositionScale() {
+  // A fully opaque mask at 50% scale keeps the centre 32 x 32 region; Position x = 25% moves it to the left half
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", split_mask(8, 8, QColor(Qt::white), QColor(Qt::white)));
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  h_->set_field_double(fx, 4, 0, 50.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  for (const QPoint& p : {QPoint(32, 32), QPoint(18, 18), QPoint(45, 45), QPoint(18, 45)}) {
+    QVERIFY2(mask_value(pixels, p.x(), p.y()) >= 254, qPrintable(QString("(%1,%2) not kept").arg(p.x()).arg(p.y())));
+  }
+  for (const QPoint& p : {QPoint(13, 32), QPoint(50, 32), QPoint(32, 13), QPoint(32, 50), QPoint(4, 4)}) {
+    QVERIFY2(mask_value(pixels, p.x(), p.y()) <= 1, qPrintable(QString("(%1,%2) not hidden").arg(p.x()).arg(p.y())));
+  }
+  h_->set_field_double(fx, 3, 0, 25.0);  // Position x
+  pixels = h_->render_frame(seq.get(), 1);
+  QVERIFY(mask_value(pixels, 8, 32) >= 254);
+  QVERIFY(mask_value(pixels, 40, 32) <= 1);
+}
+
+void TestEffectsGpu::alphaMaskSvg() {
+  // An SVG with a filled rect over its top-left quadrant: that quadrant of the clip is kept, upright and unmirrored
+  QTemporaryDir dir;
+  const QString path = dir.filePath("m.svg");
+  {
+    QFile f(path);
+    QVERIFY(f.open(QFile::WriteOnly | QFile::Text));
+    f.write(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\">"
+        "<rect x=\"0\" y=\"0\" width=\"32\" height=\"32\" fill=\"#ffffff\"/></svg>");
+  }
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_masked_white(h_.get(), seq.get(), path);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY2(mask_value(pixels, 16, 16) >= 254, "top-left quadrant not kept");
+  QVERIFY2(mask_value(pixels, 48, 16) <= 1, "top-right quadrant not hidden");
+  QVERIFY2(mask_value(pixels, 16, 48) <= 1, "bottom-left quadrant not hidden");
+  QVERIFY2(mask_value(pixels, 48, 48) <= 1, "bottom-right quadrant not hidden");
+}
+
+void TestEffectsGpu::alphaMaskUnreadableFile() {
+  // A text file named .png: a passthrough with one warning, then a readable file picked afterwards applies
+  QTemporaryDir dir;
+  const QString bad = dir.filePath("bad.png");
+  {
+    QFile f(bad);
+    QVERIFY(f.open(QFile::WriteOnly | QFile::Text));
+    f.write("not an image\n");
+  }
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), bad);
+  QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Alpha mask: could not read"));
+  h_->assert_solid_color(h_->render_frame(seq.get(), 0), 64, 64, QColor(Qt::white), 1);
+  h_->assert_solid_color(h_->render_frame(seq.get(), 1), 64, 64, QColor(Qt::white), 1);
+
+  const QString good = save_mask(dir, "m.png", split_mask(32, 32, QColor(255, 255, 255, 255), QColor(0, 0, 0, 0)));
+  QVERIFY(!good.isEmpty());
+  h_->set_field_string(fx, 0, 0, good);
+  QByteArray pixels = h_->render_frame(seq.get(), 2);
+  QVERIFY(mask_value(pixels, 32, 8) >= 254);
+  QVERIFY(mask_value(pixels, 32, 56) <= 1);
 }
 
 // Phase 4 — only test that exercises the YUV decode path (yuv2rgb.frag.qsb).

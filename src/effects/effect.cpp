@@ -26,9 +26,14 @@
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
+#include <QFileInfo>
 #include <QFloat16>
+#include <QImage>
+#include <QImageReader>
 #include <QLocale>
+#include <QPainter>
 #include <QStandardPaths>
+#include <QSvgRenderer>
 #include <QTextStream>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
@@ -598,9 +603,17 @@ void Effect::parseEffectXml() {
 
   effect_file.close();
 
-  // The LUT, the curve texture and the original input all sit at binding 3
-  if (needsOriginal_ && (needsLut() || needsCurveTexture())) {
-    qWarning() << "Effect" << name << "uses a LUT or curves, ignoring original=\"1\" (both need texture binding 3)";
+  // The LUT, the curve texture, the mask and the original input all sit at binding 3: with more than one, the first
+  // in this order is kept and the others are ignored
+  const bool lut = needsLut();
+  const bool curve = needsCurveTexture();
+  const bool mask = needsMask();
+  if (int(lut) + int(curve) + int(mask) + int(needsOriginal_) > 1) {
+    const char* kept = lut ? "the LUT" : (curve ? "the curves" : "the mask");
+    qWarning() << "Effect" << name << "has more than one of a LUT, curves, a mask and original=\"1\" (all need texture"
+               << "binding 3), keeping" << kept;
+    if (lut || curve) maskField_ = nullptr;
+    if (lut) curveField_ = nullptr;
     needsOriginal_ = false;
   }
 }
@@ -1036,6 +1049,12 @@ void Effect::close() {
     curveTex_ = nullptr;
   }
   uploadedCurves_.clear();
+  if (maskTex_) {
+    RenderThread::DeferRhiResourceDeletion(maskTex_);
+    maskTex_ = nullptr;
+  }
+  loadedMaskPath_.clear();
+  maskSize_ = QSize(0, 0);
   vertexShader_ = {};
   fragmentShader_ = {};
   uniformEntries_.clear();
@@ -1090,6 +1109,10 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QB
     if (entry.name == QLatin1String("lutSize")) {
       float v = float(lutSize_);
       memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("mask_size")) {
+      // The loaded mask's pixel size, (0, 0) with none: process_effect runs process_mask before the passes
+      float v[2] = {float(maskSize_.width()), float(maskSize_.height())};
+      memcpy(uboData.data() + entry.offset, v, qMin(entry.size, 8));
     }
   }
 }
@@ -1502,4 +1525,86 @@ QRhiTexture* Effect::process_curve_texture(QRhi* rhi, QRhiResourceUpdateBatch* u
   uploadedCurves_ = curves;
   curveUploads_++;
   return curveTex_;
+}
+
+FileField* Effect::findMaskField() {
+  if (maskFieldSearched_) return maskField_;
+  maskFieldSearched_ = true;
+  for (int i = 0; i < row_count() && maskField_ == nullptr; i++) {
+    EffectRow* r = row(i);
+    for (int j = 0; j < r->FieldCount(); j++) {
+      if (r->Field(j)->id() == "mask_path") {
+        maskField_ = dynamic_cast<FileField*>(r->Field(j));
+        break;
+      }
+    }
+  }
+  return maskField_;
+}
+
+bool Effect::needsMask() { return findMaskField() != nullptr; }
+
+QString Effect::currentMaskPath(double timecode) {
+  FileField* f = findMaskField();
+  return f ? f->GetFileAt(timecode) : QString();
+}
+
+namespace {
+
+// Decodes a mask file to straight-alpha RGBA8888, its long side capped at `maxSide`. A null image on failure.
+QImage loadMaskImage(const QString& path, int maxSide) {
+  QImage img;
+  const QString suffix = QFileInfo(path).suffix().toLower();
+  if (suffix == QLatin1String("svg") || suffix == QLatin1String("svgz")) {
+    QSvgRenderer svg(path);
+    QSize size = svg.defaultSize();
+    if (!svg.isValid() || size.isEmpty()) return QImage();
+    // CBA: fixed 2048 raster, re-rasterise at clip resolution if large clips show softness
+    size.scale(2048, 2048, Qt::KeepAspectRatio);
+    img = QImage(size, QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::transparent);
+    QPainter p(&img);
+    svg.render(&p);
+  } else {
+    QImageReader reader(path);
+    reader.setAutoTransform(true);  // EXIF orientation: upright like in a file viewer
+    img = reader.read();
+  }
+  if (img.isNull()) return QImage();
+  // Bounds the upload and its memory on modest hardware, a mask doesn't need more
+  if (qMax(img.width(), img.height()) > maxSide) {
+    img = img.scaled(maxSide, maxSide, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  }
+  return img.convertToFormat(QImage::Format_RGBA8888);
+}
+
+}  // namespace
+
+QRhiTexture* Effect::process_mask(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& maskPath) {
+  // maskTex_ == nullptr: first use with no file picked, the empty path equals the empty loadedMaskPath_
+  if (maskPath == loadedMaskPath_ && maskTex_ != nullptr) return maskTex_;
+
+  // CBA: synchronous decode on the render thread on file change, a worker if large masks stutter the first frame
+  QImage img;
+  if (!maskPath.isEmpty()) {
+    img = loadMaskImage(maskPath, qMin(4096, rhi->resourceLimit(QRhi::TextureSizeMax)));
+    if (img.isNull()) qWarning() << "Alpha mask: could not read" << maskPath << "- the effect passes through";
+  }
+  // No file or a failed decode: a 1x1 placeholder keeps binding 3 valid, mask_size (0, 0) makes the shader a no-op
+  maskSize_ = img.isNull() ? QSize(0, 0) : img.size();
+  if (img.isNull()) {
+    img = QImage(1, 1, QImage::Format_RGBA8888);
+    img.fill(Qt::transparent);
+  }
+
+  RenderThread::DeferRhiResourceDeletion(maskTex_);
+  maskTex_ = rhi->newTexture(QRhiTexture::RGBA8, img.size());
+  maskTex_->create();
+  // Row 0 is the image top, the same as the clip textures' row 0 (vTexCoord.y = 0) on every backend
+  QRhiTextureSubresourceUploadDescription desc(img.constBits(), quint32(img.sizeInBytes()));
+  desc.setSourceSize(img.size());
+  u->uploadTexture(maskTex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
+
+  loadedMaskPath_ = maskPath;
+  return maskTex_;
 }
