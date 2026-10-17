@@ -944,6 +944,18 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
 
         // If we're not skipping this file, let's import it
         if (!skip) {
+          // Replace (and its undo) frees the old Footage, which the footage viewer may still point into (waveform
+          // stream): close the viewer if it shows this media, as deleting the media does
+          if (replace != nullptr && panel_footage_viewer != nullptr && panel_footage_viewer->seq != nullptr) {
+            for (int j = 0; j < panel_footage_viewer->seq->clips.size(); j++) {
+              ClipPtr c = panel_footage_viewer->seq->clips.at(j);
+              if (c != nullptr && c->media() == replace.get()) {
+                panel_footage_viewer->set_media(nullptr);
+                break;
+              }
+            }
+          }
+
           MediaPtr item;
           FootagePtr m;
 
