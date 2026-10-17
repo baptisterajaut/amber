@@ -778,7 +778,8 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
             }
 
             e->process_image(get_timecode(this, cacher_frame), using_db_1 ? data_buffer_1 : data_buffer_2,
-                             using_db_1 ? data_buffer_2 : data_buffer_1, frame_size);
+                             using_db_1 ? data_buffer_2 : data_buffer_1, frame->width, frame->height,
+                             frame->linesize[0]);
 
             using_db_1 = !using_db_1;
           }
