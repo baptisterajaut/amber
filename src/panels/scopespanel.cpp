@@ -95,6 +95,7 @@ void ScopesPanel::onFrameReady() {
 }
 
 void ScopesPanel::processFrame() {
+  if (!on_screen_) return;  // hidden while the throttle was armed
   amber::scopes::Sample sample;
   // Never cache the RenderThread: fetch it through the viewer panel each time
   RenderThread* renderer = nullptr;
