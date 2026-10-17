@@ -81,6 +81,9 @@ bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, 
     }
 
     packet->stream_index = stream->index;
+    // The encoder leaves video durations at 0, so the muxer stores the last frame as zero-length and players
+    // that honour the mp4 edit list drop it. One tick of the 1/framerate video time base is one frame.
+    if (packet->duration == 0 && codec_ctx->codec_type == AVMEDIA_TYPE_VIDEO) packet->duration = 1;
 
     av_packet_rescale_ts(packet, codec_ctx->time_base, stream->time_base);
 
