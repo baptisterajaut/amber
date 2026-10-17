@@ -95,6 +95,8 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 
 **RHI resource caching:** Currently ~16 QRhi resource allocs+destructs per clip per frame (buffers, SRBs, pipelines). Pipeline creation is 100µs+ on Vulkan. Pre-create and cache pipelines/SRBs per clip, use a buffer pool for dynamic buffers.
 
+**Measuring:** `amber-bench-render` (not a ctest) gives median/p95 ms per 1080p frame on fixed scenarios, `--rhi gl|vulkan`. Run it before and after each change above with `--frames 300` or more (median noise is about ±0.1 ms). Baseline on an RX 6900 XT, 100 frames: GL solid 1.0 / fx5 2.4 / stack4 1.8 ms, Vulkan 0.85 / 1.28 / 1.27 ms.
+
 **Pre-allocated YUV staging buffers:** Clip::Retrieve() currently constructs new QByteArrays per frame for YUV plane upload — 3.0 MB of heap alloc per 1080p frame. Pre-allocate persistent buffers to eliminate churn. (Note: zero-copy is not feasible — Qt RHI's `QRhiTextureSubresourceUploadDescription` only accepts QByteArray, no raw pointer API. The copy overhead itself is negligible at 0.45% CPU bandwidth.)
 
 **Lower-res readback during scrub:** Full GPU→CPU→GPU round-trip on every frame (8.3 MB for 1080p). Half-res readback during scrub would cut bandwidth 4x.
