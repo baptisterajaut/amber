@@ -253,8 +253,9 @@ void RenderThread::run() {
       rhi_failed_ = false;
     }
 
-    // Latch once: start_render() may change divider_ from the GUI thread while this frame renders
-    render_divider_ = qMax(1, divider_.load());
+    // Latch once: start_render() may change divider_ from the GUI thread while this frame renders. A pending Save
+    // Frame renders at full resolution, whatever divider a viewer request (or the viewer's retry) set since.
+    render_divider_ = save_fn.isEmpty() ? qMax(1, divider_.load()) : 1;
     ensure_render_buffers(render_divider_);
     paint();
 

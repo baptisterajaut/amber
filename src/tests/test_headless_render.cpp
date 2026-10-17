@@ -779,6 +779,35 @@ class TestHeadlessRender : public QObject {
     delete surface;
     QVERIFY2(!lost, qPrintable(QString("request %1 never rendered").arg(requests)));
   }
+
+  // Save Frame renders at full resolution even when a viewer request at a preview divider (the viewer's retry after a
+  // failed render, a scrub) arrives before the save has been rendered
+  void saveFrameKeepsFullResolution() {
+    SequencePtr seq = std::make_shared<Sequence>();
+    seq->width = 16;
+    seq->height = 16;
+    seq->frame_rate = kFps;
+    QOffscreenSurface* surface = QRhiGles2InitParams::newFallbackSurface();
+    auto* rt = new RenderThread();
+    rt->setGlFallbackSurface(surface);
+    std::atomic<int> frames{0};
+    connect(rt, &RenderThread::ready, rt, [&frames]() { frames++; }, Qt::DirectConnection);
+    rt->start();
+    rt->start_render(seq.get(), 1, nullptr, nullptr, 0, 1);  // creates the QRhi
+    QTRY_VERIFY_WITH_TIMEOUT(frames.load() == 1, 10000);
+
+    const QString fn = dir_.filePath("frame.png");
+    QFile::remove(fn);
+    rt->start_render(seq.get(), 1, fn);
+    rt->start_render(seq.get(), 1, nullptr, nullptr, 0, 4);
+    // paint() saves before announcing the frame
+    QTRY_VERIFY_WITH_TIMEOUT(frames.load() > 1, 10000);
+    rt->cancel();
+    delete rt;
+    delete surface;
+    QImage saved(fn);
+    QCOMPARE(saved.size(), QSize(16, 16));
+  }
 };
 
 int main(int argc, char* argv[]) {
