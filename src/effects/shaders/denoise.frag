@@ -35,7 +35,8 @@ void main(void) {
 	float sigma_s = max(float(r) * 0.5, 0.5);
 	float sigma_r = mix(0.02, 0.3, strength * 0.01);
 	float ks = -0.5 / (sigma_s * sigma_s);
-	float kr = -0.5 / (sigma_r * sigma_r);
+	// range distance is the per-channel mean |d|^2 / 3, so sigma_r is per channel
+	float kr = -0.5 / (3.0 * sigma_r * sigma_r);
 
 	// the centre always counts, weight 1
 	vec3 sum = center;

@@ -3292,18 +3292,18 @@ void TestEffectsGpu::denoiseFlatSolid() {
 }
 
 void TestEffectsGpu::denoiseReducesNoise() {
-  // Grey 128 Solid with the Noise shader at amount 10 (row 0): grey grain uniform in +-0.1, mean |dev| ~13 per pixel.
-  // Denoise radius 2 (sigma_s 1), strength 100 (sigma_r 0.3), detail 0. Grey grain counts 3x in the rgb distance, so
-  // the range weights keep part of it: a CPU model of the shader on independent uniform grain gives ~0.34x the
-  // deviation (the GPU measured 13174 → 4254; at amount 20 only ~0.64x, 26398 → 16696). Assert at least halved.
+  // Grey 128 Solid with the Noise shader at its default amount 20: grey grain uniform in +-0.2, mean |dev| ~25 per
+  // pixel. Denoise radius 2 (sigma_s 1), strength 100 (sigma_r 0.3 per channel), detail 50 (a quarter of the centre
+  // back). A CPU model of the shader on independent uniform grain gives 0.48..0.50x the deviation over 12 seeds; GL
+  // and Vulkan measured 0.49x (26398 → 12919). Thin margin, but the Noise shader is deterministic per pixel.
   auto seq = h_->make_sequence(64, 64, 30.0);
   Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
   h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
   EffectPtr noise = h_->attach_xml_shader(c, "Noise");
-  h_->set_field_double(noise.get(), 0, 0, 10.0);
+  h_->set_field_double(noise.get(), 0, 0, 20.0);
   const long noisy = block_abs_deviation(h_->render_frame(seq.get(), 0));
   QVERIFY2(noisy > 1024 * 5, qPrintable(QString("Noise shader barely changed the solid, deviation %1").arg(noisy)));
-  attach_denoise(h_.get(), c, 2.0, 100.0, 0.0);
+  attach_denoise(h_.get(), c, 2.0, 100.0, 50.0);
   const long denoised = block_abs_deviation(h_->render_frame(seq.get(), 0));
   QVERIFY2(
       denoised * 2 <= noisy,
@@ -3312,9 +3312,9 @@ void TestEffectsGpu::denoiseReducesNoise() {
 
 void TestEffectsGpu::denoiseKeepsHardEdge() {
   // Black/white checkerboard, vertical edge between x = 15 (black) and 16 (white). Denoise radius 4 (sigma_s 2),
-  // strength 30 (sigma_r = 0.02 + 0.28 * 0.3 = 0.104): a tap across the edge has |d|^2 = 3, range weight
-  // exp(-3 / (2 * 0.104^2)) = exp(-139) ~ 0, so both sides keep their value (0 and 255). A Gaussian Blur of the same
-  // sigma 2 mixes the cells: (15,8) ~104, (16,8) ~154.
+  // strength 30 (sigma_r = 0.02 + 0.28 * 0.3 = 0.104): a tap across the edge has |d|^2 / 3 = 1, range
+  // weight exp(-1 / (2 * 0.104^2)) = exp(-46) ~ 0, so both sides keep their value (0 and 255). A Gaussian Blur of the
+  // same sigma 2 mixes the cells: (15,8) ~104, (16,8) ~154.
   struct Probe {
     int x, y;
   };
@@ -3350,20 +3350,20 @@ void TestEffectsGpu::denoiseKeepsHardEdge() {
 }
 
 void TestEffectsGpu::denoiseBilateralWeights() {
-  // Black / grey g = 77/255 = 0.302 checkerboard, edge between x = 15 and 16, radius 2 (sigma_s 1), strength 100
-  // (sigma_r 0.3), detail 0. At y = 8 all 5 rows are in the same cell; per column dx the spatial weights sum to
-  // exp(-dx^2 / 2) * S, S = 1 + 2 * 0.60653 + 2 * 0.13534 = 2.48373. Same side: columns 0, -1, -2 (or 0, 1, 2)
-  // → S * 1.74187 = 4.32634. Other side: S * 0.74187 = 1.84260, times the range weight exp(-3 g^2 / 0.18) = 0.21880
-  // → 0.40316. (15,8): 0.40316 * g / 4.72950 = 0.02574 → 7. (16,8): 4.32634 * g / 4.72950 = 0.27622 → 70.
-  // Plain gaussian (no range weight): 23 and 54.
+  // Black / grey g = 128/255 = 0.50196 checkerboard, edge between x = 15 and 16, radius 2 (sigma_s 1), strength 100
+  // (sigma_r 0.3 per channel), detail 0. At y = 8 all 5 rows are in the same cell; per column dx the spatial weights
+  // sum to exp(-dx^2 / 2) * S, S = 1 + 2 * 0.60653 + 2 * 0.13534 = 2.48373. Same side: columns 0, -1, -2 (or 0, 1, 2)
+  // → S * 1.74187 = 4.32633. Other side: S * 0.74187 = 1.84260, times the range weight exp(-(3 g^2 / 3) / 0.18) =
+  // 0.24665 → 0.45447. (15,8): 0.45447 * g / 4.78080 = 0.04772 → 12. (16,8): 4.32633 * g / 4.78080 = 0.45425 → 116.
+  // Plain gaussian (no range weight): 38 and 90.
   auto seq = h_->make_sequence(64, 64, 30.0);
-  Clip* c = add_checkerboard(h_.get(), seq.get(), QColor(77, 77, 77));
+  Clip* c = add_checkerboard(h_.get(), seq.get(), QColor(128, 128, 128));
   attach_denoise(h_.get(), c, 2.0, 100.0, 0.0);
   QByteArray pixels = h_->render_frame(seq.get(), 0);
   struct Probe {
     int x, y, expected;
   };
-  const Probe probes[] = {{15, 8, 7}, {16, 8, 70}};
+  const Probe probes[] = {{15, 8, 12}, {16, 8, 116}};
   for (const Probe& p : probes) {
     Rgba px = pixel_at(pixels, 64, p.x, p.y);
     QVERIFY2(qAbs(px.r - p.expected) <= 4 && qAbs(px.g - p.expected) <= 4 && qAbs(px.b - p.expected) <= 4,
@@ -3380,8 +3380,8 @@ void TestEffectsGpu::denoiseBilateralWeights() {
 void TestEffectsGpu::denoiseIgnoresTransparentTaps() {
   // Grey (60,60,60) Solid, Crop left 25%: texels x <= 15 become (0,0,0,0), x = 16 is the first opaque column.
   // Denoise radius 4, strength 100, detail 0 at (16,32): the transparent taps have weight 0, every remaining tap is
-  // the same grey → stays 60. Were they counted as black (range weight exp(-3 * 0.2353^2 / 0.18) = 0.397 on columns
-  // dx -1..-4 = 9.547 of spatial weight, vs 14.445 on the grey side) the pixel would drop to ~47.
+  // the same grey → stays 60. Were they counted as black (range weight exp(-0.2353^2 / 0.18) = 0.735 on columns
+  // dx -1..-4 = 9.546 of spatial weight, vs 14.444 on the grey side) the pixel would drop to ~40.
   auto seq = h_->make_sequence(64, 64, 30.0);
   Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
   h_->set_field_color(c->effects[1].get(), 2, 0, QColor(60, 60, 60));
