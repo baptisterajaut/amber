@@ -333,6 +333,7 @@ void RenderThread::paint() {
   // CPU readback. gpu_ns spans endOffscreenFrame() (waits for the GPU to finish the frame, readback included) to the
   // end of the CPU copy; it excludes compose_sequence(), so decoder waits don't count.
   qint64 gpu_ns = 0;
+  bool frame_ok = false;
   {
     QRhiReadbackResult readback;
     QRhiResourceUpdateBatch* u = rhi_->nextResourceUpdateBatch();
@@ -343,7 +344,7 @@ void RenderThread::paint() {
 
     QElapsedTimer gpu_timer;
     gpu_timer.start();
-    rhi_->endOffscreenFrame();
+    frame_ok = rhi_->endOffscreenFrame() == QRhi::FrameOpSuccess;
 
     qDeleteAll(params.transientResources);
     params.transientResources.clear();
@@ -363,8 +364,9 @@ void RenderThread::paint() {
 
   texture_failed = params.texture_failed;
 
-  // Publish viewer frames only: failed frames and export renders (pixel_buffer, cleared further down) are skipped
-  if (!texture_failed && pixel_buffer == nullptr) {
+  // Publish viewer frames only: failed frames (texture not ready, device lost) and export renders (pixel_buffer,
+  // cleared further down) are skipped. Reads the local params: the GUI thread may write texture_failed concurrently.
+  if (frame_ok && !params.texture_failed && pixel_buffer == nullptr) {
     QMutexLocker tl(&timing_mutex_);
     last_timing_.serial++;
     last_timing_.gpu_ms = gpu_ns / 1e6;
