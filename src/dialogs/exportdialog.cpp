@@ -617,6 +617,7 @@ void ExportDialog::setup_ui() {
 
   videoGridLayout->addWidget(new QLabel(tr("Frame Rate:"), this), 3, 0, 1, 1);
   framerateSpinbox = new QDoubleSpinBox(videoGroupbox);
+  framerateSpinbox->setMinimum(1);
   framerateSpinbox->setMaximum(60);
   framerateSpinbox->setValue(0);
   videoGridLayout->addWidget(framerateSpinbox, 3, 1, 1, 1);
@@ -650,6 +651,7 @@ void ExportDialog::setup_ui() {
 
   audioGridLayout->addWidget(new QLabel(tr("Sampling Rate:"), this), 1, 0, 1, 1);
   samplingRateSpinbox = new QSpinBox(audioGroupbox);
+  samplingRateSpinbox->setMinimum(1);
   samplingRateSpinbox->setMaximum(96000);
   samplingRateSpinbox->setValue(0);
   audioGridLayout->addWidget(samplingRateSpinbox, 1, 1, 1, 1);
