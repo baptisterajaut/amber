@@ -353,7 +353,7 @@ static void reverseAudioSeekBack(AVCodecContext* codecCtx, AVFormatContext* form
 
 // Decode one audio frame from the filter graph (handles reverse/forward logic).
 // Returns true if a frame was decoded; false if the outer loop should break.
-bool Cacher::cacheAudioDecodeOneFrame(AVFrame* frame, bool reverse_audio, double timebase, bool audio_just_reset) {
+bool Cacher::cacheAudioDecodeOneFrame(AVFrame*& frame, bool reverse_audio, double timebase, bool audio_just_reset) {
   if (reverse_audio && !audio_just_reset) {
     reverseAudioSeekBack(codecCtx, formatCtx, stream, reverse_target_, reached_end);
   }

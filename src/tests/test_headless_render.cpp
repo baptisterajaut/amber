@@ -65,12 +65,14 @@ QByteArray checkerboard_y4m() {
   return y4m;
 }
 
-// 1 s of a stereo sine (by default 440 Hz at half scale), S16 PCM
-QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5) {
+// 1 s of a stereo sine (by default 440 Hz at half scale), S16 PCM. With ramp, the amplitude rises linearly from 0 so
+// the signal isn't symmetric in time.
+QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5, bool ramp = false) {
   const int frames = kAudioRate;
   QByteArray pcm(frames * 4, Qt::Uninitialized);
   for (int i = 0; i < frames; i++) {
-    qint16 v = qint16(qRound(32768.0 * amplitude * qSin(2.0 * M_PI * freq * i / kAudioRate)));
+    const double a = ramp ? amplitude * i / frames : amplitude;
+    qint16 v = qint16(qRound(32768.0 * a * qSin(2.0 * M_PI * freq * i / kAudioRate)));
     qToLittleEndian(v, pcm.data() + i * 4);
     qToLittleEndian(v, pcm.data() + i * 4 + 2);
   }
@@ -183,6 +185,40 @@ QString nested_fixture(const QString& url, const QString& wav_a, const QString& 
       .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), wav_a.toHtmlEscaped(), wav_b.toHtmlEscaped(),
            QString::number(kSize), QString::number(kFps, 'f', 10), QString::number(kAudioRate),
            QString::number(kClipOut), QString::number(MEDIA_TYPE_SEQUENCE));
+}
+
+// Two sequences over one WAV: Forward plays it, Reversed plays it with the reverse flag (the test moves Forward's
+// in point to the span Reversed reads)
+QString reversed_fixture(const QString& url, const QString& wav) {
+  return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <version>%1</version>
+    <url>%2</url>
+    <folders>
+        <folder id="1" name="Bin" parent="0"/>
+    </folders>
+    <media>
+        <footage id="1" folder="1" name="ramp" url="%3"/>
+    </media>
+    <sequences>
+        <sequence id="1" folder="0" name="Forward" width="%4" height="%4" framerate="%5" afreq="%6" alayout="3">
+            <clip id="0" enabled="1" name="ramp" clipin="0" in="0" out="%7" track="0" r="128" g="192" b="128"
+                  autoscale="1" type="0" media="1" stream="0" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+            </clip>
+        </sequence>
+        <sequence id="2" folder="0" name="Reversed" width="%4" height="%4" framerate="%5" afreq="%6" alayout="3"
+                  open="1">
+            <clip id="0" enabled="1" name="ramp" clipin="0" in="0" out="%7" track="0" r="128" g="192" b="128"
+                  autoscale="1" type="0" media="1" stream="0" speed="1" maintainpitch="0" reverse="1">
+                <linked></linked>
+            </clip>
+        </sequence>
+    </sequences>
+</project>
+)")
+      .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), wav.toHtmlEscaped(), QString::number(kSize),
+           QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(kClipOut));
 }
 
 // RGBA8 copy of a decoded video frame (BT.601 through swscale's defaults, same for source and output)
@@ -598,6 +634,109 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(flat.audio_peak > 0.3, "flat mix is silent or too quiet");
     QVERIFY2(max_delta <= 2.0f / 32768, qPrintable(QString("max delta %1").arg(max_delta)));
     QCOMPARE(nested.audio_samples, flat.audio_samples);
+  }
+
+  // A reversed audio clip must export as the time-reversed forward export: the reverse path decodes a span, flips it
+  // and must hand the whole flipped buffer to the mixer, not the last raw frame it decoded
+  void reversedAudioMatchesForward() {
+    const QString wav = dir_.filePath("ramp.wav");
+    {
+      QFile f(wav);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav(440.0, 0.5, true));
+    }
+    const QString project = dir_.filePath("reversed.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(reversed_fixture(project, wav).toUtf8());
+    }
+
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+
+    auto find_sequence = [](const QString& name) -> SequencePtr {
+      for (int i = 0; i < amber::project_model.childCount(); i++) {
+        Media* m = amber::project_model.child(i);
+        if (m->get_type() == MEDIA_TYPE_SEQUENCE && m->to_sequence()->name == name) return m->to_sequence();
+      }
+      return nullptr;
+    };
+    SequencePtr fwd_seq = find_sequence("Forward");
+    SequencePtr rev_seq = find_sequence("Reversed");
+    QVERIFY(fwd_seq != nullptr);
+    QVERIFY(rev_seq != nullptr);
+    QCOMPARE(fwd_seq->clips.size(), 1);
+    QCOMPARE(rev_seq->clips.size(), 1);
+    ClipPtr fwd_clip = fwd_seq->clips.at(0);
+    ClipPtr rev_clip = rev_seq->clips.at(0);
+    QVERIFY(rev_clip->reversed());
+    QVERIFY(fwd_clip->media() != nullptr);
+    Footage* footage = fwd_clip->media()->to_footage();
+    QPointer<PreviewGenerator> gen(footage->preview_gen.load());
+    QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+    QVERIFY(footage->ready);
+    QVERIFY(!footage->invalid);
+    QVERIFY(rev_clip->media_length() > kClipOut);
+    // A reversed clip plays from the media's last frame down (playhead_to_clip_seconds: media_length - frame - 1), so
+    // timeline [0, kClipOut) reads source frames [media_length - 1 - kClipOut, media_length - 1) backwards: start the
+    // forward clip there so both exports cover the same source span
+    fwd_clip->set_clip_in(rev_clip->media_length() - 1 - kClipOut);
+
+    auto export_audio = [this](Sequence* seq, const QString& name, QString& path) -> QString {
+      ExportParams params{};
+      params.filename = dir_.filePath(name + ".wav");
+      params.video_enabled = false;
+      params.audio_enabled = true;
+      params.audio_codec = AV_CODEC_ID_PCM_S16LE;
+      params.audio_sampling_rate = kAudioRate;
+      params.audio_bitrate = 1536;  // ignored by PCM
+      params.start_frame = 0;
+      params.end_frame = seq->getEndFrame();
+      path = params.filename;
+      return export_sequence(seq, params);
+    };
+    QString fwd_path;
+    QString rev_path;
+    QString error = export_audio(fwd_seq.get(), "forward", fwd_path);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    error = export_audio(rev_seq.get(), "reversed", rev_path);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    Decoded fwd = decode_file(fwd_path);
+    Decoded rev = decode_file(rev_path);
+    QVERIFY(fwd.ok);
+    QVERIFY(rev.ok);
+    QVERIFY(fwd.has_audio);
+    QVERIFY(rev.has_audio);
+    QCOMPARE(rev.audio_samples, fwd.audio_samples);
+
+    // Over the clip's span, the reversed export read forwards must match the forward export read backwards, up to a
+    // few samples of alignment (where each path rounds the span's ends): take the best lag, compare sample by sample
+    const int span = int(qRound64(kClipOut / kFps * kAudioRate));
+    QVERIFY(fwd.audio_left.size() >= span);
+    QVERIFY(rev.audio_left.size() >= span);
+    constexpr int kMaxLag = 8;
+    float best_delta = 1e9f;
+    int best_lag = 0;
+    for (int lag = -kMaxLag; lag <= kMaxLag; lag++) {
+      float d = 0;
+      for (int i = kMaxLag; i < span - kMaxLag; i++)
+        d = qMax(d, qAbs(rev.audio_left[i] - fwd.audio_left[span - 1 - i + lag]));
+      if (d < best_delta) {
+        best_delta = d;
+        best_lag = lag;
+      }
+    }
+    qInfo("reversed vs forward: %d samples, best lag %d, max |delta| = %f, peaks %f / %f", span, best_lag, best_delta,
+          rev.audio_peak, fwd.audio_peak);
+    QVERIFY2(fwd.audio_peak > 0.25, "forward export is silent or too quiet");
+    QVERIFY2(best_delta <= 2.0f / 32768, qPrintable(QString("max delta %1 at lag %2").arg(best_delta).arg(best_lag)));
   }
 };
 
