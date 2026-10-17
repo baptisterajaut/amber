@@ -203,9 +203,12 @@ void RenderThread::run() {
     }
 
     if (rhi_ != nullptr) {
-      // Recreate buffers if sequence size or divider changed
-      int target_w = qMax(1, seq->width / divider_);
-      int target_h = qMax(1, seq->height / divider_);
+      // Recreate buffers if sequence size or divider changed. Latch once: start_render() may change divider_ from the
+      // GUI thread while this frame renders. A pending Save Frame (save_fn is only written under wait_lock_, held
+      // here) renders at full resolution, whatever divider a viewer request (or the viewer's retry) set since.
+      const int render_divider = save_fn.isEmpty() ? qMax(1, divider_.load()) : 1;
+      int target_w = qMax(1, seq->width / render_divider);
+      int target_h = qMax(1, seq->height / render_divider);
       if (target_w != tex_width || target_h != tex_height) {
         delete_buffers();
         tex_width = target_w;

@@ -133,7 +133,7 @@ private:
   int playback_speed_;
   int tex_width{-1};
   int tex_height{-1};
-  int divider_{1};
+  std::atomic<int> divider_{1};  // written by start_render() (viewer path without wait_lock_), latched by run()
   QAtomicInt queued;
   bool texture_failed{false};
   bool scrubbing_{false};
