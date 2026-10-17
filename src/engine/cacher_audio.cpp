@@ -405,6 +405,9 @@ bool Cacher::cacheAudioFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_a
   while ((frame_sample_index_ == -1 || frame_sample_index_ >= nb_bytes) && nb_bytes > 0) {
     if (reached_end) break;
 
+    // A reverse decode hands back the reverse buffer (queue_.at(1)) in frame: decode into queue_.at(0) again, or the
+    // next decode unrefs the reverse buffer and accumulates into itself
+    frame = queue_.at(0);
     cacheAudioDecodeOneFrame(frame, reverse_audio, timebase, audio_just_reset);
 
     new_frame = true;

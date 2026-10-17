@@ -59,6 +59,8 @@ QColor get_curve_color(int index, int length) {
 
 // An undo can remove keyframes behind the selection's back: forget entries that no longer exist.
 // Called right before the selection is used.
+// CBA: only drops out-of-range indices; an undo removing an earlier keyframe shifts later ones, so the selection then
+// points at a different keyframe. Upgrade path: select by keyframe identity instead of index.
 static void drop_stale_selection(EffectRow* row, QVector<int>& keys, QVector<int>& key_fields) {
   if (row == nullptr) return;
   const int n = qMin(keys.size(), key_fields.size());

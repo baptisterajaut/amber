@@ -270,7 +270,8 @@ class TestProjectSaver : public QObject {
       QVERIFY(!amber::save_project_file("/dev/full", "/dev/full"));
     }
 
-    // Writable file in a read-only directory: QFile truncated it, QSaveFile cannot create its temp file
+    // Writable file in a read-only directory: QSaveFile has nowhere to put its temp file, so it falls back to writing
+    // the file in place (setDirectWriteFallback) and the save still succeeds, as it did with QFile
     const QString ro_dir = dir_.filePath("readonly");
     QVERIFY(QDir().mkpath(ro_dir));
     const QString existing = ro_dir + "/old.ove";
@@ -282,14 +283,13 @@ class TestProjectSaver : public QObject {
     QFile::setPermissions(ro_dir, QFile::ReadOwner | QFile::ExeOwner);
     QFile probe(ro_dir + "/probe");
     const bool dir_writable = probe.open(QFile::WriteOnly);  // root ignores the mode bits
-    if (!dir_writable) {
-      QVERIFY(!amber::save_project_file(existing, existing));
-    }
+    const bool saved = !dir_writable && amber::save_project_file(existing, existing);
     QFile::setPermissions(ro_dir, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
     if (dir_writable) QSKIP("directory permissions not enforced (running as root?)");
+    QVERIFY(saved);
     QFile f(existing);
     QVERIFY(f.open(QFile::ReadOnly));
-    QCOMPARE(f.readAll(), QByteArray("previous project"));
+    QVERIFY(f.readAll().startsWith("<?xml"));
   }
 };
 

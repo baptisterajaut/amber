@@ -11,7 +11,7 @@ layout(location = 0) out vec4 fragColor;
 
 vec4 PostFX(sampler2D tex, vec2 uv, float time) {
 	vec4 c = vec4(0.0);
-	float size = stitching_size;
+	float size = max(stitching_size, 1.0);
 	vec2 cPos = uv * resolution;
 	vec2 tlPos = floor(cPos / vec2(size, size));
 	tlPos *= size;

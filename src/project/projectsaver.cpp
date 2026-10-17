@@ -303,6 +303,8 @@ void amber::save_project_xml(QXmlStreamWriter& stream, const QString& project_fi
 bool amber::save_project_file(const QString& path, const QString& project_file) {
   // QSaveFile writes to a temp file and renames it over `path` on commit(): a failed save leaves the old file intact
   QSaveFile file(path);
+  // A writable file in a read-only directory has no room for the temp file: write it in place there, as before
+  file.setDirectWriteFallback(true);
   if (!file.open(QIODevice::WriteOnly)) return false;
   QXmlStreamWriter stream(&file);
   save_project_xml(stream, project_file);
