@@ -157,6 +157,10 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr), shade
       btn->setFixedSize(16, 16);
       btn->setFlat(true);
       btn->setToolTip(tr("Reset to Default"));
+      // A column holding only hidden widgets gets no spacing: keep the slot so values end at the same x either way
+      QSizePolicy sp = btn->sizePolicy();
+      sp.setRetainSizeWhenHidden(true);
+      btn->setSizePolicy(sp);
       btn->setVisible(false);
       layout_->addWidget(btn, i, reset_column, layout_->itemAtPosition(i, 0)->alignment());
 
@@ -168,6 +172,12 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr), shade
       row_reset_buttons_[i] = nullptr;
     }
   }
+
+  // CBA: values start at a shared column; right-aligned numbers if anyone asks
+  // Label column (0) is sized by the panel via SetLabelColumnWidth() and never takes spare width; the field columns
+  // share it, and the reset column keeps its 16 px whether its buttons are shown or not.
+  for (int c = 1; c < reset_column; c++) layout_->setColumnStretch(c, 1);
+  layout_->setColumnMinimumWidth(reset_column, 16);
 
   // Create keyframe controls
   maximum_column++;
@@ -211,6 +221,8 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr), shade
     update_ui(false);
   });
 }
+
+void EffectUI::SetLabelColumnWidth(int w) { layout_->setColumnMinimumWidth(0, w); }
 
 void EffectUI::UpdateShaderError() {
   const QString error = effect_->shaderError();
