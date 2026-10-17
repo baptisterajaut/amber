@@ -234,7 +234,9 @@ Guide LoadThread::parse_guide(QXmlStreamReader& stream) {
 }
 
 QString LoadThread::resolve_footage_url(const QString& raw_url) {
-  if (QFileInfo::exists(raw_url)) {
+  // Absolute paths only: a relative one would be tested against the process's working directory and pick up an
+  // unrelated file of the same name there. Relative paths are resolved against the project folders below.
+  if (QFileInfo(raw_url).isAbsolute() && QFileInfo::exists(raw_url)) {
     qInfo() << "Matched" << raw_url << "with absolute path";
     return QFileInfo(raw_url).absoluteFilePath();
   }
