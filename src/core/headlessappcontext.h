@@ -30,7 +30,7 @@ class HeadlessAppContext : public AppContext {
   void setModified(bool) override {}
   void updateUi(bool) override {}
   int showMessage(const QString& title, const QString& text, int type) override;
-  bool showQuestion(const QString& title, const QString& text, bool warning) override;
+  bool showQuestion(const QString& title, const QString& text, bool warning, bool default_no) override;
   bool isInteractive() override { return false; }
   QString showSaveFileDialog(const QString&, const QString&) override { return {}; }
   QString showOpenFileDialog(const QString&, const QString&) override { return {}; }

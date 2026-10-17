@@ -34,6 +34,9 @@
  * Shows a modal dialog for loading a project. Designed to be connected to a LoadThread object. This dialog should
  * generally not be created directly, use AmberGlobal::LoadProject (or its variants) to correctly set up a LoadDialog
  * and LoadThread and connect them to each other.
+ *
+ * The dialog doesn't close itself: Escape and the window's close button cancel like the Cancel button, and the owner
+ * closes it once the LoadThread has finished.
  */
 class LoadDialog : public QDialog
 {
@@ -45,8 +48,15 @@ public:
    * @param parent
    *
    * QWidget parent. Usually MainWindow.
+   *
+   * @param filename
+   *
+   * The project file being loaded or imported, shown in the dialog.
    */
-  LoadDialog(QWidget* parent);
+  LoadDialog(QWidget* parent, const QString& filename);
+
+  // Escape / close button: cancel the load instead of closing (the thread would keep loading behind a closed dialog)
+  void reject() override;
 
 public slots:
   /**

@@ -449,6 +449,11 @@ class AmberGlobal : public QObject {
    */
   bool autorecovery_loaded_{false};
 
+  /**
+   * @brief True from LoadProject() until its LoadThread has finished: a second load is refused meanwhile.
+   */
+  bool load_running_{false};
+
   ProjectIO* project_io_;
 
  private slots:

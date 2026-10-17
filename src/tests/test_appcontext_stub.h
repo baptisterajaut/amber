@@ -7,7 +7,7 @@
 class TestAppContext : public HeadlessAppContext {
  public:
   int showMessage(const QString&, const QString&, int) override { return 0; }
-  bool showQuestion(const QString&, const QString&, bool) override { return false; }
+  bool showQuestion(const QString&, const QString&, bool, bool) override { return false; }
 };
 
 #endif  // TEST_APPCONTEXT_STUB_H

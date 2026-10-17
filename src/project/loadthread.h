@@ -21,6 +21,8 @@
 #ifndef LOADTHREAD_H
 #define LOADTHREAD_H
 
+#include <atomic>
+
 #include <QDir>
 #include <QMutex>
 #include <QPair>
@@ -111,7 +113,7 @@ class LoadThread : public QThread {
   QMutex mutex;
   QWaitCondition waitCond;
 
-  bool cancelled_{false};
+  std::atomic<bool> cancelled_{false};  // set by cancel() on the GUI thread
   bool question_answered_{false};
   bool xml_error;
 
