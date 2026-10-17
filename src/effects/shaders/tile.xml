@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <effect name="Tile" category="Distort">
 	<row name="Scale">
-		<field type="double" min="0" default="50" id="scale"/>
+		<field type="double" min="0.01" default="50" id="scale"/>
 	</row>
 	<row name="Center">
 		<field type="double" default="0" id="centerx"/>

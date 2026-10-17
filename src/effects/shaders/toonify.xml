@@ -4,10 +4,10 @@
 		<field type="double" min="0" default="12" max="360" id="colors"/>
 	</row>
 	<row name="Saturation Levels">
-		<field type="double" min="0" default="4" id="sat_levels"/>
+		<field type="double" min="1" default="4" id="sat_levels"/>
 	</row>
 	<row name="Brightness Levels">
-		<field type="double" min="0" default="4" id="bri_levels"/>
+		<field type="double" min="1" default="4" id="bri_levels"/>
 	</row>
 	<row name="Edge Tolerance">
 		<field type="double" default="20" id="edge_thres"/>
