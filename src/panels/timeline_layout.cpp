@@ -47,4 +47,21 @@ int track_at_y(const TrackHeights& h, int y) {
   return INT_MIN;
 }
 
+static bool same_side(int a, int b) { return (a < 0) == (b < 0); }
+
+int ghost_track(int old_track, int drag_track_start, int track_diff) {
+  return same_side(old_track, drag_track_start) ? old_track + track_diff : old_track - track_diff;
+}
+
+int clamp_track_diff(const QVector<int>& old_tracks, int drag_track_start, int track_diff) {
+  // Every seam limit points the same way: dragging from video, they are all upper bounds on track_diff (a video
+  // ghost can't go below V1, a mirrored audio ghost can't go above A1); dragging from audio, all lower bounds. 0 meets
+  // them all and a violation only happens on the far side of 0, so stepping back toward 0 always ends.
+  const int step = (drag_track_start < 0) ? -1 : 1;
+  for (int old_track : old_tracks) {
+    while (!same_side(old_track, ghost_track(old_track, drag_track_start, track_diff))) track_diff += step;
+  }
+  return track_diff;
+}
+
 }  // namespace amber::timeline_layout
