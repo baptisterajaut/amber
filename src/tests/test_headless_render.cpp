@@ -11,6 +11,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 }
 
@@ -25,6 +26,7 @@ extern "C" {
 #include <QtMath>
 
 #include "core/headlessappcontext.h"
+#include "effects/effect.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "global/config.h"
@@ -36,6 +38,9 @@ extern "C" {
 #include "project/projectmodel.h"
 #include "rendering/exportthread.h"
 #include "rendering/renderthread.h"
+
+// External entry point from effectloaders.cpp (no header export), as in test_render_harness.cpp
+extern void load_internal_effects();
 
 namespace {
 
@@ -357,6 +362,32 @@ Decoded decode_file(const QString& path) {
   return d;
 }
 
+// kSize x kSize sequence holding one white Solid (default Transform, centred, full frame) at 50 % Transform opacity
+// over nothing, on frames [0, kClipOut): the composite is half-transparent white
+SequencePtr half_white_sequence() {
+  SequencePtr seq = std::make_shared<Sequence>();
+  seq->name = "Alpha";
+  seq->width = kSize;
+  seq->height = kSize;
+  seq->frame_rate = kFps;
+  seq->audio_frequency = kAudioRate;
+  ClipPtr c = std::make_shared<Clip>(seq.get());
+  c->set_media(nullptr, 0);
+  c->set_timeline_in(0);
+  c->set_timeline_out(kClipOut);
+  c->set_clip_in(0);
+  c->set_track(-1);
+  c->set_name("Solid");
+  EffectPtr transform = Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TRANSFORM, EFFECT_TYPE_EFFECT));
+  transform->row(5)->Field(0)->SetValueAt(0.0, QVariant(50.0));  // Opacity
+  c->effects.append(transform);
+  EffectPtr solid = Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SOLID, EFFECT_TYPE_EFFECT));
+  solid->row(2)->Field(0)->SetValueAt(0.0, QVariant(QColor(Qt::white)));  // Color
+  c->effects.append(solid);
+  seq->clips.append(c);
+  return seq;
+}
+
 }  // namespace
 
 class TestHeadlessRender : public QObject {
@@ -369,9 +400,9 @@ class TestHeadlessRender : public QObject {
 
   // Export the way ExportDialog::launch_export_thread() / export_thread_finished() do it. Returns the error, empty on
   // success.
-  QString export_sequence(Sequence* seq, const ExportParams& params) {
+  QString export_sequence(Sequence* seq, const ExportParams& params, AVPixelFormat pix_fmt = AV_PIX_FMT_YUV420P) {
     VideoCodecParams vparams;
-    vparams.pix_fmt = AV_PIX_FMT_YUV420P;
+    vparams.pix_fmt = pix_fmt;
     vparams.threads = 0;
 
     auto* et = new ExportThread(seq, params, vparams);
@@ -406,6 +437,7 @@ class TestHeadlessRender : public QObject {
     // prepare_export() creates on this thread
     amber::CurrentRuntimeConfig.rhi_backend = RhiBackend::OpenGL;
     amber::CurrentConfig.hardware_decoding = false;
+    if (effects.empty()) load_internal_effects();
   }
 
   void cleanupTestCase() {
@@ -778,6 +810,100 @@ class TestHeadlessRender : public QObject {
     delete rt;
     delete surface;
     QVERIFY2(!lost, qPrintable(QString("request %1 never rendered").arg(requests)));
+  }
+
+  // The composite is premultiplied; a pixel format with alpha must receive straight alpha, an opaque one the
+  // composite over black. Half-transparent white: straight (255, 255, 255, 128), over black (128, 128, 128).
+  void exportWritesStraightAlpha_data() {
+    QTest::addColumn<int>("codec");
+    QTest::addColumn<int>("pix_fmt");
+    QTest::addColumn<QString>("file");
+    QTest::newRow("png rgba") << int(AV_CODEC_ID_PNG) << int(AV_PIX_FMT_RGBA) << "png.mov";
+    QTest::newRow("png rgba64be") << int(AV_CODEC_ID_PNG) << int(AV_PIX_FMT_RGBA64BE) << "png16.mov";
+    QTest::newRow("qtrle argb") << int(AV_CODEC_ID_QTRLE) << int(AV_PIX_FMT_ARGB) << "qtrle.mov";
+    QTest::newRow("prores yuva444p10le") << int(AV_CODEC_ID_PRORES) << int(AV_PIX_FMT_YUVA444P10LE) << "prores.mov";
+    QTest::newRow("png rgb24 (opaque)") << int(AV_CODEC_ID_PNG) << int(AV_PIX_FMT_RGB24) << "png24.mov";
+    QTest::newRow("mpeg4 yuv420p (opaque)") << int(AV_CODEC_ID_MPEG4) << int(AV_PIX_FMT_YUV420P) << "mpeg4.mp4";
+  }
+
+  void exportWritesStraightAlpha() {
+    QFETCH(int, codec);
+    QFETCH(int, pix_fmt);
+    QFETCH(QString, file);
+    if (avcodec_find_encoder(AVCodecID(codec)) == nullptr) QSKIP("encoder not in this FFmpeg build");
+
+    SequencePtr seq = half_white_sequence();
+    ExportParams params;
+    params.filename = dir_.filePath(file);
+    params.video_enabled = true;
+    params.video_codec = codec;
+    params.video_width = kSize;
+    params.video_height = kSize;
+    params.video_compression_type = COMPRESSION_TYPE_CBR;
+    params.video_bitrate = 20.0;  // Mbps
+    params.audio_enabled = false;
+    params.start_frame = 0;
+    params.end_frame = 2;
+    const QString error = export_sequence(seq.get(), params, AVPixelFormat(pix_fmt));
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    Decoded out = decode_file(params.filename);
+    QVERIFY(out.ok);
+    QVERIFY(out.has_video);
+    QCOMPARE(out.first_rgba.size(), kSize * kSize * 4);
+    const int off = ((kSize / 2) * kSize + kSize / 2) * 4;
+    const int r = uchar(out.first_rgba[off]), g = uchar(out.first_rgba[off + 1]), b = uchar(out.first_rgba[off + 2]),
+              a = uchar(out.first_rgba[off + 3]);
+    qInfo("%s: centre pixel (%d, %d, %d, %d)", QTest::currentDataTag(), r, g, b, a);
+    const bool has_alpha = av_pix_fmt_desc_get(AVPixelFormat(pix_fmt))->flags & AV_PIX_FMT_FLAG_ALPHA;
+    // ProRes and MPEG-4 are lossy, and the YUV round trip (BT.601 limited range) costs a few levels
+    const int tol = 4;
+    if (has_alpha) {
+      QVERIFY2(qAbs(a - 128) <= tol, qPrintable(QString("alpha %1").arg(a)));
+      for (int ch : {r, g, b}) QVERIFY2(ch >= 255 - tol, qPrintable(QString("straight colour %1").arg(ch)));
+    } else {
+      for (int ch : {r, g, b}) QVERIFY2(qAbs(ch - 128) <= tol, qPrintable(QString("colour over black %1").arg(ch)));
+    }
+  }
+
+  // Save Frame writes a PNG with straight alpha too, and a format without alpha the composite over black
+  void saveFrameWritesStraightAlpha_data() {
+    QTest::addColumn<QString>("file");
+    QTest::newRow("png") << "alpha.png";
+    QTest::newRow("jpg (opaque)") << "alpha.jpg";
+  }
+
+  void saveFrameWritesStraightAlpha() {
+    QFETCH(QString, file);
+    SequencePtr seq = half_white_sequence();
+    QOffscreenSurface* surface = QRhiGles2InitParams::newFallbackSurface();
+    auto* rt = new RenderThread();
+    rt->setGlFallbackSurface(surface);
+    std::atomic<int> frames{0};
+    connect(rt, &RenderThread::ready, rt, [&frames]() { frames++; }, Qt::DirectConnection);
+    rt->start();
+    const QString fn = dir_.filePath(file);
+    QFile::remove(fn);
+    // A frame whose clip texture isn't ready keeps the save queued; paint() saves before announcing the frame
+    rt->start_render(seq.get(), 1, fn);
+    QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(fn), 10000);
+    rt->cancel();
+    delete rt;
+    delete surface;
+    QImage saved(fn);
+    QCOMPARE(saved.size(), QSize(kSize, kSize));
+    const QColor px = saved.pixelColor(kSize / 2, kSize / 2);
+    qInfo("save frame %s: centre pixel (%d, %d, %d, %d)", qPrintable(file), px.red(), px.green(), px.blue(),
+          px.alpha());
+    const QString rgb = QString("%1 %2 %3").arg(px.red()).arg(px.green()).arg(px.blue());
+    if (saved.hasAlphaChannel()) {
+      QVERIFY2(qAbs(px.alpha() - 128) <= 1, qPrintable(QString("alpha %1").arg(px.alpha())));
+      QVERIFY2(px.red() >= 254 && px.green() >= 254 && px.blue() >= 254, qPrintable("straight colour " + rgb));
+    } else {
+      // JPEG is lossy, a flat colour barely so
+      const bool over_black = qAbs(px.red() - 128) <= 3 && qAbs(px.green() - 128) <= 3 && qAbs(px.blue() - 128) <= 3;
+      QVERIFY2(over_black, qPrintable("colour over black " + rgb));
+    }
   }
 
   // Save Frame renders at full resolution even when a viewer request at a preview divider (the viewer's retry after a

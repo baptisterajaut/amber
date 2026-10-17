@@ -31,6 +31,7 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 - **Timeline ruler**: timecode labels no longer overlap, and dragging a marker to the edge scrolls the view.
 - **Clip names** are drawn with a shadow, readable on any clip colour.
 - **Scrubbing in Effect Controls** repaints the panel instead of rebuilding it.
+- **Exports with transparency** (PNG, QuickTime Animation, ProRes 4444 and the other formats with alpha, picked in the advanced video settings) and Save Frame as PNG keep semi-transparent areas at their real colour: a half-transparent white clip used to come out half-transparent grey. Exports without transparency are unchanged. The fix is coming to 1.x too.
 - **Bezier into Hold keyframes**: a Bezier keyframe followed by a Hold keyframe now eases with the Bezier keyframe's handle. Projects that use this combination animate differently than in 1.x.
 - **Preferences** describe what each option does in its tooltip.
 - **Translations**: the 2.0 strings are translated in all 15 languages, and about 600 existing entries were corrected (wrong meanings such as Import shown as Export, swapped Move Up / Move Down, blank labels, typos).

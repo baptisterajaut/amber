@@ -24,6 +24,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/opt.h>
+#include <libavutil/pixdesc.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
@@ -32,6 +33,7 @@ extern "C" {
 #include <QFile>
 #include <QtMath>
 
+#include "core/alpha.h"
 #include "core/appcontext.h"
 #include "engine/sequence.h"
 #include "global/config.h"
@@ -213,6 +215,13 @@ bool ExportThread::SetupVideo() {
   sws_ctx = sws_getContext(seq_->width, seq_->height, AV_PIX_FMT_RGBA, params_.video_width, params_.video_height,
                            vcodec_ctx->pix_fmt, SWS_BILINEAR, nullptr, nullptr, nullptr);
 
+  // The composite is premultiplied alpha (renderfunctions.cpp), but swscale and the encoders take RGBA as straight.
+  // A format without alpha drops it, leaving the composite over black, which is what an opaque file should show.
+  // CBA: scaling to another size filters straight colour, so semi-transparent edges can darken slightly; scale the
+  // premultiplied frame first if that ever shows
+  const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(vcodec_ctx->pix_fmt);
+  unpremultiply_ = desc != nullptr && (desc->flags & AV_PIX_FMT_FLAG_ALPHA);
+
   return true;
 }
 
@@ -388,6 +397,10 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
   } while (renderer->did_texture_fail());
 
   if (interrupt_) return false;
+
+  if (unpremultiply_) {
+    amber::unpremultiply_rgba8(video_frame->data[0], video_frame->width, video_frame->height, video_frame->linesize[0]);
+  }
 
   // Alloc/free sws_frame every frame — required to avoid GIF getting stuck on first frame
   // (see https://stackoverflow.com/a/38997739)
