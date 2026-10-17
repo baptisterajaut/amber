@@ -1051,17 +1051,24 @@ void Project::clear() {
   tree_view->update();
 }
 
-void Project::save_project(bool autorecovery) {
+bool Project::save_project(bool autorecovery) {
   const QString target = autorecovery ? amber::project_io->autorecoveryFilename() : amber::ActiveProjectFilename;
   if (!amber::save_project_file(target, amber::ActiveProjectFilename)) {
-    qCritical() << "Could not open file";
-    return;
+    qCritical() << "Could not save project to" << target;
+    // Auto-recovery runs on a timer: log only, a modal every few minutes would be worse than a missed backup
+    if (!autorecovery) {
+      QMessageBox::critical(this, tr("Save Failed"),
+                            tr("Could not save the project to \"%1\". The file on disk was not changed.").arg(target),
+                            QMessageBox::Ok);
+    }
+    return false;
   }
 
   if (!autorecovery) {
     add_recent_project(amber::ActiveProjectFilename);
     amber::Global->set_modified(false);
   }
+  return true;
 }
 
 void Project::update_view_type() {

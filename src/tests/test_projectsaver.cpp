@@ -257,6 +257,40 @@ class TestProjectSaver : public QObject {
     QCOMPARE(outer2->clips.at(0)->media()->to_sequence(), inner);
     QCOMPARE(find_media("clip")->to_footage()->markers.size(), 1);
   }
+
+  // A failed save must report false and leave the previous file untouched (disk full, read-only share). Before
+  // QSaveFile the old file was truncated on open and a write error still returned true
+  void failedSaveKeepsPreviousFile() {
+    reset_project();
+    const QString missing_dir = dir_.filePath("no-such-dir/p.ove");
+    QVERIFY(!amber::save_project_file(missing_dir, missing_dir));
+
+    // /dev/full: open succeeds, every write fails with ENOSPC
+    if (QFileInfo::exists("/dev/full")) {
+      QVERIFY(!amber::save_project_file("/dev/full", "/dev/full"));
+    }
+
+    // Writable file in a read-only directory: QFile truncated it, QSaveFile cannot create its temp file
+    const QString ro_dir = dir_.filePath("readonly");
+    QVERIFY(QDir().mkpath(ro_dir));
+    const QString existing = ro_dir + "/old.ove";
+    {
+      QFile f(existing);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write("previous project");
+    }
+    QFile::setPermissions(ro_dir, QFile::ReadOwner | QFile::ExeOwner);
+    QFile probe(ro_dir + "/probe");
+    const bool dir_writable = probe.open(QFile::WriteOnly);  // root ignores the mode bits
+    if (!dir_writable) {
+      QVERIFY(!amber::save_project_file(existing, existing));
+    }
+    QFile::setPermissions(ro_dir, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    if (dir_writable) QSKIP("directory permissions not enforced (running as root?)");
+    QFile f(existing);
+    QVERIFY(f.open(QFile::ReadOnly));
+    QCOMPARE(f.readAll(), QByteArray("previous project"));
+  }
 };
 
 // TextEffect's FontField queries QFontDatabase, which needs a QGuiApplication (same main as the GPU tests)

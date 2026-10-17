@@ -22,6 +22,7 @@
 
 #include <QFile>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <QtMath>
@@ -203,7 +204,8 @@ void Config::load(QString path) {
 }
 
 void Config::save(QString path) {
-  QFile f(path);
+  // Temp file + rename on commit(): a failed write keeps the previous config instead of truncating it
+  QSaveFile f(path);
   if (!f.open(QIODevice::WriteOnly)) {
     qCritical() << "Could not save configuration";
     return;
@@ -285,7 +287,9 @@ void Config::save(QString path) {
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc
-  f.close();
+  if (stream.hasError() || !f.commit()) {
+    qCritical() << "Could not save configuration";
+  }
 }
 
 RuntimeConfig::RuntimeConfig()

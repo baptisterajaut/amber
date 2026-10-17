@@ -321,8 +321,7 @@ bool AmberGlobal::save_project_as() {
       fn += ".ove";
     }
     update_project_filename(fn);
-    panel_project->save_project(false);
-    return true;
+    return panel_project->save_project(false);
   }
   return false;
 }
@@ -331,8 +330,7 @@ bool AmberGlobal::save_project() {
   if (amber::ActiveProjectFilename.isEmpty()) {
     return save_project_as();
   } else {
-    panel_project->save_project(false);
-    return true;
+    return panel_project->save_project(false);
   }
 }
 

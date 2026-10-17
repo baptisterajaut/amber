@@ -64,7 +64,7 @@ class Project : public Panel {
   bool reveal_media(Media* media, QModelIndex parent = QModelIndex());
   void add_recent_project(QString url);
 
-  void save_project(bool autorecovery);
+  bool save_project(bool autorecovery);
 
   MediaPtr create_folder_internal(QString name);
 

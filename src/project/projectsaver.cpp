@@ -1,8 +1,8 @@
 #include "project/projectsaver.h"
 
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QXmlStreamWriter>
 
 #include "effects/effect.h"
@@ -301,10 +301,11 @@ void amber::save_project_xml(QXmlStreamWriter& stream, const QString& project_fi
 }
 
 bool amber::save_project_file(const QString& path, const QString& project_file) {
-  QFile file(path);
+  // QSaveFile writes to a temp file and renames it over `path` on commit(): a failed save leaves the old file intact
+  QSaveFile file(path);
   if (!file.open(QIODevice::WriteOnly)) return false;
   QXmlStreamWriter stream(&file);
   save_project_xml(stream, project_file);
-  file.close();
-  return true;
+  if (stream.hasError()) return false;  // no commit(): the destructor discards the temp file
+  return file.commit();
 }

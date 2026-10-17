@@ -13,9 +13,8 @@ namespace amber {
 // (written as open="1") and amber::CurrentConfig.preview_resolution_divider, and turns on auto-formatting on `stream`.
 void save_project_xml(QXmlStreamWriter& stream, const QString& project_file);
 
-// Opens `path` for writing and calls save_project_xml(). Returns false if the file cannot be opened.
-// CBA: write errors after a successful open (disk full) are not detected, as before the move; check
-// stream.hasError() if a caller ever needs that.
+// Writes save_project_xml() to `path` through a QSaveFile. Returns false if the file cannot be written (open,
+// write or rename failure); the previous file at `path` is then left untouched.
 bool save_project_file(const QString& path, const QString& project_file);
 
 }  // namespace amber
