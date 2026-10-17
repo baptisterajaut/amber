@@ -47,7 +47,9 @@ void main(void) {
   } else {
     // Blur: simple 9-tap box blur, pixel-sized step so the blur radius
     // stays consistent regardless of the clip's resolution
-    vec2 texel = (intensity * 0.3) / resolution;
+    // CBA: 9 taps stay a blur only up to ~3 px apart (wider reads as ghost copies), so this tops out
+    // as a light blur; a separable multi-tap pass if it needs to hide more
+    vec2 texel = (intensity * 0.03) / resolution;
     vec4 blurAccumulator = vec4(0.0);
 
     blurAccumulator += texture(sceneTex, vTexCoord + vec2(-texel.x, -texel.y));

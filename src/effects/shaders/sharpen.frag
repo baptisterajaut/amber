@@ -26,6 +26,6 @@ void main(void) {
 
   vec4 detail = original - blurred;
   fragColor = original + detail * (amount * 0.01);
-  fragColor.rgb = clamp(fragColor.rgb, 0.0, 1.0);
+  fragColor.rgb = clamp(fragColor.rgb, 0.0, original.a);  // premultiplied: rgb must stay <= alpha
   fragColor.a = original.a;  // don't sharpen the alpha channel
 }
