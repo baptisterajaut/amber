@@ -37,12 +37,13 @@ class TestConfig : public QObject {
     QVERIFY(cfg.show_frei0r_effects);
   }
 
-  void showFrameRateRoundTrips() {
+  void savedTogglesRoundTrip() {
     QTemporaryDir dir;
     const QString path = dir.filePath("config.xml");
     Config saved;
     QVERIFY(!saved.show_frame_rate);  // off by default
     saved.show_frame_rate = true;
+    saved.lock_guides = true;  // was loaded but never saved
     HeadlessAppContext ctx;
     amber::app_ctx = &ctx;  // save() asks it for the project toolbar state
     saved.save(path);
@@ -50,6 +51,7 @@ class TestConfig : public QObject {
     Config loaded;
     loaded.load(path);
     QVERIFY(loaded.show_frame_rate);
+    QVERIFY(loaded.lock_guides);
   }
 };
 
