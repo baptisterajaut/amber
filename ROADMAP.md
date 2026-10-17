@@ -67,14 +67,14 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Timer / countdown — done in 2.0: Timer generator, counts up from the clip's start or down to 0 on its last frame, MM:SS / HH:MM:SS / seconds / hundredths, prefix and time offset
 - Progress bar — done in 2.0: Progress Bar generator, fills over the clip's duration or follows a keyframeable value, top or bottom edge, thickness, margin, direction
 - Drop Shadow — done in 2.0: drawn in sequence space from the clip as already transformed, so it works on opaque picture-in-picture clips; colour, opacity, direction, distance, softness, all keyframeable
-- Lift / gamma / gain (3-way color correction)
+- Lift / gamma / gain — done in 2.0: Lift/Gamma/Gain shader effect (Color), one of the ten GPU effects replacing common Frei0r plugins
 - **Tone Curve** — done in 2.0: Curves effect (Color), a square curve editor in Effect Controls with RGB / Luma / R / G / B curves (monotone cubic through the points), applied through a 256-entry lookup texture. The curve field is generic (`<field type="curve">`), usable by any XML shader effect. Not keyframeable yet. Complementary to the 3-way corrector. (#59)
 - **Alpha Mask (image source)** — done in 2.0: Alpha Mask effect (Keying), takes a PNG / JPEG / WebP / BMP / SVG file and keeps the clip where the mask is opaque, or white with the Luminance channel. Stretch / Fit / Fill, position, scale, feather, invert, opacity, keyframeable except the file and the combos. Pinned to the clip (applied before Transform, moves with it). No blend controls: a stencil only multiplies alpha, blending belongs to track compositing. Covers text reveals, shape stencils, static masks. Track-based variant (mask = clip on adjacent track) deferred — see Future. (#61)
-- Color correction tool (scopes — waveform, vectorscope, histogram)
+- Color correction tool (scopes — waveform, vectorscope, histogram) — done in 2.0: see the Scopes panel under Scopes & monitoring
 - Subtitle editor — dedicated floating window for bulk subtitle editing (import is shipped in 1.5.0, this is the full editing UI)
 - ~~Text stroke — outline color + width on the Rich Text effect~~ (shipped in v1.7.0, #12)
 - **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
-- **LUT loader** — apply a `.cube` 3D LUT as a shader effect (3D texture lookup) with an intensity control blending with the original. Needed for log footage.
+- **LUT loader** — done: LUT effect (Color) loads a `.cube` 3D LUT with a Strength blend (#77), on 2.0.x and on main for the next 1.7 release
 
 ### Scopes & monitoring
 
@@ -89,7 +89,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 - **Per-track volume and pan** — simple mixer controls in the track headers, next to mute/solo. Applied in the audio mix, not as a clip effect.
 - Linked clip vertical drag — V+A clips move together across tracks when dragging a linked pair, standard NLE behavior (#12)
 - Layout presets (Default, 3-Point Editing, Color)
-- Color labels on media in project panel (field exists on Clip, needs UI on Media)
+- ~~Color labels on media in project panel~~ (shipped in v1.7.0)
 - Proxy toggle (switch proxy/full-res during playback without rebuild)
 - Markers with duration — range markers with in/out points, Premiere-style section marking (#15)
 - Effect presets save/load — serialize effect parameters, apply saved presets to clips (#15)
