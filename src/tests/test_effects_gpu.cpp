@@ -17,6 +17,7 @@ extern "C" {
 #include "effects/effect.h"
 #include "effects/internal/srtparser.h"
 #include "effects/internal/subtitleeffect.h"
+#include "effects/transition.h"
 #include "engine/clip.h"
 #include "rendering/renderfunctions.h"
 #include "tests/test_render_harness.h"
@@ -55,6 +56,15 @@ class TestEffectsGpu : public QObject {
   void subtitleActiveEntry();
   void subtitleOutlineSurroundsText();
   void gradientRendersTwoStops();
+
+  // F-5 — Timer and Progress Bar generators.
+  void progressBarFollowsClipDuration();
+  void progressBarRightToLeft();
+  void progressBarTopManual();
+  void progressBarHeadTrimmed();
+  void progressBarOpeningTransition();
+  void timerRenders();
+  void timerCountDownEndsAtZero();
 
   // Bespoke audio effect tests (Phase 2).
   void toneGeneratesAudio();
@@ -473,6 +483,12 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
   QVERIFY2(orig != nullptr, "Glow after Box Blur should snapshot its input into ClipRhiResources::orig");
   QVERIFY(!h_->render_frame(seq.get(), 20).isEmpty());
   QCOMPARE(static_cast<ClipRhiResources*>(c->fbo_rhi)->orig, orig);
+
+  // Superimpose generator redrawn on every frame (AlwaysUpdate): an image upload per frame, nothing else
+  SequencePtr bar = h_->make_sequence(64, 64, 30);
+  h_->add_generator_clip(bar.get(), -1, 0, 30, EFFECT_INTERNAL_PROGRESSBAR);
+  check_steady(bar.get(), 0, 1, "progress bar", frame0);
+  if (QTest::currentTestFailed()) return;
 
   // Decoded footage: the YUV->RGB pass in Clip::retrieveYuvGpuPath (1-frame fixtures, so stay on frame 0)
   if (avcodec_find_decoder(AV_CODEC_ID_H264)) {
@@ -1028,6 +1044,141 @@ void TestEffectsGpu::gradientRendersTwoStops() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(mid.r > 40 && mid.b > 40,
            qPrintable(QString("expected purple near middle, got R=%1 G=%2 B=%3").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+// ---------------------------------------------------------------------------
+// F-5 — Timer and Progress Bar generators
+// ---------------------------------------------------------------------------
+//
+// Progress Bar rows: 0 source (combo), 1 progress, 2 position (combo), 3 thickness (% of height), 4 margin,
+// 5 direction (combo), 6 color, 7 bgcolor, 8 bgalpha. Timer rows: 0 mode (combo), 1 time offset, 2 format (combo),
+// 3 prefix, 4 size, 5 color, 6 bgcolor, 7 bgalpha, 8 offset x/y.
+// Bars use Thickness 25 (16 px of 64) to leave room; the default 2 % is a 1 px line here. Clip 0..41: last frame 40.
+
+void TestEffectsGpu::progressBarFollowsClipDuration() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 41, EFFECT_INTERNAL_PROGRESSBAR);
+  h_->set_field_double(c->effects[1].get(), 3, 0, 25.0);
+
+  // Frame 10 of 40: 25 %, the 16 leftmost columns of the bottom 16 rows
+  QByteArray pixels = h_->render_frame(seq.get(), 10);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 8, 60, QColor(255, 255, 255, 255));
+  h_->assert_pixel(pixels, 64, 24, 60, QColor(0, 0, 0, 128));  // background, opacity 50
+  h_->assert_pixel(pixels, 64, 8, 10, QColor(0, 0, 0, 0));     // above the bar
+
+  // Full on the last frame
+  pixels = h_->render_frame(seq.get(), 40);
+  h_->assert_pixel(pixels, 64, 63, 60, QColor(255, 255, 255, 255));
+}
+
+void TestEffectsGpu::progressBarRightToLeft() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 41, EFFECT_INTERNAL_PROGRESSBAR);
+  Effect* bar = c->effects[1].get();
+  h_->set_field_double(bar, 3, 0, 25.0);
+  h_->set_field_combo(bar, 5, 0, 1);  // Right to Left
+
+  // 75 %: columns 16..63
+  QByteArray pixels = h_->render_frame(seq.get(), 30);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 60, 60, QColor(255, 255, 255, 255));
+  h_->assert_pixel(pixels, 64, 8, 60, QColor(0, 0, 0, 128));
+}
+
+void TestEffectsGpu::progressBarTopManual() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 41, EFFECT_INTERNAL_PROGRESSBAR);
+  Effect* bar = c->effects[1].get();
+  h_->set_field_combo(bar, 0, 0, 1);  // Manual
+  h_->set_field_double(bar, 1, 0, 50.0);
+  h_->set_field_combo(bar, 2, 0, 1);  // Top
+  h_->set_field_double(bar, 3, 0, 25.0);
+
+  // 50 % whatever the playhead: columns 0..31 of rows 0..15
+  QByteArray pixels = h_->render_frame(seq.get(), 5);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 28, 4, QColor(255, 255, 255, 255));
+  h_->assert_pixel(pixels, 64, 36, 4, QColor(0, 0, 0, 128));
+  h_->assert_pixel(pixels, 64, 28, 60, QColor(0, 0, 0, 0));
+}
+
+void TestEffectsGpu::progressBarHeadTrimmed() {
+  // Trimming the head (clip_in 10, same timeline position) must not move the bar: still 25 % at playhead 10
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 41, EFFECT_INTERNAL_PROGRESSBAR);
+  c->set_clip_in(10);
+  h_->set_field_double(c->effects[1].get(), 3, 0, 25.0);
+
+  QByteArray pixels = h_->render_frame(seq.get(), 10);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 8, 60, QColor(255, 255, 255, 255));
+  h_->assert_pixel(pixels, 64, 24, 60, QColor(0, 0, 0, 128));
+}
+
+void TestEffectsGpu::progressBarOpeningTransition() {
+  // A (transparent, 0..20) cross-dissolves into B (bar, 20..61, clip_in 10) over a shared 10-frame transition:
+  // B is drawn from frame 10, its own in point is frame 20. The bar stays empty until then and counts from there.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* a = h_->add_generator_clip(seq.get(), -1, 0, 20, EFFECT_INTERNAL_SOLID);
+  h_->set_field_double(a->effects[1].get(), 1, 0, 0.0);  // Solid opacity 0: A draws nothing
+  Clip* b = h_->add_generator_clip(seq.get(), -1, 20, 61, EFFECT_INTERNAL_PROGRESSBAR);
+  b->set_clip_in(10);
+  h_->set_field_double(b->effects[1].get(), 3, 0, 25.0);
+  TransitionPtr t =
+      Transition::Create(b, a, Effect::GetInternalMeta(TRANSITION_INTERNAL_CROSSDISSOLVE, EFFECT_TYPE_TRANSITION), 10);
+  QVERIFY(t != nullptr);
+  b->opening_transition = t;
+  a->closing_transition = t;
+
+  // Frame 15, a quarter into the dissolve: only B's background, at a quarter of its opacity (128 / 4); no fill
+  QByteArray pixels = h_->render_frame(seq.get(), 15);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 2, 60, QColor(0, 0, 0, 32), 3);
+
+  // Frame 30: 10 frames past B's in point, of 40 (length 41): 25 %
+  pixels = h_->render_frame(seq.get(), 30);
+  h_->assert_pixel(pixels, 64, 8, 60, QColor(255, 255, 255, 255));
+  h_->assert_pixel(pixels, 64, 24, 60, QColor(0, 0, 0, 128));
+}
+
+void TestEffectsGpu::timerRenders() {
+  // Text and its background near the bottom, nothing in the top half. No glyph shape assertions (fonts differ).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  h_->add_generator_clip(seq.get(), -1, 0, 41, EFFECT_INTERNAL_TIMER);
+
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  bool any_pixel = false;
+  for (int y = 48; y < 64 && !any_pixel; ++y) {
+    for (int x = 0; x < 64; ++x) {
+      if (alpha_of(pixels, 64, x, y) > 100) {
+        any_pixel = true;
+        break;
+      }
+    }
+  }
+  QVERIFY2(any_pixel, "expected timer text/background pixels in the bottom band");
+  for (int y = 0; y < 32; ++y) {
+    for (int x = 0; x < 64; ++x) {
+      QVERIFY2(alpha_of(pixels, 64, x, y) == 0, qPrintable(QString("unexpected pixel at (%1, %2)").arg(x).arg(y)));
+    }
+  }
+}
+
+void TestEffectsGpu::timerCountDownEndsAtZero() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 41, EFFECT_INTERNAL_TIMER);
+  Effect* timer = c->effects[1].get();
+  h_->set_field_double(timer, 4, 0, 300.0);  // 18 px text: glyph differences well above noise
+
+  const QByteArray up_first = h_->render_frame(seq.get(), 0);    // "00:00"
+  h_->set_field_combo(timer, 0, 0, 1);                           // Count Down
+  const QByteArray down_first = h_->render_frame(seq.get(), 0);  // 40 frames left at 30 fps: "00:02"
+  const QByteArray down_last = h_->render_frame(seq.get(), 40);  // "00:00"
+  QVERIFY(!up_first.isEmpty() && !down_first.isEmpty() && !down_last.isEmpty());
+  QVERIFY2(buf_diff(down_first, down_last) > 0, "count down shows the same text on its first and last frames");
+  QVERIFY2(buffers_within(down_last, up_first, 0), "count down's last frame should read the same as 0");
 }
 
 // ---------------------------------------------------------------------------

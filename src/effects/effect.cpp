@@ -53,12 +53,14 @@
 #include "effects/internal/frei0reffect.h"
 #include "effects/internal/gradienteffect.h"
 #include "effects/internal/paneffect.h"
+#include "effects/internal/progressbareffect.h"
 #include "effects/internal/richtexteffect.h"
 #include "effects/internal/shakeeffect.h"
 #include "effects/internal/solideffect.h"
 #include "effects/internal/subtitleeffect.h"
 #include "effects/internal/texteffect.h"
 #include "effects/internal/timecodeeffect.h"
+#include "effects/internal/timereffect.h"
 #include "effects/internal/toneeffect.h"
 #include "effects/internal/transformeffect.h"
 #include "effects/internal/volumeeffect.h"
@@ -263,6 +265,10 @@ static EffectPtr CreateInternalEffect(Clip* c, const EffectMeta* em) {
       return std::make_shared<SubtitleEffect>(c, em);
     case EFFECT_INTERNAL_GRADIENT:
       return std::make_shared<GradientEffect>(c, em);
+    case EFFECT_INTERNAL_TIMER:
+      return std::make_shared<TimerEffect>(c, em);
+    case EFFECT_INTERNAL_PROGRESSBAR:
+      return std::make_shared<ProgressBarEffect>(c, em);
     default:
       return nullptr;
   }
