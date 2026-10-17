@@ -30,6 +30,7 @@
 #include <QWaitCondition>
 
 #include "core/guide.h"
+#include "core/scrubresolution.h"
 #include "effects/effect.h"
 #include "engine/clip.h"
 #include "project/footage.h"
@@ -162,11 +163,17 @@ class ViewerWidget : public QRhiWidget {
   double x_scroll{0};
   double y_scroll{0};
   QString save_frame_last_dir_;
+  // Half resolution while scrubbing: Auto decision state and the settle timer (restarted by each scrub render)
+  amber::ScrubResolution scrub_res_;
+  QTimer settle_timer_;
+  int last_requested_divider_{1};  // divider of the last viewer render requested, reused by the retry
  public slots:
   void queue_repaint();
 
  private slots:
   void context_destroy();
+  // Scrub gesture over: re-renders the same frame at the base divider if the last request was reduced
+  void scrub_settled();
   void retry();
   void show_context_menu();
   void save_frame();
