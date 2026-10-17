@@ -456,8 +456,9 @@ bool ExportThread::Export()
   renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
-  // Loop from now (set to the beginning frame earlier) to the end of the frame
-  while (amber::ActiveSequence->playhead <= params_.end_frame && !interrupt_) {
+  // Loop from now (set to the beginning frame earlier) to the end of the frame. end_frame is exclusive (the frame
+  // after the last clip, or the out point): N sequence frames give N video frames
+  while (amber::ActiveSequence->playhead < params_.end_frame && !interrupt_) {
 
     // Start timing how long this frame will take
     frame_start_time = QDateTime::currentMSecsSinceEpoch();
@@ -562,9 +563,10 @@ bool ExportThread::Export()
       // Make sure nothing is writing while we're retrieving
       audio_write_lock.lock();
 
-      // Check if the count of encoded samples exceeds the current Sequence playhead, in which case we don't need to
-      // encode any audio at this moment
-      while (!interrupt_ && file_audio_samples <= (timecode_secs*params_.audio_sampling_rate)) {
+      // Encode audio up to the end of this frame, so the last frame's audio isn't cut and both streams end together
+      double frame_end_secs =
+          double(amber::ActiveSequence->playhead + 1 - params_.start_frame) / amber::ActiveSequence->frame_rate;
+      while (!interrupt_ && file_audio_samples <= (frame_end_secs*params_.audio_sampling_rate)) {
 
         // Copy samples from audio buffer to AVFrame
         int adjusted_read = audio_ibuffer_read.load() % audio_ibuffer_size;
@@ -606,12 +608,12 @@ bool ExportThread::Export()
     // Generating encoding statistics (e.g. the time it took to encode this frame/estimated remaining time)
     frame_time = (QDateTime::currentMSecsSinceEpoch()-frame_start_time);
     total_time += frame_time;
-    remaining_frames = (params_.end_frame - amber::ActiveSequence->playhead);
+    remaining_frames = (params_.end_frame - amber::ActiveSequence->playhead - 1);
     avg_time = (total_time/frame_count);
     eta = (remaining_frames*avg_time);
 
     // Emit a signal for the percent of the sequence that's been encoded so far
-    emit ProgressChanged(qRound((double(amber::ActiveSequence->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
+    emit ProgressChanged(qRound((double(amber::ActiveSequence->playhead + 1 - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
 
     // Increment sequence playhead
     amber::ActiveSequence->playhead++;

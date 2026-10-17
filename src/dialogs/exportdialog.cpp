@@ -478,6 +478,19 @@ void ExportDialog::StartExport() {
     return;
   }
 
+  // end_frame is exclusive: an empty range would write a file with no frames. Same range as the params built below
+  long range_start = 0;
+  long range_end = amber::ActiveSequence->getEndFrame();
+  if (rangeCombobox->currentIndex() == 1) {
+    range_start = qMax(amber::ActiveSequence->workarea_in, range_start);
+    range_end = qMin(amber::ActiveSequence->workarea_out, range_end);
+  }
+  if (range_end <= range_start) {
+    QMessageBox::critical(this, tr("Nothing to export"), tr("Nothing to export: the sequence or work area is empty."),
+                          QMessageBox::Ok);
+    return;
+  }
+
   QString ext = GetFormatExtension(formatCombobox->currentIndex(), vcodecCombobox->currentData().toInt(),
                                    videoGroupbox->isChecked(), audioGroupbox->isChecked());
   if (ext.isEmpty()) {
