@@ -52,6 +52,14 @@ public:
    */
   explicit ExportDialog(QWidget *parent);
 
+  /**
+   * @brief Esc / title-bar close while exporting interrupts the export instead of closing
+   *
+   * Closing would destroy the running ExportThread (a child of this stack dialog). export_thread_finished() runs
+   * once the thread stops, as with the progress bar's cancel button.
+   */
+  void reject() override;
+
 private slots:
   /**
    * @brief Slot for when the user changes the format
@@ -175,7 +183,7 @@ private:
    *
    * Set when exporting starts, and deleted by export_thread_finished() when the thread is complete.
    */
-  ExportThread* export_thread_;
+  ExportThread* export_thread_{nullptr};
 
   /**
    * @brief GL fallback surface for the export RenderThread
