@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Sharpen" category="Blur">
+	<row name="Amount">
+		<field type="double" min="0" max="500" default="100" id="amount"/>
+	</row>
+	<row name="Radius">
+		<field type="double" min="0.5" max="10" default="1.5" id="radius"/>
+	</row>
+	<shader vert="common.vert" frag="sharpen.frag"/>
+</effect>
