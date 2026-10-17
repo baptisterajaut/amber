@@ -1123,8 +1123,23 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
   gizmos = renderer->gizmos;
   if (viewer->seq != nullptr && gizmos != viewer->seq->GetSelectedGizmo()) {
     gizmos = nullptr;
-    // Not a failure retry: a paused re-render at base, which may supersede a reduced scrub frame (settle then no-ops)
-    QTimer::singleShot(0, this, &ViewerWidget::frame_update);
+    // Fires on any paint (paused or playing) while the clip's gizmo isn't drawn (clip closed, lock busy, near a cut),
+    // so it can repeat every frame. Mid-gesture it re-requests at the gesture's divider without audio and without
+    // touching the Auto state or the settle timer; the pending settle restores base. Otherwise a plain frame_update().
+    if (settle_timer_.isActive() && !viewer->playing) {
+      QTimer::singleShot(0, this, [this]() {
+        if (audio_rendering || viewer->seq == nullptr) return;
+        if (viewer->playing || waveform) {
+          frame_update();  // playback started (or waveform view) meanwhile: same as outside a gesture
+          return;
+        }
+        // same scrubbing value frame_update() would compute while paused (true unless a precise step is pending)
+        renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0,
+                               last_requested_divider_, !viewer->precise_next_render_);
+      });
+    } else {
+      QTimer::singleShot(0, this, &ViewerWidget::frame_update);
+    }
   }
 
   if (has_frame && window->isVisible()) window->set_frame(frame_data, fw, fh);
