@@ -63,7 +63,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - `textureGrad`/`textureGather`/`texture*Offset`/`textureProj` on `iChannel0` (rejected with a message: the flip can't be applied)
 
 ### New built-in effects
-- Gradient generator — linear/radial with multi-stop color ramp, applicable to solids and text (#21)
+- Gradient generator — 2-stop linear/radial shipped in v1.7.0; 2.0 adds "As Mask" to fill the Text / Rich Text letters above it. Remaining: a multi-stop color ramp (#21)
 - Timer / countdown — done in 2.0: Timer generator, counts up from the clip's start or down to 0 on its last frame, MM:SS / HH:MM:SS / seconds / hundredths, prefix and time offset
 - Progress bar — done in 2.0: Progress Bar generator, fills over the clip's duration or follows a keyframeable value, top or bottom edge, thickness, margin, direction
 - Drop Shadow — done in 2.0: drawn in sequence space from the clip as already transformed, so it works on opaque picture-in-picture clips; colour, opacity, direction, distance, softness, all keyframeable
@@ -72,7 +72,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - **Alpha Mask (image source)** — masking effect that takes a PNG/SVG file as alpha source, with invert / feather / opacity / blend controls. Covers text reveals, shape stencils, static masks. Track-based variant (mask = clip on adjacent track) deferred — see Future. (#61)
 - Color correction tool (scopes — waveform, vectorscope, histogram)
 - Subtitle editor — dedicated floating window for bulk subtitle editing (import is shipped in 1.5.0, this is the full editing UI)
-- **Text stroke** — QPainterPath outline on rich text effect (#12)
+- ~~Text stroke — outline color + width on the Rich Text effect~~ (shipped in v1.7.0, #12)
 - **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
 - **LUT loader** — apply a `.cube` 3D LUT as a shader effect (3D texture lookup) with an intensity control blending with the original. Needed for log footage.
 
