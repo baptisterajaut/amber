@@ -458,8 +458,13 @@ bool RenderThread::did_texture_fail() { return texture_failed; }
 bool RenderThread::rhi_failed() const { return rhi_failed_.load(); }
 
 void RenderThread::cancel() {
+  // Same lost-wakeup guard as start_render()'s export path: run() holds wait_lock_ from its `running` check until
+  // wait_cond_.wait() releases it, so taking the lock here means the wake can't land in between. Blocks until the
+  // current paint() finishes, which wait() below did anyway.
+  wait_lock_.lock();
   running = false;
   wait_cond_.wakeAll();
+  wait_lock_.unlock();
   wait();
 }
 
