@@ -161,11 +161,18 @@ void load_internal_effects() {
 void load_shader_effects_worker(const QString& effects_path) {
   QDir effects_dir(effects_path);
   if (effects_dir.exists()) {
-    QList<QString> entries = effects_dir.entryList(QStringList("*.xml"), QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
+    QList<QString> entries = effects_dir.entryList(QStringList({"*.xml", "*.shadertoy"}),
+                                                   QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot);
     for (const auto & entrie : entries) {
       QString entry_path = effects_dir.filePath(entrie);
-      if (QFileInfo(entry_path).isDir()) {
+      QFileInfo entry_info(entry_path);
+      if (entry_info.isDir()) {
         load_shader_effects_worker(entry_path);
+      } else if (entry_info.suffix().compare(QLatin1String("shadertoy"), Qt::CaseInsensitive) == 0) {
+        // A sibling <name>.xml is this shader's descriptor (sidecar), registered by the XML branch
+        if (!QFileInfo::exists(effects_dir.filePath(entry_info.completeBaseName() + ".xml"))) {
+          register_shadertoy_effect(entry_info.absoluteFilePath());
+        }
       } else {
         QFile file(effects_path + "/" + entrie);
         if (!file.open(QIODevice::ReadOnly)) {
@@ -208,6 +215,27 @@ void load_shader_effects_worker(const QString& effects_path) {
       }
     }
   }
+}
+
+const EffectMeta* register_shadertoy_effect(const QString& file) {
+  // Readers that iterate `effects` without effects_loaded_mutex (GetInternalMeta, get_meta_from_name from paste) run
+  // on the UI thread, the import dialog's thread, so they can't race this push_back; validate_meta_path (render
+  // thread) returns before iterating for a meta with a path, which every shader effect has.
+  QFileInfo info(file);
+  const QString name = info.completeBaseName();
+  for (const auto& em : effects) {
+    if (em.category == QLatin1String("ShaderToy") && em.name == name) return &em;
+  }
+  EffectMeta em;
+  em.type = EFFECT_TYPE_EFFECT;
+  em.subtype = EFFECT_TYPE_VIDEO;
+  em.name = name;
+  em.category = QStringLiteral("ShaderToy");
+  em.filename = info.absoluteFilePath();
+  em.path = info.absolutePath();
+  em.internal = -1;
+  effects.push_back(em);
+  return &effects.back();
 }
 
 void load_shader_effects() {

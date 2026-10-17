@@ -1,0 +1,4 @@
+<effect name="Sidecar Level" category="ShaderToy">
+  <row name="Level"><field type="double" id="level" default="1" min="0" max="1"/></row>
+  <shader frag="st_sidecar.shadertoy"/>
+</effect>

@@ -23,6 +23,9 @@ extern "C" {
 #include "tests/test_render_harness.h"
 #include "tests/test_gpu_required.h"
 
+// External entry point from effectloaders.cpp (no header export), as in test_render_harness.cpp
+extern void load_shader_effects_worker(const QString& effects_path);
+
 class TestEffectsGpu : public QObject {
   Q_OBJECT
  private slots:
@@ -189,6 +192,17 @@ class TestEffectsGpu : public QObject {
   void denoiseBilateralWeights();
   void denoiseIgnoresTransparentTaps();
 
+  // F-2 — ShaderToy import (fixtures in tests/fixtures/shadertoy).
+  void shadertoyFragCoordIsYUp();
+  void shadertoyFragCoordX();
+  void shadertoyReadsAreIdentity_data();
+  void shadertoyReadsAreIdentity();
+  void shadertoyResolutionIsClipTexture();
+  void shadertoyTimeIsClipLocal();
+  void shadertoyKeepsSemiTransparentColour();
+  void shadertoySidecarField();
+  void shadertoyBrokenIsNoOp();
+
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
   void yuvDecodeNV12();
@@ -201,6 +215,8 @@ void TestEffectsGpu::initTestCase() {
   h_ = std::make_unique<TestRenderHarness>(
       qEnvironmentVariable("AMBER_TEST_RHI") == QLatin1String("vulkan") ? QRhi::Vulkan : QRhi::OpenGLES2);
   if (!h_->initialized()) AMBER_SKIP_NO_GPU("QRhi OpenGLES2 unavailable");
+  // The ShaderToy fixtures join the registry, so the passthrough sweep covers them too
+  load_shader_effects_worker(QStringLiteral(SOURCE_DIR "/tests/fixtures/shadertoy"));
 }
 
 void TestEffectsGpu::cleanupTestCase() { h_.reset(); }
@@ -521,6 +537,14 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
   check_steady(shadowed.get(), 5, 1, "drop shadow", frame0);
   if (QTest::currentTestFailed()) return;
   QVERIFY2(alpha_of(frame0, 64, 50, 50) > 150, "drop shadow scene drew no shadow");
+
+  // ShaderToy effects: the time-driven uniforms change every frame, the pipeline and UBO must not
+  SequencePtr toy = h_->make_sequence(64, 64, 30);
+  Clip* toy_clip = h_->add_generator_clip(toy.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->attach_xml_shader(toy_clip, "st_plasma");
+  h_->attach_xml_shader(toy_clip, "st_read_texture");
+  check_steady(toy.get(), 5, 1, "shadertoy", frame0);
+  if (QTest::currentTestFailed()) return;
 
   // Superimpose generator redrawn on every frame (AlwaysUpdate): an image upload per frame, nothing else
   SequencePtr bar = h_->make_sequence(64, 64, 30);
@@ -3392,6 +3416,7 @@ void TestEffectsGpu::colorShadersKeepTransparentClipTransparent() {
       {"Colorize", [this](Effect* e) { h_->set_field_double(e, 2, 0, 50.0); }},             // lightness 50
       {"Glow", [](Effect*) {}},  // defaults: bright pass of zeros is zero, a = max(0, max(rgb)) = 0
       {"Denoise", [this](Effect* e) { h_->set_field_double(e, 1, 0, 100.0); }},  // strength 100
+      {"st_white", [](Effect*) {}},  // ShaderToy generator writing alpha 1: the wrapper keeps the input's alpha
   };
 
   auto make_bottom = [this](Sequence* seq) {
@@ -3844,6 +3869,177 @@ void TestEffectsGpu::yuvDecodeNV12() {
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// F-2 — ShaderToy import. Fixtures: tests/fixtures/shadertoy/*.shadertoy, loaded in initTestCase.
+// Orientation contract: readback row 0 is the image top; ShaderToy's fragCoord and iChannel0 are y-up.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Opaque Solid of `color` with the ShaderToy fixture `name` on top
+Clip* add_solid_with_toy(TestRenderHarness* h, Sequence* seq, const QString& name,
+                         QColor color = QColor(128, 128, 128)) {
+  Clip* c = h->add_generator_clip(seq, -1, 0, 60, EFFECT_INTERNAL_SOLID);
+  h->set_field_color(c->effects[1].get(), 2, 0, color);
+  if (!name.isEmpty()) h->attach_xml_shader(c, name);
+  return c;
+}
+
+// Red→blue gradient top→bottom (rows: 0 type, 1 start, 2 end, 3 angle)
+Clip* add_red_blue_gradient(TestRenderHarness* h, Sequence* seq) {
+  Clip* c = h->add_generator_clip(seq, -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  h->set_field_color(c->effects[1].get(), 1, 0, QColor(Qt::red));
+  h->set_field_color(c->effects[1].get(), 2, 0, QColor(Qt::blue));
+  h->set_field_double(c->effects[1].get(), 3, 0, 90.0);
+  return c;
+}
+
+}  // namespace
+
+void TestEffectsGpu::shadertoyFragCoordIsYUp() {
+  // fragColor = fragCoord.y / iResolution.y: ShaderToy's y-up puts the bright end at the image top
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_solid_with_toy(h_.get(), seq.get(), "st_orient_y");
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  Rgba top = pixel_at(pixels, 64, 32, 0);
+  Rgba bottom = pixel_at(pixels, 64, 32, 63);
+  QVERIFY2(top.r > 240 && bottom.r < 15,
+           qPrintable(QString("expected bright top, dark bottom, got top=%1 bottom=%2").arg(top.r).arg(bottom.r)));
+}
+
+void TestEffectsGpu::shadertoyFragCoordX() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_solid_with_toy(h_.get(), seq.get(), "st_orient_x");
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  Rgba left = pixel_at(pixels, 64, 0, 32);
+  Rgba right = pixel_at(pixels, 64, 63, 32);
+  QVERIFY2(left.r < 15 && right.r > 240,
+           qPrintable(QString("expected dark left, bright right, got left=%1 right=%2").arg(left.r).arg(right.r)));
+}
+
+void TestEffectsGpu::shadertoyReadsAreIdentity_data() {
+  QTest::addColumn<QString>("fixture");
+  QTest::newRow("texture") << QStringLiteral("st_read_texture");
+  QTest::newRow("texelFetch") << QStringLiteral("st_read_texelfetch");
+  QTest::newRow("textureLod") << QStringLiteral("st_read_lod");
+}
+
+void TestEffectsGpu::shadertoyReadsAreIdentity() {
+  // The read helpers flip iChannel0 the same way the wrapper flips fragCoord: a passthrough is an exact identity on
+  // a top→bottom gradient (a flip on either side alone would turn it upside down)
+  QFETCH(QString, fixture);
+  auto ref_seq = h_->make_sequence(64, 64, 30.0);
+  add_red_blue_gradient(h_.get(), ref_seq.get());
+  QByteArray reference = h_->render_frame(ref_seq.get(), 0);
+  QVERIFY(!reference.isEmpty());
+
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_red_blue_gradient(h_.get(), seq.get());
+  h_->attach_xml_shader(c, fixture);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba top = pixel_at(pixels, 64, 32, 2);
+  QVERIFY2(buffers_within(reference, pixels, 2),
+           qPrintable(QString("%1 passthrough differs from the gradient: top (%2,%3,%4), diff=%5")
+                          .arg(fixture)
+                          .arg(top.r)
+                          .arg(top.g)
+                          .arg(top.b)
+                          .arg(buf_diff(reference, pixels))));
+}
+
+void TestEffectsGpu::shadertoyResolutionIsClipTexture() {
+  // iResolution and iChannelResolution[0] = the effect pass's target, here the 64x48 clip texture
+  for (const char* fixture : {"st_resolution", "st_channel_resolution"}) {
+    auto seq = h_->make_sequence(64, 48, 30.0);
+    add_solid_with_toy(h_.get(), seq.get(), fixture);
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    QVERIFY(!pixels.isEmpty());
+    Rgba mid = pixel_at(pixels, 64, 32, 24);
+    QVERIFY2(qAbs(mid.r - 64) <= 1 && qAbs(mid.g - 48) <= 1,
+             qPrintable(QString("%1: expected (64, 48), got (%2, %3)").arg(fixture).arg(mid.r).arg(mid.g)));
+  }
+}
+
+void TestEffectsGpu::shadertoyTimeIsClipLocal() {
+  // fragColor = (iTime, iFrame / 255, iTimeDelta * 30) at 30 fps, 15 frames into the clip: (0.5, 15, 1)
+  struct Case {
+    long timeline_in, playhead;
+  };
+  for (const Case k : {Case{0, 15}, Case{10, 25}}) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_generator_clip(seq.get(), -1, k.timeline_in, k.timeline_in + 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
+    h_->attach_xml_shader(c, "st_time");
+    QByteArray pixels = h_->render_frame(seq.get(), k.playhead);
+    QVERIFY(!pixels.isEmpty());
+    Rgba mid = pixel_at(pixels, 64, 32, 32);
+    QVERIFY2(qAbs(mid.r - 128) <= 1 && mid.g == 15 && mid.b >= 254,
+             qPrintable(QString("clip at %1, playhead %2: expected (128, 15, 255), got (%3, %4, %5)")
+                            .arg(k.timeline_in)
+                            .arg(k.playhead)
+                            .arg(mid.r)
+                            .arg(mid.g)
+                            .arg(mid.b)));
+  }
+}
+
+void TestEffectsGpu::shadertoyKeepsSemiTransparentColour() {
+  // A 50% Solid through a passthrough: the reads unpremultiply and the wrapper re-multiplies by the input's alpha,
+  // so the colour isn't darkened (nor the alpha squared)
+  auto make = [this](Sequence* seq, const QString& fixture) {
+    Clip* c = add_solid_with_toy(h_.get(), seq, fixture, QColor(200, 100, 50));
+    h_->set_field_double(c->effects[1].get(), 1, 0, 50.0);  // Solid opacity 50%
+  };
+  auto ref_seq = h_->make_sequence(64, 64, 30.0);
+  make(ref_seq.get(), QString());
+  QByteArray reference = h_->render_frame(ref_seq.get(), 0);
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  make(seq.get(), "st_read_texture");
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!reference.isEmpty() && !pixels.isEmpty());
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  Rgba ref = pixel_at(reference, 64, 32, 32);
+  QVERIFY2(buffers_within(reference, pixels, 2), qPrintable(QString("expected (%1,%2,%3,%4), got (%5,%6,%7,%8)")
+                                                                .arg(ref.r)
+                                                                .arg(ref.g)
+                                                                .arg(ref.b)
+                                                                .arg(ref.a)
+                                                                .arg(mid.r)
+                                                                .arg(mid.g)
+                                                                .arg(mid.b)
+                                                                .arg(mid.a)));
+}
+
+void TestEffectsGpu::shadertoySidecarField() {
+  // st_sidecar.xml names st_sidecar.shadertoy: its "level" field is a uniform, and it suppresses the auto entry
+  QVERIFY(get_meta_from_name("ShaderToy/st_sidecar") == nullptr);
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_solid_with_toy(h_.get(), seq.get(), "Sidecar Level");
+  h_->set_field_double(c->effects[2].get(), 0, 0, 0.25);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 64) <= 1 && mid.g < 3 && mid.b < 3,
+           qPrintable(QString("expected (64, 0, 0), got (%1, %2, %3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::shadertoyBrokenIsNoOp() {
+  // A shader the baker rejects renders as a no-op and reports its error for the Effect Controls indicator
+  auto ref_seq = h_->make_sequence(64, 64, 30.0);
+  add_solid_with_toy(h_.get(), ref_seq.get(), QString(), QColor(30, 160, 90));
+  QByteArray reference = h_->render_frame(ref_seq.get(), 0);
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_solid_with_toy(h_.get(), seq.get(), "st_broken", QColor(30, 160, 90));
+  Effect* broken = c->effects[2].get();
+  QVERIFY(broken->shaderError().isEmpty());
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!reference.isEmpty() && !pixels.isEmpty());
+  QVERIFY(buffers_within(reference, pixels, 0));
+  QVERIFY2(broken->shaderError().contains(QLatin1String(":3:")), qPrintable(broken->shaderError()));
 }
 
 int main(int argc, char* argv[]) {

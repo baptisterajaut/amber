@@ -1,0 +1,3 @@
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  fragColor = textureLod(iChannel0, fragCoord / iResolution.xy, 0.0);
+}

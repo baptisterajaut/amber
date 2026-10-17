@@ -26,6 +26,8 @@
 #include <QString>
 #include <QThread>
 
+struct EffectMeta;
+
 /**
  * @brief The EffectInit class
  *
@@ -53,6 +55,11 @@ protected:
 /// EffectInit locks it at construction and unlocks it when loading finishes.
 /// Code that needs effects to be available should lock/unlock this mutex.
 extern QMutex effects_loaded_mutex;
+
+/// Registers the effect "ShaderToy/<base name>" for a .shadertoy file (no sidecar XML) and returns its meta. A name
+/// already registered in that category returns the existing entry instead, so the first effects folder wins.
+/// Called with effects_loaded_mutex held (effect loading, the import dialog).
+const EffectMeta* register_shadertoy_effect(const QString& file);
 
 /// True for an effect name as a project saves it ("category/name", Effect::save) that belongs to a Frei0r plugin.
 bool is_frei0r_effect_name(const QString& saved_name);

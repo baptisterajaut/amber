@@ -3,7 +3,11 @@
 
 #include <QtTest>
 
+#include <QTemporaryDir>
+
 #include "core/shadertoy.h"
+#include "effects/effect.h"
+#include "effects/effectloaders.h"
 
 using amber::shadertoy::Param;
 using amber::shadertoy::to_amber_glsl;
@@ -36,12 +40,26 @@ QString reject_message(const QString& src, const QVector<Param>& params = {}) {
   return out.isEmpty() ? err : QString();
 }
 
+QString read_fixture(const char* name) {
+  QFile f(QStringLiteral(SOURCE_DIR "/tests/fixtures/shadertoy/") + QLatin1String(name));
+  if (!f.open(QIODevice::ReadOnly)) return {};
+  return QString::fromUtf8(f.readAll());
+}
+
 }  // namespace
 
 class TestShaderToy : public QObject {
   Q_OBJECT
 
+  QTemporaryDir cache_;
+
  private slots:
+  void initTestCase() {
+    // Bakes write the .qsb disk cache: keep it out of the user's cache, and empty so the baker really runs
+    QVERIFY(cache_.isValid());
+    qputenv("XDG_CACHE_HOME", cache_.path().toLocal8Bit());
+  }
+
   void minimalBody() {
     const QString out = convert(kMinimal);
     QVERIFY(out.startsWith(QLatin1String("#version 440\n")));
@@ -170,6 +188,68 @@ class TestShaderToy : public QObject {
     QVERIFY(!out.isEmpty());
     QVERIFY(!out.contains('\r'));
     QVERIFY(out.contains(QLatin1String("#line 1\n\n") + kMinimal));
+  }
+
+  void bakesValid_data() {
+    QTest::addColumn<QString>("src");
+    QTest::newRow("passthrough") << read_fixture("st_read_texture.shadertoy");
+    QTest::newRow("plasma") << read_fixture("st_plasma.shadertoy");
+    QTest::newRow("defines") << QStringLiteral(
+        "#define R iResolution\n"
+        "#define T(u) texture(iChannel0, u)\n"
+        "#define ROT(a) mat2(cos(a), -sin(a), sin(a), cos(a))\n"
+        "#define S(a, b, t) smoothstep(a, b, t)\n"
+        "void mainImage(out vec4 O, vec2 U) {\n"
+        "  vec2 uv = U / R.xy;\n"
+        "  uv = ROT(iTime) * (uv - 0.5) + 0.5;\n"
+        "  O = T(uv) * S(0.0, 1.0, uv.x) + vec4(gl_FragCoord.xy / R.xy, float(iFrame), iDate.w);\n"
+        "}\n");
+    QTest::newRow("bias") << QStringLiteral(
+        "void mainImage(out vec4 c, in vec2 p) { c = texture(iChannel0, p / iResolution.xy, 1.0) + iMouse; }\n");
+    QTest::newRow("precision") << QStringLiteral(
+        "#version 300 es\n"
+        "precision highp float;\n"
+        "precision mediump int;\n"
+        "uniform vec3 iResolution;\n"
+        "uniform float iTime;\n"
+        "void mainImage(out vec4 c, in vec2 p) { c = vec4(p / iResolution.xy, sin(iTime), 1.0); }\n");
+  }
+  void bakesValid() {
+    QFETCH(QString, src);
+    QVERIFY(!src.isEmpty());
+    QString err;
+    const QString glsl = to_amber_glsl(src, {{QStringLiteral("speed"), QStringLiteral("float")}}, &err);
+    QVERIFY2(!glsl.isEmpty(), qPrintable(err));
+    const QShader shader = Effect::bakeSource(glsl.toUtf8(), QShader::FragmentStage, &err);
+    QVERIFY2(shader.isValid(), qPrintable(err + "\n" + glsl));
+    // The cache entry the import dialog leaves for the first render: a second bake of the same source loads it
+    QVERIFY(Effect::bakeSource(glsl.toUtf8(), QShader::FragmentStage).isValid());
+  }
+
+  void bakeErrorCitesUserLine() {
+    QString err;
+    const QString glsl = to_amber_glsl(read_fixture("st_broken.shadertoy"), {}, &err);
+    QVERIFY2(!glsl.isEmpty(), qPrintable(err));
+    QVERIFY(!Effect::bakeSource(glsl.toUtf8(), QShader::FragmentStage, &err).isValid());
+    // The fixture's syntax error is on its line 3: #line 1 maps baker lines back onto the user's
+    QVERIFY2(err.contains(QLatin1String(":3:")), qPrintable(err));
+  }
+
+  void registryKeepsPointers() {
+    const EffectMeta* first = register_shadertoy_effect(QStringLiteral("/nowhere/st_first.shadertoy"));
+    QVERIFY(first != nullptr);
+    QCOMPARE(first->name, QStringLiteral("st_first"));
+    QCOMPARE(first->category, QStringLiteral("ShaderToy"));
+    QCOMPARE(first->path, QStringLiteral("/nowhere"));
+    QCOMPARE(first->internal, -1);
+    const size_t index = effects.size() - 1;
+    for (int i = 0; i < 100; i++) register_shadertoy_effect(QStringLiteral("/nowhere/st_%1.shadertoy").arg(i));
+    QCOMPARE(&effects[index], first);
+    QCOMPARE(first->name, QStringLiteral("st_first"));
+    // A duplicate name (another folder) returns the first entry: the first effects folder wins
+    const size_t count = effects.size();
+    QCOMPARE(register_shadertoy_effect(QStringLiteral("/elsewhere/st_first.shadertoy")), first);
+    QCOMPARE(effects.size(), count);
   }
 };
 

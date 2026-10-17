@@ -1,0 +1,4 @@
+// Orientation: ShaderToy fragCoord is y-up, so the image top is bright
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  fragColor = vec4(vec3(fragCoord.y / iResolution.y), 1.0);
+}

@@ -1,0 +1,4 @@
+// A generator writing opaque white: still only shows where the clip is opaque
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  fragColor = vec4(1.0);
+}

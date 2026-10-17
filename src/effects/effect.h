@@ -199,7 +199,15 @@ class Effect : public QObject {
   virtual void startEffect();
   virtual void endEffect();
 
-  static QShader bakeOrLoadCached(const QString& path, QShader::Stage stage);
+  // Reads `path` and bakes it through bakeSource
+  static QShader bakeOrLoadCached(const QString& path, QShader::Stage stage, QString* error = nullptr);
+  // Bakes GLSL 440 to every RHI target, through the disk cache (keyed on the source's SHA1). Invalid shader and
+  // *error = the baker's message on failure.
+  static QShader bakeSource(const QByteArray& source, QShader::Stage stage, QString* error = nullptr);
+
+  // Last shader preprocess/bake failure of open() (any shader effect), empty once a bake succeeds. Written on the
+  // render thread, read on the UI thread; ShaderErrorChanged is emitted when it changes.
+  QString shaderError() const;
 
   // ClipShaderFlag: the effect's shaders replace the passthrough pair when the clip itself is drawn,
   // instead of running as an intermediate full-frame pass like ShaderFlag.
@@ -265,6 +273,7 @@ class Effect : public QObject {
   void SetExpanded(bool e);
  signals:
   void EnabledChanged(bool);
+  void ShaderErrorChanged();
  public slots:
   void delete_self();
   void move_up();
@@ -307,6 +316,10 @@ class Effect : public QObject {
   bool expanded_{true};
 
   int flags_{0};
+
+  mutable QMutex shader_error_mutex_;
+  QString shader_error_;
+  void setShaderError(const QString& error);
 
   QVector<KeyframeDataChange*> gizmo_dragging_actions_;
 

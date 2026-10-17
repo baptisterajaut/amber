@@ -1,0 +1,4 @@
+// Driven by the sidecar st_sidecar.xml: its "level" field is a uniform
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  fragColor = vec4(level, 0.0, 0.0, 1.0);
+}
