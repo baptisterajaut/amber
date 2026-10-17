@@ -216,6 +216,16 @@ bool PreviewGenerator::retrieve_preview(const QString& hash) {
   return !found;
 }
 
+// Release Footage::ready_lock, which the Footage constructor locks once. A re-analysis (relink, replace) runs a new
+// generator on footage whose lock is already released, and unlocking an unlocked QMutex is undefined: take it
+// first if it's free, so the unlock below always releases a held lock.
+// CBA: a waiter's brief lock()/unlock() pair (viewer, timeline) racing a re-analysis can still lose its lock here;
+// a QSemaphore or a ready flag + QWaitCondition would close that.
+static void release_ready_lock(Footage* footage) {
+  footage->ready_lock.tryLock();
+  footage->ready_lock.unlock();
+}
+
 void PreviewGenerator::finalize_media() {
   if (!cancelled_) {
     bool footage_is_ready = true;
@@ -236,7 +246,7 @@ void PreviewGenerator::finalize_media() {
     }
 
     if (footage_is_ready) {
-      footage_->ready_lock.unlock();
+      release_ready_lock(footage_);
       footage_->ready = true;
       media_->update_tooltip();
     }
@@ -251,7 +261,7 @@ void PreviewGenerator::invalidate_media(const QString& error_msg) {
   media_->update_tooltip(error_msg);
   if (amber::app_ctx) amber::app_ctx->setMediaIcon(media_, ICON_TYPE_ERROR);
   footage_->invalid = true;
-  footage_->ready_lock.unlock();
+  release_ready_lock(footage_);
 }
 
 bool PreviewGenerator::setup_stream_codecs(AVCodecContext** codec_ctx, qint16*** waveform_cache_data) {

@@ -693,7 +693,7 @@ class Cacher : public QThread {
    * @param audio_just_reset  True if this is the first frame after a seek reset
    * @return true if a frame was decoded and ready; false if the outer loop should break
    */
-  bool cacheAudioDecodeOneFrame(AVFrame* frame, bool reverse_audio, double timebase, bool audio_just_reset);
+  bool cacheAudioDecodeOneFrame(AVFrame*& frame, bool reverse_audio, double timebase, bool audio_just_reset);
 
   /**
    * @brief Result codes for cacheAudioMixToBuffer

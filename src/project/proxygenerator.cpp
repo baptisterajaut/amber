@@ -25,6 +25,7 @@
 #include "ui/mainwindow.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QStatusBar>
 #include <QtMath>
@@ -112,6 +113,17 @@ static bool setup_proxy_video_stream(int i, AVFormatContext* input_fmt_ctx, AVFo
   return true;
 }
 
+// Write every packet the encoder has ready.
+static void write_proxy_packets(int stream_index, AVPacket* packet, AVFormatContext* output_fmt_ctx,
+                                QVector<AVCodecContext*>& output_streams, bool& skip) {
+  int recret;
+  while ((recret = avcodec_receive_packet(output_streams.at(stream_index), packet)) >= 0 && !skip) {
+    packet->stream_index = stream_index;
+    av_interleaved_write_frame(output_fmt_ctx, packet);
+    av_packet_unref(packet);
+  }
+}
+
 // Process one decoded frame: pixel-convert if needed, send to encoder, write output packets.
 static void encode_proxy_frame(int stream_index, AVFrame* dec_frame, AVPacket* packet, AVFormatContext* input_fmt_ctx,
                                AVFormatContext* output_fmt_ctx, QVector<AVCodecContext*>& input_streams,
@@ -139,12 +151,7 @@ static void encode_proxy_frame(int stream_index, AVFrame* dec_frame, AVPacket* p
   avcodec_send_frame(output_streams.at(stream_index), enc_frame);
   if (convert_pix_fmt) av_frame_free(&enc_frame);
 
-  int recret;
-  while ((recret = avcodec_receive_packet(output_streams.at(stream_index), packet)) >= 0 && !skip) {
-    packet->stream_index = stream_index;
-    av_interleaved_write_frame(output_fmt_ctx, packet);
-    av_packet_unref(packet);
-  }
+  write_proxy_packets(stream_index, packet, output_fmt_ctx, output_streams, skip);
 }
 
 // Open the input/output format contexts for proxy transcoding.
@@ -180,6 +187,7 @@ static bool proxy_open_contexts(const QString& input_url, const QString& output_
   if (avformat_find_stream_info(input_fmt_ctx, nullptr) < 0) {
     qCritical() << "Proxy: could not find stream info" << input_url;
     avio_closep(&output_fmt_ctx->pb);
+    QFile::remove(output_path);  // just created, empty
     avformat_close_input(&input_fmt_ctx);
     avformat_free_context(output_fmt_ctx);
     return false;
@@ -187,59 +195,81 @@ static bool proxy_open_contexts(const QString& input_url, const QString& output_
   return true;
 }
 
+// What proxy_process_packet() stopped on
+enum ProxyReadStatus { kProxyFrame, kProxyEof, kProxyError, kProxySkipped };
+
 // Process one packet in the decode loop — passthrough or decode+encode for video.
-// Returns false if read failed or skip was set.
-static bool proxy_process_packet(AVPacket* packet, AVFrame* dec_frame, AVFormatContext* input_fmt_ctx,
-                                 AVFormatContext* output_fmt_ctx, QVector<AVCodecContext*>& input_streams,
-                                 QVector<AVCodecContext*>& output_streams, QVector<SwsContext*>& sws_contexts,
-                                 int& stream_index, bool& skip, double& current_progress) {
-  int read_ret = -1;
-  do {
-    read_ret = av_read_frame(input_fmt_ctx, packet);
+// Returns kProxyFrame with a decoded frame in dec_frame, or why reading stopped.
+static ProxyReadStatus proxy_process_packet(AVPacket* packet, AVFrame* dec_frame, AVFormatContext* input_fmt_ctx,
+                                            AVFormatContext* output_fmt_ctx, QVector<AVCodecContext*>& input_streams,
+                                            int& stream_index, bool& skip, double& current_progress) {
+  while (!skip) {
+    int read_ret = av_read_frame(input_fmt_ctx, packet);
     if (read_ret < 0) {
       if (read_ret != AVERROR_EOF) {
         qWarning() << "Proxy generation ended prematurely (read error" << read_ret << ")";
+        return kProxyError;
       }
-      return false;
+      return kProxyEof;
     }
     stream_index = packet->stream_index;
-    if (input_streams.at(stream_index) == nullptr) {
+    // A stream that showed up after the header was written (AVFMTCTX_NOHEADER formats) has no output stream
+    if (stream_index < 0 || stream_index >= input_streams.size()) {
+      av_packet_unref(packet);
+      continue;
+    }
+    AVCodecContext* dec_ctx = input_streams.at(stream_index);
+    if (dec_ctx == nullptr) {
+      // passthrough streams have no decoder: write the packet as is and keep reading
       av_packet_rescale_ts(packet, input_fmt_ctx->streams[stream_index]->time_base,
                            output_fmt_ctx->streams[stream_index]->time_base);
       av_interleaved_write_frame(output_fmt_ctx, packet);
-    } else {
-      avcodec_send_packet(input_streams.at(stream_index), packet);
-      current_progress =
-          qCeil((double(packet->pts) / double(input_fmt_ctx->streams[stream_index]->duration)) * 100);
+      av_packet_unref(packet);
+      continue;
     }
+    avcodec_send_packet(dec_ctx, packet);
+    current_progress = qCeil((double(packet->pts) / double(input_fmt_ctx->streams[stream_index]->duration)) * 100);
     av_packet_unref(packet);
-    // passthrough streams have no decoder: keep reading instead of polling one
-  } while (!skip && (input_streams.at(stream_index) == nullptr ||
-                     avcodec_receive_frame(input_streams.at(stream_index), dec_frame) == AVERROR(EAGAIN)));
-
-  return !skip;
+    // EAGAIN: the decoder needs more input; any other error: drop this packet's output rather than encode a
+    // frame that holds nothing
+    if (avcodec_receive_frame(dec_ctx, dec_frame) == 0) return kProxyFrame;
+  }
+  return kProxySkipped;
 }
 
-// Main decode/encode loop for proxy transcoding.
-static void proxy_decode_loop(AVFormatContext* input_fmt_ctx, AVFormatContext* output_fmt_ctx,
+// Main decode/encode loop for proxy transcoding. Returns true if the whole input was read and encoded.
+static bool proxy_decode_loop(AVFormatContext* input_fmt_ctx, AVFormatContext* output_fmt_ctx,
                               QVector<AVCodecContext*>& input_streams, QVector<AVCodecContext*>& output_streams,
                               QVector<SwsContext*>& sws_contexts, bool& skip, double& current_progress) {
   AVPacket* packet = av_packet_alloc();
   AVFrame* dec_frame = av_frame_alloc();
 
-  while (!skip) {
-    int stream_index = 0;
-    if (!proxy_process_packet(packet, dec_frame, input_fmt_ctx, output_fmt_ctx, input_streams, output_streams,
-                              sws_contexts, stream_index, skip, current_progress)) {
-      break;
-    }
-    av_packet_unref(packet);
+  ProxyReadStatus status;
+  int stream_index = 0;
+  while ((status = proxy_process_packet(packet, dec_frame, input_fmt_ctx, output_fmt_ctx, input_streams, stream_index,
+                                        skip, current_progress)) == kProxyFrame) {
     encode_proxy_frame(stream_index, dec_frame, packet, input_fmt_ctx, output_fmt_ctx, input_streams, output_streams,
                        sws_contexts, skip);
   }
 
+  if (status == kProxyEof) {
+    // Drain what the decoders and encoders still buffer (frame threading, B-frames): without this the proxy loses
+    // its last frames
+    for (int i = 0; i < input_streams.size(); i++) {
+      if (input_streams.at(i) == nullptr) continue;
+      avcodec_send_packet(input_streams.at(i), nullptr);
+      while (!skip && avcodec_receive_frame(input_streams.at(i), dec_frame) == 0) {
+        encode_proxy_frame(i, dec_frame, packet, input_fmt_ctx, output_fmt_ctx, input_streams, output_streams,
+                           sws_contexts, skip);
+      }
+      avcodec_send_frame(output_streams.at(i), nullptr);
+      write_proxy_packets(i, packet, output_fmt_ctx, output_streams, skip);
+    }
+  }
+
   av_packet_free(&packet);
   av_frame_free(&dec_frame);
+  return status == kProxyEof && !skip;
 }
 
 void ProxyGenerator::transcode(const ProxyInfo& info) {
@@ -248,7 +278,10 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
 
   AVFormatContext* input_fmt_ctx = nullptr;
   AVFormatContext* output_fmt_ctx = nullptr;
-  if (!proxy_open_contexts(footage->url, info.path, footage->start_number, input_fmt_ctx, output_fmt_ctx)) return;
+  if (!proxy_open_contexts(footage->url, info.path, footage->start_number, input_fmt_ctx, output_fmt_ctx)) {
+    footage->proxy = false;  // clear ProxyDialog's "generating" mark, see the failure path below
+    return;
+  }
 
   QVector<AVCodecContext*> input_streams(input_fmt_ctx->nb_streams, nullptr);
   QVector<AVCodecContext*> output_streams(input_fmt_ctx->nb_streams, nullptr);
@@ -265,15 +298,16 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
     if (!video_ok) avcodec_parameters_copy(out_stream->codecpar, in_stream->codecpar);
   }
 
+  // A failure here only fails this proxy: the generator thread keeps serving the queue (cancelled is for cancel())
+  bool success = false;
   if (avformat_write_header(output_fmt_ctx, nullptr) < 0) {
     qWarning() << "Failed to write video header";
-    cancelled = true;
-    skip = true;
+  } else {
+    success = proxy_decode_loop(input_fmt_ctx, output_fmt_ctx, input_streams, output_streams, sws_contexts, skip,
+                                current_progress);
+    // av_write_trailer() also reports a sticky I/O error (disk full) from any earlier write
+    if (av_write_trailer(output_fmt_ctx) < 0) success = false;
   }
-
-  proxy_decode_loop(input_fmt_ctx, output_fmt_ctx, input_streams, output_streams, sws_contexts, skip, current_progress);
-
-  av_write_trailer(output_fmt_ctx);
 
   for (int i = 0; i < int(input_fmt_ctx->nb_streams); i++) {
     if (input_streams[i] != nullptr) {
@@ -286,6 +320,18 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   avio_closep(&output_fmt_ctx->pb);
   avformat_free_context(output_fmt_ctx);
   avformat_close_input(&input_fmt_ctx);
+
+  if (!success) {
+    // Don't leave a truncated file behind
+    QFile::remove(info.path);
+    if (!skip) {
+      // Skipped: cancelled, or re-queued (the new entry owns the footage's proxy state). Failed: clear the
+      // "generating" mark ProxyDialog set (proxy on, empty path) so the footage isn't shown as a proxy in progress
+      qWarning() << "Failed to create proxy for" << footage->url;
+      footage->proxy = false;
+    }
+    return;
+  }
 
   footage->proxy = true;
   footage->proxy_path = info.path;

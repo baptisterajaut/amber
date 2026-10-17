@@ -1243,7 +1243,8 @@ Lut3D loadCubeFile(const QString& path) {
 
 }  // namespace
 QRhiTexture* Effect::process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& lutPath) {
-  if (lutPath != loadedLutPath_) {
+  // lutTex_ == nullptr: first use with no file picked, the empty path equals the empty loadedLutPath_
+  if (lutPath != loadedLutPath_ || lutTex_ == nullptr) {
     Lut3D lut = lutPath.isEmpty() ? Lut3D() : loadCubeFile(lutPath);
 
     if (lut.size <= 0) {

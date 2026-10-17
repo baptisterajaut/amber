@@ -89,6 +89,7 @@ class TestEffectsGpu : public QObject {
   void lutIdentityPassthrough();
   void lutInvertFullStrength();
   void lutHalfStrengthBlends();
+  void lutNoFilePassthrough();
   void huesatbriSaturationZero();
   void huesatbriContrast();
   void huesatbriHueRotate();
@@ -1525,6 +1526,29 @@ void TestEffectsGpu::lutHalfStrengthBlends() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(qAbs(mid.r - 128) <= 3 && qAbs(mid.g - 128) <= 3 && qAbs(mid.b - 128) <= 3,
            qPrintable(QString("expected ~(128,128,128), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::lutNoFilePassthrough() {
+  // A LUT effect just added, no file picked yet: the identity fallback must bind, the image passes through unchanged.
+  // A gradient, not a solid: with no LUT texture bound, GL samples the image itself as the LUT, which a uniform colour
+  // would hide.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);  // top→bottom
+  QByteArray before = h_->render_frame(seq.get(), 0);
+  h_->attach_xml_shader(c, "LUT");
+  QByteArray after = h_->render_frame(seq.get(), 0);
+  QVERIFY(!before.isEmpty());
+  QCOMPARE(after.size(), before.size());
+  Rgba top = pixel_at(before, 64, 32, 4);
+  Rgba bot = pixel_at(before, 64, 32, 60);
+  QVERIFY2(bot.r > top.r + 100, "reference gradient missing");
+  // 2x2x2 identity LUT through linear filtering: allow a couple of levels per channel
+  const int diff = buf_diff(before, after);
+  QVERIFY2(diff <= 64 * 64 * 3 * 2, qPrintable(QString("LUT with no file changed the image, diff=%1").arg(diff)));
 }
 
 void TestEffectsGpu::huesatbriSaturationZero() {

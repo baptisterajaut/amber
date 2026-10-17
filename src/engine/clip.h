@@ -204,6 +204,9 @@ class Clip {
   std::atomic<bool> open_{false};
   bool cacher_uses_rgba_{false};
 
+  // reset_audio() with the nested sequences already being reset, to stop on a sequence that nests itself
+  void reset_audio(QVector<Sequence*>& chain);
+
   // ---------------------------------------------------------------------------
   // Private helpers for Retrieve()
   // ---------------------------------------------------------------------------

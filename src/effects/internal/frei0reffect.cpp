@@ -25,6 +25,7 @@
 #include <QDir>
 #include <QHash>
 #include <QMutex>
+#include <cstring>
 
 #include "core/appcontext.h"
 #include "engine/clip.h"
@@ -182,7 +183,7 @@ void ApplyFrei0rParam(f0r_instance_t instance, f0rSetParamValue set_param, Effec
 
 }  // namespace
 
-void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* output, int) {
+void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* output, int size) {
   // Reconstruct Frei0r instance if clip dimensions changed since construction
   // (e.g., effect was created during project load before media was analyzed)
   int w = parent_clip->media_width();
@@ -202,6 +203,13 @@ void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* outpu
     get_param_info(&param_info, i);
     if (param_info.type < 0 || param_info.type > F0R_PARAM_STRING) continue;
     ApplyFrei0rParam(instance, set_param_func_, row(row_idx++), param_info.type, i, timecode);
+  }
+
+  // The instance reads and writes w * h RGBA pixels, w/h from the stream parameters: a decoded frame smaller than
+  // declared (corrupt or mid-stream resolution change) would be overrun. Pass it through untouched instead.
+  if (size < qint64(w) * h * 4) {
+    memcpy(output, input, size);
+    return;
   }
 
   update_func_(instance, timecode, reinterpret_cast<uint32_t*>(input), reinterpret_cast<uint32_t*>(output));

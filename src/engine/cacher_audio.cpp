@@ -238,7 +238,12 @@ bool Cacher::cacheAudioAccumulateReverse(AVFrame* frame, AVFrame*& out_frame, in
        << "limit:" << rev_frame->linesize[0];
 #endif
 
-  rev_frame->nb_samples += frame->nb_samples;
+  // The buffer holds 10 s at the sequence rate (openWorkerAudioFilter): never count more samples than it holds, or
+  // reverseAudioSamples() walks past its end (e.g. a reverse segment of a clip slowed below 10 %)
+  const int rev_capacity =
+      rev_frame->linesize[0] /
+      (rev_frame->ch_layout.nb_channels * av_get_bytes_per_sample(static_cast<AVSampleFormat>(rev_frame->format)));
+  rev_frame->nb_samples = qMin(rev_frame->nb_samples + frame->nb_samples, rev_capacity);
 
   if ((frame_->pts >= reverse_target_) || (ret == AVERROR_EOF)) {
     double playback_speed_ = Cacher::getEffectivePlaybackSpeed(clip);
@@ -248,7 +253,8 @@ bool Cacher::cacheAudioAccumulateReverse(AVFrame* frame, AVFrame*& out_frame, in
          << "rev_target:" << reverse_target_;
 #endif
     double freq_ratio = qFuzzyIsNull(playback_speed_) ? 0.0 : (current_audio_freq() / playback_speed_);
-    rev_frame->nb_samples = qMax(0LL, qRound64(double(reverse_target_ - rev_frame->pts) * timebase * freq_ratio));
+    rev_frame->nb_samples = int(qBound(0LL, qRound64(double(reverse_target_ - rev_frame->pts) * timebase * freq_ratio),
+                                       static_cast<long long>(rev_capacity)));
 #ifdef AUDIOWARNINGS
     dout << "post cutoff deets::" << rev_frame->nb_samples;
 #endif
@@ -353,7 +359,7 @@ static void reverseAudioSeekBack(AVCodecContext* codecCtx, AVFormatContext* form
 
 // Decode one audio frame from the filter graph (handles reverse/forward logic).
 // Returns true if a frame was decoded; false if the outer loop should break.
-bool Cacher::cacheAudioDecodeOneFrame(AVFrame* frame, bool reverse_audio, double timebase, bool audio_just_reset) {
+bool Cacher::cacheAudioDecodeOneFrame(AVFrame*& frame, bool reverse_audio, double timebase, bool audio_just_reset) {
   if (reverse_audio && !audio_just_reset) {
     reverseAudioSeekBack(codecCtx, formatCtx, stream, reverse_target_, reached_end);
   }

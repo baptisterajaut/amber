@@ -24,7 +24,9 @@
 #include <climits>
 
 #include "engine/clip.h"
+#include "engine/sequence.h"
 #include "project/footage.h"
+#include "project/media.h"
 #include "rendering/renderfunctions.h"
 
 // These tests call the real engine functions (amber-engine is linked as an OBJECT library).
@@ -115,6 +117,22 @@ class TestEngine : public QObject {
     f.speed = 0.5;  // half speed plays twice as long
     QCOMPARE(f.get_length_in_frames(30.0), 120L);
     f.ready_lock.unlock();
+  }
+
+  // -- Clip::reset_audio -----------------------------------------------------
+
+  void resetAudioSelfNestedSequence() {
+    // A sequence holding a clip of itself (corrupt or hand-edited .ove): reset_audio() must return instead of
+    // recursing until the stack overflows
+    auto seq = std::make_shared<Sequence>();
+    Media m;
+    m.set_sequence(seq);
+    auto clip = std::make_shared<Clip>(seq.get());
+    clip->set_track(-1);  // video track: no cacher to reset, only the nesting walk
+    clip->set_media(&m, 0);
+    seq->clips.append(clip);
+    clip->reset_audio();
+    seq->clips.clear();  // before m goes out of scope: the clip points at it
   }
 
   void footageLengthZeroSpeed() {

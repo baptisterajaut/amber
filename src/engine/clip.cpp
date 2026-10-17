@@ -173,6 +173,11 @@ void Clip::move(ComboAction* ca, long iin, long iout, long iclip_in, int itrack,
 }
 
 void Clip::reset_audio() {
+  QVector<Sequence*> chain;
+  reset_audio(chain);
+}
+
+void Clip::reset_audio(QVector<Sequence*>& chain) {
   if (UsesCacher()) {
     cacher.ResetAudio();
   }
@@ -182,12 +187,17 @@ void Clip::reset_audio() {
       qWarning() << "Clip::reset_audio: nested sequence is null";
       return;
     }
+    // Circular nesting guard, as in compose_sequence(): a .ove where a sequence nests itself (directly or through
+    // another one) would otherwise recurse until the stack overflows
+    if (chain.contains(nested_sequence)) return;
+    chain.append(nested_sequence);
     for (const auto& clip : nested_sequence->clips) {
       Clip* c = clip.get();
       if (c != nullptr) {
-        c->reset_audio();
+        c->reset_audio(chain);
       }
     }
+    chain.removeLast();
   }
 }
 
@@ -568,31 +578,38 @@ bool Clip::retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceP
   // Upload plane data
   QRhiResourceUpdateBatch* u = rhi->nextResourceUpdateBatch();
 
+  // Copy no more than the decoded frame holds: w/h come from the stream parameters, and a frame smaller than declared
+  // (corrupt or mid-stream resolution change) would otherwise be read past its end. 4:2:0 chroma rounds up.
+  // CBA: textures stay at the declared size on a mid-stream size change (the uncovered area keeps stale pixels);
+  // recreate them from frame->width/height if streams that change resolution need to display correctly.
+  const int y_w = qMin(w, frame->width);
+  const int y_h = qMin(h, frame->height);
+  const int c_w = qMin(w / 2, (frame->width + 1) / 2);
+  const int c_h = qMin(h / 2, (frame->height + 1) / 2);
+
   // Y plane
   {
-    QByteArray yData(reinterpret_cast<const char*>(frame->data[0]), frame->linesize[0] * h);
+    QByteArray yData(reinterpret_cast<const char*>(frame->data[0]), frame->linesize[0] * y_h);
     QRhiTextureSubresourceUploadDescription desc(yData);
-    desc.setSourceSize(QSize(w, h));
+    desc.setSourceSize(QSize(y_w, y_h));
     desc.setDataStride(frame->linesize[0]);
     u->uploadTexture(yuv_tex_y, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
   }
 
   // U/UV plane (NV12 and YUV420P use the same upload path — NV12 just has an RG8 texture)
   {
-    int uv_h = h / 2;
-    QByteArray uvData(reinterpret_cast<const char*>(frame->data[1]), frame->linesize[1] * uv_h);
+    QByteArray uvData(reinterpret_cast<const char*>(frame->data[1]), frame->linesize[1] * c_h);
     QRhiTextureSubresourceUploadDescription desc(uvData);
-    desc.setSourceSize(QSize(w / 2, uv_h));
+    desc.setSourceSize(QSize(c_w, c_h));
     desc.setDataStride(frame->linesize[1]);
     u->uploadTexture(yuv_tex_u, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
   }
 
   // V plane (YUV420P only)
   if (is_yuv420p) {
-    int v_h = h / 2;
-    QByteArray vData(reinterpret_cast<const char*>(frame->data[2]), frame->linesize[2] * v_h);
+    QByteArray vData(reinterpret_cast<const char*>(frame->data[2]), frame->linesize[2] * c_h);
     QRhiTextureSubresourceUploadDescription desc(vData);
-    desc.setSourceSize(QSize(w / 2, v_h));
+    desc.setSourceSize(QSize(c_w, c_h));
     desc.setDataStride(frame->linesize[2]);
     u->uploadTexture(yuv_tex_v, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
   }
@@ -718,9 +735,12 @@ bool Clip::retrieveCpuRgbaPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequence
   QRhiResourceUpdateBatch* u = rhi->nextResourceUpdateBatch();
   const uint8_t* uploadData = using_db_1 ? data_buffer_1 : data_buffer_2;
   int stride = frame->linesize[0];
-  QByteArray texData(reinterpret_cast<const char*>(uploadData), stride * h);
+  // The buffers hold frame->height rows (frame_size): never read more than that or wider than the frame, see
+  // retrieveYuvGpuPath(). CBA: same fixed texture size on a mid-stream size change.
+  const int up_h = qMin(h, frame->height);
+  QByteArray texData(reinterpret_cast<const char*>(uploadData), stride * up_h);
   QRhiTextureSubresourceUploadDescription desc(texData);
-  desc.setSourceSize(QSize(w, h));
+  desc.setSourceSize(QSize(qMin(w, frame->width), up_h));
   desc.setDataStride(stride);
   u->uploadTexture(rgba_tex, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
 
