@@ -272,6 +272,7 @@ Clip::~Clip() {
     }
     if (res->clear_rpd) to_delete.append(res->clear_rpd);
     if (res->rpd) to_delete.append(res->rpd);
+    if (res->orig) to_delete.append(res->orig);
     delete res;
   }
   if (!to_delete.isEmpty()) {
@@ -498,6 +499,7 @@ void Clip::collectRhiResourcesToDelete(QVector<QRhiResource*>& to_delete) {
     }
     if (res->clear_rpd) to_delete.append(res->clear_rpd);
     if (res->rpd) to_delete.append(res->rpd);
+    if (res->orig) to_delete.append(res->orig);
     delete res;  // Plain C++ struct, not a QRhiResource — safe from any thread
     fbo_rhi = nullptr;
   }

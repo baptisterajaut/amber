@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Glow" category="Stylize">
+	<row name="Threshold">
+		<field type="double" min="0" default="60" max="100" id="threshold"/>
+	</row>
+	<row name="Radius">
+		<field type="double" min="0" default="20" max="100" id="radius"/>
+	</row>
+	<row name="Intensity">
+		<field type="double" min="0" default="100" max="400" id="intensity"/>
+	</row>
+	<row name="Blend">
+		<field type="combo" default="0" id="blend_mode">
+			<option>Add</option>
+			<option>Screen</option>
+		</field>
+	</row>
+	<shader vert="common.vert" frag="glow.frag" iterations="3" original="1"/>
+</effect>

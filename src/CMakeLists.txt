@@ -345,6 +345,8 @@ set(AMBER_EFFECTS
   effects/shaders/flip.xml
   effects/shaders/gaussianblur.frag
   effects/shaders/gaussianblur.xml
+  effects/shaders/glow.frag
+  effects/shaders/glow.xml
   effects/shaders/highlightcircle.frag
   effects/shaders/highlightcircle.xml
   effects/shaders/huesatbri.frag
