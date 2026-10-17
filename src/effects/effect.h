@@ -265,9 +265,25 @@ class Effect : public QObject {
   QRhiTexture* process_curve_texture(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode);
   int curveUploadCount() const { return curveUploads_; }  // for tests
 
+  // A file field with id "mask_path" (Alpha Mask): the decoded image at binding 3, exclusive with the LUT, the curve
+  // texture and original
+  bool needsMask();
+  QString currentMaskPath(double timecode);
+  // The mask texture, decoded and uploaded in `u` only when `maskPath` changed. A 1x1 placeholder with no file or a
+  // failed decode, maskSize() is then (0, 0)
+  QRhiTexture* process_mask(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& maskPath);
+  QSize maskSize() const { return maskSize_; }
+
  private:
   FileField* findLutField();
   CurveField* findCurveField();
+  FileField* findMaskField();
+
+  FileField* maskField_{nullptr};
+  bool maskFieldSearched_{false};
+  QRhiTexture* maskTex_{nullptr};
+  QString loadedMaskPath_;
+  QSize maskSize_{0, 0};
 
   CurveField* curveField_{nullptr};
   bool curveFieldSearched_{false};

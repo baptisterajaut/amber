@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Alpha Mask" category="Keying">
+	<row name="Mask File" keyframable="0">
+		<field type="file" id="mask_path" filename=""/>
+	</row>
+	<row name="Channel" keyframable="0">
+		<field type="combo" default="0" id="channel">
+			<option>Alpha</option>
+			<option>Luminance</option>
+		</field>
+	</row>
+	<row name="Fit" keyframable="0">
+		<field type="combo" default="0" id="fit">
+			<option>Stretch</option>
+			<option>Fit</option>
+			<option>Fill</option>
+		</field>
+	</row>
+	<row name="Position">
+		<field type="double" default="50" id="pos_x"/>
+		<field type="double" default="50" id="pos_y"/>
+	</row>
+	<row name="Scale">
+		<field type="double" default="100" min="1" max="1000" id="mask_scale"/>
+	</row>
+	<row name="Feather">
+		<field type="double" default="0" min="0" max="100" id="feather"/>
+	</row>
+	<row name="Invert">
+		<field type="bool" default="0" id="invert"/>
+	</row>
+	<row name="Opacity">
+		<field type="double" default="100" min="0" max="100" id="opacity"/>
+	</row>
+	<shader vert="common.vert" frag="alpha_mask.frag"/>
+</effect>
