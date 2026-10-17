@@ -320,6 +320,8 @@ set(AMBER_EFFECTS
   effects/shaders/chromaticaberration.xml
   effects/shaders/colorcorrection.frag
   effects/shaders/colorcorrection.xml
+  effects/shaders/colorize.frag
+  effects/shaders/colorize.xml
   effects/shaders/colorsel.frag
   effects/shaders/colorsel.xml
   effects/shaders/common.frag
