@@ -127,6 +127,8 @@ ViewerWidget::ViewerWidget(QWidget* parent)
   settle_timer_.setInterval(amber::kScrubSettleMs);
   connect(&settle_timer_, &QTimer::timeout, this, &ViewerWidget::scrub_settled);
 
+  fps_clock_.start();
+
   // Overlay created by ViewerContainer as sibling — child QWidget over
   // QRhiWidget breaks Vulkan compositing in Amber's widget hierarchy.
 }
@@ -898,6 +900,36 @@ void ViewerWidget::draw_gizmos(QPainter& p) {
   }
 }
 
+// CBA: sequence viewer only, the footage viewer can reuse the same overlay if asked
+bool ViewerWidget::frame_rate_shown() const {
+  return amber::CurrentConfig.show_frame_rate && viewer == panel_sequence_viewer && viewer->playing &&
+         viewer->seq != nullptr && !waveform;
+}
+
+void ViewerWidget::draw_frame_rate(QPainter& p) {
+  double fps;
+  if (!fps_meter_.rate(&fps)) return;  // fewer than 2 frames since play: nothing to show yet
+  double target = viewer->seq->frame_rate;
+  // Red only once a whole window was measured: the first frames after play (cachers warming up) don't count
+  bool slow = fps_meter_.window_full() && amber::below_target(fps, target);
+  QString text = tr("%1 / %2 fps").arg(QString::number(fps, 'f', 1), QString::number(target));
+
+  QFont f = font();
+  f.setBold(true);
+  p.setFont(f);
+  QFontMetrics fm(f);
+  const int margin = 8;
+  const int pad = 4;
+  QRect box(margin, margin, fm.horizontalAdvance(text) + pad * 2, fm.height() + pad * 2);
+
+  p.setRenderHint(QPainter::Antialiasing, true);
+  p.setPen(Qt::NoPen);
+  p.setBrush(QColor(0, 0, 0, 160));
+  p.drawRoundedRect(box, 4, 4);
+  p.setPen(slow ? QColor(0xe0, 0x50, 0x50) : QColor(Qt::white));
+  p.drawText(box, Qt::AlignCenter, text);
+}
+
 int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {
   if (viewer->seq == nullptr) return -1;
   int threshold = qMax(3, int(5.0 * viewer->seq->width / width()));
@@ -1159,6 +1191,25 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
   frame_lock->unlock();
   // --- end CPU bridge ---
 
+  // Frame rate overlay: a frame counts when a paint takes in a newly published one. Not per ready(): frames rendered
+  // between two paints are never shown. Not per paint: resizes and gizmo hovers repaint too. Nor when it shows the
+  // same sequence frame as the last one: the playback timer ticks every floor(1000 / fps) ms, so it re-renders a
+  // frame now and then (30.3 "new" frames a second at 29.97).
+  // CBA: the serial is bumped just before the front buffer flips, so a paint landing in between counts the frame one
+  // paint early; the count over the window is unchanged.
+  RenderThread::FrameTiming shown = renderer->last_frame_timing();
+  bool new_frame = false;
+  if (shown.serial != fps_last_serial_) {
+    new_frame = has_frame && shown.playhead != fps_last_playhead_;
+    fps_last_serial_ = shown.serial;
+    fps_last_playhead_ = shown.playhead;
+  }
+  if (!frame_rate_shown()) {
+    fps_meter_.reset();  // label off (or stopped, which Viewer::pause() already reset)
+  } else if (new_frame) {
+    fps_meter_.add_frame(fps_clock_.elapsed());
+  }
+
   // Compute zoom/scroll quad in NDC
   float zoom_left = -1.0f, zoom_right = 1.0f, zoom_bottom = -1.0f, zoom_top = 1.0f;
   if (viewer->seq != nullptr) {
@@ -1212,6 +1263,11 @@ void ViewerWidget::update_overlay() {
   if (overlay_) overlay_->update();
 }
 
+void ViewerWidget::reset_frame_rate() {
+  fps_meter_.reset();
+  update_overlay();
+}
+
 // --- ViewerOverlay ---
 
 ViewerOverlay::ViewerOverlay(ViewerWidget* vw, QWidget* parent) : QWidget(parent), vw_(vw) {
@@ -1238,6 +1294,9 @@ void ViewerOverlay::paintEvent(QPaintEvent*) {
       p.setFont(f);
       p.setPen(QColor(255, 255, 255, 200));
       p.drawText(rect(), Qt::AlignCenter, QString::number(vw_->viewer->preroll_seconds_left));
+    }
+    if (vw_->frame_rate_shown()) {
+      vw_->draw_frame_rate(p);  // last, so no gizmo covers it
     }
   }
 }

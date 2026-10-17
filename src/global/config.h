@@ -641,6 +641,11 @@ struct Config {
   bool lock_guides{false};
 
   /**
+   * @brief Show the displayed frame rate in the sequence viewer during playback
+   */
+  bool show_frame_rate{false};
+
+  /**
    * @brief Show color labels on clips and markers
    *
    * **TRUE** if clips and markers should display their assigned color label

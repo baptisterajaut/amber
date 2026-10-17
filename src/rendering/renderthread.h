@@ -73,13 +73,14 @@ class RenderThread : public QThread {
   void cancel();
   void wait_until_paused();
 
-  // GPU + readback time of the last successfully rendered viewer frame, the divider it was rendered at, and a
-  // serial that increments per published frame (0 = none yet). Written on the render thread, read on the GUI
-  // thread; the three fields always belong to the same frame.
+  // GPU + readback time of the last successfully rendered viewer frame, the divider it was rendered at, the
+  // sequence frame it shows, and a serial that increments per published frame (0 = none yet). Written on the render
+  // thread, read on the GUI thread; the fields always belong to the same frame.
   struct FrameTiming {
     quint64 serial{0};
     double gpu_ms{0};
     int divider{1};
+    long playhead{-1};
   };
   FrameTiming last_frame_timing() const;
 

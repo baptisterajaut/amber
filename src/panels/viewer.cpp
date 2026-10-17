@@ -399,6 +399,8 @@ void Viewer::pause(bool clear_buffer) {
   set_playpause_icon(true);
   playback_updater.stop();
   playback_speed = 0;
+  // Here, not on the next paint: a play can follow before any frame is painted
+  if (amber::CurrentConfig.show_frame_rate) viewer_widget->reset_frame_rate();
 
   // Flush audio buffer on pause to prevent stale samples from playing
   if (clear_buffer) {
