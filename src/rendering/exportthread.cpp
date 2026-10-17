@@ -467,16 +467,22 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
 
   if (palette_graph != nullptr) {
     video_frame->pts = qRound(timecode_secs / av_q2d(vcodec_ctx->time_base));
-    // The graph keeps a reference to video_frame's buffer and may hold the frame past this call: making video_frame
-    // writable again gives the next render its own buffer
     ret = av_buffersrc_add_frame_flags(palette_src, video_frame, AV_BUFFERSRC_FLAG_KEEP_REF);
-    if (ret >= 0) ret = av_frame_make_writable(video_frame);
     if (ret < 0) {
       qCritical() << "Failed to send frame to the palette filter graph." << ret;
       export_error = tr("failed to send frame to the palette filter (%1)").arg(QString::number(ret));
       return false;
     }
-    return EncodePaletteFrames();
+    if (!EncodePaletteFrames()) return false;
+    // The graph keeps a reference to video_frame's buffer and may hold the frame past the drain above: making
+    // video_frame writable again gives the next render its own buffer (a no-op once the graph has let go)
+    ret = av_frame_make_writable(video_frame);
+    if (ret < 0) {
+      qCritical() << "Could not reallocate video frame buffer." << ret;
+      export_error = tr("could not allocate video frame buffer (%1)").arg(QString::number(ret));
+      return false;
+    }
+    return true;
   }
 
   // Alloc/free sws_frame every frame — required to avoid GIF getting stuck on first frame

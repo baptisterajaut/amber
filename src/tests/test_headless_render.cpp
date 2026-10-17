@@ -10,6 +10,7 @@
 
 extern "C" {
 #include <libavcodec/avcodec.h>
+#include <libavfilter/avfilter.h>
 #include <libavformat/avformat.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
@@ -1067,6 +1068,9 @@ class TestHeadlessRender : public QObject {
   // fully transparent pixels must stay transparent.
   void gifPal8Export() {
     if (avcodec_find_encoder(AV_CODEC_ID_GIF) == nullptr) QSKIP("GIF encoder not in this FFmpeg build");
+    if (avfilter_get_by_name("palettegen") == nullptr || avfilter_get_by_name("paletteuse") == nullptr) {
+      QSKIP("palettegen/paletteuse not in this FFmpeg build");
+    }
     const int frames = kPaletteClipFrames * int(std::size(kPaletteColours));
     auto export_gif = [this, frames](AVPixelFormat pix_fmt, const QString& file, Decoded& out, int size = kSize) {
       SequencePtr seq = palette_sequence();
