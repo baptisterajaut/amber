@@ -25,12 +25,15 @@
 
 #include <QFont>
 #include <QImage>
+#include <QPainterPath>
+#include <QVector>
 
 class TextEffect : public Effect {
   Q_OBJECT
  public:
   TextEffect(Clip* c, const EffectMeta* em);
   void redraw(double timecode) override;
+  bool AlwaysUpdate() override;
  private slots:
   void outline_enable(bool);
   void shadow_enable(bool);
@@ -40,6 +43,9 @@ class TextEffect : public Effect {
 
   StringField* text_val;
   DoubleField* size_val;
+  DoubleField* reveal_val;
+  BoolField* animate_in_bool;
+  DoubleField* animate_duration;
   ColorField* set_color_button;
   FontField* set_font_combobox;
   ComboField* halign_field;
@@ -61,12 +67,18 @@ class TextEffect : public Effect {
   DoubleField* shadow_softness;
   DoubleField* shadow_opacity;
 
+  // One grapheme cluster, already placed, with its reveal progress (0 hidden, 1 shown)
+  struct ClusterPath {
+    QPainterPath path;
+    double progress;
+  };
+
   // Helpers for redraw()
   void ApplyWordWrap(QStringList& lines, const QFontMetrics& fm, int width);
   int ComputeTextX(const QString& line, int halign, const QFontMetrics& fm, int width);
   int ComputeTextY(int line_index, int valign, const QFontMetrics& fm, int line_h, int text_height, int height);
-  void DrawShadow(QPainter& p, const QPainterPath& path, double timecode);
-  void DrawOutline(QPainter& p, const QPainterPath& path, double timecode);
+  void DrawShadow(QPainter& p, const QVector<ClusterPath>& clusters, double timecode);
+  void DrawOutline(QPainter& p, const QVector<ClusterPath>& clusters, double timecode);
 };
 
 #endif  // TEXTEFFECT_H
