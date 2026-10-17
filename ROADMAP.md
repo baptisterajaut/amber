@@ -127,7 +127,7 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 
 ### UI polish
 - **Welcome screen** — QDialog at startup with recent projects + new project with sequence templates.
-- **Effect controls alignment** — align labels and values in a grid layout (labels left-aligned, values right-aligned with consistent weight). Touches `CollapsibleWidget` + `EffectRow` layout. (#12)
+- **Effect controls alignment** — done in 2.0: every effect's values start at one shared column, after the widest label of the expanded effects, and wide fields end at the same edge. Values stay left-aligned at that column rather than right-aligned. (#12)
 - **Audio plugin parameters in EffectControls** — expose VST2 parameters as native EffectField rows instead of "open GUI" button only. Depends on plugin API exposing param metadata. (#12)
 - **Graph Editor improvements** — better curve editing UX, currently minimal on 0.1.x (#15)
 

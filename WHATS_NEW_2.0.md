@@ -32,6 +32,7 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 - **Thinner tracks**: tracks can shrink to 15 px instead of 30 (#73).
 - **Timeline ruler**: timecode labels no longer overlap, and dragging a marker to the edge scrolls the view.
 - **Clip names** are drawn with a shadow, readable on any clip colour.
+- **Aligned Effect Controls**: every effect's values start at the same column and wide fields end at the same edge, however many fields its rows have, instead of jumping left and right from one effect to the next.
 - **Scrubbing in Effect Controls** repaints the panel instead of rebuilding it.
 - **Exports with transparency** (PNG, QuickTime Animation, ProRes 4444 and the other formats with alpha, picked in the advanced video settings) and Save Frame as PNG keep semi-transparent areas at their real colour: a half-transparent white clip used to come out half-transparent grey. Exports without transparency are unchanged. The fix is coming to 1.x too.
 - **Bezier into Hold keyframes**: a Bezier keyframe followed by a Hold keyframe now eases with the Bezier keyframe's handle. Projects that use this combination animate differently than in 1.x.
@@ -43,6 +44,7 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 - **Export reads the original media**: footage with a finished proxy was exported from the proxy, at its reduced resolution and quality. Proxies are now used for preview only; export (video and audio) always decodes the original file, and the viewer goes back to the proxy after the export.
 - **Frei0r effects on proxied footage**: a Frei0r effect silently did nothing on a clip whose footage had a proxy. It now processes the frame it is given, whatever its size, and no longer shears the picture of footage of some widths, such as 1366 pixels or a 270-pixel-wide proxy of portrait video.
 - **GIF export with an adaptive palette**: choosing pal8 for a GIF in the advanced video settings crashed the export on its first frame. It now works and gives each frame its own palette of up to 256 colours taken from the picture, with transparency kept, instead of the fixed 256-colour grid of the default rgb8. On 1.x the pal8 option is removed instead, and a pixel format the converter can't produce stops the export with an error rather than a crash.
+- **Text effect's Shadow Opacity** no longer shows a reset arrow on a new effect, and resetting it gives back the 100 % a new effect starts with instead of 80 %.
 
 ## Under the hood
 
