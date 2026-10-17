@@ -43,6 +43,11 @@ Footage::Footage() {
 
 Footage::~Footage() {
   reset();
+  // The probe releases the lock the constructor took, but footage destroyed before its probe ran or finished (load
+  // cancelled or failed, probe cancelled) still holds it; destroying a locked QMutex is undefined. reset() waited for
+  // the probe, so nothing else touches the lock now: take it if free, then release it either way.
+  ready_lock.tryLock();
+  ready_lock.unlock();
 }
 
 void Footage::reset() {

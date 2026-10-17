@@ -7,6 +7,7 @@
 #include "effects/ui/buttonfieldwidget.h"
 #include "effects/ui/colorfieldwidget.h"
 #include "effects/ui/combofieldwidget.h"
+#include "effects/ui/curvefieldwidget.h"
 #include "effects/ui/doublefieldwidget.h"
 #include "effects/ui/filefieldwidget.h"
 #include "effects/ui/fontfieldwidget.h"
@@ -39,6 +40,8 @@ EffectFieldWidget* EffectFieldWidget::Create(EffectField* field, QObject* parent
       return new FontFieldWidget(field, parent);
     case EffectField::EFFECT_FIELD_FILE:
       return new FileFieldWidget(field, parent);
+    case EffectField::EFFECT_FIELD_CURVE:
+      return new CurveFieldWidget(field, parent);
     case EffectField::EFFECT_FIELD_UI:
       // ButtonField and LabelField both use EFFECT_FIELD_UI.
       // Distinguish via dynamic_cast.

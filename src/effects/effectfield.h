@@ -83,7 +83,10 @@ class EffectField : public QObject {
     EFFECT_FIELD_FILE,
 
     /** Values is a UI object with no data. Corresponds to nothing. */
-    EFFECT_FIELD_UI
+    EFFECT_FIELD_UI,
+
+    /** Values are tone curves (canonical string, see core/curves.h). Also corresponds to CurveField. */
+    EFFECT_FIELD_CURVE
   };
 
   /**

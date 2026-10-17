@@ -233,9 +233,12 @@ void RenderThread::run() {
 
   while (running) {
     if (!queued) {
-      wait_cond_.wait(&wait_lock_);
+      // Bounded: start_render()'s viewer path publishes without wait_lock_ (see there), so its wake can land between
+      // the check above and this wait and be lost. The timeout picks such a request up within 100 ms.
+      wait_cond_.wait(&wait_lock_, 100);
     }
     if (!running) break;
+    if (!queued) continue;  // timed out with nothing to render
     queued = false;
 
     if (rhi_ == nullptr) {
@@ -251,8 +254,9 @@ void RenderThread::run() {
       rhi_failed_ = false;
     }
 
-    // Latch once: start_render() may change divider_ from the GUI thread while this frame renders
-    render_divider_ = qMax(1, divider_.load());
+    // Latch once: start_render() may change divider_ from the GUI thread while this frame renders. A pending Save
+    // Frame renders at full resolution, whatever divider a viewer request (or the viewer's retry) set since.
+    render_divider_ = save_fn.isEmpty() ? qMax(1, divider_.load()) : 1;
     ensure_render_buffers(render_divider_);
     paint();
 
@@ -327,6 +331,7 @@ void RenderThread::paint() {
   params.backend_rpd = back_rpd_;
 
   gizmos = seq->GetSelectedGizmo();
+  gizmo_selection_ = gizmos;
   params.gizmos = gizmos;
 
   amber::rendering::compose_sequence(params);
@@ -442,7 +447,8 @@ void RenderThread::start_render(Sequence* s, int playback_speed, const QString& 
   // the lock to prevent a lost-wakeup deadlock and to avoid racing paint() on save_fn.
   // Viewer/scrubbing refresh (both null) must NOT lock — the render thread holds
   // wait_lock_ during the entire paint() operation, so locking here would make
-  // scrubbing synchronous (UI blocks until previous frame finishes rendering).
+  // scrubbing synchronous (UI blocks until previous frame finishes rendering). Their wake can then be lost (run()
+  // checks `queued` and waits under the lock); run()'s bounded wait covers it.
   bool needs_lock = (pixels != nullptr) || !save.isEmpty();
   if (needs_lock) {
     wait_lock_.lock();

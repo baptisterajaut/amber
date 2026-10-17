@@ -11,6 +11,7 @@
 #include "fields/buttonfield.h"
 #include "fields/colorfield.h"
 #include "fields/combofield.h"
+#include "fields/curvefield.h"
 #include "fields/doublefield.h"
 #include "fields/filefield.h"
 #include "fields/fontfield.h"

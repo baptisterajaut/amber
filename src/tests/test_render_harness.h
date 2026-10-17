@@ -84,7 +84,9 @@ class TestRenderHarness {
 
   // Run compose_sequence() at `playhead` (sequence frame). Reads back the main
   // texture. Returns RGBA8 bytes, row-major, size = w*h*4. Reports failure via
-  // QFAIL on RHI errors (caller's QTest slot reports failure).
+  // QFAIL on RHI errors (caller's QTest slot reports failure). A frame whose clip
+  // texture failed (footage not decoded in time) is re-rendered up to 5 times,
+  // 20 ms apart; the last attempt is returned.
   // divider > 1 renders at the preview resolution RenderThread uses (w/divider x h/divider, at least 1x1): the
   // readback is that size, so pass w/divider to the pixel helpers.
   QByteArray render_frame(Sequence* seq, long playhead, int divider = 1);
@@ -151,6 +153,8 @@ class TestRenderHarness {
   void assert_channels_equal(const QByteArray& samples, int tolerance = 1);
 
  private:
+  // One compose + readback; texture_failed = compose_sequence() could not get a clip's texture
+  QByteArray render_frame_once(Sequence* seq, long playhead, int divider, bool& texture_failed);
   void load_core_shaders();
   void ensure_buffers(int w, int h);  // allocate or re-allocate if size changed
   void release_buffers();
