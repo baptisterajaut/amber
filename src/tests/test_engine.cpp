@@ -18,6 +18,7 @@
 
 ***/
 
+#include <QScopeGuard>
 #include <QtMath>
 #include <QtTest>
 
@@ -73,6 +74,7 @@ class TestEngine : public QObject {
     Clip c(&seq);
     c.set_track(-1);  // video, no media: opens without a cacher
     audio_rendering = false;
+    const auto reset_rendering = qScopeGuard([] { audio_rendering = false; });  // even when a check fails
     c.Open();
     QVERIFY(c.IsOpen());
     QVERIFY(!c.OpenedForExport());

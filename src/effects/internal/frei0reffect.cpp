@@ -185,7 +185,10 @@ void ApplyFrei0rParam(f0r_instance_t instance, f0rSetParamValue set_param, Effec
 
 void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* output, int width, int height, int stride) {
   const int row_bytes = width * 4;
-  if (width <= 0 || height <= 0 || stride < row_bytes) return;
+  if (width <= 0 || height <= 0 || stride < row_bytes) {
+    if (stride > 0 && height > 0) memcpy(output, input, size_t(stride) * height);  // unusable size: pass through
+    return;
+  }
 
   // Build the instance at the size of the frame actually decoded, not the footage stream's: a proxied clip decodes
   // smaller frames, and a mid-stream resolution change alters them
