@@ -32,6 +32,8 @@ class RhiResourceCache {
   RhiResourceCache(const RhiResourceCache&) = delete;
   RhiResourceCache& operator=(const RhiResourceCache&) = delete;
 
+  // CBA: SRBs stay transient (one per pass per frame); caching them needs a per-texture forgetResources hook in
+  // drainDeferredDeletes. Each lookup also hashes and compares both QShaders by content: cheap so far (bench).
   // Pipeline (2x Float2 vertex input, stride 16, triangle strip) for this shader pair and blend, usable with
   // any render pass compatible with `rpd` and any SRB whose bindings match `layout`. Null if creation failed;
   // the failure is cached and warned once. The pipeline is destroyed once it goes evict_after_frames frames

@@ -322,6 +322,7 @@ int main(int argc, char* argv[]) {
   fmt.setRenderableType(QSurfaceFormat::OpenGL);
   QSurfaceFormat::setDefaultFormat(fmt);
 
+  if (qEnvironmentVariable("AMBER_TEST_RHI") != QLatin1String("vulkan")) qputenv("QT_QPA_PLATFORM", "offscreen");
   QGuiApplication app(argc, argv);
   TestRhiCache test;
   return QTest::qExec(&test, argc, argv);
