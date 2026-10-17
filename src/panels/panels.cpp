@@ -37,6 +37,7 @@ Viewer* panel_footage_viewer = nullptr;
 Timeline* panel_timeline = nullptr;
 GraphEditor* panel_graph_editor = nullptr;
 UndoHistoryPanel* panel_undo_history = nullptr;
+ScopesPanel* panel_scopes = nullptr;
 
 void update_ui(bool modified, bool scrubbing) {
   if (panel_effect_controls != nullptr) {
@@ -100,9 +101,15 @@ void alloc_panels(QWidget* parent) {
   panel_graph_editor->setObjectName("graph_editor");
   panel_undo_history = new UndoHistoryPanel(parent);
   panel_undo_history->hide();
+  // Last: connects to the sequence viewer's RenderThread
+  panel_scopes = new ScopesPanel(parent);
+  panel_scopes->hide();
 }
 
 void free_panels() {
+  // Before the viewers: it reads the sequence viewer's frames
+  delete panel_scopes;
+  panel_scopes = nullptr;
   delete panel_sequence_viewer;
   panel_sequence_viewer = nullptr;
   delete panel_footage_viewer;
