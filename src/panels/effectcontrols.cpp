@@ -219,8 +219,10 @@ void EffectControls::show_effect_menu(int type, int subtype) {
   Menu effects_menu(this);
   effects_menu.setToolTipsVisible(true);
 
+  const bool show_frei0r = frei0r_effects_visible();
   for (const auto& em : effects) {
     if (em.type != type || em.subtype != subtype) continue;
+    if (em.internal == EFFECT_INTERNAL_FREI0R && !show_frei0r) continue;
     QAction* action = new QAction(&effects_menu);
     action->setText(em.name);
     action->setData(reinterpret_cast<quintptr>(&em));

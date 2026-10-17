@@ -39,6 +39,7 @@
 #include "dialogs/loaddialog.h"
 #include "dialogs/preferencesdialog.h"
 #include "dialogs/speeddialog.h"
+#include "effects/effectloaders.h"
 #include "engine/sequence.h"
 #include "engine/undo/undostack.h"
 #include "global/config.h"
@@ -292,6 +293,9 @@ void AmberGlobal::ClearProject() {
 
   // set to unmodified
   amber::Global->set_modified(false);
+
+  // Frei0r effects go back to hidden unless the preference shows them (an open sets the flag again if needed)
+  set_project_uses_frei0r(false);
 }
 
 void AmberGlobal::ImportProject(const QString& fn) {

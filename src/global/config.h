@@ -664,6 +664,14 @@ struct Config {
   bool sticky_keyframe_type{true};
 
   /**
+   * @brief List Frei0r effects in the add-effect menus
+   *
+   * Frei0r effects are CPU plugins that slow playback, so they are hidden by default. A project that uses some shows
+   * them while it is open, without changing this setting.
+   */
+  bool show_frei0r_effects{false};
+
+  /**
    * @brief Default keyframe interpolation type
    *
    * The interpolation type used when creating new keyframes.

@@ -143,6 +143,7 @@ void LoadThread::load_effect(QXmlStreamReader& stream, Clip* c) {
   bool effect_enabled = true;
   long effect_length = -1;
   load_effect_parse_attrs(stream, effect_id, effect_name, effect_enabled, effect_length);
+  if (is_frei0r_effect_name(effect_name)) frei0r_effect_count_++;
 
   // Effect loading occurs in another thread, and while it's usually very quick, just for safety we wait here
   // for all the effects to finish loading
@@ -761,6 +762,7 @@ void LoadThread::finalize_loaded_media() {
     }
   }
 
+  report_frei0r_effects();
   emit success();
 
   if (!invalid_footage.isEmpty()) {
@@ -770,6 +772,22 @@ void LoadThread::finalize_loaded_media() {
   for (auto loaded_media_item : loaded_media_items) {
     PreviewGenerator::AnalyzeMedia(loaded_media_item);
   }
+}
+
+// A project using Frei0r effects shows them in the add-effect menus while it is open. Without Frei0r compiled in they
+// load as "Missing Effect" placeholders that keep their XML for saving: say why once per load.
+void LoadThread::report_frei0r_effects() {
+  if (frei0r_effect_count_ == 0) return;
+#ifdef NOFREI0R
+  // Off the GUI thread: the app context queues the box and returns at once. 2 = QMessageBox::Warning
+  amber::app_ctx->showMessage(tr("Frei0r effects"),
+                              tr("Frei0r plugins were not compiled into this version of Amber. The Frei0r effects in "
+                                 "this project (%1) are kept but won't render.")
+                                  .arg(frei0r_effect_count_),
+                              2);
+#else
+  set_project_uses_frei0r(true);
+#endif
 }
 
 // Count total elements for progress reporting.

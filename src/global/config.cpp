@@ -91,6 +91,7 @@ constexpr BoolEntry kBoolEntries[] = {
     {"ShowColorLabels", &Config::show_color_labels},
     {"AutorecoveryEnabled", &Config::autorecovery_enabled},
     {"StickyKeyframeType", &Config::sticky_keyframe_type},
+    {"ShowFrei0rEffects", &Config::show_frei0r_effects},
 };
 
 constexpr IntEntry kIntEntries[] = {
@@ -296,6 +297,7 @@ void Config::save(QString path) {
   stream.writeTextElement("AutorecoveryMax", QString::number(autorecovery_max));
   stream.writeTextElement("StickyKeyframeType", QString::number(sticky_keyframe_type));
   stream.writeTextElement("DefaultKeyframeType", QString::number(default_keyframe_type));
+  stream.writeTextElement("ShowFrei0rEffects", QString::number(show_frei0r_effects));
   for (const QString& path : trusted_vst_plugins) stream.writeTextElement("TrustedVstPlugin", path);
 
   stream.writeEndElement();   // configuration
