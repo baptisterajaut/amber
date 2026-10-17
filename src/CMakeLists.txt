@@ -310,6 +310,8 @@ set(AMBER_RESOURCES
 )
 
 set(AMBER_EFFECTS
+  effects/shaders/alphaadjust.frag
+  effects/shaders/alphaadjust.xml
   effects/shaders/boxblur.frag
   effects/shaders/boxblur.xml
   effects/shaders/bulge.frag
