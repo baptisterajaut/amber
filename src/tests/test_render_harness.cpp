@@ -326,6 +326,20 @@ void TestRenderHarness::set_field_combo(Effect* e, int row, int field, int index
 }
 
 QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead) {
+  // A footage clip's frame can miss the cacher (decode not done in time, e.g. under heavy parallel load): Retrieve()
+  // fails, compose_sequence() reports texture_failed and the clip isn't drawn. Re-render the same frame once the
+  // cacher had time to catch up, as the viewer's retry does. Steady-state frames render a clip whose frame is already
+  // queued, so the retries land in a scene's first frames, before its counters are read.
+  constexpr int kRetries = 5;
+  for (int retry = 0;; retry++) {
+    bool texture_failed = false;
+    QByteArray frame = render_frame_once(seq, playhead, texture_failed);
+    if (!texture_failed || frame.isEmpty() || retry == kRetries) return frame;
+    QTest::qWait(20);
+  }
+}
+
+QByteArray TestRenderHarness::render_frame_once(Sequence* seq, long playhead, bool& texture_failed) {
   if (!rhi_) {
     QTest::qFail("render_frame called but QRhi unavailable", __FILE__, __LINE__);
     return {};
@@ -392,6 +406,7 @@ QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead) {
   params.transientResources.clear();
   cache_->endFrame();
 
+  texture_failed = params.texture_failed;
   if (!done || readback.data.isEmpty()) {
     QTest::qFail("readback failed", __FILE__, __LINE__);
     return {};
