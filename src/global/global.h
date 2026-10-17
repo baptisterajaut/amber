@@ -395,12 +395,12 @@ private:
      *
      * TRUE if this file is an autorecovery file, in which case it's loaded slightly differently
      *
-     * @param clear
+     * @param import
      *
-     * TRUE if the current project should be closed before opening, FALSE if the project should be imported into the
-     * currently open one.
+     * TRUE if the file is being imported into the currently open project: the open project stays modified, and its
+     * recent projects entry and active sequence are left alone.
      */
-    void LoadProject(const QString& fn, bool autorecovery);
+    void LoadProject(const QString& fn, bool autorecovery, bool import = false);
 
     /**
      * @brief Indiscriminately clear the project without prompting the user
