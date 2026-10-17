@@ -209,13 +209,14 @@ void KeyframePropertiesDialog::accept() {
   for (int i = 0; i < fields_.size(); i++) {
     EffectField* f = fields_[i];
     int ki = keyframe_indices_[i];
-    EffectKeyframe& kf = f->keyframes[ki];
+    const EffectKeyframe& kf = f->keyframes.at(ki);
 
     // Time
     if (time_modified_ && !qIsNaN(time_slider_->value())) {
       long new_time = qRound(time_slider_->value());
       if (new_time != kf.time) {
-        ca->append(new SetLong(&kf.time, originals_[i].time, new_time));
+        ca->append(new KeyframeMemberChange(f, ki, KeyframeMemberChange::kTime, qlonglong(originals_[i].time),
+                                            qlonglong(new_time)));
         any_change = true;
       }
     }
@@ -224,7 +225,7 @@ void KeyframePropertiesDialog::accept() {
     if (type_modified_) {
       int new_type = type_combo_->currentData().toInt();
       if (new_type >= 0 && new_type != kf.type) {
-        ca->append(new SetInt(&kf.type, new_type));
+        ca->append(new KeyframeMemberChange(f, ki, KeyframeMemberChange::kType, kf.type, new_type));
         any_change = true;
         if (new_type_for_sticky < 0) {
           new_type_for_sticky = new_type;
@@ -236,14 +237,16 @@ void KeyframePropertiesDialog::accept() {
     if (pre_handle_x_modified_ && !qIsNaN(pre_handle_x_->value())) {
       double new_val = pre_handle_x_->value();
       if (!qFuzzyCompare(new_val, kf.pre_handle_x)) {
-        ca->append(new SetDouble(&kf.pre_handle_x, originals_[i].pre_handle_x, new_val));
+        ca->append(
+            new KeyframeMemberChange(f, ki, KeyframeMemberChange::kPreHandleX, originals_[i].pre_handle_x, new_val));
         any_change = true;
       }
     }
     if (pre_handle_y_modified_ && !qIsNaN(pre_handle_y_->value())) {
       double new_val = pre_handle_y_->value();
       if (!qFuzzyCompare(new_val, kf.pre_handle_y)) {
-        ca->append(new SetDouble(&kf.pre_handle_y, originals_[i].pre_handle_y, new_val));
+        ca->append(
+            new KeyframeMemberChange(f, ki, KeyframeMemberChange::kPreHandleY, originals_[i].pre_handle_y, new_val));
         any_change = true;
       }
     }
@@ -252,14 +255,16 @@ void KeyframePropertiesDialog::accept() {
     if (post_handle_x_modified_ && !qIsNaN(post_handle_x_->value())) {
       double new_val = post_handle_x_->value();
       if (!qFuzzyCompare(new_val, kf.post_handle_x)) {
-        ca->append(new SetDouble(&kf.post_handle_x, originals_[i].post_handle_x, new_val));
+        ca->append(
+            new KeyframeMemberChange(f, ki, KeyframeMemberChange::kPostHandleX, originals_[i].post_handle_x, new_val));
         any_change = true;
       }
     }
     if (post_handle_y_modified_ && !qIsNaN(post_handle_y_->value())) {
       double new_val = post_handle_y_->value();
       if (!qFuzzyCompare(new_val, kf.post_handle_y)) {
-        ca->append(new SetDouble(&kf.post_handle_y, originals_[i].post_handle_y, new_val));
+        ca->append(
+            new KeyframeMemberChange(f, ki, KeyframeMemberChange::kPostHandleY, originals_[i].post_handle_y, new_val));
         any_change = true;
       }
     }

@@ -742,18 +742,27 @@ void GraphView::mouseReleaseEvent(QMouseEvent*) {
     switch (current_handle) {
       case kBezierHandleNone:
         for (int i = 0; i < selected_keys.size(); i++) {
-          EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)];
-          ca->append(new SetLong(&key.time, selected_keys_old_vals.at(i), key.time));
-          ca->append(new SetQVariant(&key.data, selected_keys_old_doubles.at(i), key.data));
+          EffectField* f = row->Field(selected_keys_fields.at(i));
+          int k = selected_keys.at(i);
+          const EffectKeyframe& key = f->keyframes.at(k);
+          ca->append(new KeyframeMemberChange(f, k, KeyframeMemberChange::kTime,
+                                              qlonglong(selected_keys_old_vals.at(i)), qlonglong(key.time)));
+          ca->append(
+              new KeyframeMemberChange(f, k, KeyframeMemberChange::kData, selected_keys_old_doubles.at(i), key.data));
         }
         break;
       case kBezierHandlePre:
       case kBezierHandlePost: {
-        EffectKeyframe& key = row->Field(handle_field)->keyframes[handle_index];
-        ca->append(new SetDouble(&key.pre_handle_x, old_pre_handle_x, key.pre_handle_x));
-        ca->append(new SetDouble(&key.pre_handle_y, old_pre_handle_y, key.pre_handle_y));
-        ca->append(new SetDouble(&key.post_handle_x, old_post_handle_x, key.post_handle_x));
-        ca->append(new SetDouble(&key.post_handle_y, old_post_handle_y, key.post_handle_y));
+        EffectField* f = row->Field(handle_field);
+        const EffectKeyframe& key = f->keyframes.at(handle_index);
+        ca->append(new KeyframeMemberChange(f, handle_index, KeyframeMemberChange::kPreHandleX, old_pre_handle_x,
+                                            key.pre_handle_x));
+        ca->append(new KeyframeMemberChange(f, handle_index, KeyframeMemberChange::kPreHandleY, old_pre_handle_y,
+                                            key.pre_handle_y));
+        ca->append(new KeyframeMemberChange(f, handle_index, KeyframeMemberChange::kPostHandleX, old_post_handle_x,
+                                            key.post_handle_x));
+        ca->append(new KeyframeMemberChange(f, handle_index, KeyframeMemberChange::kPostHandleY, old_post_handle_y,
+                                            key.post_handle_y));
       } break;
     }
     amber::UndoStack.push(ca);
@@ -881,8 +890,9 @@ void GraphView::set_selected_keyframe_type(int type) {
   if (selected_keys.size() > 0) {
     ComboAction* ca = new ComboAction(tr("Change Keyframe Type"));
     for (int i = 0; i < selected_keys.size(); i++) {
-      EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)];
-      ca->append(new SetInt(&key.type, type));
+      EffectField* f = row->Field(selected_keys_fields.at(i));
+      int k = selected_keys.at(i);
+      ca->append(new KeyframeMemberChange(f, k, KeyframeMemberChange::kType, f->keyframes.at(k).type, type));
     }
     amber::UndoStack.push(ca);
     update_ui(false);

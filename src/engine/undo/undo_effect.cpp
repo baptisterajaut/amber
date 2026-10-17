@@ -385,3 +385,34 @@ void KeyframeDataChange::doRedo()
     done_ = true;
   }
 }
+
+KeyframeMemberChange::KeyframeMemberChange(EffectField* field, int index, Member member, const QVariant& old_value,
+                                           const QVariant& new_value) :
+  field_(field),
+  index_(index),
+  member_(member),
+  old_value_(old_value),
+  new_value_(new_value)
+{
+}
+
+void KeyframeMemberChange::doUndo() { apply(old_value_); }
+
+void KeyframeMemberChange::doRedo() { apply(new_value_); }
+
+void KeyframeMemberChange::apply(const QVariant& value) {
+  if (!field_ || index_ < 0 || index_ >= field_->keyframes.size()) {
+    qWarning() << "KeyframeMemberChange: keyframe index out of range";
+    return;
+  }
+  EffectKeyframe& key = field_->keyframes[index_];
+  switch (member_) {
+    case kType: key.type = value.toInt(); break;
+    case kTime: key.time = long(value.toLongLong()); break;
+    case kData: key.data = value; break;
+    case kPreHandleX: key.pre_handle_x = value.toDouble(); break;
+    case kPreHandleY: key.pre_handle_y = value.toDouble(); break;
+    case kPostHandleX: key.post_handle_x = value.toDouble(); break;
+    case kPostHandleY: key.post_handle_y = value.toDouble(); break;
+  }
+}
