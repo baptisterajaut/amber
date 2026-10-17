@@ -357,6 +357,7 @@ void TimelineHeader::update_zoom(double z) {
 double TimelineHeader::get_zoom() { return zoom; }
 
 void TimelineHeader::delete_markers() {
+  if (viewer->marker_ref == nullptr) return;  // viewer emptied, selection is stale
   if (selected_markers.size() > 0) {
     // Send command to delete selected markers
     DeleteMarkerAction* dma = new DeleteMarkerAction(viewer->marker_ref);
