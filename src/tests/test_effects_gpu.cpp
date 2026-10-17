@@ -108,6 +108,7 @@ class TestEffectsGpu : public QObject {
   void flipHorizontal();
   void flipVertical();
   void cropTransparentBorders();
+  void cropKeepsSemiTransparentColour();
   void embossOutputDiffers();
   void toonifyOutputDiffers();
   void noiseShaderOutputDiffers();
@@ -2043,6 +2044,20 @@ void TestEffectsGpu::cropTransparentBorders() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(qAbs(mid.r - 200) <= 10 && qAbs(mid.g - 100) <= 10 && qAbs(mid.b - 50) <= 10,
            qPrintable(QString("expected centre preserved, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::cropKeepsSemiTransparentColour() {
+  // No margins: Crop must leave a 50% opacity clip as it is. Premultiplied input multiplied by alpha again darkened it
+  // to a quarter. The readback forces alpha to 255 and shows the premultiplied rgb: (200,100,50) * 128/255.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_double(c->effects[1].get(), 1, 0, 50.0);  // Solid opacity 50% → alpha 128
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 100, 50));
+  h_->attach_xml_shader(c, "Crop");
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 100) <= 4 && qAbs(mid.g - 50) <= 4 && qAbs(mid.b - 25) <= 4,
+           qPrintable(QString("expected ~(100,50,25), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
 }
 
 void TestEffectsGpu::embossOutputDiffers() {
