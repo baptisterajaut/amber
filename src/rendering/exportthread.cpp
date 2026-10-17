@@ -235,6 +235,13 @@ bool ExportThread::SetupVideo() {
         nullptr,
         nullptr
         );
+  // swscale can't output every format an encoder accepts (e.g. GIF's pal8): fail the export instead of
+  // crashing in sws_scale() on the first frame
+  if (sws_ctx == nullptr) {
+    qCritical() << "Could not create pixel format conversion context";
+    export_error = tr("could not convert to pixel format %1").arg(av_get_pix_fmt_name(vcodec_ctx->pix_fmt));
+    return false;
+  }
 
   // The composite is premultiplied alpha (renderfunctions.cpp), but swscale and the encoders take RGBA as straight.
   // A format without alpha drops it, leaving the composite over black, which is what an opaque file should show.

@@ -23,6 +23,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libswscale/swscale.h>
 }
 
 #include <QCoreApplication>
@@ -661,7 +662,18 @@ void ExportDialog::vcodec_changed(int index) {
       pix_fmts = codec_info->pix_fmts;
       if (pix_fmts && pix_fmts[0] != AV_PIX_FMT_NONE) {
 #endif
+        // first format swscale can output, the export converts through it
         vcodec_params.pix_fmt = pix_fmts[0];
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
+        for (int i = 0; i < num_pix_fmts; i++) {
+#else
+        for (int i = 0; pix_fmts[i] != AV_PIX_FMT_NONE; i++) {
+#endif
+          if (sws_isSupportedOutput(pix_fmts[i])) {
+            vcodec_params.pix_fmt = pix_fmts[i];
+            break;
+          }
+        }
       } else {
         vcodec_params.pix_fmt = -1;
         QMessageBox::critical(this, tr("Invalid Codec"),
