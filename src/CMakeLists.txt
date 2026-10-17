@@ -332,6 +332,8 @@ set(AMBER_EFFECTS
   effects/shaders/crop.xml
   effects/shaders/crossstitch.frag
   effects/shaders/crossstitch.xml
+  effects/shaders/denoise.frag
+  effects/shaders/denoise.xml
   effects/shaders/directionalblur.frag
   effects/shaders/directionalblur.xml
   effects/shaders/dropshadow.xml.disabled
