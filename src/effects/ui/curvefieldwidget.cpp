@@ -13,7 +13,10 @@ const char* const kOwnerProperty = "amber_curve_field_widget";
 
 CurveFieldWidget::CurveFieldWidget(EffectField* field, QObject* parent) : EffectFieldWidget(field, parent) {}
 
-CurveFieldWidget::~CurveFieldWidget() { qDeleteAll(changes_); }
+CurveFieldWidget::~CurveFieldWidget() {
+  // A gesture still open (the editor went first, or never got to end it): keep its edit undoable
+  if (!changes_.isEmpty()) FinishEdit(tr("Change Curve"), true);
+}
 
 QWidget* CurveFieldWidget::CreateWidget(QWidget* existing) {
   if (existing != nullptr) {

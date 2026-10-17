@@ -80,6 +80,8 @@ CurveEditor::CurveEditor(QWidget* parent) : QWidget(parent), curves_(identity())
   updateButtons();
 }
 
+CurveEditor::~CurveEditor() { finishSession(); }
+
 void CurveEditor::setCurves(const QString& value) {
   if (session_.active) return;
   const CurveSet parsed = parse(value);
@@ -248,6 +250,7 @@ void CurveEditor::emitEdited() {
 }
 
 void CurveEditor::finishSession() {
+  if (double_click_window_.isActive()) qApp->removeEventFilter(this);
   double_click_window_.stop();
   if (!session_.active) return;
   const Session done = session_;
@@ -328,6 +331,7 @@ void CurveEditor::mouseReleaseEvent(QMouseEvent* e) {
   // and the whole thing then is no change at all
   if (session_.added && !session_.moved) {
     double_click_window_.start();
+    qApp->installEventFilter(this);
   } else {
     finishSession();
   }
@@ -350,6 +354,27 @@ void CurveEditor::mouseDoubleClickEvent(QMouseEvent* e) {
   emitEdited();
   finishSession();
   updateHover(e->position());
+}
+
+void CurveEditor::hideEvent(QHideEvent* e) {
+  finishSession();  // collapsed effect, Effect Controls rebuilt for another clip, ...
+  QWidget::hideEvent(e);
+}
+
+bool CurveEditor::eventFilter(QObject* watched, QEvent* e) {
+  // Installed on the application only during the double-click window: any key or shortcut (Ctrl+Z among them) and
+  // any press elsewhere ends the pending add first, so its undo entry lands before whatever that input does
+  switch (e->type()) {
+    case QEvent::ShortcutOverride:
+    case QEvent::Shortcut:
+    case QEvent::KeyPress:
+    case QEvent::MouseButtonPress:
+      finishSession();
+      break;
+    default:
+      break;
+  }
+  return QWidget::eventFilter(watched, e);
 }
 
 void CurveEditor::leaveEvent(QEvent* e) {

@@ -19,6 +19,8 @@ class CurveEditor : public QWidget {
   Q_OBJECT
  public:
   explicit CurveEditor(QWidget* parent = nullptr);
+  // Ends a pending gesture (editFinished) so its edit isn't left without an undo entry
+  ~CurveEditor() override;
 
   // Ignored while a gesture is in progress (it would clobber the drag)
   void setCurves(const QString& value);
@@ -59,6 +61,8 @@ class CurveEditor : public QWidget {
   void mouseReleaseEvent(QMouseEvent* e) override;
   void mouseDoubleClickEvent(QMouseEvent* e) override;
   void leaveEvent(QEvent* e) override;
+  void hideEvent(QHideEvent* e) override;
+  bool eventFilter(QObject* watched, QEvent* e) override;
 
  private:
   struct Session {

@@ -86,6 +86,39 @@ class TestCurveEditor : public QObject {
     QVERIFY(!e->isEditing());
   }
 
+  // An add without movement waits for a double-click, but anything that could act on the undo stack or tear the
+  // editor down first ends it, so the add always gets its undo entry before
+  void pendingAddEndsOnDestroyKeyOrHide_data() {
+    QTest::addColumn<int>("how");
+    QTest::newRow("destroyed") << 0;
+    QTest::newRow("key (Ctrl+Z)") << 1;
+    QTest::newRow("press elsewhere") << 2;
+    QTest::newRow("hidden") << 3;
+  }
+  void pendingAddEndsOnDestroyKeyOrHide() {
+    QFETCH(int, how);
+    auto e = make();
+    QVERIFY(e);
+    QSignalSpy finished(e, &CurveEditor::editFinished);
+    const QPointF at = e->valueToWidget(QPointF(64, 64));
+    press(e, at);
+    release(e, at);
+    QCOMPARE(finished.count(), 0);
+    if (how == 0) {
+      delete e;
+    } else if (how == 1) {
+      QTest::keyClick(host_.get(), Qt::Key_Z, Qt::ControlModifier);
+    } else if (how == 2) {
+      send(host_.get(), QEvent::MouseButtonPress, QPointF(1, 1), Qt::LeftButton, Qt::LeftButton);
+    } else {
+      e->hide();
+    }
+    QCOMPARE(finished.count(), 1);
+    QCOMPARE(finished.at(0).at(0).toString(), QStringLiteral("Add Curve Point"));
+    QCOMPARE(finished.at(0).at(1).toBool(), true);
+    if (how != 0) QVERIFY(!e->isEditing());
+  }
+
   void addedPointIsDraggedAtOnce() {
     auto e = make();
     QVERIFY(e);
