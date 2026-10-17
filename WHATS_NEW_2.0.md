@@ -40,6 +40,6 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 
 ## Not there yet
 
-Planned for 2.0 and not started: ShaderToy import, scopes, track mute/solo/lock, a colour correction tool, adjustment layers, hardware encoding and a render queue. The full plan is in the [roadmap](https://github.com/baptisterajaut/amber/blob/main/ROADMAP.md).
+Planned for 2.0 and not started: ShaderToy import, track mute/solo/lock, a colour correction tool, adjustment layers, hardware encoding and a render queue. The full plan is in the [roadmap](https://github.com/baptisterajaut/amber/blob/main/ROADMAP.md).
 
 There is no Arch package for 2.0 yet; use the AppImage.
