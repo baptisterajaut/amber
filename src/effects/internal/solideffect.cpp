@@ -174,7 +174,8 @@ void SolidEffect::redraw(double timecode) {
     QPainter p(&img);
     img.fill(Qt::transparent);
 
-    int checker_width = qCeil(checkerboard_size_field->GetDoubleAt(timecode));
+    // SetMinimum(1) only bounds the UI: a loaded .ove can hold 0 or less, which would divide by zero below
+    int checker_width = qMax(1, qCeil(checkerboard_size_field->GetDoubleAt(timecode)));
     int checker_x, checker_y;
     int checkerboard_size_w = qCeil(double(w)/checker_width);
     int checkerboard_size_h = qCeil(double(h)/checker_width);

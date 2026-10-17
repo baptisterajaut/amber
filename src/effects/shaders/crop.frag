@@ -27,18 +27,22 @@ void main(void) {
 		if (bottom > 0.0) alpha = alpha * clamp((((1.0-vTexCoord.y)+(0.5/f))-(bottom*0.01))*f, 0.0, 1.0); // bottom
 	}
 
+	// input is premultiplied: scale the straight colour by the new alpha (scaling the premultiplied one multiplied by
+	// alpha twice and darkened semi-transparent edges)
+	vec3 rgb = textureColor.a > 0.0 ? textureColor.rgb / textureColor.a : vec3(0.0);
+
 	if (invert)
 	{fragColor = vec4(
-		textureColor.r*(1.0 - alpha),
-		textureColor.g*(1.0 - alpha),
-		textureColor.b*(1.0 - alpha),
+		rgb.r*(1.0 - alpha),
+		rgb.g*(1.0 - alpha),
+		rgb.b*(1.0 - alpha),
 		1.0 - alpha
 	);}
 	else{
 		fragColor = vec4(
-		textureColor.r*(alpha),
-		textureColor.g*(alpha),
-		textureColor.b*(alpha),
+		rgb.r*(alpha),
+		rgb.g*(alpha),
+		rgb.b*(alpha),
 		alpha
 	);}
 }

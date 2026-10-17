@@ -29,6 +29,7 @@
 
 #include <QCoreApplication>
 #include <QScrollBar>
+#include <QThread>
 
 Project* panel_project = nullptr;
 EffectControls* panel_effect_controls = nullptr;
@@ -39,6 +40,9 @@ GraphEditor* panel_graph_editor = nullptr;
 UndoHistoryPanel* panel_undo_history = nullptr;
 
 void update_ui(bool modified, bool scrubbing) {
+  // Off the GUI thread (every effect field LoadThread loads emits Changed()): never touch the panels from there. A
+  // loaded project's panels are rebuilt on the GUI thread by set_sequence() once loading ends.
+  if (QThread::currentThread() != QCoreApplication::instance()->thread()) return;
   if (!scrubbing && panel_effect_controls != nullptr) {
     if (modified) {
       panel_effect_controls->SetClips();

@@ -26,6 +26,7 @@
 #include <QDir>
 #include <QHash>
 #include <QMutex>
+#include <cstring>
 
 #include "engine/clip.h"
 
@@ -153,7 +154,7 @@ Frei0rEffect::~Frei0rEffect() {
   }
 }
 
-void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *output, int) {
+void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *output, int size) {
   // Reconstruct Frei0r instance if clip dimensions changed since construction
   // (e.g., effect was created during project load before media was analyzed)
   int w = parent_clip->media_width();
@@ -209,9 +210,10 @@ void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *outpu
       break;
     case F0R_PARAM_POSITION:
     {
+      // The fields show 0-100 like the double params; Frei0r expects positions in [0, 1].
       f0r_param_position pos;
-      pos.x = param_row->Field(0)->GetValueAt(timecode).toDouble();
-      pos.y = param_row->Field(1)->GetValueAt(timecode).toDouble();
+      pos.x = param_row->Field(0)->GetValueAt(timecode).toDouble() * 0.01;
+      pos.y = param_row->Field(1)->GetValueAt(timecode).toDouble() * 0.01;
       set_param(instance, &pos, i);
     }
       break;
@@ -223,6 +225,13 @@ void Frei0rEffect::process_image(double timecode, uint8_t *input, uint8_t *outpu
     }
       break;
     }
+  }
+
+  // The instance reads and writes w * h RGBA pixels, w/h from the stream parameters: a decoded frame smaller than
+  // declared (corrupt or mid-stream resolution change) would be overrun. Pass it through untouched instead.
+  if (size < qint64(w) * h * 4) {
+    memcpy(output, input, size);
+    return;
   }
 
   update_func(instance, timecode, reinterpret_cast<uint32_t*>(input), reinterpret_cast<uint32_t*>(output));

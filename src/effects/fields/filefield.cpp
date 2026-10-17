@@ -2,6 +2,9 @@
 
 #include <QDebug>
 
+#include "effects/effect.h"
+#include "effects/effectrow.h"
+#include "global/config.h"
 #include "ui/embeddedfilechooser.h"
 
 FileField::FileField(EffectRow* parent, const QString &id) :
@@ -37,6 +40,14 @@ void FileField::UpdateWidgetValue(QWidget *widget, double timecode)
 
 void FileField::UpdateFromWidget(const QString &s)
 {
+  // Only emitted when the user picks a file: picking a VST plugin is consent to run it, so trust its path before the
+  // field change loads it (VSTHost::PluginPathTrusted)
+  const Effect* e = GetParentRow()->GetParentEffect();
+  if (!s.isEmpty() && e->meta != nullptr && e->meta->internal == EFFECT_INTERNAL_VST &&
+      !amber::CurrentConfig.trusted_vst_plugins.contains(s)) {
+    amber::CurrentConfig.trusted_vst_plugins.append(s);
+  }
+
   KeyframeDataChange* kdc = new KeyframeDataChange(this);
 
   SetValueAt(Now(), s);

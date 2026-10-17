@@ -1009,9 +1009,6 @@ QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
     return QColor();
   }
 
-  int video_x = qRound(widget_x * double(viewer->seq->width) / double(width()));
-  int video_y = qRound(widget_y * double(viewer->seq->height) / double(height()));
-
   int idx = renderer->front_buffer_index();
   QMutex* mutex = renderer->get_texture_mutex(idx);
   QMutexLocker lock(mutex);
@@ -1024,8 +1021,10 @@ QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
     return QColor();
   }
 
-  video_x = qBound(0, video_x, fw - 1);
-  video_y = qBound(0, video_y, fh - 1);
+  // Map to buffer pixels, not sequence pixels: the buffer is seq size / preview divider.
+  // CBA: assumes the frame fills the widget (ignores viewer zoom/scroll), as before
+  int video_x = qBound(0, qRound(widget_x * double(fw) / double(width())), fw - 1);
+  int video_y = qBound(0, qRound(widget_y * double(fh) / double(height())), fh - 1);
 
   // RGBA8888, no Y-flip — readBackTexture() is top-to-bottom on all backends
   int offset = (video_y * fw + video_x) * 4;

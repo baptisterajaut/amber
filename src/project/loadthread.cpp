@@ -38,9 +38,10 @@
 #include <QFile>
 #include <QTreeWidgetItem>
 
-LoadThread::LoadThread(const QString& filename, bool autorecovery)
+LoadThread::LoadThread(const QString& filename, bool autorecovery, bool import)
     : filename_(filename),
-      autorecovery_(autorecovery)
+      autorecovery_(autorecovery),
+      import_(import)
 
 {
   connect(this, &QThread::finished, this, &QObject::deleteLater);
@@ -234,7 +235,9 @@ Guide LoadThread::parse_guide(QXmlStreamReader& stream) {
 }
 
 QString LoadThread::resolve_footage_url(const QString& raw_url) {
-  if (QFileInfo::exists(raw_url)) {
+  // Absolute paths only: a relative one would be tested against the process's working directory and pick up an
+  // unrelated file of the same name there. Relative paths are resolved against the project folders below.
+  if (QFileInfo(raw_url).isAbsolute() && QFileInfo::exists(raw_url)) {
     qInfo() << "Matched" << raw_url << "with absolute path";
     return QFileInfo(raw_url).absoluteFilePath();
   }
@@ -633,7 +636,8 @@ bool LoadThread::load_worker(QFile& f, QXmlStreamReader& stream, int type) {
         internal_proj_dir = QFileInfo(internal_proj_url).absoluteDir();
       } else if (type == LOAD_TYPE_PREVIEW_RES) {
         int div = stream.readElementText().toInt();
-        if (div == 1 || div == 2 || div == 4) {
+        // An imported project doesn't get to change the open project's preview resolution
+        if (!import_ && (div == 1 || div == 2 || div == 4)) {
           amber::CurrentConfig.preview_resolution_divider = div;
         }
       } else {
@@ -689,7 +693,14 @@ void LoadThread::run() {
 
   QFile file(filename_);
   if (!file.open(QIODevice::ReadOnly)) {
-    qCritical() << "Could not open file";
+    qCritical() << "Could not open file" << filename_ << file.errorString();
+    // Same exit as any other load error: error_func() reports it and the app resets to an empty project, so a later
+    // Ctrl+S can't write an empty project over the file under its old name
+    error_str = tr("Could not open '%1': %2").arg(filename_, file.errorString());
+    show_err = true;
+    xml_error = false;
+    mutex.unlock();
+    emit error();
     return;
   }
 
@@ -754,16 +765,15 @@ void LoadThread::run() {
     cont = load_worker(file, stream, MEDIA_TYPE_SEQUENCE);
   }
 
+  // On failure error() is emitted once, below; error_func() shows the message unless show_err was cleared
   if (!cancelled_) {
     if (!cont) {
       xml_error = false;
-      if (show_err) emit error();
     } else if (stream.hasError()) {
       error_str =
           tr("%1 - Line: %2 Col: %3")
               .arg(stream.errorString(), QString::number(stream.lineNumber()), QString::number(stream.columnNumber()));
       xml_error = true;
-      emit error();
       cont = false;
     } else {
       // attach nested sequence clips to their sequences
@@ -780,7 +790,11 @@ void LoadThread::run() {
     }
   }
 
-  if (cont) {
+  // A cancelled load emits neither success() nor error(): LoadProject() ends it on finished(), so a cancel no longer
+  // shows an error box nor clears the project twice (error() -> new_project(), then the finished handler)
+  const bool cancelled = cancelled_;
+
+  if (cont && !cancelled) {
     // Collect invalid footage (files that couldn't be resolved) before analysis
     QVector<QPair<Media*, Footage*>> invalid_footage;
     for (auto loaded_media_item : loaded_media_items) {
@@ -800,7 +814,7 @@ void LoadThread::run() {
     for (auto loaded_media_item : loaded_media_items) {
       PreviewGenerator::AnalyzeMedia(loaded_media_item);
     }
-  } else {
+  } else if (!cancelled) {
     if (error_str.isEmpty()) {
       error_str = tr("User aborted loading");
     }
@@ -831,6 +845,7 @@ void LoadThread::question_func(const QString& title, const QString& text, int bu
 }
 
 void LoadThread::error_func() {
+  if (!show_err) return;  // the user chose to stop (version mismatch "No"): nothing to report
   if (xml_error) {
     qCritical() << "Error parsing XML." << error_str;
     QMessageBox::critical(amber::MainWindow, tr("XML Parsing Error"),
@@ -842,6 +857,12 @@ void LoadThread::error_func() {
 }
 
 void LoadThread::success_func() {
+  if (import_) {
+    // Merged into the open project: it now has unsaved content, and stays the project it was
+    amber::Global->set_modified(true);
+    return;
+  }
+
   if (autorecovery_) {
     QString orig_filename = internal_proj_url;
     int insert_index = internal_proj_url.lastIndexOf(".ove", -1, Qt::CaseInsensitive);

@@ -21,6 +21,8 @@
 #ifndef LOADTHREAD_H
 #define LOADTHREAD_H
 
+#include <atomic>
+
 #include <QThread>
 #include <QDir>
 #include <QPair>
@@ -37,7 +39,8 @@ class LoadThread : public QThread
 {
   Q_OBJECT
 public:
-  LoadThread(const QString& filename, bool autorecovery);
+  // import: merge into the open project (stays modified; recents and active sequence untouched)
+  LoadThread(const QString& filename, bool autorecovery, bool import = false);
   void run() override;
 public slots:
   void cancel();
@@ -53,6 +56,7 @@ private slots:
   void success_func();
 private:
   bool autorecovery_;
+  bool import_;
   QString filename_;
 
   bool load_worker(QFile& f, QXmlStreamReader& stream, int type);
@@ -99,7 +103,7 @@ private:
   QMutex mutex;
   QWaitCondition waitCond;
 
-  bool cancelled_{false};
+  std::atomic<bool> cancelled_{false};  // set by cancel() on the GUI thread
   bool question_answered_{false};
   bool xml_error;
 

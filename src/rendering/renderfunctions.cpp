@@ -409,9 +409,10 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
         QRhiTexture* lutTexture = nullptr;
         if (e->needsLut()) {
           QString lutPath = e->currentLutPath(timecode);
-          if (lutPath != e->loadedLutPath()) {
-            // Upload only happens when the file actually changed — mirrors the
-            // loadedLutPath_ check inside process_lut() itself
+          if (lutPath != e->loadedLutPath() || e->currentLutTexture() == nullptr) {
+            // Upload only happens when the file actually changed, or on first use (no file
+            // picked yet: both paths are empty but the identity fallback still needs a
+            // texture), mirroring the check inside process_lut() itself
             QRhiResourceUpdateBatch* lutUpload = params.rhi->nextResourceUpdateBatch();
             lutTexture = e->process_lut(params.rhi, lutUpload, lutPath);
 

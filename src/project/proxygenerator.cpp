@@ -25,6 +25,7 @@
 #include "ui/mainwindow.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QtMath>
 #include <QStatusBar>
@@ -40,6 +41,71 @@ extern "C" {
 enum AVCodecID temp_enc_codec = AV_CODEC_ID_PRORES;
 
 ProxyGenerator::ProxyGenerator()  = default;
+
+// Write every packet the encoder has ready.
+static void write_proxy_packets(int stream_index, AVPacket* packet, AVFormatContext* output_fmt_ctx,
+                                QVector<AVCodecContext*>& output_streams, bool& skip) {
+  // return value for packet receiving
+  int recret;
+
+  // loop through receiving packets
+  while ((recret = avcodec_receive_packet(output_streams.at(stream_index), packet)) >= 0 && !skip) {
+
+    // set packet stream index to current stream index
+    packet->stream_index = stream_index;
+
+    // write frame to file
+    av_interleaved_write_frame(output_fmt_ctx, packet);
+
+    // unref old packet
+    av_packet_unref(packet);
+
+  }
+}
+
+// Process one decoded frame: pixel-convert if needed, send to encoder, write output packets.
+static void encode_proxy_frame(int stream_index, AVFrame* dec_frame, AVPacket* packet, AVFormatContext* input_fmt_ctx,
+                               AVFormatContext* output_fmt_ctx, QVector<AVCodecContext*>& input_streams,
+                               QVector<AVCodecContext*>& output_streams, QVector<SwsContext*>& sws_contexts,
+                               bool& skip) {
+  // rescale input frame timestamp to output timestamp
+  dec_frame->pts = av_rescale_q(dec_frame->pts,
+                                input_fmt_ctx->streams[stream_index]->time_base,
+                                output_fmt_ctx->streams[stream_index]->time_base);
+
+  // determine if the pix_fmt, width, and/or height is different, so if we need to convert
+  bool convert_pix_fmt = (output_streams.at(stream_index)->pix_fmt != input_streams.at(stream_index)->pix_fmt
+      || output_streams.at(stream_index)->width != input_streams.at(stream_index)->width
+      || output_streams.at(stream_index)->height != input_streams.at(stream_index)->height);
+
+  // create reference to the frame to be sent to the encoder
+  AVFrame* enc_frame = dec_frame;
+
+  if (convert_pix_fmt) {
+    // create sws frame for pixel format conversion
+    enc_frame = av_frame_alloc();
+    enc_frame->width = output_streams.at(stream_index)->width;
+    enc_frame->height = output_streams.at(stream_index)->height;
+    enc_frame->format = output_streams.at(stream_index)->pix_fmt;
+    av_frame_get_buffer(enc_frame, 0);
+
+    // convert pixel format to format expected by the encoder
+    sws_scale(sws_contexts.at(stream_index), dec_frame->data, dec_frame->linesize, 0, dec_frame->height, enc_frame->data, enc_frame->linesize);
+
+    // set same pts as dec_frame
+    enc_frame->pts = dec_frame->pts;
+  }
+
+  // send frame to encoder
+  avcodec_send_frame(output_streams.at(stream_index), enc_frame);
+
+  if (convert_pix_fmt) {
+    // free sws frame since we made one before
+    av_frame_free(&enc_frame);
+  }
+
+  write_proxy_packets(stream_index, packet, output_fmt_ctx, output_streams, skip);
+}
 
 void ProxyGenerator::transcode(const ProxyInfo& info) {
   Footage* footage = info.media->to_footage();
@@ -57,6 +123,7 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   AVFormatContext* input_fmt_ctx = nullptr;
   if (avformat_open_input(&input_fmt_ctx, footage->url.toUtf8(), nullptr, &format_opts) < 0) {
     qCritical() << "Proxy: could not open input" << footage->url;
+    footage->proxy = false;  // clear ProxyDialog's "generating" mark, see the failure path below
     return;
   }
 
@@ -66,6 +133,7 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   if (output_fmt_ctx == nullptr) {
     qCritical() << "Proxy: could not allocate output context";
     avformat_close_input(&input_fmt_ctx);
+    footage->proxy = false;
     return;
   }
 
@@ -74,6 +142,7 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
     qCritical() << "Proxy: could not open output" << info.path;
     avformat_close_input(&input_fmt_ctx);
     avformat_free_context(output_fmt_ctx);
+    footage->proxy = false;
     return;
   }
 
@@ -81,8 +150,10 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   if (avformat_find_stream_info(input_fmt_ctx, nullptr) < 0) {
     qCritical() << "Proxy: could not find stream info" << footage->url;
     avio_closep(&output_fmt_ctx->pb);
+    QFile::remove(info.path);  // just created, empty
     avformat_close_input(&input_fmt_ctx);
     avformat_free_context(output_fmt_ctx);
+    footage->proxy = false;
     return;
   }
 
@@ -155,7 +226,7 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
       enc_ctx->width = qFloor(dec_ctx->width*info.size_multiplier);
       enc_ctx->height = qFloor(dec_ctx->height*info.size_multiplier);
       enc_ctx->sample_aspect_ratio = dec_ctx->sample_aspect_ratio;
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
       const enum AVPixelFormat *pix_fmts = nullptr;
       int num_pix_fmts = 0;
       avcodec_get_supported_config(nullptr, enc_codec, AV_CODEC_CONFIG_PIX_FORMAT, 0,
@@ -214,142 +285,113 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   }
 
   // write video header
+  // A failure here only fails this proxy: the generator thread keeps serving the queue (cancelled is for cancel())
+  bool success = false;
   int error_code = avformat_write_header(output_fmt_ctx, nullptr);
   if (error_code < 0) {
     qWarning() << "Failed to write video header";
-    cancelled = true;
-    skip = true;
-  }
+  } else {
+    // packet that av_read_frame will dump file packets into
+    AVPacket *packet = av_packet_alloc();
 
-  // packet that av_read_frame will dump file packets into
-  AVPacket *packet = av_packet_alloc();
+    // frame that decoder will decode into
+    AVFrame* dec_frame = av_frame_alloc();
 
-  // frame that decoder will decode into
-  AVFrame* dec_frame = av_frame_alloc();
+    // set once the whole input was read (as opposed to a read error or skip)
+    bool reached_eof = false;
 
-  // main transcoding loop
-  while (!skip) {
+    // main transcoding loop
+    while (!skip) {
 
-    // cache stream index
-    int stream_index = packet->stream_index;
+      // read packets until the decoder of a transcoded stream returns a frame
+      int stream_index = 0;
+      bool got_frame = false;
+      while (!skip) {
+        // read from input file
+        int read_ret = av_read_frame(input_fmt_ctx, packet);
 
-    // retrieve frame from decoder (this will clear the last frame so we don't have to do that)
-    int read_ret = -1;
-    int recfr_ret = -1;
-    do {
-      // read from input file
-      read_ret = av_read_frame(input_fmt_ctx, packet);
+        // handle errors
+        if (read_ret < 0) {
 
-      // handle errors
-      if (read_ret < 0) {
+          // AVERROR_EOF means we've simply reached the end of the file, otherwise this is an error
+          if (read_ret != AVERROR_EOF) {
+            qWarning() << "Proxy generation for file" << footage->url << "ended prematurely";
+          } else {
+            reached_eof = true;
+          }
 
-        // AVERROR_EOF means we've simply reached the end of the file, otherwise this is an error
-        if (read_ret != AVERROR_EOF) {
-          qWarning() << "Proxy generation for file" << footage->url << "ended prematurely";
+          // either way, we shall abort reading
+          break;
         }
 
-        // either way, we shall abort reading
+        stream_index = packet->stream_index;
+
+        // A stream that showed up after the header was written (AVFMTCTX_NOHEADER formats) has no output stream
+        if (stream_index < 0 || stream_index >= input_streams.size()) {
+          av_packet_unref(packet);
+          continue;
+        }
+
+        // determine whether this frame is from a stream we're transcoding
+        AVCodecContext* dec_ctx = input_streams.at(stream_index);
+        if (dec_ctx == nullptr) {
+          // if we didn't allocate a decoder for this earlier, we just pass it through and keep reading
+          av_packet_rescale_ts(packet, input_fmt_ctx->streams[stream_index]->time_base, output_fmt_ctx->streams[stream_index]->time_base);
+          av_interleaved_write_frame(output_fmt_ctx, packet);
+          av_packet_unref(packet);
+          continue;
+        }
+
+        // we're going to transcode this packet: send it to the decoder
+        avcodec_send_packet(dec_ctx, packet);
+
+        // use timestamp and stream duration to create a rough estimation of the progress through this file
+        current_progress = qCeil((double(packet->pts)/double(input_fmt_ctx->streams[stream_index]->duration))*100);
+
+        // free packet allocated by av_read_frame
+        av_packet_unref(packet);
+
+        // EAGAIN: the decoder needs more input; any other error: drop this packet's output rather than encode a
+        // frame that holds nothing
+        if (avcodec_receive_frame(dec_ctx, dec_frame) == 0) {
+          got_frame = true;
+          break;
+        }
+      }
+
+      // error/eof/skip - cancel while loop
+      if (!got_frame) {
         break;
       }
 
-      stream_index = packet->stream_index;
+      encode_proxy_frame(stream_index, dec_frame, packet, input_fmt_ctx, output_fmt_ctx, input_streams, output_streams,
+                         sws_contexts, skip);
+    }
 
-      // determine whether this frame is from a stream we're transcoding
-      if (input_streams.at(stream_index) == nullptr) {
-        // if we didn't allocate a decoder for this earlier, we just pass it through
-
-        av_packet_rescale_ts(packet, input_fmt_ctx->streams[stream_index]->time_base, output_fmt_ctx->streams[stream_index]->time_base);
-
-        // write packet to output
-        av_interleaved_write_frame(output_fmt_ctx, packet);
-
-      } else {
-        // we're going to transcode this packet.
-
-        // send packet to decoder
-        avcodec_send_packet(input_streams.at(stream_index), packet);
-
-        // use timestamp and stream duration to create a rough estimation of the progress through this file
-        current_progress = qCeil((double(packet->pts)/double(input_fmt_ctx->streams[packet->stream_index]->duration))*100);
-
+    if (reached_eof) {
+      // Drain what the decoders and encoders still buffer (frame threading, B-frames): without this the proxy loses
+      // its last frames
+      for (int i = 0; i < input_streams.size(); i++) {
+        if (input_streams.at(i) == nullptr) continue;
+        avcodec_send_packet(input_streams.at(i), nullptr);
+        while (!skip && avcodec_receive_frame(input_streams.at(i), dec_frame) == 0) {
+          encode_proxy_frame(i, dec_frame, packet, input_fmt_ctx, output_fmt_ctx, input_streams, output_streams,
+                             sws_contexts, skip);
+        }
+        avcodec_send_frame(output_streams.at(i), nullptr);
+        write_proxy_packets(i, packet, output_fmt_ctx, output_streams, skip);
       }
-
-      // free packet allocated by av_read_frame
-      av_packet_unref(packet);
-      // passthrough streams have no decoder: keep reading instead of polling one, and use the
-      // index captured before unref (packet->stream_index is reset by av_packet_unref)
-    } while (!skip && (input_streams.at(stream_index) == nullptr ||
-                        (recfr_ret = avcodec_receive_frame(input_streams.at(stream_index), dec_frame)) == AVERROR(EAGAIN)));
-
-    // error/eof handling - cancel while loop
-    if (read_ret < 0 || skip) {
-      break;
     }
 
-    // free packet as we're about to use it for encoding
-    av_packet_unref(packet);
+    // free packet and dec_frame
+    av_packet_free(&packet);
+    av_frame_free(&dec_frame);
 
-    // rescale input frame timestamp to output timestamp
-    dec_frame->pts = av_rescale_q(dec_frame->pts,
-                                  input_fmt_ctx->streams[stream_index]->time_base,
-                                  output_fmt_ctx->streams[stream_index]->time_base);
+    success = reached_eof && !skip;
 
-    // determine if the pix_fmt, width, and/or height is different, so if we need to convert
-    bool convert_pix_fmt = (output_streams.at(stream_index)->pix_fmt != input_streams.at(stream_index)->pix_fmt
-        || output_streams.at(stream_index)->width != input_streams.at(stream_index)->width
-        || output_streams.at(stream_index)->height != input_streams.at(stream_index)->height);
-
-    // create reference to the frame to be sent to the encoder
-    AVFrame* enc_frame = dec_frame;
-
-    if (convert_pix_fmt) {
-      // create sws frame for pixel format conversion
-      enc_frame = av_frame_alloc();
-      enc_frame->width = output_streams.at(stream_index)->width;
-      enc_frame->height = output_streams.at(stream_index)->height;
-      enc_frame->format = output_streams.at(stream_index)->pix_fmt;
-      av_frame_get_buffer(enc_frame, 0);
-
-      // convert pixel format to format expected by the encoder
-      sws_scale(sws_contexts.at(stream_index), dec_frame->data, dec_frame->linesize, 0, dec_frame->height, enc_frame->data, enc_frame->linesize);
-
-      // set same pts as dec_frame
-      enc_frame->pts = dec_frame->pts;
-    }
-
-    // send frame to encoder
-    avcodec_send_frame(output_streams.at(stream_index), enc_frame);
-
-    if (convert_pix_fmt) {
-      // free sws frame since we made one before
-      av_frame_free(&enc_frame);
-    }
-
-    // return value for packet receiving
-    int recret;
-
-    // loop through receiving packets
-    while ((recret = avcodec_receive_packet(output_streams.at(stream_index), packet)) >= 0 && !skip) {
-
-      // set packet stream index to current stream index
-      packet->stream_index = stream_index;
-
-      // write frame to file
-      av_interleaved_write_frame(output_fmt_ctx, packet);
-
-      // unref old packet
-      av_packet_unref(packet);
-
-    }
-
+    // write video trailer. av_write_trailer() also reports a sticky I/O error (disk full) from any earlier write
+    if (av_write_trailer(output_fmt_ctx) < 0) success = false;
   }
-
-  // free packet and dec_frame
-  av_packet_free(&packet);
-  av_frame_free(&dec_frame);
-
-  // write video trailer
-  av_write_trailer(output_fmt_ctx);
 
   // free stream contexts
   for (int i=0;i<int(input_fmt_ctx->nb_streams);i++) {
@@ -373,6 +415,18 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
 
   // close input file
   avformat_close_input(&input_fmt_ctx);
+
+  if (!success) {
+    // Don't leave a truncated file behind
+    QFile::remove(info.path);
+    if (!skip) {
+      // Skipped: cancelled, or re-queued (the new entry owns the footage's proxy state). Failed: clear the
+      // "generating" mark ProxyDialog set (proxy on, empty path) so the footage isn't shown as a proxy in progress
+      qWarning() << "Failed to create proxy for" << footage->url;
+      footage->proxy = false;
+    }
+    return;
+  }
 
   // set footage to use newly generated proxy
   footage->proxy = true;
@@ -400,17 +454,25 @@ void ProxyGenerator::run() {
     // loop through queue until the queue is empty
     while (proxy_queue.size() > 0) {
 
-      // grab proxy info
-      const ProxyInfo& info = proxy_queue.first();
-
-      // create directory for info
-      QFileInfo(info.path).dir().mkpath(".");
+      // grab proxy info (a copy: queue() may grow proxy_queue while the mutex is released below)
+      const ProxyInfo info = proxy_queue.first();
 
       // set skip to false
       skip = false;
 
+      // release the mutex during the transcode so queue() doesn't block the UI until it ends. The entry stays at
+      // first() meanwhile: queue() never removes it, it sets skip to abort it when the same footage is re-queued.
+      // CBA: skip is a plain bool read unlocked by the decode loop, as cancel() already relies on; std::atomic
+      // would need the helpers' bool& parameters changed
+      mutex.unlock();
+
+      // create directory for info
+      QFileInfo(info.path).dir().mkpath(".");
+
       // transcode proxy
       transcode(info);
+
+      mutex.lock();
 
       // we're finished with this proxy, remove it
       proxy_queue.removeFirst();
@@ -455,9 +517,12 @@ void ProxyGenerator::queue(const ProxyInfo &info) {
 
 // to be called from another thread to terminate the proxy generator thread and free it
 void ProxyGenerator::cancel() {
-  // signal to thread to cancel
+  // signal to thread to cancel. Under the mutex: run() holds it from its `cancelled` check until waitCond.wait()
+  // releases it, so the wake below can't land in between and be lost (the mutex is free during a transcode)
+  mutex.lock();
   cancelled = true;
   skip = true;
+  mutex.unlock();
 
   // if signal is sleeping, wake it to cancel correctly
   waitCond.wakeAll();
@@ -467,6 +532,8 @@ void ProxyGenerator::cancel() {
 }
 
 double ProxyGenerator::get_proxy_progress(Media* m) {
+  // only held briefly by the generator thread now, so the UI can take it
+  QMutexLocker locker(&mutex);
   if (!proxy_queue.isEmpty() && proxy_queue.first().media == m) {
     return current_progress;
   }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <effect name="Cross Stitch" category="Stylize">
 	<row name="Size">
-		<field type="double" default="6" id="stitching_size"/>
+		<field type="double" min="1" default="6" id="stitching_size"/>
 	</row>
 	<row name="Invert">
 		<field type="bool" default="0" id="invert"/>

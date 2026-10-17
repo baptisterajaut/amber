@@ -91,6 +91,7 @@ bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, 
     av_packet_unref(packet);
     if (ret < 0) {
       qCritical() << "Failed to write packet." << ret;
+      export_error = tr("failed to write packet to output file (%1)").arg(QString::number(ret));
       return false;
     }
   }
@@ -100,6 +101,12 @@ bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, 
 bool ExportThread::SetupVideo() {
   // if video is disabled, no setup necessary
   if (!params_.video_enabled) return true;
+
+  // The sequence gives the frame rate below and the frame size further down
+  if (amber::ActiveSequence == nullptr) {
+    export_error = tr("no active sequence");
+    return false;
+  }
 
   // find video encoder
   vcodec = avcodec_find_encoder(static_cast<enum AVCodecID>(params_.video_codec));
@@ -134,7 +141,9 @@ bool ExportThread::SetupVideo() {
   vcodec_ctx->height = params_.video_height;
   vcodec_ctx->sample_aspect_ratio = {1, 1};
   vcodec_ctx->pix_fmt = static_cast<AVPixelFormat>(vcodec_params_.pix_fmt);
-  vcodec_ctx->framerate = av_d2q(params_.video_frame_rate, INT_MAX);
+  // Always the sequence rate: the encode loop stamps one frame per sequence frame, so any other rate gives
+  // duplicate pts (export fails) or uneven frame timing. A codec that can't encode it fails in avcodec_open2() below.
+  vcodec_ctx->framerate = av_d2q(amber::ActiveSequence->frame_rate, INT_MAX);
   if (params_.video_compression_type == COMPRESSION_TYPE_CBR) {
     vcodec_ctx->bit_rate = qRound(params_.video_bitrate * 1000000);
   }
@@ -198,10 +207,6 @@ bool ExportThread::SetupVideo() {
   }
 
   // Create raw AVFrame that will contain the RGBA buffer straight from compositing
-  if (amber::ActiveSequence == nullptr) {
-    export_error = tr("no active sequence");
-    return false;
-  }
   video_frame = av_frame_alloc();
   video_frame->format = AV_PIX_FMT_RGBA;
   video_frame->width = amber::ActiveSequence->width;
@@ -271,7 +276,7 @@ bool ExportThread::SetupAudio() {
   acodec_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
   acodec_ctx->sample_rate = params_.audio_sampling_rate;
   av_channel_layout_from_mask(&acodec_ctx->ch_layout, AV_CH_LAYOUT_STEREO);  // change this to support surround/mono sound in the future (this is what the user sets the output audio to)
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
   const enum AVSampleFormat *sample_fmts = nullptr;
   int num_sample_fmts = 0;
   avcodec_get_supported_config(nullptr, acodec, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0,
@@ -451,8 +456,9 @@ bool ExportThread::Export()
   renderer->start(QThread::HighestPriority);
   connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
 
-  // Loop from now (set to the beginning frame earlier) to the end of the frame
-  while (amber::ActiveSequence->playhead <= params_.end_frame && !interrupt_) {
+  // Loop from now (set to the beginning frame earlier) to the end of the frame. end_frame is exclusive (the frame
+  // after the last clip, or the out point): N sequence frames give N video frames
+  while (amber::ActiveSequence->playhead < params_.end_frame && !interrupt_) {
 
     // Start timing how long this frame will take
     frame_start_time = QDateTime::currentMSecsSinceEpoch();
@@ -557,9 +563,10 @@ bool ExportThread::Export()
       // Make sure nothing is writing while we're retrieving
       audio_write_lock.lock();
 
-      // Check if the count of encoded samples exceeds the current Sequence playhead, in which case we don't need to
-      // encode any audio at this moment
-      while (!interrupt_ && file_audio_samples <= (timecode_secs*params_.audio_sampling_rate)) {
+      // Encode audio up to the end of this frame, so the last frame's audio isn't cut and both streams end together
+      double frame_end_secs =
+          double(amber::ActiveSequence->playhead + 1 - params_.start_frame) / amber::ActiveSequence->frame_rate;
+      while (!interrupt_ && file_audio_samples <= (frame_end_secs*params_.audio_sampling_rate)) {
 
         // Copy samples from audio buffer to AVFrame
         int adjusted_read = audio_ibuffer_read.load() % audio_ibuffer_size;
@@ -601,12 +608,12 @@ bool ExportThread::Export()
     // Generating encoding statistics (e.g. the time it took to encode this frame/estimated remaining time)
     frame_time = (QDateTime::currentMSecsSinceEpoch()-frame_start_time);
     total_time += frame_time;
-    remaining_frames = (params_.end_frame - amber::ActiveSequence->playhead);
+    remaining_frames = (params_.end_frame - amber::ActiveSequence->playhead - 1);
     avg_time = (total_time/frame_count);
     eta = (remaining_frames*avg_time);
 
     // Emit a signal for the percent of the sequence that's been encoded so far
-    emit ProgressChanged(qRound((double(amber::ActiveSequence->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
+    emit ProgressChanged(qRound((double(amber::ActiveSequence->playhead + 1 - params_.start_frame) / double(params_.end_frame - params_.start_frame)) * 100.0), eta);
 
     // Increment sequence playhead
     amber::ActiveSequence->playhead++;
@@ -652,11 +659,15 @@ cleanup_state:
   }
 
   // Flush remaining packets out of video and audio encoders by sending a null frame
+  // Encode() also returns false on the AVERROR_EOF that ends a normal drain; only a set export_error is a failure
   if (params_.video_enabled) {
     Encode(fmt_ctx, vcodec_ctx, nullptr, video_pkt, video_stream);
   }
   if (params_.audio_enabled) {
     Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
+  }
+  if (!export_error.isEmpty()) {
+    return false;
   }
 
   // Write container trailer
@@ -674,7 +685,12 @@ cleanup_state:
 void ExportThread::Cleanup()
 {
   if (fmt_ctx != nullptr) {
-    avio_closep(&fmt_ctx->pb);
+    // The final buffered write happens here: a full disk can fail it after a clean trailer
+    int close_ret = avio_closep(&fmt_ctx->pb);
+    if (close_ret < 0 && export_error.isEmpty() && !interrupt_) {
+      qCritical() << "Could not close output file." << close_ret;
+      export_error = tr("could not close output file (%1)").arg(QString::number(close_ret));
+    }
     avformat_free_context(fmt_ctx);
   }
 
@@ -737,6 +753,12 @@ void ExportThread::run() {
 
   // Clean up anything that was allocated in Export() (whether it succeeded or not)
   Cleanup();
+  if (!export_error.isEmpty()) succeeded = false;  // Cleanup() reports a failed close
+
+  // Callers judge success by !WasInterrupted() && GetError().isEmpty(): a failure must never leave both clear
+  if (!succeeded && !interrupt_ && export_error.isEmpty()) {
+    export_error = tr("unknown error");  // shown as "Export failed - unknown error"
+  }
 
   // Don't leave a truncated file behind. Cleanup() has already closed the AVIO handle, which Windows needs before
   // the file can be deleted.

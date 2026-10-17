@@ -374,15 +374,24 @@ void SourcesCommon::reveal_in_browser() {
   args << "/select," << QDir::toNativeSeparators(m->url);
   QProcess::startDetached("explorer", args);
 #elif defined(Q_OS_MAC)
+  // The path goes in as a run-handler argument, never into the script text: a quote in a file name would otherwise
+  // end the string literal and inject AppleScript
   QStringList args;
+  args << "-e";
+  args << "on run argv";
+  args << "-e";
+  args << "set target_file to POSIX file (item 1 of argv)";
   args << "-e";
   args << "tell application \"Finder\"";
   args << "-e";
   args << "activate";
   args << "-e";
-  args << "select POSIX file \""+m->url+"\"";
+  args << "select target_file";
   args << "-e";
   args << "end tell";
+  args << "-e";
+  args << "end run";
+  args << m->url;
   QProcess::startDetached("osascript", args);
 #else
   QDesktopServices::openUrl(QUrl::fromLocalFile(m->url.left(m->url.lastIndexOf('/'))));

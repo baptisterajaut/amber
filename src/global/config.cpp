@@ -21,6 +21,7 @@
 #include "config.h"
 
 #include <QFile>
+#include <QSaveFile>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
@@ -186,6 +187,9 @@ void Config::load(QString path) {
     }
     if (!handled && name == QLatin1String("Style")) {
       style = static_cast<amber::styling::Style>(text.toInt());
+    } else if (!handled && name == QLatin1String("TrustedVstPlugin") && !text.isEmpty()) {
+      // one element per path
+      if (!trusted_vst_plugins.contains(text.toString())) trusted_vst_plugins.append(text.toString());
     }
   }
 
@@ -201,7 +205,10 @@ void Config::load(QString path) {
 }
 
 void Config::save(QString path) {
-  QFile f(path);
+  // Temp file + rename on commit(): a failed write keeps the previous config instead of truncating it
+  QSaveFile f(path);
+  // A writable file in a read-only directory has no room for the temp file: write it in place there, as before
+  f.setDirectWriteFallback(true);
   if (!f.open(QIODevice::WriteOnly)) {
     qCritical() << "Could not save configuration";
     return;
@@ -278,10 +285,13 @@ void Config::save(QString path) {
   stream.writeTextElement("AutorecoveryMax", QString::number(autorecovery_max));
   stream.writeTextElement("StickyKeyframeType", QString::number(sticky_keyframe_type));
   stream.writeTextElement("DefaultKeyframeType", QString::number(default_keyframe_type));
+  for (const QString& path : trusted_vst_plugins) stream.writeTextElement("TrustedVstPlugin", path);
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc
-  f.close();
+  if (stream.hasError() || !f.commit()) {
+    qCritical() << "Could not save configuration";
+  }
 }
 
 RuntimeConfig::RuntimeConfig()

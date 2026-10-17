@@ -29,13 +29,16 @@ void LogarithmicFadeTransition::process_audio(double timecode_start, double time
 
 	for (int i=0;i<nb_bytes;i+=2) {
 		qint16 samp = (qint16) (((samples[i+1] & 0xFF) << 8) | (samples[i] & 0xFF));
+		// progress through the transition, 0..1; clamped as the chunk can run past either edge (a factor
+		// above 1 wraps the sample, the square root of a negative is NaN)
+		double progress = qBound(0.0, timecode_start + (interval * i), 1.0);
 
 		switch (type) {
         case kTransitionOpening:
-			samp *= qSqrt(timecode_start + (interval * i));
+			samp *= qSqrt(progress);
 			break;
         case kTransitionClosing:
-			samp *= qSqrt(1 - (timecode_start + (interval * i)));
+			samp *= qSqrt(1 - progress);
 			break;
 		}
 

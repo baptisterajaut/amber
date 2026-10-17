@@ -373,6 +373,7 @@ void ExportDialog::export_thread_finished() {
 
   // Free the export thread
   export_thread_->deleteLater();
+  export_thread_ = nullptr;
 
   // Free the GL fallback surface (must be deleted on GUI thread — we're on it)
   delete export_gl_surface_;
@@ -382,6 +383,16 @@ void ExportDialog::export_thread_finished() {
   if (succeeded) {
     accept();
   }
+}
+
+void ExportDialog::reject() {
+  if (export_thread_ != nullptr) {
+    // Still exporting, or finished with export_thread_finished() pending: never close under the thread. Only a running
+    // thread is interrupted, so a completed export isn't reported as cancelled.
+    if (export_thread_->isRunning()) export_thread_->Interrupt();
+    return;
+  }
+  QDialog::reject();
 }
 
 void ExportDialog::prep_ui_for_render(bool r) {
@@ -467,6 +478,19 @@ void ExportDialog::StartExport() {
     return;
   }
 
+  // end_frame is exclusive: an empty range would write a file with no frames. Same range as the params built below
+  long range_start = 0;
+  long range_end = amber::ActiveSequence->getEndFrame();
+  if (rangeCombobox->currentIndex() == 1) {
+    range_start = qMax(amber::ActiveSequence->workarea_in, range_start);
+    range_end = qMin(amber::ActiveSequence->workarea_out, range_end);
+  }
+  if (range_end <= range_start) {
+    QMessageBox::critical(this, tr("Nothing to export"), tr("Nothing to export: the sequence or work area is empty."),
+                          QMessageBox::Ok);
+    return;
+  }
+
   QString ext = GetFormatExtension(formatCombobox->currentIndex(), vcodecCombobox->currentData().toInt(),
                                    videoGroupbox->isChecked(), audioGroupbox->isChecked());
   if (ext.isEmpty()) {
@@ -501,7 +525,6 @@ void ExportDialog::StartExport() {
       params.video_codec = vcodecCombobox->currentData().toInt();
       params.video_width = widthSpinbox->value();
       params.video_height = heightSpinbox->value();
-      params.video_frame_rate = framerateSpinbox->value();
       params.video_compression_type = compressionTypeCombobox->currentData().toInt();
       params.video_bitrate = videobitrateSpinbox->value();
     }
@@ -629,7 +652,7 @@ void ExportDialog::vcodec_changed(int index) {
                             tr("Failed to find a suitable encoder for this codec. Export will likely fail."));
     } else {
       const enum AVPixelFormat* pix_fmts = nullptr;
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
       int num_pix_fmts = 0;
       if (avcodec_get_supported_config(nullptr, codec_info, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void**)&pix_fmts,
                                        &num_pix_fmts) == 0 &&
@@ -740,7 +763,13 @@ void ExportDialog::setup_ui() {
 
   videoGridLayout->addWidget(new QLabel(tr("Frame Rate:"), this), 3, 0, 1, 1);
   framerateSpinbox = new QDoubleSpinBox(videoGroupbox);
-  framerateSpinbox->setMaximum(60);
+  // Display only: the export always uses the sequence frame rate (ExportThread::SetupVideo)
+  framerateSpinbox->setEnabled(false);
+  framerateSpinbox->setToolTip(tr("Exports always use the sequence frame rate. Change it in Sequence Settings."));
+  framerateSpinbox->setDecimals(3);  // 23.976 and 59.94 shown as they are
+  framerateSpinbox->setMinimum(1);
+  // CBA: display ceiling only, no sequence (even from high-speed footage) comes near it
+  framerateSpinbox->setMaximum(1000);
   framerateSpinbox->setValue(0);
   videoGridLayout->addWidget(framerateSpinbox, 3, 1, 1, 1);
 
@@ -773,6 +802,7 @@ void ExportDialog::setup_ui() {
 
   audioGridLayout->addWidget(new QLabel(tr("Sampling Rate:"), this), 1, 0, 1, 1);
   samplingRateSpinbox = new QSpinBox(audioGroupbox);
+  samplingRateSpinbox->setMinimum(1);
   samplingRateSpinbox->setMaximum(96000);
   samplingRateSpinbox->setValue(0);
   audioGridLayout->addWidget(samplingRateSpinbox, 1, 1, 1, 1);
@@ -925,7 +955,6 @@ void ExportDialog::SavePreset(const QString& name) {
   stream.writeTextElement("video_codec_index", QString::number(vcodecCombobox->currentIndex()));
   stream.writeTextElement("width", QString::number(widthSpinbox->value()));
   stream.writeTextElement("height", QString::number(heightSpinbox->value()));
-  stream.writeTextElement("frame_rate", QString::number(framerateSpinbox->value(), 'f', 6));
   stream.writeTextElement("compression_type_index", QString::number(compressionTypeCombobox->currentIndex()));
   stream.writeTextElement("video_bitrate", QString::number(videobitrateSpinbox->value(), 'f', 6));
 
@@ -967,7 +996,6 @@ void ExportDialog::LoadPreset(const QString& name) {
   int video_codec_index = -1;
   int width = -1;
   int height = -1;
-  double frame_rate = -1;
   int compression_type_index = -1;
   double video_bitrate = -1;
   int audio_enabled = -1;
@@ -989,8 +1017,6 @@ void ExportDialog::LoadPreset(const QString& name) {
         width = stream.readElementText().toInt();
       } else if (tag == "height") {
         height = stream.readElementText().toInt();
-      } else if (tag == "frame_rate") {
-        frame_rate = stream.readElementText().toDouble();
       } else if (tag == "compression_type_index") {
         compression_type_index = stream.readElementText().toInt();
       } else if (tag == "video_bitrate") {
@@ -1028,7 +1054,7 @@ void ExportDialog::LoadPreset(const QString& name) {
   // 3. Video settings (after codec is set so compression type combo is populated)
   if (width >= 0) widthSpinbox->setValue(width);
   if (height >= 0) heightSpinbox->setValue(height);
-  if (frame_rate >= 0) framerateSpinbox->setValue(frame_rate);
+  // An older preset's frame_rate is skipped: the export always uses the sequence frame rate
   if (compression_type_index >= 0 && compression_type_index < compressionTypeCombobox->count()) {
     compressionTypeCombobox->setCurrentIndex(compression_type_index);
   }

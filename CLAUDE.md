@@ -39,7 +39,7 @@ Tested on Arch Linux only. AppImage, Windows and macOS builds are best-effort.
 
 ## Known issues
 
-- **FFmpeg compat**: `#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)` guards needed for `avcodec_get_supported_config()` (replaces `codec->pix_fmts`/`codec->sample_fmts`). `#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)` for `AV_FRAME_FLAG_INTERLACED`.
+- **FFmpeg compat**: `#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)` guards needed for `avcodec_get_supported_config()` (replaces `codec->pix_fmts`/`codec->sample_fmts`). `#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)` for `AV_FRAME_FLAG_INTERLACED`.
 - **Qt 6.10 PipeWire audio backend**: Does not enumerate Bluetooth audio sinks. Workaround: `qputenv("QT_AUDIO_BACKEND", "pulseaudio")` in `main.cpp` forces PulseAudio engine (works through `pipewire-pulse`). Safe no-op on Windows/macOS.
 - **AppImage VAAPI**: `libva` must NOT be bundled in the AppImage (`--exclude-library "libva*"`). The host's libva loads its own GPU-specific drivers; bundling the container's libva breaks driver discovery.
 - **AppImage FFmpeg ABI**: Qt 6.10 bundles FFmpeg 7.x. `FindFFMPEG.cmake` uses `NO_CMAKE_PATH` to prevent cmake from finding Qt's FFmpeg instead of the system one. Removing Qt's `libffmpegmediaplugin.so` before linuxdeploy avoids bundling a second FFmpeg.

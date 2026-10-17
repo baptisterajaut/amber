@@ -27,13 +27,16 @@ void LinearFadeTransition::process_audio(double timecode_start, double timecode_
 
 	for (int i=0;i<nb_bytes;i+=2) {
 		qint16 samp = (qint16) (((samples[i+1] & 0xFF) << 8) | (samples[i] & 0xFF));
+		// progress through the transition, 0..1; clamped as the chunk can run past either edge (a factor
+		// above 1 wraps the sample, a negative one inverts it)
+		double progress = qBound(0.0, timecode_start + (interval * i), 1.0);
 
 		switch (type) {
         case kTransitionOpening:
-			samp *= timecode_start + (interval * i);
+			samp *= progress;
 			break;
         case kTransitionClosing:
-			samp *= 1 - (timecode_start + (interval * i));
+			samp *= 1 - progress;
 			break;
 		}
 

@@ -37,5 +37,7 @@ void main() {
     //self-multiply
     color = color0.rgb * gray;
 
-	fragColor = vec4(color * color0.a, color0.a);
+	// color0 is premultiplied, so color already is: multiplying by alpha again darkened semi-transparent edges.
+	// Clamped so rgb stays <= alpha (gray can exceed 1)
+	fragColor = vec4(clamp(color, 0.0, color0.a), color0.a);
 }
