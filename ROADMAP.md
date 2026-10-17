@@ -29,6 +29,8 @@ Major release. Ships progressively via preview releases — features land as the
 
 Replace common per-pixel Frei0r plugins (brightness, contrast, blur, chroma key, distortions…) with built-in RHI fragment shaders. The existing shader effect infrastructure (XML + GLSL + keyframes) already supports this — it's writing the shaders, not building new architecture. ~15-20 new shaders needed for remaining common Frei0r equivalents (levels, curves, sharpen, basic denoise). Each shader: 20-80 lines GLSL + XML.
 
+Done in 2.0 so far: Levels (input/output black and white, gamma, per channel), Lift/Gamma/Gain (per-channel, the shader the color correction tool will drive), Tint (shadows/highlights colors, sepia by default), Threshold, Lens Correction (K1/K2 radial, center, zoom). Still missing among common Frei0r equivalents: curves, glow/softglow, edge detection (Sobel, edge glow), alpha operations, denoise.
+
 Internal C++ effects (Transform, Text, Solid, Timecode) stay as-is — they use SuperimposeFlag, not ImageFlag. Temporal Frei0r effects (deshake, motion stabilization) have no GPU equivalent — they require multi-frame analysis and optical flow, which are inherently CPU algorithms. These stay as Frei0r and keep the `NeedsCpuRgba()` path. A `-DFREI0R_LEGACY` compile flag keeps the full bridge for users who depend on niche Frei0r plugins.
 
 **Risks:** Visual regression vs Frei0r originals (A/B comparison testing needed). Some effects may need multi-pass (3-way color corrector, denoise).

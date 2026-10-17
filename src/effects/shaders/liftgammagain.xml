@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Lift/Gamma/Gain" category="Color">
+	<row name="Lift">
+		<field type="double" min="-100" default="0" max="100" id="lift_r"/>
+		<field type="double" min="-100" default="0" max="100" id="lift_g"/>
+		<field type="double" min="-100" default="0" max="100" id="lift_b"/>
+	</row>
+	<row name="Gamma">
+		<field type="double" min="10" default="100" max="400" id="gamma_r"/>
+		<field type="double" min="10" default="100" max="400" id="gamma_g"/>
+		<field type="double" min="10" default="100" max="400" id="gamma_b"/>
+	</row>
+	<row name="Gain">
+		<field type="double" min="0" default="100" max="400" id="gain_r"/>
+		<field type="double" min="0" default="100" max="400" id="gain_g"/>
+		<field type="double" min="0" default="100" max="400" id="gain_b"/>
+	</row>
+	<shader vert="common.vert" frag="liftgammagain.frag"/>
+</effect>

@@ -347,6 +347,12 @@ set(AMBER_EFFECTS
   effects/shaders/huesatbri.xml
   effects/shaders/invert.frag
   effects/shaders/invert.xml
+  effects/shaders/lenscorrection.frag
+  effects/shaders/lenscorrection.xml
+  effects/shaders/levels.frag
+  effects/shaders/levels.xml
+  effects/shaders/liftgammagain.frag
+  effects/shaders/liftgammagain.xml
   effects/shaders/lumakey.frag
   effects/shaders/lumakey.xml
   effects/shaders/lut.frag
@@ -367,8 +373,12 @@ set(AMBER_EFFECTS
   effects/shaders/sphere.xml
   effects/shaders/swirl.frag
   effects/shaders/swirl.xml
+  effects/shaders/threshold.frag
+  effects/shaders/threshold.xml
   effects/shaders/tile.frag
   effects/shaders/tile.xml
+  effects/shaders/tint.frag
+  effects/shaders/tint.xml
   effects/shaders/toonify.frag
   effects/shaders/toonify.xml
   effects/shaders/sharpen.frag

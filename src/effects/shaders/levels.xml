@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Levels" category="Color">
+	<row name="Input Black">
+		<field type="double" min="0" default="0" max="100" id="in_black"/>
+	</row>
+	<row name="Input White">
+		<field type="double" min="0" default="100" max="100" id="in_white"/>
+	</row>
+	<row name="Gamma">
+		<field type="double" min="1" default="100" max="1000" id="gamma"/>
+	</row>
+	<row name="Output Black">
+		<field type="double" min="0" default="0" max="100" id="out_black"/>
+	</row>
+	<row name="Output White">
+		<field type="double" min="0" default="100" max="100" id="out_white"/>
+	</row>
+	<row name="Channel">
+		<field type="combo" default="0" id="channel">
+			<option>RGB</option>
+			<option>Red</option>
+			<option>Green</option>
+			<option>Blue</option>
+		</field>
+	</row>
+	<shader vert="common.vert" frag="levels.frag"/>
+</effect>

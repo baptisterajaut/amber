@@ -5,6 +5,7 @@
 #include <QTest>
 #include <QTextStream>
 #include <QVector3D>
+#include <cmath>
 #include <functional>
 
 #include <memory>
@@ -122,6 +123,25 @@ class TestEffectsGpu : public QObject {
   void pixelateBlocks();
   void crossstitchOutputDiffers();
   void volumetricLightOutputDiffers();
+
+  // F-1 batch 1 — native replacements for common Frei0r color/lens plugins.
+  void levelsNeutralIdentity();
+  void levelsInputWhite();
+  void levelsGamma();
+  void levelsChannelRed();
+  void liftGammaGainNeutralIdentity();
+  void liftGammaGainGainRed();
+  void liftGammaGainLiftWhite();
+  void tintAmountZero();
+  void tintShadowsHighlights();
+  void thresholdLevel();
+  void thresholdInvert();
+  void lensCorrectionNeutralIdentity();
+  void lensCorrectionK1Distorts();
+  void colorShadersKeepTransparentClipTransparent();
+  void liftGammaGainGamma();
+  void thresholdCustomLevel();
+  void lensCorrectionNonSquareAspect();
 
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
@@ -2446,6 +2466,370 @@ void TestEffectsGpu::volumetricLightOutputDiffers() {
 
   const int diff = buf_diff(baseline, with_fx);
   QVERIFY2(diff > 1000, qPrintable(QString("expected volumetric light to change output, diff=%1").arg(diff)));
+}
+
+// ---------------------------------------------------------------------------
+// F-1 batch 1 — Levels, Lift/Gamma/Gain, Tint, Threshold, Lens Correction
+// ---------------------------------------------------------------------------
+
+void TestEffectsGpu::levelsNeutralIdentity() {
+  // levels.xml defaults (0, 100, gamma 100, 0, 100, RGB): c = (c-0)/1, pow(c, 1), mix(0, 1, c) = c.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Levels");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/4),
+           qPrintable(QString("expected neutral Levels passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::levelsInputWhite() {
+  // Row 1 = Input White. 50 → c = 64/255 / 0.5 = 0.502 → 128.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(64, 64, 64));
+  EffectPtr fx = h_->attach_xml_shader(c, "Levels");
+  h_->set_field_double(fx.get(), 1, 0, 50.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 128) <= 4 && qAbs(mid.g - 128) <= 4 && qAbs(mid.b - 128) <= 4,
+           qPrintable(QString("expected ~(128,128,128), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::levelsGamma() {
+  // Row 2 = Gamma. 200 → c = pow(128/255, 100/200) = pow(0.502, 0.5) = 0.7085 → 181.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
+  EffectPtr fx = h_->attach_xml_shader(c, "Levels");
+  h_->set_field_double(fx.get(), 2, 0, 200.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 181) <= 4 && qAbs(mid.g - 181) <= 4 && qAbs(mid.b - 181) <= 4,
+           qPrintable(QString("expected ~(181,181,181), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::levelsChannelRed() {
+  // Row 5 = Channel (0 RGB, 1 Red, 2 Green, 3 Blue). Red + Input White 50 on (64,64,64): R → 128, G/B untouched.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(64, 64, 64));
+  EffectPtr fx = h_->attach_xml_shader(c, "Levels");
+  h_->set_field_double(fx.get(), 1, 0, 50.0);
+  h_->set_field_combo(fx.get(), 5, 0, 1);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 128) <= 4 && qAbs(mid.g - 64) <= 4 && qAbs(mid.b - 64) <= 4,
+           qPrintable(QString("expected ~(128,64,64), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::liftGammaGainNeutralIdentity() {
+  // liftgammagain.xml defaults (lift 0, gamma 100, gain 100): c = 1 * (c + 0), pow(c, 1) = c.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Lift/Gamma/Gain");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  QVERIFY2(
+      buffers_within(baseline, with_fx, /*tolerance=*/4),
+      qPrintable(QString("expected neutral Lift/Gamma/Gain passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::liftGammaGainGainRed() {
+  // Row 2 = Gain (R, G, B). Gain R 50 on (200,100,50): R = 0.5 * 200 = 100, G/B untouched → (100,100,50).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 100, 50));
+  EffectPtr fx = h_->attach_xml_shader(c, "Lift/Gamma/Gain");
+  h_->set_field_double(fx.get(), 2, 0, 50.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 100) <= 4 && qAbs(mid.g - 100) <= 4 && qAbs(mid.b - 50) <= 4,
+           qPrintable(QString("expected ~(100,100,50), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::liftGammaGainLiftWhite() {
+  // Row 0 = Lift (R, G, B). Lift 100 everywhere: c + 1 * (1 - c) = 1 → white whatever the input.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(50, 100, 150));
+  EffectPtr fx = h_->attach_xml_shader(c, "Lift/Gamma/Gain");
+  for (int f = 0; f < 3; f++) h_->set_field_double(fx.get(), 0, f, 100.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r >= 251 && mid.g >= 251 && mid.b >= 251,
+           qPrintable(QString("expected white, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::tintAmountZero() {
+  // Row 2 = Amount. 0 → mix(rgb, tint, 0) = rgb.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Tint");
+  h_->set_field_double(fx.get(), 2, 0, 0.0);
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/4),
+           qPrintable(QString("expected Tint amount 0 passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::tintShadowsHighlights() {
+  // Row 0 = Shadows (set to (20,40,80)), row 1 = Highlights (default sepia (255,224,178)), amount 100.
+  // Black: luma 0 → shadows. White: luma 1 → highlights.
+  struct Case {
+    QColor in, expected;
+  };
+  const Case cases[] = {{QColor(0, 0, 0), QColor(20, 40, 80)}, {QColor(255, 255, 255), QColor(255, 224, 178)}};
+  for (const Case& k : cases) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(c->effects[1].get(), 2, 0, k.in);
+    EffectPtr fx = h_->attach_xml_shader(c, "Tint");
+    h_->set_field_color(fx.get(), 0, 0, QColor(20, 40, 80));
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    Rgba mid = pixel_at(pixels, 64, 32, 32);
+    QVERIFY2(qAbs(mid.r - k.expected.red()) <= 4 && qAbs(mid.g - k.expected.green()) <= 4 &&
+                 qAbs(mid.b - k.expected.blue()) <= 4,
+             qPrintable(QString("input %1: expected %2, got (%3,%4,%5)")
+                            .arg(k.in.name(), k.expected.name())
+                            .arg(mid.r)
+                            .arg(mid.g)
+                            .arg(mid.b)));
+  }
+}
+
+void TestEffectsGpu::thresholdLevel() {
+  // Row 0 = Level (default 50). Grey 100: luma 0.392 < 0.5 → black. Grey 200: luma 0.784 → white.
+  const int greys[] = {100, 200};
+  for (int grey : greys) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(c->effects[1].get(), 2, 0, QColor(grey, grey, grey));
+    h_->attach_xml_shader(c, "Threshold");
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    Rgba mid = pixel_at(pixels, 64, 32, 32);
+    const int expected = grey < 128 ? 0 : 255;
+    QVERIFY2(
+        qAbs(mid.r - expected) <= 4 && qAbs(mid.g - expected) <= 4 && qAbs(mid.b - expected) <= 4,
+        qPrintable(
+            QString("grey %1: expected %2, got (%3,%4,%5)").arg(grey).arg(expected).arg(mid.r).arg(mid.g).arg(mid.b)));
+  }
+}
+
+void TestEffectsGpu::thresholdInvert() {
+  // Row 1 = Invert: grey 100 → white, grey 200 → black.
+  const int greys[] = {100, 200};
+  for (int grey : greys) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(c->effects[1].get(), 2, 0, QColor(grey, grey, grey));
+    EffectPtr fx = h_->attach_xml_shader(c, "Threshold");
+    h_->set_field_bool(fx.get(), 1, 0, true);
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    Rgba mid = pixel_at(pixels, 64, 32, 32);
+    const int expected = grey < 128 ? 255 : 0;
+    QVERIFY2(qAbs(mid.r - expected) <= 4 && qAbs(mid.g - expected) <= 4 && qAbs(mid.b - expected) <= 4,
+             qPrintable(QString("grey %1 inverted: expected %2, got (%3,%4,%5)")
+                            .arg(grey)
+                            .arg(expected)
+                            .arg(mid.r)
+                            .arg(mid.g)
+                            .arg(mid.b)));
+  }
+}
+
+void TestEffectsGpu::lensCorrectionNeutralIdentity() {
+  // lenscorrection.xml defaults (center 0,0, K1 0, K2 0, zoom 100): src = c + p * 1 * 1 = uv.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  h_->attach_xml_shader(c, "Lens Correction");
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  QVERIFY2(
+      buffers_within(baseline, with_fx, /*tolerance=*/4),
+      qPrintable(QString("expected neutral Lens Correction passthrough, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::lensCorrectionK1Distorts() {
+  // Row 1 = K1. 50 → src = c + p * (1 + 0.5 r²): rows away from the centre sample further out (and the corners fall
+  // outside the frame → transparent), the centre (r ≈ 0) stays put.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Lens Correction");
+  h_->set_field_double(fx.get(), 1, 0, 50.0);
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+  const int diff = buf_diff(baseline, with_fx);
+  QVERIFY2(diff > 1000, qPrintable(QString("expected K1 to change output, diff=%1").arg(diff)));
+  Rgba base_mid = pixel_at(baseline, 64, 32, 32);
+  Rgba fx_mid = pixel_at(with_fx, 64, 32, 32);
+  QVERIFY2(qAbs(base_mid.r - fx_mid.r) <= 4,
+           qPrintable(QString("expected the centre to stay put, %1 vs %2").arg(base_mid.r).arg(fx_mid.r)));
+}
+
+void TestEffectsGpu::liftGammaGainGamma() {
+  // Row 1 = Gamma (R, G, B). 200 everywhere on grey 128: pow(128/255, 100/200) = pow(0.502, 0.5) = 0.7085 → 181.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
+  EffectPtr fx = h_->attach_xml_shader(c, "Lift/Gamma/Gain");
+  for (int f = 0; f < 3; f++) h_->set_field_double(fx.get(), 1, f, 200.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 181) <= 4 && qAbs(mid.g - 181) <= 4 && qAbs(mid.b - 181) <= 4,
+           qPrintable(QString("expected ~(181,181,181), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::thresholdCustomLevel() {
+  // Row 0 = Level 30 on grey 100: luma 0.392 >= 0.3 → white (black at the default level 50, see thresholdLevel).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(100, 100, 100));
+  EffectPtr fx = h_->attach_xml_shader(c, "Threshold");
+  h_->set_field_double(fx.get(), 0, 0, 30.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r >= 251 && mid.g >= 251 && mid.b >= 251,
+           qPrintable(QString("expected white, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::lensCorrectionNonSquareAspect() {
+  // 96x48 (aspect 2), K1 50: the output pixel must equal the input sampled where the shader's model says, computed
+  // here on the CPU: p = (uv - 0.5) * (aspect, 1) / half_diag, half_diag = |(0.5 * aspect, 0.5)| = 1.118,
+  // src = 0.5 + (uv - 0.5) * (1 + 0.5 r²). One pixel on the horizontal axis over a left→right gradient, one on the
+  // vertical axis over a top→bottom gradient. A swapped aspect or a half_diag without the aspect moves the sample by
+  // several pixels on at least one of them.
+  //   (84,24): r² = 0.4635, f = 1.2317, src.x = 0.9683 → x' = 92.46 (swapped aspect: 86.1)
+  //   (48,42): r² = 0.1189, f = 1.0595, src.y = 0.9083 → y' = 43.10 (swapped aspect: 46.4)
+  // The expected value is a bilinear read of the unaffected render at (x', y'); the mapping is point-symmetric about
+  // the centre, so it holds whichever way the readback rows run.
+  const int W = 96, H = 48;
+  const double k1 = 0.5;
+  struct Case {
+    double angle;  // gradient angle: 0 = left→right, 90 = top→bottom
+    int x, y;
+  };
+  const Case cases[] = {{0.0, 84, 24}, {90.0, 48, 42}};
+  for (const Case& k : cases) {
+    auto seq = h_->make_sequence(W, H, 30.0);
+    Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+    Effect* gradient = c->effects[1].get();
+    h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+    h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+    h_->set_field_double(gradient, 3, 0, k.angle);
+    QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+    EffectPtr fx = h_->attach_xml_shader(c, "Lens Correction");
+    h_->set_field_double(fx.get(), 1, 0, k1 * 100.0);
+    QByteArray with_fx = h_->render_frame(seq.get(), 0);
+
+    const double aspect = double(W) / H;
+    const double half_diag = std::hypot(0.5 * aspect, 0.5);
+    const double dx = (k.x + 0.5) / W - 0.5, dy = (k.y + 0.5) / H - 0.5;
+    const double r2 = (dx * aspect * dx * aspect + dy * dy) / (half_diag * half_diag);
+    const double f = 1.0 + k1 * r2;
+    const double sx = (0.5 + dx * f) * W - 0.5, sy = (0.5 + dy * f) * H - 0.5;  // source, in pixel indices
+    const int x0 = int(std::floor(sx)), y0 = int(std::floor(sy));
+    QVERIFY2(x0 >= 0 && x0 + 1 < W && y0 >= 0 && y0 + 1 < H, "expected source inside the frame");
+    const double tx = sx - x0, ty = sy - y0;
+    auto r_at = [&](int x, int y) { return double(pixel_at(baseline, W, x, y).r); };
+    const double expected = (r_at(x0, y0) * (1 - tx) + r_at(x0 + 1, y0) * tx) * (1 - ty) +
+                            (r_at(x0, y0 + 1) * (1 - tx) + r_at(x0 + 1, y0 + 1) * tx) * ty;
+    // the gradient must run along the tested axis (pixel vs its mirror about the centre), else the check proves nothing
+    const int near = pixel_at(baseline, W, k.x, k.y).r, mirror = pixel_at(baseline, W, W - 1 - k.x, H - 1 - k.y).r;
+    QVERIFY2(
+        qAbs(near - mirror) > 50,
+        qPrintable(
+            QString("angle %1: reference gradient not along the axis (%2 vs %3)").arg(k.angle).arg(near).arg(mirror)));
+    const int got = pixel_at(with_fx, W, k.x, k.y).r;
+    QVERIFY2(qAbs(got - expected) <= 4,
+             qPrintable(QString("angle %1, pixel (%2,%3): expected ~%4 (source %5,%6), got %7")
+                            .arg(k.angle)
+                            .arg(k.x)
+                            .arg(k.y)
+                            .arg(expected, 0, 'f', 1)
+                            .arg(sx, 0, 'f', 2)
+                            .arg(sy, 0, 'f', 2)
+                            .arg(got)));
+  }
+}
+
+void TestEffectsGpu::colorShadersKeepTransparentClipTransparent() {
+  // Premultiplied input: a fully transparent clip is (0,0,0,0). An offset op applied to premultiplied rgb (output
+  // black, lift, shadows tint, inverted threshold) would give rgb > 0 with a = 0, which the srcover blend ADDS onto the
+  // track below. Each effect, with non-neutral parameters, sits on a 0% opacity Solid over an opaque (50,100,150)
+  // track: the track below must come out unchanged.
+  struct Case {
+    const char* effect;
+    std::function<void(Effect*)> configure;
+  };
+  const Case cases[] = {
+      {"Levels", [this](Effect* e) { h_->set_field_double(e, 3, 0, 50.0); }},  // output black 50
+      {"Lift/Gamma/Gain",
+       [this](Effect* e) {
+         for (int f = 0; f < 3; f++) h_->set_field_double(e, 0, f, 50.0);  // lift 50
+       }},
+      {"Tint", [this](Effect* e) { h_->set_field_color(e, 0, 0, QColor(200, 100, 50)); }},  // shadows non-black
+      {"Threshold", [this](Effect* e) { h_->set_field_bool(e, 1, 0, true); }},              // invert: black → white
+  };
+
+  auto make_bottom = [this](Sequence* seq) {
+    Clip* bottom = h_->add_generator_clip(seq, -1, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(bottom->effects[1].get(), 2, 0, QColor(50, 100, 150));
+  };
+  auto ref_seq = h_->make_sequence(64, 64, 30.0);
+  make_bottom(ref_seq.get());
+  QByteArray reference = h_->render_frame(ref_seq.get(), 0);
+  QVERIFY(!reference.isEmpty());
+
+  for (const Case& k : cases) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    make_bottom(seq.get());
+    Clip* top = h_->add_generator_clip(seq.get(), -2, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_double(top->effects[1].get(), 1, 0, 0.0);  // Solid opacity 0% → (0,0,0,0)
+    h_->set_field_color(top->effects[1].get(), 2, 0, QColor(200, 100, 50));
+    EffectPtr fx = h_->attach_xml_shader(top, k.effect);
+    k.configure(fx.get());
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    Rgba mid = pixel_at(pixels, 64, 32, 32);
+    QVERIFY2(buffers_within(reference, pixels, /*tolerance=*/4),
+             qPrintable(QString("%1 on a transparent clip changed the track below: got (%2,%3,%4), diff=%5")
+                            .arg(k.effect)
+                            .arg(mid.r)
+                            .arg(mid.g)
+                            .arg(mid.b)
+                            .arg(buf_diff(reference, pixels))));
+  }
 }
 
 // Phase 4 — only test that exercises the YUV decode path (yuv2rgb.frag.qsb).
