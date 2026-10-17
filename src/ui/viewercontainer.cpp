@@ -218,4 +218,8 @@ void ViewerContainer::scroll_changed() {
   double vmax = vertical_scrollbar->maximum();
   child->set_scroll(hmax > 0 ? double(horizontal_scrollbar->value()) / hmax : 0.0,
                     vmax > 0 ? double(vertical_scrollbar->value()) / vmax : 0.0);
+  if (horizontal_ruler != nullptr) {  // they follow the scrolled frame
+    horizontal_ruler->update();
+    vertical_ruler->update();
+  }
 }
