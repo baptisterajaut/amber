@@ -18,7 +18,7 @@ void main(void) {
 	if (mode == 2) {
 		fragColor = vec4(vec3(a), 1.0);
 	} else {
-		float new_a = mode == 0 ? 1.0 - a : (a >= level * 0.01 ? 1.0 : 0.0);
+		float new_a = mode == 0 ? 1.0 - a : (a > 0.0 && a >= level * 0.01 ? 1.0 : 0.0);
 		fragColor = vec4(rgb * new_a, new_a);
 	}
 }
