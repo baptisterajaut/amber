@@ -30,6 +30,7 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/pixdesc.h>
+#include <libswscale/swscale.h>
 }
 
 AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
@@ -65,6 +66,9 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
   if (pix_fmts) {
     for (int i = 0; pix_fmts[i] != AV_PIX_FMT_NONE; i++) {
 #endif
+      // Export converts through swscale, which can't output every format an encoder accepts (GIF offers pal8)
+      if (!sws_isSupportedOutput(pix_fmts[i])) continue;
+
       // get the name of the pixel format and add it to the combobox (with the pixel format constant)
       pix_fmt_combo_->addItem(av_get_pix_fmt_name(pix_fmts[i]), pix_fmts[i]);
 
