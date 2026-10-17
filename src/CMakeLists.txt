@@ -310,6 +310,8 @@ set(AMBER_RESOURCES
 )
 
 set(AMBER_EFFECTS
+  effects/shaders/alphaadjust.frag
+  effects/shaders/alphaadjust.xml
   effects/shaders/boxblur.frag
   effects/shaders/boxblur.xml
   effects/shaders/bulge.frag
@@ -320,6 +322,8 @@ set(AMBER_EFFECTS
   effects/shaders/chromaticaberration.xml
   effects/shaders/colorcorrection.frag
   effects/shaders/colorcorrection.xml
+  effects/shaders/colorize.frag
+  effects/shaders/colorize.xml
   effects/shaders/colorsel.frag
   effects/shaders/colorsel.xml
   effects/shaders/common.frag
@@ -334,7 +338,7 @@ set(AMBER_EFFECTS
   effects/shaders/emboss.frag
   effects/shaders/emboss.xml
   effects/shaders/findedges.frag
-  effects/shaders/findedges.xml.disabled
+  effects/shaders/findedges.xml
   effects/shaders/fisheye.frag
   effects/shaders/fisheye.xml
   effects/shaders/flip.frag

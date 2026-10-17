@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Alpha Adjust" category="Keying">
+	<row name="Mode">
+		<field type="combo" default="1" id="mode">
+			<option>Invert</option>
+			<option>Threshold</option>
+			<option>Show Alpha</option>
+		</field>
+	</row>
+	<row name="Level">
+		<field type="double" min="0" default="50" max="100" id="level"/>
+	</row>
+	<shader vert="common.vert" frag="alphaadjust.frag"/>
+</effect>

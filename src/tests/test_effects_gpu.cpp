@@ -143,6 +143,18 @@ class TestEffectsGpu : public QObject {
   void thresholdCustomLevel();
   void lensCorrectionNonSquareAspect();
 
+  // F-1 batch 2 — Find Edges, Colorize, Alpha Adjust.
+  void findEdgesFlatSolid();
+  void findEdgesHardEdge();
+  void findEdgesStrengthZero();
+  void findEdgesColorMode();
+  void colorizeSaturationZero();
+  void colorizeRedHue();
+  void colorizeLightnessWhite();
+  void alphaAdjustInvert();
+  void alphaAdjustThreshold();
+  void alphaAdjustShowAlpha();
+
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
   void yuvDecodeNV12();
@@ -2784,11 +2796,229 @@ void TestEffectsGpu::lensCorrectionNonSquareAspect() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// F-1 batch 2 — Find Edges, Colorize, Alpha Adjust
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// 64x64 Solid checkerboard, 16 px cells, (0,0) cell opaque black, the others `color`: hard edges inside one clip
+// texture (a Transform-shifted clip wouldn't do, effects see the clip texture before its Transform).
+Clip* add_checkerboard(TestRenderHarness* h, Sequence* seq, QColor color) {
+  Clip* c = h->add_generator_clip(seq, -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  Effect* checker = c->effects[1].get();
+  h->set_field_combo(checker, 0, 0, 2);  // Type = SOLID_TYPE_CHECKERBOARD
+  h->set_field_color(checker, 2, 0, color);
+  h->set_field_double(checker, 3, 0, 16.0);
+  return c;
+}
+
+}  // namespace
+
+void TestEffectsGpu::findEdgesFlatSolid() {
+  // Flat colour: every Sobel tap is equal → magnitude 0 → black (Luma mode, default), white with Invert (row 2).
+  const bool inverts[] = {false, true};
+  for (bool invert : inverts) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 100, 50));
+    EffectPtr fx = h_->attach_xml_shader(c, "Find Edges");
+    h_->set_field_bool(fx.get(), 2, 0, invert);
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    const int expected = invert ? 255 : 0;
+    Rgba mid = pixel_at(pixels, 64, 32, 32);
+    QVERIFY2(qAbs(mid.r - expected) <= 4 && qAbs(mid.g - expected) <= 4 && qAbs(mid.b - expected) <= 4,
+             qPrintable(QString("invert %1: expected %2, got (%3,%4,%5)")
+                            .arg(invert)
+                            .arg(expected)
+                            .arg(mid.r)
+                            .arg(mid.g)
+                            .arg(mid.b)));
+  }
+}
+
+void TestEffectsGpu::findEdgesHardEdge() {
+  // Black/white checkerboard, edges at x = 16 and y = 16. (15,8) and (16,8) straddle the vertical edge: one Sobel
+  // column is white, the other black → |gx| = 1 + 2 + 1 = 4 → clamp(4 * 1) = 1 → 255. Same for (8,15) across the
+  // horizontal edge. (8,8) and (24,8) are cell interiors (black and white) → 0.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_checkerboard(h_.get(), seq.get(), QColor(255, 255, 255));
+  h_->attach_xml_shader(c, "Find Edges");
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  struct Probe {
+    int x, y, expected;
+  };
+  const Probe probes[] = {{15, 8, 255}, {16, 8, 255}, {8, 15, 255}, {8, 8, 0}, {24, 8, 0}};
+  for (const Probe& p : probes) {
+    Rgba px = pixel_at(pixels, 64, p.x, p.y);
+    QVERIFY2(qAbs(px.r - p.expected) <= 4 && qAbs(px.g - p.expected) <= 4 && qAbs(px.b - p.expected) <= 4,
+             qPrintable(QString("(%1,%2): expected %3, got (%4,%5,%6)")
+                            .arg(p.x)
+                            .arg(p.y)
+                            .arg(p.expected)
+                            .arg(px.r)
+                            .arg(px.g)
+                            .arg(px.b)));
+  }
+}
+
+void TestEffectsGpu::findEdgesStrengthZero() {
+  // Row 0 = Strength. 0 → e = clamp(mag * 0) = 0 everywhere, edges included.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_checkerboard(h_.get(), seq.get(), QColor(255, 255, 255));
+  EffectPtr fx = h_->attach_xml_shader(c, "Find Edges");
+  h_->set_field_double(fx.get(), 0, 0, 0.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  int brightest = 0;
+  for (int i = 0; i + 3 < pixels.size(); i += 4) {
+    for (int ch = 0; ch < 3; ch++) brightest = qMax(brightest, int(static_cast<uchar>(pixels[i + ch])));
+  }
+  QVERIFY2(brightest <= 4, qPrintable(QString("expected black everywhere, brightest channel %1").arg(brightest)));
+}
+
+void TestEffectsGpu::findEdgesColorMode() {
+  // Black/red checkerboard, pixel (16,8) on the vertical edge. Luma mode (0): luma step 0.2126 → |gx| = 0.8504 → grey
+  // 217. Color mode (row 1 = 1): per channel, R step 1 → 1, G/B 0 → (255,0,0).
+  struct Case {
+    int mode;
+    QColor expected;
+  };
+  const Case cases[] = {{0, QColor(217, 217, 217)}, {1, QColor(255, 0, 0)}};
+  for (const Case& k : cases) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = add_checkerboard(h_.get(), seq.get(), QColor(255, 0, 0));
+    EffectPtr fx = h_->attach_xml_shader(c, "Find Edges");
+    h_->set_field_combo(fx.get(), 1, 0, k.mode);
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    Rgba px = pixel_at(pixels, 64, 16, 8);
+    QVERIFY2(qAbs(px.r - k.expected.red()) <= 4 && qAbs(px.g - k.expected.green()) <= 4 &&
+                 qAbs(px.b - k.expected.blue()) <= 4,
+             qPrintable(QString("mode %1: expected %2, got (%3,%4,%5)")
+                            .arg(k.mode)
+                            .arg(k.expected.name())
+                            .arg(px.r)
+                            .arg(px.g)
+                            .arg(px.b)));
+  }
+}
+
+void TestEffectsGpu::colorizeSaturationZero() {
+  // Row 1 = Saturation 0: HSL with S = 0 is grey L. (200,100,50): L = 0.2126*0.7843 + 0.7152*0.3922 + 0.0722*0.1961
+  // = 0.4614 → 118.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 100, 50));
+  EffectPtr fx = h_->attach_xml_shader(c, "Colorize");
+  h_->set_field_double(fx.get(), 1, 0, 0.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 118) <= 4 && qAbs(mid.g - 118) <= 4 && qAbs(mid.b - 118) <= 4,
+           qPrintable(QString("expected ~(118,118,118), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::colorizeRedHue() {
+  // Hue 0, saturation 100, lightness 0 on grey 128: L = 0.502, C = (1 - |2L - 1|) * S = 0.996, pure hue 0 = (1,0,0)
+  // → L + C * ((1,0,0) - 0.5) = (1.000, 0.004, 0.004) → (255,1,1).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
+  EffectPtr fx = h_->attach_xml_shader(c, "Colorize");
+  h_->set_field_double(fx.get(), 0, 0, 0.0);
+  h_->set_field_double(fx.get(), 1, 0, 100.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 255) <= 4 && qAbs(mid.g - 1) <= 4 && qAbs(mid.b - 1) <= 4,
+           qPrintable(QString("expected ~(255,1,1), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::colorizeLightnessWhite() {
+  // Row 2 = Lightness 100: L' = L + (1 - L) * 1 = 1 → C = 0 → white, whatever the hue/saturation (defaults 30/50).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(50, 100, 150));
+  EffectPtr fx = h_->attach_xml_shader(c, "Colorize");
+  h_->set_field_double(fx.get(), 2, 0, 100.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(mid.r >= 251 && mid.g >= 251 && mid.b >= 251,
+           qPrintable(QString("expected white, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+namespace {
+
+// Opaque (50,100,150) Solid on track -1, a (200,100,50) Solid at `opacity` % on track -2 carrying Alpha Adjust in
+// `mode` (row 0) with Level `level` (row 1). Returns the composite at the centre. Alpha can't be read back (the
+// readback forces 255), the srcover composite over the track below shows it: top * a' + bottom * (1 - a').
+Rgba alpha_adjust_composite(TestRenderHarness* h, double opacity, int mode, double level) {
+  auto seq = h->make_sequence(64, 64, 30.0);
+  Clip* bottom = h->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h->set_field_color(bottom->effects[1].get(), 2, 0, QColor(50, 100, 150));
+  Clip* top = h->add_generator_clip(seq.get(), -2, 0, 30, EFFECT_INTERNAL_SOLID);
+  h->set_field_double(top->effects[1].get(), 1, 0, opacity);  // Solid opacity → alpha round(opacity * 2.55)
+  h->set_field_color(top->effects[1].get(), 2, 0, QColor(200, 100, 50));
+  EffectPtr fx = h->attach_xml_shader(top, "Alpha Adjust");
+  h->set_field_combo(fx.get(), 0, 0, mode);
+  h->set_field_double(fx.get(), 1, 0, level);
+  QByteArray pixels = h->render_frame(seq.get(), 0);
+  return pixel_at(pixels, 64, 32, 32);
+}
+
+}  // namespace
+
+void TestEffectsGpu::alphaAdjustInvert() {
+  // Mode 0 = Invert. Top at 25% → alpha 64/255 = 0.251 → a' = 0.749. Composite: R 200*0.749 + 50*0.251 = 162,
+  // G 100, B 50*0.749 + 150*0.251 = 75. Without the effect it would be (88,100,125).
+  Rgba mid = alpha_adjust_composite(h_.get(), 25.0, 0, 50.0);
+  QVERIFY2(qAbs(mid.r - 162) <= 4 && qAbs(mid.g - 100) <= 4 && qAbs(mid.b - 75) <= 4,
+           qPrintable(QString("expected ~(162,100,75), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::alphaAdjustThreshold() {
+  // Mode 1 = Threshold. Top at 60% → alpha 0.6. Level 50: 0.6 >= 0.5 → a' = 1 → the top colour (200,100,50).
+  // Level 70: 0.6 < 0.7 → a' = 0 → the track below (50,100,150).
+  struct Case {
+    double level;
+    QColor expected;
+  };
+  const Case cases[] = {{50.0, QColor(200, 100, 50)}, {70.0, QColor(50, 100, 150)}};
+  for (const Case& k : cases) {
+    Rgba mid = alpha_adjust_composite(h_.get(), 60.0, 1, k.level);
+    QVERIFY2(qAbs(mid.r - k.expected.red()) <= 4 && qAbs(mid.g - k.expected.green()) <= 4 &&
+                 qAbs(mid.b - k.expected.blue()) <= 4,
+             qPrintable(QString("level %1: expected %2, got (%3,%4,%5)")
+                            .arg(k.level)
+                            .arg(k.expected.name())
+                            .arg(mid.r)
+                            .arg(mid.g)
+                            .arg(mid.b)));
+  }
+}
+
+void TestEffectsGpu::alphaAdjustShowAlpha() {
+  // Mode 2 = Show Alpha: vec4(vec3(a), 1), opaque so it hides the track below. Opaque top → white; top at 25% →
+  // grey 64.
+  struct Case {
+    double opacity;
+    int expected;
+  };
+  const Case cases[] = {{100.0, 255}, {25.0, 64}};
+  for (const Case& k : cases) {
+    Rgba mid = alpha_adjust_composite(h_.get(), k.opacity, 2, 50.0);
+    QVERIFY2(qAbs(mid.r - k.expected) <= 4 && qAbs(mid.g - k.expected) <= 4 && qAbs(mid.b - k.expected) <= 4,
+             qPrintable(QString("opacity %1: expected %2, got (%3,%4,%5)")
+                            .arg(k.opacity)
+                            .arg(k.expected)
+                            .arg(mid.r)
+                            .arg(mid.g)
+                            .arg(mid.b)));
+  }
+}
+
 void TestEffectsGpu::colorShadersKeepTransparentClipTransparent() {
   // Premultiplied input: a fully transparent clip is (0,0,0,0). An offset op applied to premultiplied rgb (output
-  // black, lift, shadows tint, inverted threshold) would give rgb > 0 with a = 0, which the srcover blend ADDS onto the
-  // track below. Each effect, with non-neutral parameters, sits on a 0% opacity Solid over an opaque (50,100,150)
-  // track: the track below must come out unchanged.
+  // black, lift, shadows tint, inverted threshold/edges, colorize lightness) would give rgb > 0 with a = 0, which the
+  // srcover blend ADDS onto the track below. Each effect, with non-neutral parameters, sits on a 0% opacity Solid over
+  // an opaque (50,100,150) track: the track below must come out unchanged.
   struct Case {
     const char* effect;
     std::function<void(Effect*)> configure;
@@ -2801,6 +3031,8 @@ void TestEffectsGpu::colorShadersKeepTransparentClipTransparent() {
        }},
       {"Tint", [this](Effect* e) { h_->set_field_color(e, 0, 0, QColor(200, 100, 50)); }},  // shadows non-black
       {"Threshold", [this](Effect* e) { h_->set_field_bool(e, 1, 0, true); }},              // invert: black → white
+      {"Find Edges", [this](Effect* e) { h_->set_field_bool(e, 2, 0, true); }},             // invert: no edge → white
+      {"Colorize", [this](Effect* e) { h_->set_field_double(e, 2, 0, 50.0); }},             // lightness 50
   };
 
   auto make_bottom = [this](Sequence* seq) {
