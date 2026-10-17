@@ -154,7 +154,9 @@ void MediaPropertiesDialog::accept() {
       bool found = false;
       for (auto & video_track : f->video_tracks) {
         if (video_track.file_index == index) {
-          video_track.enabled = (item->checkState() == Qt::Checked);
+          // Through the ComboAction so Ctrl+Z restores the track
+          bool enabled = (item->checkState() == Qt::Checked);
+          if (video_track.enabled != enabled) ca->append(new SetBool(&video_track.enabled, enabled));
           found = true;
           break;
         }
@@ -162,7 +164,8 @@ void MediaPropertiesDialog::accept() {
       if (!found) {
         for (auto & audio_track : f->audio_tracks) {
           if (audio_track.file_index == index) {
-            audio_track.enabled = (item->checkState() == Qt::Checked);
+            bool enabled = (item->checkState() == Qt::Checked);
+            if (audio_track.enabled != enabled) ca->append(new SetBool(&audio_track.enabled, enabled));
             break;
           }
         }
