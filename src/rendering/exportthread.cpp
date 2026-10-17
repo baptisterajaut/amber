@@ -21,6 +21,9 @@
 #include "exportthread.h"
 
 extern "C" {
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavutil/channel_layout.h>
 #include <libavutil/opt.h>
@@ -212,8 +215,18 @@ bool ExportThread::SetupVideo() {
   video_pkt = av_packet_alloc();
 
   // Set up conversion context
-  sws_ctx = sws_getContext(seq_->width, seq_->height, AV_PIX_FMT_RGBA, params_.video_width, params_.video_height,
-                           vcodec_ctx->pix_fmt, SWS_BILINEAR, nullptr, nullptr, nullptr);
+  if (vcodec_ctx->pix_fmt == AV_PIX_FMT_PAL8) {
+    if (!SetupPaletteGraph()) return false;
+  } else {
+    sws_ctx = sws_getContext(seq_->width, seq_->height, AV_PIX_FMT_RGBA, params_.video_width, params_.video_height,
+                             vcodec_ctx->pix_fmt, SWS_BILINEAR, nullptr, nullptr, nullptr);
+    if (sws_ctx == nullptr) {
+      qCritical() << "Could not create pixel format conversion context";
+      export_error =
+          tr("could not convert to pixel format %1").arg(QString::fromUtf8(av_get_pix_fmt_name(vcodec_ctx->pix_fmt)));
+      return false;
+    }
+  }
 
   // The composite is premultiplied alpha (renderfunctions.cpp), but swscale and the encoders take RGBA as straight.
   // A format without alpha drops it, leaving the composite over black, which is what an opaque file should show.
@@ -222,6 +235,56 @@ bool ExportThread::SetupVideo() {
   const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(vcodec_ctx->pix_fmt);
   unpremultiply_ = desc != nullptr && (desc->flags & AV_PIX_FMT_FLAG_ALPHA);
 
+  return true;
+}
+
+// swscale can't output PAL8, and the fixed palettes it can (rgb8, the GIF default) band badly. Build an optimal palette
+// for every frame with palettegen and map the frame onto it with paletteuse; pixels under half alpha take the
+// palette's transparent entry. Cleanup() frees the graph, on failure too.
+// CBA: per-frame palettes, a two-pass global palette (less flicker) if anyone asks
+bool ExportThread::SetupPaletteGraph() {
+  palette_graph = avfilter_graph_alloc();
+  bool ok = palette_graph != nullptr;
+
+  char args[256];
+  snprintf(args, sizeof(args), "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=1/1", seq_->width,
+           seq_->height, AV_PIX_FMT_RGBA, vcodec_ctx->time_base.num, vcodec_ctx->time_base.den);
+  ok = ok && avfilter_graph_create_filter(&palette_src, avfilter_get_by_name("buffer"), "in", args, nullptr,
+                                          palette_graph) >= 0;
+  ok = ok && avfilter_graph_create_filter(&palette_sink, avfilter_get_by_name("buffersink"), "out", nullptr, nullptr,
+                                          palette_graph) >= 0;
+
+  QByteArray chain;
+  if (params_.video_width != seq_->width || params_.video_height != seq_->height) {
+    chain = QString("scale=%1:%2:flags=bilinear,").arg(params_.video_width).arg(params_.video_height).toUtf8();
+  }
+  chain += "split[a][b];[a]palettegen=stats_mode=single:reserve_transparent=1[p];[b][p]paletteuse=new=1";
+
+  // The chain's open input is fed by the buffer source, its open output feeds the sink
+  AVFilterInOut* outputs = avfilter_inout_alloc();
+  AVFilterInOut* inputs = avfilter_inout_alloc();
+  ok = ok && outputs != nullptr && inputs != nullptr;
+  if (ok) {
+    outputs->name = av_strdup("in");
+    outputs->filter_ctx = palette_src;
+    outputs->pad_idx = 0;
+    outputs->next = nullptr;
+    inputs->name = av_strdup("out");
+    inputs->filter_ctx = palette_sink;
+    inputs->pad_idx = 0;
+    inputs->next = nullptr;
+    ok = avfilter_graph_parse_ptr(palette_graph, chain.constData(), &inputs, &outputs, nullptr) >= 0;
+  }
+  avfilter_inout_free(&inputs);
+  avfilter_inout_free(&outputs);
+  ok = ok && avfilter_graph_config(palette_graph, nullptr) >= 0;
+
+  if (!ok) {
+    qCritical() << "Could not set up the palette filter graph";
+    export_error =
+        tr("could not convert to pixel format %1").arg(QString::fromUtf8(av_get_pix_fmt_name(AV_PIX_FMT_PAL8)));
+    return false;
+  }
   return true;
 }
 
@@ -402,6 +465,26 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
     amber::unpremultiply_rgba8(video_frame->data[0], video_frame->width, video_frame->height, video_frame->linesize[0]);
   }
 
+  if (palette_graph != nullptr) {
+    video_frame->pts = qRound(timecode_secs / av_q2d(vcodec_ctx->time_base));
+    ret = av_buffersrc_add_frame_flags(palette_src, video_frame, AV_BUFFERSRC_FLAG_KEEP_REF);
+    if (ret < 0) {
+      qCritical() << "Failed to send frame to the palette filter graph." << ret;
+      export_error = tr("failed to send frame to the palette filter (%1)").arg(QString::number(ret));
+      return false;
+    }
+    if (!EncodePaletteFrames()) return false;
+    // The graph keeps a reference to video_frame's buffer and may hold the frame past the drain above: making
+    // video_frame writable again gives the next render its own buffer (a no-op once the graph has let go)
+    ret = av_frame_make_writable(video_frame);
+    if (ret < 0) {
+      qCritical() << "Could not reallocate video frame buffer." << ret;
+      export_error = tr("could not allocate video frame buffer (%1)").arg(QString::number(ret));
+      return false;
+    }
+    return true;
+  }
+
   // Alloc/free sws_frame every frame — required to avoid GIF getting stuck on first frame
   // (see https://stackoverflow.com/a/38997739)
   sws_frame = av_frame_alloc();
@@ -418,6 +501,39 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
   av_frame_free(&sws_frame);
   sws_frame = nullptr;
   return ok;
+}
+
+// Encode every frame the palette graph has ready (it can hold frames back). Returns false on error.
+bool ExportThread::EncodePaletteFrames() {
+  while (true) {
+    AVFrame* frame = av_frame_alloc();
+    ret = av_buffersink_get_frame(palette_sink, frame);
+    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+      av_frame_free(&frame);
+      return true;
+    } else if (ret < 0) {
+      av_frame_free(&frame);
+      qCritical() << "Failed to receive frame from the palette filter graph." << ret;
+      export_error = tr("failed to receive frame from the palette filter (%1)").arg(QString::number(ret));
+      return false;
+    }
+    frame->pts = av_rescale_q(frame->pts, av_buffersink_get_time_base(palette_sink), vcodec_ctx->time_base);
+    bool ok = Encode(fmt_ctx, vcodec_ctx, frame, video_pkt, video_stream);
+    av_frame_free(&frame);
+    if (!ok) return false;
+  }
+}
+
+// Push EOF through the palette graph and encode the frames it still holds. Returns false on error.
+bool ExportThread::FlushPaletteGraph() {
+  if (palette_graph == nullptr) return true;
+  ret = av_buffersrc_add_frame_flags(palette_src, nullptr, 0);
+  if (ret < 0) {
+    qCritical() << "Failed to flush the palette filter graph." << ret;
+    export_error = tr("failed to send frame to the palette filter (%1)").arg(QString::number(ret));
+    return false;
+  }
+  return EncodePaletteFrames();
 }
 
 // Drain audio buffer and encode frames up to timecode_secs. Returns false on error (caller should goto
@@ -525,6 +641,8 @@ bool ExportThread::FlushSwrAudio(long& file_audio_samples) {
 
 // Flush encoder drain (send nullptr frame) to emit any buffered packets. Returns false on encoder/write error.
 bool ExportThread::FlushEncoders() {
+  // The palette graph's last frames go to the encoder before it's drained
+  if (!FlushPaletteGraph()) return false;
   // Encode() also returns false on the AVERROR_EOF that ends a normal drain; only a set export_error is a failure
   if (params_.video_enabled) Encode(fmt_ctx, vcodec_ctx, nullptr, video_pkt, video_stream);
   if (params_.audio_enabled) Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
@@ -622,6 +740,10 @@ void ExportThread::Cleanup() {
 
   if (sws_ctx != nullptr) {
     sws_freeContext(sws_ctx);
+  }
+
+  if (palette_graph != nullptr) {
+    avfilter_graph_free(&palette_graph);
   }
 
   if (swr_ctx != nullptr) {

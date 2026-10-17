@@ -35,6 +35,8 @@ struct AVStream;
 struct AVCodec;
 struct SwsContext;
 struct SwrContext;
+struct AVFilterGraph;
+struct AVFilterContext;
 class Sequence;
 class RenderThread;
 
@@ -96,7 +98,10 @@ class ExportThread : public QThread {
   bool SetupContainer();
   bool Export();
   void Cleanup();
+  bool SetupPaletteGraph();
   bool EncodeVideoFrame(RenderThread* renderer, double timecode_secs);
+  bool EncodePaletteFrames();
+  bool FlushPaletteGraph();
   bool EncodeAudioFrames(long& file_audio_samples, double timecode_secs, int audio_cachers);
   bool EncodeAllFrames(RenderThread* renderer, long& file_audio_samples);
   bool FlushSwrAudio(long& file_audio_samples);
@@ -117,6 +122,10 @@ class ExportThread : public QThread {
   AVFrame* video_frame{nullptr};
   AVFrame* sws_frame{nullptr};
   SwsContext* sws_ctx{nullptr};
+  // PAL8 only (swscale can't output it): buffer -> palettegen/paletteuse -> buffersink
+  AVFilterGraph* palette_graph{nullptr};
+  AVFilterContext* palette_src{nullptr};
+  AVFilterContext* palette_sink{nullptr};
   bool unpremultiply_{false};  // the encoder's pixel format has alpha: straighten the premultiplied composite
   AVStream* audio_stream{nullptr};
   const AVCodec* acodec{nullptr};
