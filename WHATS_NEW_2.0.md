@@ -4,6 +4,8 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 
 ## Only in 2.0
 
+- **Ten new GPU effects**, replacing the most common Frei0r plugins with effects that run on the graphics card: Levels, Lift/Gamma/Gain, Tint, Threshold, Lens Correction, Find Edges (Olive's was broken and hidden), Colorize, Alpha Adjust, Glow and Denoise. They are keyframeable like any other effect and work on clips with transparency.
+- **Half resolution while scrubbing**, in Preferences > Playback (Auto by default): when the viewer can't keep up while you drag the playhead, scrub frames render at half the preview resolution, and the frame is redrawn sharp a moment after you stop. Always and Never are there too.
 - **Undo history with times**: each step in the Undo History panel shows when it was done. Clicking a step goes back to it.
 - **Gradient text**: the Gradient effect's new "As Mask" option fills the letters of the Text or Rich Text effect above it with the gradient. "Ignore Text Shadow" keeps the shadow in its own colour.
 - **Richer clip tooltip**: hovering a clip also shows its source file, speed and colour label.
@@ -26,12 +28,14 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 ## Under the hood
 
 - The engine is separated from the interface and builds as a library of its own, so rendering can be tested without a window.
-- A GPU test suite renders about 70 effect and decode cases on a real Qt RHI backend, to catch rendering regressions before they ship.
+- A GPU test suite renders about 175 effect and decode cases on a real Qt RHI backend (OpenGL and Vulkan), to catch rendering regressions before they ship.
+- Rendering reuses its GPU pipelines and buffers from one frame to the next instead of recreating them: a frame with effects composites about a third faster on OpenGL.
+- Decoded video frames are copied into buffers that each clip keeps, instead of new memory every frame.
 - The timeline drawing and mouse handling code was split into much smaller functions. This is the part of 2.0 most likely to hide regressions: if something in the timeline behaves differently from 1.x, please open an issue.
 - Frei0r plugins no longer have their functions looked up again on every frame.
 
 ## Not there yet
 
-Planned for 2.0 and not started: GPU replacements for the common Frei0r effects, ShaderToy import, scopes, track mute/solo/lock, a colour correction tool, adjustment layers, hardware encoding and a render queue. The full plan is in the [roadmap](https://github.com/baptisterajaut/amber/blob/main/ROADMAP.md).
+Planned for 2.0 and not started: a Curves effect, ShaderToy import, scopes, track mute/solo/lock, a colour correction tool, adjustment layers, hardware encoding and a render queue. The full plan is in the [roadmap](https://github.com/baptisterajaut/amber/blob/main/ROADMAP.md).
 
 There is no Arch package for 2.0 yet; use the AppImage.
