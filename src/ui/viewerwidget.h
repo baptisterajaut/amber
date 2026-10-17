@@ -121,7 +121,8 @@ class ViewerWidget : public QRhiWidget {
   int creating_guide_pos_{0};
   bool color_pick_mode_{false};
   void exitColorPickMode();
-  QColor readPixelAt(int widget_x, int widget_y);
+  // Colour of the shown frame at a widget position, straight alpha. Invalid with no frame or off the frame.
+  QColor readPixelAt(const QPointF& pos);
   void seek_from_click(int x);
   Effect* gizmos{nullptr};
   int drag_start_x;

@@ -99,6 +99,15 @@ target_include_directories(amber-test-shortcutfile PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-shortcutfile PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-shortcutfile COMMAND amber-test-shortcutfile)
 
+add_executable(amber-test-pixel-sampler
+  test_pixel_sampler.cpp
+  ${CMAKE_SOURCE_DIR}/core/pixelsampler.cpp
+  ${CMAKE_SOURCE_DIR}/core/pixelsampler.h
+)
+target_include_directories(amber-test-pixel-sampler PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-pixel-sampler PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-pixel-sampler COMMAND amber-test-pixel-sampler)
+
 add_executable(amber-test-config
   test_config.cpp
   ${CMAKE_SOURCE_DIR}/global/config.cpp

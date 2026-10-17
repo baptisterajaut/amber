@@ -44,7 +44,9 @@ extern "C" {
 
 #include "global/config.h"
 #include "global/debug.h"
+#include "core/alpha.h"
 #include "core/math.h"
+#include "core/pixelsampler.h"
 #include "mainwindow.h"
 #include "panels/panels.h"
 #include "project/media.h"
@@ -485,7 +487,7 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   if (color_pick_mode_) {
     if (event->button() == Qt::LeftButton) {
-      QColor c = readPixelAt(qRound(event->position().x()), qRound(event->position().y()));
+      QColor c = readPixelAt(event->position());
       if (c.isValid()) {
         emit colorPicked(c);
       } else {
@@ -1004,7 +1006,7 @@ void ViewerWidget::exitColorPickMode() {
   unsetCursor();
 }
 
-QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
+QColor ViewerWidget::readPixelAt(const QPointF& pos) {
   if (viewer->seq == nullptr || width() <= 0 || height() <= 0) {
     return QColor();
   }
@@ -1021,15 +1023,25 @@ QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
     return QColor();
   }
 
-  // Map to buffer pixels, not sequence pixels: the buffer is seq size / preview divider.
-  // CBA: assumes the frame fills the widget (ignores viewer zoom/scroll), as before
-  int video_x = qBound(0, qRound(widget_x * double(fw) / double(width())), fw - 1);
-  int video_y = qBound(0, qRound(widget_y * double(fh) / double(height())), fh - 1);
+  // Where render() draws the frame: past a zoom the widget stops growing and the frame overflows it, panned by the
+  // scrollbars. The buffer is seq size / preview divider.
+  amber::ViewerFrameGeometry g;
+  g.widget = QSizeF(width(), height());
+  g.zoom = container->zoom;
+  g.x_scroll = x_scroll;
+  g.y_scroll = y_scroll;
+  g.sequence = QSize(viewer->seq->width, viewer->seq->height);
+  amber::FramePoint pt;
+  if (!amber::map_viewer_point(g, pos, QSize(fw, fh), &pt)) {
+    return QColor();
+  }
 
-  // RGBA8888, no Y-flip — readBackTexture() is top-to-bottom on all backends
-  int offset = (video_y * fw + video_x) * 4;
-  return QColor(static_cast<unsigned char>(data[offset]), static_cast<unsigned char>(data[offset + 1]),
-                static_cast<unsigned char>(data[offset + 2]), static_cast<unsigned char>(data[offset + 3]));
+  // RGBA8888, no Y-flip — readBackTexture() is top-to-bottom on all backends. Premultiplied (compose_sequence()
+  // blends premultiplied over a transparent clear): straightened like export and Save Frame do for formats with alpha
+  uchar px[4];
+  memcpy(px, data + (pt.buf_y * fw + pt.buf_x) * 4, 4);
+  amber::unpremultiply_rgba8(px, 1, 1, 4);
+  return QColor(px[0], px[1], px[2], px[3]);
 }
 
 void ViewerWidget::render(QRhiCommandBuffer *cb) {
