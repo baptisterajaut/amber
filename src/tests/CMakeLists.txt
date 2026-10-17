@@ -25,6 +25,11 @@ target_include_directories(amber-test-scopes PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-scopes PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-scopes COMMAND amber-test-scopes)
 
+add_executable(amber-test-curves test_curves.cpp)
+target_include_directories(amber-test-curves PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-curves PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-curves COMMAND amber-test-curves)
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 add_executable(amber-test-scopewidget test_scopewidget.cpp ${CMAKE_SOURCE_DIR}/ui/scopewidget.cpp)
 target_include_directories(amber-test-scopewidget PRIVATE ${CMAKE_SOURCE_DIR})
