@@ -329,6 +329,7 @@ void RenderThread::paint() {
   params.backend_rpd = back_rpd_;
 
   gizmos = seq->GetSelectedGizmo();
+  gizmo_selection_ = gizmos;
   params.gizmos = gizmos;
 
   amber::rendering::compose_sequence(params);

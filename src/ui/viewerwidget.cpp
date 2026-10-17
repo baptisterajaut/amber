@@ -1080,8 +1080,12 @@ void ViewerWidget::render(QRhiCommandBuffer *cb) {
 
   // Update gizmo tracking — detect stale gizmo (user selected a different clip while paused)
   gizmos = renderer->gizmos;
-  if (viewer->seq != nullptr && gizmos != viewer->seq->GetSelectedGizmo()) {
-    gizmos = nullptr;
+  Effect* selected_gizmo = viewer->seq != nullptr ? viewer->seq->GetSelectedGizmo() : nullptr;
+  if (gizmos != selected_gizmo) gizmos = nullptr;
+  // Re-render when the selection changed since the frame was rendered, not merely because its gizmo wasn't drawn: a
+  // selected clip near the playhead but not under it (IsActiveAt's window) is never drawn, and re-requesting then
+  // re-rendered the same frame on every paint. A clip not open yet fails the texture, which the retry below covers.
+  if (viewer->seq != nullptr && selected_gizmo != renderer->rendered_gizmo_selection()) {
     QTimer::singleShot(0, this, &ViewerWidget::frame_update);
   }
 
