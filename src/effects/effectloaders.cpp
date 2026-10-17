@@ -130,6 +130,11 @@ void load_internal_effects() {
   em.internal = EFFECT_INTERNAL_PROGRESSBAR;
   effects.append(em);
 
+  em.name = "Drop Shadow";
+  em.category = "Stylize";
+  em.internal = EFFECT_INTERNAL_DROPSHADOW;
+  effects.append(em);
+
   // internal transitions
   em.type = EFFECT_TYPE_TRANSITION;
   em.category = "";

@@ -64,6 +64,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Gradient generator — linear/radial with multi-stop color ramp, applicable to solids and text (#21)
 - Timer / countdown — done in 2.0: Timer generator, counts up from the clip's start or down to 0 on its last frame, MM:SS / HH:MM:SS / seconds / hundredths, prefix and time offset
 - Progress bar — done in 2.0: Progress Bar generator, fills over the clip's duration or follows a keyframeable value, top or bottom edge, thickness, margin, direction
+- Drop Shadow — done in 2.0: drawn in sequence space from the clip as already transformed, so it works on opaque picture-in-picture clips; colour, opacity, direction, distance, softness, all keyframeable
 - Lift / gamma / gain (3-way color correction)
 - **Tone Curve** — graphical curve editor (input → output mapping) with RGB / Luma / R / G / B modes, custom 2D widget + LUT texture shader. Complementary to the 3-way corrector. (#59)
 - **Alpha Mask (image source)** — masking effect that takes a PNG/SVG file as alpha source, with invert / feather / opacity / blend controls. Covers text reveals, shape stencils, static masks. Track-based variant (mask = clip on adjacent track) deferred — see Future. (#61)

@@ -80,6 +80,7 @@ struct ComposeSequenceParams {
   QShader blendingFrag;
   QShader premultiplyFrag;
   QShader yuvFrag;
+  QShader shadowFrag;  // Drop Shadow passes
 
   // Main compositing target (PreserveColorContents)
   QRhiTexture* main_tex;
