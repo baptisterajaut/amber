@@ -41,6 +41,7 @@ class TestEffectsGpu : public QObject {
   void textRenders();
   void textSizeZeroShowsNothing();
   void richTextRenders();
+  void richTextShadowOpacity();
   void shakeChangesOutput();
   void timecodeRenders();
   void cornerpinDistorts();
@@ -525,6 +526,54 @@ void TestEffectsGpu::richTextRenders() {
     }
   }
   QVERIFY2(any_glyph, "expected at least one non-background pixel from RichText glyph");
+}
+
+void TestEffectsGpu::richTextShadowOpacity() {
+  // Shadow Opacity used to be ignored. It now dims the shadow, and a project saved before the fix (its dead
+  // "shadowopacity" field holds 0) still loads with a full-strength shadow.
+  auto make_rich = [this](SequencePtr& seq) {
+    seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(c->effects[1].get(), 2, 0, QColor(0, 0, 0, 0));
+    return h_->attach_internal(c, EFFECT_INTERNAL_RICHTEXT, EFFECT_TYPE_EFFECT);
+  };
+  // Brightest red in the frame: the red shadow, away from the white glyph. Over the black background a dimmer
+  // shadow reads as a darker red.
+  auto shadow_red = [](const QByteArray& buf) {
+    int best = 0;
+    for (int i = 0; i + 3 < buf.size(); i += 4) {
+      const int r = static_cast<uchar>(buf[i]);
+      if (static_cast<uchar>(buf[i + 1]) < 60 && static_cast<uchar>(buf[i + 2]) < 60) best = qMax(best, r);
+    }
+    return best;
+  };
+
+  SequencePtr seq;
+  EffectPtr rich = make_rich(seq);
+  // Rows: 0=text, 6=shadow, 7=shadow colour, 9=distance, 11=opacity (angle 0 and softness 0 by default)
+  h_->set_field_string(rich.get(), 0, 0,
+                       "<html><body style=\"color:#ffffff; font-size:20pt;\"><center>X</center></body></html>");
+  h_->set_field_bool(rich.get(), 6, 0, true);
+  h_->set_field_color(rich.get(), 7, 0, QColor(Qt::red));
+  h_->set_field_double(rich.get(), 9, 0, 6.0);
+
+  const int full = shadow_red(h_->render_frame(seq.get(), 0));
+  QVERIFY2(full > 200, qPrintable(QString("expected a full-strength red shadow at default opacity, got %1").arg(full)));
+
+  h_->set_field_double(rich.get(), 11, 0, 50.0);
+  const int half = shadow_red(h_->render_frame(seq.get(), 0));
+  QVERIFY2(half > 80 && half < 180, qPrintable(QString("expected a half-strength shadow, got %1").arg(half)));
+
+  // Same settings as saved by a pre-fix project: the opacity under its old id, at the 0 it always held.
+  QByteArray legacy = rich->save_to_string();
+  QVERIFY(legacy.contains("id=\"shadow_opacity\" value=\"50\""));
+  legacy.replace("id=\"shadow_opacity\" value=\"50\"", "id=\"shadowopacity\" value=\"0\"");
+  SequencePtr seq2;
+  EffectPtr loaded = make_rich(seq2);
+  loaded->load_from_string(legacy);
+  const int legacy_red = shadow_red(h_->render_frame(seq2.get(), 0));
+  QVERIFY2(legacy_red > 200,
+           qPrintable(QString("expected a pre-fix project to keep its full shadow, got %1").arg(legacy_red)));
 }
 
 void TestEffectsGpu::shakeChangesOutput() {
