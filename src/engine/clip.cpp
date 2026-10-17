@@ -478,6 +478,7 @@ void Clip::Open() {
     open_ = true;
     cacher_uses_rgba_ = NeedsCpuRgba();
     opened_for_export_ = audio_rendering;
+    opened_with_proxies_ = amber::CurrentConfig.use_proxies;
 
     for (const auto& effect : effects) {
       effect->open();
@@ -820,7 +821,13 @@ bool Clip::NeedsCpuRgba() const {
 }
 
 bool Clip::NeedsCacherReconfigure() const {
-  return open_ && (NeedsCpuRgba() != cacher_uses_rgba_ || audio_rendering != opened_for_export_);
+  if (!open_) return false;
+  // CBA: Use Proxies reopens the clip on its next frame, so an audio clip may drop a short gap when toggled during
+  // playback. A clip opened for export, or whose footage has no proxy, decodes the original either way and stays open.
+  const bool proxies_toggled = amber::CurrentConfig.use_proxies != opened_with_proxies_ && !opened_for_export_ &&
+                               media_ != nullptr && media_->get_type() == MEDIA_TYPE_FOOTAGE &&
+                               media_->to_footage()->proxy;
+  return NeedsCpuRgba() != cacher_uses_rgba_ || audio_rendering != opened_for_export_ || proxies_toggled;
 }
 
 ClipSpeed::ClipSpeed()

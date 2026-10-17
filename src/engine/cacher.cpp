@@ -132,7 +132,7 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
   }
 
   // Proxy or original, by the mode Clip::Open() recorded
-  QByteArray ba = m->decode_url(clip->OpenedForExport()).toUtf8();
+  QByteArray ba = m->decode_url(clip->OpenedForExport(), clip->OpenedWithProxies()).toUtf8();
   const char* filename = ba.constData();
 
   // For image sequences that don't start at 0, set the index where it does start

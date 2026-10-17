@@ -651,6 +651,11 @@ struct Config {
   bool show_pixel_sampler{false};
 
   /**
+   * @brief Decode a footage's finished proxy instead of the original in the viewers (export always uses the original)
+   */
+  bool use_proxies{true};
+
+  /**
    * @brief Show color labels on clips and markers
    *
    * **TRUE** if clips and markers should display their assigned color label
