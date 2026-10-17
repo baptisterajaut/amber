@@ -96,7 +96,8 @@ void KeyframeView::menu_set_key_type(QAction* a) {
     ComboAction* ca = new ComboAction(tr("Change Keyframe Type"));
     for (int i = 0; i < selected_fields.size(); i++) {
       EffectField* f = selected_fields.at(i);
-      ca->append(new SetInt(&f->keyframes[selected_keyframes.at(i)].type, new_type));
+      int k = selected_keyframes.at(i);
+      ca->append(new KeyframeMemberChange(f, k, KeyframeMemberChange::kType, f->keyframes.at(k).type, new_type));
     }
     amber::UndoStack.push(ca);
 
@@ -428,8 +429,9 @@ void KeyframeView::mouseReleaseEvent(QMouseEvent*) {
   if (dragging) {
     ComboAction* ca = new ComboAction(tr("Move Keyframe(s)"));
     for (int i = 0; i < selected_fields.size(); i++) {
-      ca->append(new SetLong(&selected_fields.at(i)->keyframes[selected_keyframes.at(i)].time, old_key_vals.at(i),
-                             selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time));
+      ca->append(new KeyframeMemberChange(
+          selected_fields.at(i), selected_keyframes.at(i), KeyframeMemberChange::kTime, qlonglong(old_key_vals.at(i)),
+          qlonglong(selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time)));
     }
     amber::UndoStack.push(ca);
   }

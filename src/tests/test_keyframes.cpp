@@ -6,6 +6,7 @@
 #include "effects/fields/doublefield.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
+#include "engine/undo/undo_effect.h"
 #include "tests/test_appcontext_stub.h"
 
 // Hosts one DoubleField in a real Sequence -> Clip -> Effect -> EffectRow chain, headless.
@@ -23,6 +24,8 @@ class TestKeyframes : public QObject {
   void holdThenLinearStaysFlat();
   void bezierThenLinearUsesPostHandle();
   void identicalTimesAreDeterministic();
+  void memberChangeUndoSurvivesReallocation();
+  void memberChangeIgnoresStaleIndex();
 
  private:
   static EffectKeyframe key(long time, double value, int type);
@@ -141,6 +144,46 @@ void TestKeyframes::identicalTimesAreDeterministic() {
   QCOMPARE(value_at_frame(10), 1.0);
   QCOMPARE(value_at_frame(0), 1.0);
   QCOMPARE(value_at_frame(15), 2.0);  // lerp(1, 3, 0.5) from the first key at frame 10
+}
+
+// A keyframe appended between an edit and its undo reallocates the vector: the undo must still
+// land on the edited keyframe (it used to write through a pointer into the freed buffer).
+void TestKeyframes::memberChangeUndoSurvivesReallocation() {
+  field_->keyframes.append(key(0, 0.0, EFFECT_KEYFRAME_LINEAR));
+  field_->keyframes.append(key(30, 100.0, EFFECT_KEYFRAME_LINEAR));
+  field_->keyframes.squeeze();  // capacity == size, so the next append reallocates
+
+  KeyframeMemberChange move(field_, 1, KeyframeMemberChange::kTime, qlonglong(30), qlonglong(45));
+  KeyframeMemberChange type(field_, 1, KeyframeMemberChange::kType, EFFECT_KEYFRAME_LINEAR, EFFECT_KEYFRAME_BEZIER);
+  move.redo();
+  type.redo();
+  QCOMPARE(field_->keyframes.at(1).time, 45L);
+  QCOMPARE(field_->keyframes.at(1).type, int(EFFECT_KEYFRAME_BEZIER));
+
+  // Same sequence as GraphView's click-add: append, then push a KeyframeAdd for it
+  const EffectKeyframe* before = field_->keyframes.constData();
+  field_->keyframes.append(key(60, 0.0, EFFECT_KEYFRAME_LINEAR));
+  QVERIFY(field_->keyframes.constData() != before);  // the append did reallocate
+  KeyframeAdd add(field_, 2);
+  add.redo();
+  add.undo();
+  QCOMPARE(field_->keyframes.size(), 2);
+
+  type.undo();
+  move.undo();
+  QCOMPARE(field_->keyframes.at(1).time, 30L);
+  QCOMPARE(field_->keyframes.at(1).type, int(EFFECT_KEYFRAME_LINEAR));
+  move.redo();
+  QCOMPARE(field_->keyframes.at(1).time, 45L);
+}
+
+void TestKeyframes::memberChangeIgnoresStaleIndex() {
+  field_->keyframes.append(key(0, 0.0, EFFECT_KEYFRAME_LINEAR));
+  KeyframeMemberChange stale(field_, 3, KeyframeMemberChange::kTime, qlonglong(0), qlonglong(10));
+  QTest::ignoreMessage(QtWarningMsg, "KeyframeMemberChange: keyframe index out of range");
+  stale.redo();
+  QCOMPARE(field_->keyframes.size(), 1);
+  QCOMPARE(field_->keyframes.at(0).time, 0L);
 }
 
 QTEST_GUILESS_MAIN(TestKeyframes)
