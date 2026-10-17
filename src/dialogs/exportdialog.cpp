@@ -279,11 +279,22 @@ void ExportDialog::export_thread_finished() {
 
   // Free the export thread
   export_thread_->deleteLater();
+  export_thread_ = nullptr;
 
   // If the export succeeded, close the dialog
   if (succeeded) {
     accept();
   }
+}
+
+void ExportDialog::reject() {
+  if (export_thread_ != nullptr) {
+    // Still exporting, or finished with export_thread_finished() pending: never close under the thread. Only a running
+    // thread is interrupted, so a completed export isn't reported as cancelled.
+    if (export_thread_->isRunning()) export_thread_->Interrupt();
+    return;
+  }
+  QDialog::reject();
 }
 
 void ExportDialog::prep_ui_for_render(bool r) {
