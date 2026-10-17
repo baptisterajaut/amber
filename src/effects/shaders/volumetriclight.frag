@@ -14,7 +14,7 @@ void main()  {
 
 	vec3 p = gl_FragCoord.xyz/vec3(resolution, 1.0)-.5;
 	vec3 o = T.rgb;
-	for (float i=0.;i<amount;i++) {
+	for (float i=0.;i<min(amount, 100.0);i++) {
 		p.z += pow(max(0.,.5-length(T.rg)),2.)*exp(-i*.08);
 	}
 	fragColor=vec4(o*o+p.z, alpha);
