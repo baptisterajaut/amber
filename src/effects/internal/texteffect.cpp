@@ -197,7 +197,8 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
 
 void TextEffect::ApplyWordWrap(QStringList& lines, const QFontMetrics& fm, int width) {
   for (int i = 0; i < lines.size(); i++) {
-    const QString& s = lines.at(i);
+    // A copy: lines.insert() below can reallocate the list and leave a reference dangling
+    const QString s = lines.at(i);
     if (fm.horizontalAdvance(s) <= width) continue;
     int last_space_index = 0;
     for (int j = 0; j < s.length(); j++) {
