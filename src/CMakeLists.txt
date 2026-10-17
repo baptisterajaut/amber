@@ -347,6 +347,8 @@ set(AMBER_EFFECTS
   effects/shaders/huesatbri.xml
   effects/shaders/invert.frag
   effects/shaders/invert.xml
+  effects/shaders/lenscorrection.frag
+  effects/shaders/lenscorrection.xml
   effects/shaders/levels.frag
   effects/shaders/levels.xml
   effects/shaders/liftgammagain.frag
