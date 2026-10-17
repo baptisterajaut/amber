@@ -80,10 +80,13 @@ RichTextEffect::RichTextEffect(Clip *c, const EffectMeta *em) :
   shadow_softness->SetMinimum(0);
 
   EffectRow* shadow_opacity_row = new EffectRow(this, tr("Shadow Opacity"));
-  shadow_opacity = new DoubleField(shadow_opacity_row, "shadowopacity");
+  // Not "shadowopacity": that id never reached the renderer and every saved project holds 0 in it. A new id
+  // makes load() skip the stale value, so existing projects get the default 100 and keep their opaque shadow.
+  shadow_opacity = new DoubleField(shadow_opacity_row, "shadow_opacity");
   shadow_opacity->SetColumnSpan(2);
   shadow_opacity->SetMinimum(0);
   shadow_opacity->SetMaximum(100);
+  shadow_opacity->SetDefault(100);
 
   EffectRow* stroke_enabled_row = new EffectRow(this, tr("Stroke"));
   stroke_bool = new BoolField(stroke_enabled_row, "stroke");
@@ -221,7 +224,9 @@ void RichTextEffect::redraw(double timecode)
 
     p.setCompositionMode(QPainter::CompositionMode_SourceIn);
 
-    p.fillRect(clip_rect, shadow_color->GetColorAt(timecode));
+    QColor shadow_col = shadow_color->GetColorAt(timecode);
+    shadow_col.setAlphaF(shadow_col.alphaF() * shadow_opacity->GetDoubleAt(timecode) * 0.01);
+    p.fillRect(clip_rect, shadow_col);
 
     p.setCompositionMode(QPainter::CompositionMode_SourceOver);
 
