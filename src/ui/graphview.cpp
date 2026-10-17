@@ -57,6 +57,22 @@ QColor get_curve_color(int index, int length) {
   return c;
 }
 
+// An undo can remove keyframes behind the selection's back: forget entries that no longer exist.
+// Called right before the selection is used.
+static void drop_stale_selection(EffectRow* row, QVector<int>& keys, QVector<int>& key_fields) {
+  if (row == nullptr) return;
+  const int n = qMin(keys.size(), key_fields.size());
+  keys.resize(n);
+  key_fields.resize(n);
+  for (int i = n - 1; i >= 0; i--) {
+    const int f = key_fields.at(i);
+    if (f < 0 || f >= row->FieldCount() || keys.at(i) < 0 || keys.at(i) >= row->Field(f)->keyframes.size()) {
+      keys.removeAt(i);
+      key_fields.removeAt(i);
+    }
+  }
+}
+
 GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   x_scroll = 0;
   y_scroll = 0;
@@ -115,6 +131,7 @@ void GraphView::reset_view() {
 }
 
 void GraphView::set_view_to_selection() {
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
   if (row != nullptr && selected_keys.size() > 0) {
     long min_time = LONG_MAX;
     long max_time = LONG_MIN;
@@ -841,6 +858,7 @@ void GraphView::set_row(EffectRow* r) {
 void GraphView::set_visible_in(long i) { visible_in = i; }
 
 void GraphView::set_selected_keyframe_type(int type) {
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
   if (selected_keys.size() > 0) {
     ComboAction* ca = new ComboAction(tr("Change Keyframe Type"));
     for (int i = 0; i < selected_keys.size(); i++) {
@@ -860,11 +878,14 @@ void GraphView::set_field_visibility(int field, bool b) {
 
 void GraphView::delete_selected_keys() {
   if (row != nullptr) {
+    drop_stale_selection(row, selected_keys, selected_keys_fields);
     QVector<EffectField*> fields;
     for (int selected_keys_field : selected_keys_fields) {
       fields.append(row->Field(selected_keys_field));
     }
     delete_keyframes(fields, selected_keys);
+    // delete_keyframes() cleared selected_keys and our local copy, not the field indices
+    if (selected_keys.isEmpty()) selected_keys_fields.clear();
   }
 }
 
@@ -919,6 +940,7 @@ long GraphView::get_value_x(int i) {
 double GraphView::get_value_y(int i) { return double(height() + y_scroll - i) / y_zoom; }
 
 void GraphView::selection_update() {
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
   selected_keys_old_vals.clear();
   selected_keys_old_doubles.clear();
 
