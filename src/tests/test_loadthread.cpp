@@ -23,6 +23,8 @@ class CountingAppContext : public TestAppContext {
  public:
   int questions = 0;
   int messages = 0;
+  int recents = 0;
+  void addRecentProject(const QString&) override { recents++; }
   bool showQuestion(const QString&, const QString&, bool) override {
     questions++;
     return false;
@@ -79,8 +81,8 @@ class TestLoadThread : public QObject {
 
   // Start a LoadThread and pump the event loop until it has finished and deleted itself (which happens after its
   // queued success/error handlers have run on this thread).
-  void run_load(const QString& path, bool autorecovery, bool* succeeded, int* failed) {
-    auto* lt = new LoadThread(path, autorecovery);
+  void run_load(const QString& path, bool autorecovery, bool* succeeded, int* failed, bool import = false) {
+    auto* lt = new LoadThread(path, autorecovery, import);
     QPointer<LoadThread> guard(lt);
     connect(lt, &LoadThread::success, this, [succeeded]() { *succeeded = true; });
     connect(lt, &LoadThread::error, this, [failed]() { ++*failed; });
@@ -115,6 +117,7 @@ class TestLoadThread : public QObject {
     pio_->setModified(true);
     ctx_.questions = 0;
     ctx_.messages = 0;
+    ctx_.recents = 0;
   }
 
   void loadsFolderAndSequence() {
@@ -151,6 +154,26 @@ class TestLoadThread : public QObject {
     // loading a regular project)
     QCOMPARE(amber::ActiveSequence, seq);
     QCOMPARE(pio_->isModified(), false);
+    QCOMPARE(pio_->projectFilename(), QString());
+  }
+
+  // File > Import of a .ove into the open project: the content is merged, the open project stays modified, keeps
+  // its active sequence, and the imported file doesn't become a recent project.
+  void importKeepsOpenProjectState() {
+    QString path = write_fixture("import.ove", amber::kSaveVersion);
+    QVERIFY(!path.isEmpty());
+    pio_->setModified(false);
+
+    bool succeeded = false;
+    int failed = 0;  // error() emissions
+    run_load(path, false, &succeeded, &failed, true);
+    QVERIFY(succeeded);
+    QVERIFY(!failed);
+
+    QCOMPARE(amber::project_model.childCount(), 1);
+    QCOMPARE(pio_->isModified(), true);
+    QVERIFY(amber::ActiveSequence == nullptr);  // the imported open="1" sequence isn't activated
+    QCOMPARE(ctx_.recents, 0);
     QCOMPARE(pio_->projectFilename(), QString());
   }
 

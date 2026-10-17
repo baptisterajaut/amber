@@ -40,9 +40,10 @@
 #define LOAD_TYPE_URL 70
 #define LOAD_TYPE_PREVIEW_RES 71
 
-LoadThread::LoadThread(const QString& filename, bool autorecovery)
+LoadThread::LoadThread(const QString& filename, bool autorecovery, bool import)
     : filename_(filename),
-      autorecovery_(autorecovery)
+      autorecovery_(autorecovery),
+      import_(import)
 
 {
   connect(this, &QThread::finished, this, &QObject::deleteLater);
@@ -623,7 +624,8 @@ bool LoadThread::handle_scalar_load_type(QXmlStreamReader& stream, int type) {
     internal_proj_dir = QFileInfo(internal_proj_url).absoluteDir();
   } else if (type == LOAD_TYPE_PREVIEW_RES) {
     int div = stream.readElementText().toInt();
-    if (div == 1 || div == 2 || div == 4) {
+    // An imported project doesn't get to change the open project's preview resolution
+    if (!import_ && (div == 1 || div == 2 || div == 4)) {
       amber::CurrentConfig.preview_resolution_divider = div;
     }
   }
@@ -877,6 +879,12 @@ void LoadThread::error_func() {
 }
 
 void LoadThread::success_func() {
+  if (import_) {
+    // Merged into the open project: it now has unsaved content, and stays the project it was
+    amber::project_io->setModified(true);
+    return;
+  }
+
   if (autorecovery_) {
     QString orig_filename = internal_proj_url;
     int insert_index = internal_proj_url.lastIndexOf(".ove", -1, Qt::CaseInsensitive);
