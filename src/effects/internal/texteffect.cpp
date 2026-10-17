@@ -46,7 +46,12 @@
 #include "ui/fontcombobox.h"
 #include "ui/blur.h"
 #include "global/config.h"
-          
+
+// Reveal animation: delay between consecutive characters, and how far a
+// character rises into place while it fades in.
+static constexpr double kRevealStagger = 0.03;  // seconds
+static constexpr double kRevealRise = 20;       // px
+
 // Returns the grapheme-cluster boundary offsets within s, including 0 and
 // s.length(). Cutting s at any of these offsets (e.g. s.left(bounds[k]))
 // never splits a user-perceived character — a base letter plus combining
@@ -66,31 +71,9 @@ static QVector<int> grapheme_boundaries(const QString& s) {
   }
   return bounds;
 }
-bool TextEffect::AlwaysUpdate() {
-  if (!animate_in_bool->GetBoolAt(0)) return false;
 
-  if (!amber::ActiveSequence || !parent_clip) return true;  // fail safe if state's unavailable
-
-  double current_frame = amber::ActiveSequence->playhead;
-  double clip_start = parent_clip->timeline_in();
-  double clip_end = parent_clip->timeline_out();
-  double fps = amber::ActiveSequence->frame_rate;
-  if (fps <= 0.0) fps = 29.97;
-  double frame_duration = 1.0 / fps;
-  double curtime = (current_frame - clip_start) * frame_duration;
-  double clipduration = (clip_end - clip_start) * frame_duration;
-  double duration = qMax(0.01, animate_duration->GetDoubleAt(0));
-
-  // Conservative margin: the last character's fade-in (or first character's
-  // fade-out) starts stagger * character_count seconds after/before the
-  // clip's edge, so widen the window rather than track exact bounds.
-  double rough_char_count = text_val->GetStringAt(0).length();
-  double margin = 0.03 * rough_char_count;  // matches redraw()'s hardcoded stagger
-
-  bool fading_in = curtime < (duration + margin);
-  bool fading_out = (clipduration - curtime) < (duration + margin);
-  return fading_in || fading_out;
-}
+// CBA: redraws every frame while Animate is on; pass the timecode to AlwaysUpdate() if that shows up in profiles
+bool TextEffect::AlwaysUpdate() { return animate_in_bool->GetBoolAt(0); }
 
 TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
   Effect(c, em)
@@ -100,36 +83,25 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
   EffectRow* text_field = new EffectRow(this, tr("Text"));
   text_val = new StringField(text_field, "text", false);
   text_val->SetColumnSpan(2);
-  
+
   EffectRow* position_row = new EffectRow(this, tr("Position"));
   position_x = new DoubleField(position_row, "posx");
   position_y = new DoubleField(position_row, "posy");
-  
-//======================================================
+
   EffectRow* reveal_row = new EffectRow(this, tr("Reveal %"));
   reveal_val = new DoubleField(reveal_row, "reveal");
   reveal_val->SetMinimum(0);
   reveal_val->SetMaximum(100);
   reveal_val->SetColumnSpan(2);
-  
+
   EffectRow* animate_row = new EffectRow(this, tr("Animate"));
   animate_in_bool = new BoolField(animate_row, "animatein");
   animate_in_bool->SetColumnSpan(2);
-  
-//  EffectRow* stagger_row = new EffectRow(this, tr("Stagger(sec)*10"));
-//  animate_stagger = new DoubleField(stagger_row, "stagger*10");                             
-//  animate_stagger->SetMinimum(0);
-//  animate_stagger->SetColumnSpan(2);
-                                             
+
   EffectRow* duration_row = new EffectRow(this, tr("Animate duration (sec)"));
   animate_duration = new DoubleField(duration_row, "animateduration");
   animate_duration->SetMinimum(0.1);
   animate_duration->SetColumnSpan(2);
-  
-//  EffectRow* rise_row = new EffectRow(this, tr("Rise (px)"));
-//  animate_rise = new DoubleField(rise_row, "animaterise");
-//  animate_rise->SetColumnSpan(2);  
-//======================================================
 
   EffectRow* font_row = new EffectRow(this, tr("Font"));
   set_font_combobox = new FontField(font_row, "font");
@@ -211,12 +183,11 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
   shadow_opacity->SetMinimum(0);
   shadow_opacity->SetMaximum(100);
 
-//  size_val->SetDefault(48);
-  size_val->SetDefault(100);
-  text_val->SetValueAt(0, tr("Sample"));
-  set_color_button->SetValueAt(0, QColor(Qt::yellow));
-  halign_field->SetValueAt(0, Qt::AlignLeft);
-  valign_field->SetValueAt(0, Qt::AlignTop);
+  size_val->SetDefault(48);
+  text_val->SetValueAt(0, tr("Sample Text"));
+  set_color_button->SetValueAt(0, QColor(Qt::white));
+  halign_field->SetValueAt(0, Qt::AlignHCenter);
+  valign_field->SetValueAt(0, Qt::AlignVCenter);
   word_wrap_field->SetValueAt(0, true);
   outline_color->SetValueAt(0, QColor(Qt::black));
   shadow_color->SetValueAt(0, QColor(Qt::black));
@@ -225,15 +196,10 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
   shadow_softness->SetDefault(5);
   shadow_distance->SetDefault(5);
   shadow_opacity->SetDefault(80);
-  outline_width->SetDefault(20); 
-  position_x->SetDefault(20);
-  position_y->SetDefault(10);
-//======================================================  
-  reveal_val->SetDefault(100);    
-//  animate_stagger->SetDefault(0.3);
+  outline_width->SetDefault(20);
+  reveal_val->SetDefault(100);
   animate_duration->SetDefault(0.5);
-//  animate_rise->SetDefault(20);  
-                                  
+
   outline_enable(false);
   shadow_enable(false);
 
@@ -242,18 +208,17 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
 
   vertPath = "common.vert";
   fragPath = "dropshadow.frag";
-  
 }
 
 void TextEffect::redraw(double timecode) {
-  if (size_val->GetDoubleAt(timecode) <= 0) {                                                      
+  if (size_val->GetDoubleAt(timecode) <= 0) {
     return;
   }
 
   QColor bkg = set_color_button->GetColorAt(timecode);
   bkg.setAlpha(0);
   img.fill(bkg);
-                                                  
+
   QPainter p(&img);
   p.setRenderHint(QPainter::Antialiasing);
   int padding = qRound(padding_field->GetDoubleAt(timecode));
@@ -290,13 +255,12 @@ void TextEffect::redraw(double timecode) {
         }
       }
     }
-  } 
-// truncate revealed text, character-by-character, without disturbing the
-// line breaks the word-wrap pass just computed 
-//
-// Count and truncate at grapheme-cluster boundaries, not raw UTF-16 code
-  // units, so combining marks, surrogate pairs, and joined sequences never
-  // get split mid-cluster before shaping even sees them.
+  }
+
+  // Truncate the revealed text without disturbing the line breaks the word-wrap
+  // pass just computed. Count and cut at grapheme-cluster boundaries, not raw
+  // UTF-16 code units, so combining marks, surrogate pairs, and joined
+  // sequences never get split mid-cluster before shaping even sees them.
   QVector<QVector<int>> line_bounds;
   int total_graphemes = 0;
   for (const QString& l : lines) {
@@ -314,7 +278,7 @@ void TextEffect::redraw(double timecode) {
     const QVector<int>& b = line_bounds.at(li);
     int line_grapheme_count = b.size() - 1;
     if (remaining <= 0) {
-      visible_lines.append(QString());   // keep the slot so valign/height stays stable
+      visible_lines.append(QString());  // keep the slot so valign/height stays stable
     } else if (line_grapheme_count <= remaining) {
       visible_lines.append(l);
       remaining -= line_grapheme_count;
@@ -325,10 +289,11 @@ void TextEffect::redraw(double timecode) {
   }
   lines = visible_lines;
 
-  QPainterPath path;
-
   int line_h = qRound(fm.height() * line_height_field->GetDoubleAt(timecode));
   int text_height = (lines.size() - 1) * line_h + fm.height();
+
+  // baseline anchor of each line, reused by the shaping pass below
+  QVector<QPoint> anchors;
 
   for (int i=0;i<lines.size();i++) {
     int text_x, text_y;
@@ -378,92 +343,36 @@ void TextEffect::redraw(double timecode) {
       break;
     }
 
-    path.addText(text_x, text_y, font, lines.at(i));
+    anchors.append(QPoint(text_x, text_y));
   }
 
-  path.translate(position_x->GetDoubleAt(timecode) + padding, position_y->GetDoubleAt(timecode) + padding);
-
-  // draw software shadow
-  if (shadow_bool->GetBoolAt(timecode)) {
-    p.setPen(Qt::NoPen);
-
-    // calculate offset using distance and angle
-    double angle = shadow_angle->GetDoubleAt(timecode) * M_PI / 180.0;
-    double distance = qFloor(shadow_distance->GetDoubleAt(timecode));
-    int shadow_x_offset = qRound(qCos(angle) * distance);
-    int shadow_y_offset = qRound(qSin(angle) * distance);
-
-    QPainterPath shadow_path(path);
-    shadow_path.translate(shadow_x_offset, shadow_y_offset);
-
-    QColor col = shadow_color->GetColorAt(timecode);
-    col.setAlpha(0);
-    img.fill(col);
-
-    col.setAlphaF(shadow_opacity->GetDoubleAt(timecode)*0.01);
-    p.setBrush(col);
-    p.drawPath(shadow_path);
-
-    int blurSoftness = qFloor(shadow_softness->GetDoubleAt(timecode));
-    if (blurSoftness > 0) amber::ui::blur(img, img.rect(), blurSoftness, true);
-  }
-//======================================================
-//Draw the animated text
+  // Reveal animation timing, in seconds since the clip started on the timeline.
+  // timecode is counted from the start of the source media, so subtract the
+  // clip's in point.
   bool animate = animate_in_bool->GetBoolAt(timecode);
-  double stagger = 0.03;//animate_stagger->GetDoubleAt(timecode) * 0.1;
+  double curtime = 0;
+  double clipduration = 0;
+  if (animate && parent_clip != nullptr && parent_clip->sequence != nullptr && parent_clip->sequence->frame_rate > 0) {
+    double frame_rate = parent_clip->sequence->frame_rate;
+    curtime = timecode - parent_clip->clip_in(true) / frame_rate;
+    clipduration = parent_clip->length() / frame_rate;
+  } else {
+    animate = false;
+  }
   double duration = qMax(0.01, animate_duration->GetDoubleAt(timecode));
-  double rise = 20;//animate_rise->GetDoubleAt(timecode);
-   
-  p.setPen(Qt::NoPen);
-  p.save(); 
-  
-// Outline  
-  int outline_width_val = qCeil(outline_width->GetDoubleAt(timecode));
-  bool do_outline = outline_bool->GetBoolAt(timecode) && outline_width_val > 0;
-  QColor outline_base_color = outline_color->GetColorAt(timecode);
-  QColor fill_color = set_color_button->GetColorAt(timecode);  
-  
-  p.translate(position_x->GetDoubleAt(timecode) + padding,
-                position_y->GetDoubleAt(timecode) + padding);
-  
-  int global_char_index = 0;
 
   struct ClusterPath {
     QPainterPath path;
     double progress;
   };
   QVector<ClusterPath> cluster_paths;
+  int global_char_index = 0;
 
-  double current_frame = amber::ActiveSequence->playhead;
-  double clip_start    = parent_clip->timeline_in();  
-  double clip_end    = parent_clip->timeline_out();  
-  if (current_frame < clip_start) return;
-
-  double fps = amber::ActiveSequence->frame_rate;
-  if (fps <= 0.0) fps = 29.97; 
-  double frame_duration = 1.0 / fps;
-  double curtime = (current_frame - clip_start) * frame_duration;
-  double clipduration = (clip_end - clip_start)*frame_duration;  
-  
   for (int i = 0; i < lines.size(); i++) {
     const QString& line = lines.at(i);
-                                            
-    // reuse the same text_x/text_y alignment calc used earlier for this line
-    int text_x, text_y;
-    switch (halign_field->GetValueAt(timecode).toInt()) {
-      case Qt::AlignLeft: text_x = 0; break;
-      case Qt::AlignRight: text_x = width - fm.horizontalAdvance(line); break;
-      case Qt::AlignHCenter:
-      default: text_x = (width / 2) - (fm.horizontalAdvance(line) / 2); break;
-    }
-    switch (valign_field->GetValueAt(timecode).toInt()) {
-      case Qt::AlignTop: text_y = (fm.height() * i) + fm.ascent(); break;
-      case Qt::AlignBottom: text_y = (height - text_height - fm.descent()) + (fm.height() * (i + 1)); break;
-      case Qt::AlignVCenter:
-      default: text_y = ((height / 2) - (text_height / 2) - fm.descent()) + (fm.height() * (i + 1)); break;
-    }
-    int accumulated_x = 0;
-// Shape the whole line once so kerning, ligatures, and script-specific
+    if (line.isEmpty()) continue;
+
+    // Shape the whole line once so kerning, ligatures, and script-specific
     // reordering (Arabic joining, Devanagari matra placement, etc.) are all
     // resolved correctly, then walk the result one grapheme cluster at a
     // time so each visible "character" can still get its own reveal/rise
@@ -475,9 +384,9 @@ void TextEffect::redraw(double timecode) {
     layout.endLayout();
 
     // QTextLine positions glyphs relative to the line's own top-left; convert
-    // our already-computed baseline anchor (text_x, text_y) to that origin.
-    double anchor_x = text_x;
-    double anchor_y = text_y - text_line.ascent();
+    // the baseline anchor computed above to that origin.
+    double anchor_x = anchors.at(i).x();
+    double anchor_y = anchors.at(i).y() - text_line.ascent();
 
     QVector<int> clusters = grapheme_boundaries(line);
 
@@ -485,23 +394,21 @@ void TextEffect::redraw(double timecode) {
       int cluster_start = clusters.at(ci);
       int cluster_len = clusters.at(ci + 1) - cluster_start;
 
-      double progress_in = 1.0;
+      // Before the clip starts / after it ends this just clamps to hidden.
+      double progress = 1.0;
       if (animate) {
-        double t = (curtime - stagger * global_char_index) / duration;
-        progress_in = qBound(0.0, t, 1.0);
+        double t_in = (curtime - kRevealStagger * global_char_index) / duration;
+        double progress_in = qBound(0.0, t_in, 1.0);
         progress_in = progress_in * progress_in * (3.0 - 2.0 * progress_in);
-      }
 
-      double progress_out = 1.0;
-      if (animate) {
-        double time_remaining = clipduration - curtime;
-        double t_out = (time_remaining - stagger * global_char_index) / duration;
-        progress_out = qBound(0.0, t_out, 1.0);
+        double t_out = (clipduration - curtime - kRevealStagger * global_char_index) / duration;
+        double progress_out = qBound(0.0, t_out, 1.0);
         progress_out = progress_out * progress_out * (3.0 - 2.0 * progress_out);
-      }
-      double progress = qMin(progress_in, progress_out);
 
-      double y_offset = (1.0 - progress) * rise;
+        progress = qMin(progress_in, progress_out);
+      }
+
+      double y_offset = (1.0 - progress) * kRevealRise;
 
       // Winding fill so overlapping contours within a cluster (Devanagari
       // conjuncts, stacked marks) union instead of cancelling.
@@ -528,9 +435,41 @@ void TextEffect::redraw(double timecode) {
     }
   }
 
+  p.translate(position_x->GetDoubleAt(timecode) + padding, position_y->GetDoubleAt(timecode) + padding);
+
+  // draw software shadow, following each character's reveal
+  if (shadow_bool->GetBoolAt(timecode)) {
+    p.setPen(Qt::NoPen);
+
+    // calculate offset using distance and angle
+    double angle = shadow_angle->GetDoubleAt(timecode) * M_PI / 180.0;
+    double distance = qFloor(shadow_distance->GetDoubleAt(timecode));
+    int shadow_x_offset = qRound(qCos(angle) * distance);
+    int shadow_y_offset = qRound(qSin(angle) * distance);
+
+    QColor col = shadow_color->GetColorAt(timecode);
+    col.setAlpha(0);
+    img.fill(col);
+
+    double shadow_alpha = shadow_opacity->GetDoubleAt(timecode) * 0.01;
+    p.save();
+    p.translate(shadow_x_offset, shadow_y_offset);
+    for (const ClusterPath& cp : cluster_paths) {
+      col.setAlphaF(shadow_alpha * cp.progress);
+      p.setBrush(col);
+      p.drawPath(cp.path);
+    }
+    p.restore();
+
+    int blurSoftness = qFloor(shadow_softness->GetDoubleAt(timecode));
+    if (blurSoftness > 0) amber::ui::blur(img, img.rect(), blurSoftness, true);
+  }
+
   // All outlines before any fill, so a letter's outline never cuts into its
   // neighbour's fill (Arabic joins).
-  if (do_outline) {
+  int outline_width_val = qCeil(outline_width->GetDoubleAt(timecode));
+  if (outline_bool->GetBoolAt(timecode) && outline_width_val > 0) {
+    QColor outline_base_color = outline_color->GetColorAt(timecode);
     p.setBrush(Qt::NoBrush);
     for (const ClusterPath& cp : cluster_paths) {
       QColor oc = outline_base_color;
@@ -542,6 +481,8 @@ void TextEffect::redraw(double timecode) {
     }
   }
 
+  // draw "master" text
+  QColor fill_color = set_color_button->GetColorAt(timecode);
   p.setPen(Qt::NoPen);
   for (const ClusterPath& cp : cluster_paths) {
     QColor c = fill_color;
@@ -549,10 +490,9 @@ void TextEffect::redraw(double timecode) {
     p.setBrush(c);
     p.drawPath(cp.path);
   }
-  p.restore();
-                                       
+
   p.end();
-} 
+}
 
 void TextEffect::shadow_enable(bool e) {
   shadow_color->SetEnabled(e);
