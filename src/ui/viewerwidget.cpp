@@ -421,6 +421,15 @@ void ViewerWidget::scrub_settled() {
   }
 }
 
+void ViewerWidget::scrub_released() {
+  // The release's refresh renders at base, so the pending settle would take it for its own render and skip, though it
+  // is a scrub render (closest cached frame). Make it precise instead: one render, the exact frame, at base.
+  if (settle_timer_.isActive() && !viewer->playing &&
+      last_requested_divider_ != qMax(1, amber::CurrentConfig.preview_resolution_divider)) {
+    viewer->precise_next_render_ = true;
+  }
+}
+
 RenderThread* ViewerWidget::get_renderer() { return renderer; }
 
 void ViewerWidget::set_scroll(double x, double y) {
