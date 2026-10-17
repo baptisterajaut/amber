@@ -347,6 +347,8 @@ set(AMBER_EFFECTS
   effects/shaders/huesatbri.xml
   effects/shaders/invert.frag
   effects/shaders/invert.xml
+  effects/shaders/levels.frag
+  effects/shaders/levels.xml
   effects/shaders/lumakey.frag
   effects/shaders/lumakey.xml
   effects/shaders/lut.frag
