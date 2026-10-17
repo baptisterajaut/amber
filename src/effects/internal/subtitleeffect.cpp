@@ -253,8 +253,9 @@ void SubtitleEffect::DrawSubtitleOutline(QPainter& p, QTextDocument& td, const Q
   op.fillRect(outline_img.rect(), ocol);
   op.end();
 
-  // Composite outline onto main image (over shadow, under text)
-  p.drawImage(0, 0, outline_img);
+  // Composite outline onto main image (over shadow, under text). outline_img already holds the text offset and p is
+  // translated by it too: undo p's translation so the outline isn't offset twice
+  p.drawImage(-translate_x, -translate_y, outline_img);
 }
 
 static QString HalignToString(int halign) {

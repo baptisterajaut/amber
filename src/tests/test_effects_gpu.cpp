@@ -46,6 +46,7 @@ class TestEffectsGpu : public QObject {
   void cornerpinDefaultsPassthrough();
   void cornerpinMovesOneCorner();
   void subtitleActiveEntry();
+  void subtitleOutlineSurroundsText();
   void gradientRendersTwoStops();
 
   // Bespoke audio effect tests (Phase 2).
@@ -675,6 +676,45 @@ void TestEffectsGpu::subtitleActiveEntry() {
   // (n_text=222, n_after=0). Threshold max(2×, 5%) = 5% → n_after * 20 < n_text.
   QVERIFY2(n_after * 20 < n_text,
            qPrintable(QString("expected subtitle to clear past cue: inside=%1 after=%2").arg(n_text).arg(n_after)));
+}
+
+void TestEffectsGpu::subtitleOutlineSurroundsText() {
+  // The outline (on by default) must sit around the text. It used to be offset a second time by the text's
+  // padding/alignment translation, which pushed it off a bottom-aligned subtitle.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 60, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(0, 0, 0, 0));
+
+  EffectPtr sub_eff = h_->attach_internal(c, EFFECT_INTERNAL_SUBTITLE, EFFECT_TYPE_EFFECT);
+  auto* subtitle = static_cast<SubtitleEffect*>(sub_eff.get());
+  QVector<SubtitleCue> cues;
+  cues.append(SubtitleCue{0, 500, "XX"});
+  subtitle->SetCues(cues);
+  // Rows: 1=size, 6=padding, 9=outline colour (red, to tell it from the white text and the black background)
+  h_->set_field_double(sub_eff.get(), 1, 0, 16.0);
+  h_->set_field_double(sub_eff.get(), 6, 0, 0.0);
+  h_->set_field_color(sub_eff.get(), 9, 0, QColor(Qt::red));
+
+  QByteArray pixels = h_->render_frame(seq.get(), 7);
+  QVERIFY(!pixels.isEmpty());
+  // Count red pixels on the rows the white text occupies. The doubly offset outline landed below the text (rows
+  // 62-63 of this frame), so on those rows there was none.
+  int n_white = 0;
+  int n_red_by_text = 0;
+  for (int y = 0; y < 64; y++) {
+    int row_white = 0;
+    int row_red = 0;
+    for (int x = 0; x < 64; x++) {
+      Rgba px = pixel_at(pixels, 64, x, y);
+      if (px.r > 200 && px.g > 200 && px.b > 200) ++row_white;
+      if (px.r > 150 && px.g < 80 && px.b < 80) ++row_red;
+    }
+    n_white += row_white;
+    if (row_white > 0) n_red_by_text += row_red;
+  }
+  QVERIFY2(n_white > 20, qPrintable(QString("expected subtitle text pixels, got %1").arg(n_white)));
+  QVERIFY2(n_red_by_text > 20,
+           qPrintable(QString("expected red outline pixels beside the text, got %1").arg(n_red_by_text)));
 }
 
 void TestEffectsGpu::gradientRendersTwoStops() {
