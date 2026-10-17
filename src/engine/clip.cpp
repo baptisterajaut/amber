@@ -173,6 +173,11 @@ void Clip::move(ComboAction* ca, long iin, long iout, long iclip_in, int itrack,
 }
 
 void Clip::reset_audio() {
+  QVector<Sequence*> chain;
+  reset_audio(chain);
+}
+
+void Clip::reset_audio(QVector<Sequence*>& chain) {
   if (UsesCacher()) {
     cacher.ResetAudio();
   }
@@ -182,12 +187,17 @@ void Clip::reset_audio() {
       qWarning() << "Clip::reset_audio: nested sequence is null";
       return;
     }
+    // Circular nesting guard, as in compose_sequence(): a .ove where a sequence nests itself (directly or through
+    // another one) would otherwise recurse until the stack overflows
+    if (chain.contains(nested_sequence)) return;
+    chain.append(nested_sequence);
     for (const auto& clip : nested_sequence->clips) {
       Clip* c = clip.get();
       if (c != nullptr) {
-        c->reset_audio();
+        c->reset_audio(chain);
       }
     }
+    chain.removeLast();
   }
 }
 
