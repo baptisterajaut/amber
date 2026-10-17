@@ -2,6 +2,7 @@
 #define PIXELSAMPLER_H
 
 #include <QPointF>
+#include <QRectF>
 #include <QSize>
 #include <QSizeF>
 #include <QString>
@@ -16,6 +17,16 @@ struct ViewerFrameGeometry {
   double y_scroll{0.0};  // 0 shows its top edge
   QSize sequence;
 };
+
+// The rect render() draws the frame in, widget coordinates: the widget itself up to the zoom where ViewerContainer
+// stops growing it, then larger, panned by the scrolls. Empty when a size is empty.
+QRectF viewer_frame_rect(const ViewerFrameGeometry& g);
+
+// A sequence point (origin top-left, unclamped) to the widget position the viewer draws it at, and back. The overlays
+// (guides, gizmos, title safe area, rulers) and their mouse hit tests go through these so they stay on the picture at
+// any zoom and scroll. viewer_to_sequence() gives (0, 0) when a size is empty.
+QPointF sequence_to_viewer(const ViewerFrameGeometry& g, const QPointF& seq);
+QPointF viewer_to_sequence(const ViewerFrameGeometry& g, const QPointF& pos);
 
 // A viewer point on the frame: the sequence pixel under it (origin top-left) and the readback buffer pixel holding its
 // colour (sequence size / preview divider)
