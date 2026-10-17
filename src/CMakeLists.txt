@@ -243,6 +243,7 @@ set(UI_SOURCES
   effects/ui/buttonfieldwidget.cpp effects/ui/buttonfieldwidget.h
   effects/ui/colorfieldwidget.cpp effects/ui/colorfieldwidget.h
   effects/ui/combofieldwidget.cpp effects/ui/combofieldwidget.h
+  effects/ui/curvefieldwidget.cpp effects/ui/curvefieldwidget.h
   effects/ui/doublefieldwidget.cpp effects/ui/doublefieldwidget.h
   effects/ui/effectfieldwidget.cpp effects/ui/effectfieldwidget.h
   effects/ui/filefieldwidget.cpp effects/ui/filefieldwidget.h
@@ -273,6 +274,7 @@ set(UI_SOURCES
   ui/columnedgridlayout.cpp ui/columnedgridlayout.h
   ui/colorbutton.cpp ui/colorbutton.h
   ui/comboboxex.cpp ui/comboboxex.h
+  ui/curveeditor.cpp ui/curveeditor.h
   ui/cursors.cpp ui/cursors.h
   ui/effectui.cpp ui/effectui.h
   ui/embeddedfilechooser.cpp ui/embeddedfilechooser.h

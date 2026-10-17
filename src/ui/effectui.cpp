@@ -105,6 +105,9 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr) {
       layout_->addWidget(widget, i, column, 1, field->GetColumnSpan());
 
       column += field->GetColumnSpan();
+
+      // A curve editor is a tall square: its row's label sits at its top, by the channel buttons
+      if (field->type() == EffectField::EFFECT_FIELD_CURVE) layout_->setAlignment(row_label, Qt::AlignTop);
     }
 
     // Find maximum column to place keyframe controls
@@ -137,7 +140,7 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr) {
       btn->setFlat(true);
       btn->setToolTip(tr("Reset to Default"));
       btn->setVisible(false);
-      layout_->addWidget(btn, i, reset_column);
+      layout_->addWidget(btn, i, reset_column, layout_->itemAtPosition(i, 0)->alignment());
 
       int row_index = i;
       connect(btn, &QPushButton::clicked, this, [this, row_index]() { ResetRow(row_index); });
