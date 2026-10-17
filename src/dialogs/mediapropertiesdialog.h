@@ -79,6 +79,11 @@ private:
   QDoubleSpinBox* conform_fr;
 
   /**
+   * @brief conform_fr's value when the dialog opened (as rounded by the spinbox), to detect an actual change
+   */
+  double conform_fr_initial{0};
+
+  /**
    * @brief Setting for associated/premultiplied alpha
    */
   QCheckBox* premultiply_alpha_setting;

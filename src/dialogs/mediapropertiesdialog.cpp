@@ -92,7 +92,11 @@ MediaPropertiesDialog::MediaPropertiesDialog(QWidget *parent, Media *i) :
       grid->addWidget(new QLabel(tr("Conform to Frame Rate:"), this), row, 0);
       conform_fr = new QDoubleSpinBox(this);
       conform_fr->setMinimum(0.01);
+      // Qt's defaults (max 99.99, 2 decimals) would clamp 120/240 fps and round 23.976 fps
+      conform_fr->setMaximum(1000);
+      conform_fr->setDecimals(3);
       conform_fr->setValue(f->video_tracks.at(0).video_frame_rate * f->speed);
+      conform_fr_initial = conform_fr->value();
       grid->addWidget(conform_fr, row, 1);
     }
 
@@ -185,7 +189,8 @@ void MediaPropertiesDialog::accept() {
 
     // set frame rate conform
     if (!f->video_tracks.at(0).infinite_length) {
-      if (!qFuzzyCompare(conform_fr->value(), f->video_tracks.at(0).video_frame_rate)) {
+      // Only when the user changed it: the shown value is rounded, re-applying it would re-time the clips
+      if (!qFuzzyCompare(conform_fr->value(), conform_fr_initial)) {
         ca->append(new SetDouble(&f->speed, f->speed, conform_fr->value()/f->video_tracks.at(0).video_frame_rate));
         refresh_clips = true;
       }
