@@ -371,6 +371,8 @@ set(AMBER_EFFECTS
   effects/shaders/sphere.xml
   effects/shaders/swirl.frag
   effects/shaders/swirl.xml
+  effects/shaders/threshold.frag
+  effects/shaders/threshold.xml
   effects/shaders/tile.frag
   effects/shaders/tile.xml
   effects/shaders/tint.frag
