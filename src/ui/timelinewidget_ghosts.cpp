@@ -24,6 +24,7 @@
 
 #include "global/config.h"
 #include "panels/panels.h"
+#include "panels/timeline_layout.h"
 #include "rendering/renderfunctions.h"
 
 void validate_transitions(Clip* c, int transition_type, long& frame_diff) {
@@ -526,8 +527,8 @@ static void applyGhostMovable(Ghost& g, long frame_diff, int track_diff, int mou
         g.track += abs_track_diff;
       }
     }
-  } else if (same_sign(g.old_track, panel_timeline->drag_track_start)) {
-    g.track += track_diff;
+  } else {
+    g.track = amber::timeline_layout::ghost_track(g.old_track, panel_timeline->drag_track_start, track_diff);
   }
 }
 
@@ -590,7 +591,7 @@ void TimelineWidget::updateGhostsApplySelections(int effective_tool, bool clips_
             s.track += abs_track_diff;
           }
         } else {
-          if (same_sign(s.track, panel_timeline->drag_track_start)) s.track += track_diff;
+          s.track = amber::timeline_layout::ghost_track(s.old_track, panel_timeline->drag_track_start, track_diff);
         }
       }
     }
@@ -658,20 +659,16 @@ void TimelineWidget::update_ghosts(const QPoint& mouse_pos, bool lock_frame) {
     panel_timeline->snapped = false;
   }
 
-  // also validate track crossing for movable clips
+  // also validate track crossing for movable clips: no ghost crosses the V/A seam, on either side
   if (clips_are_movable) {
-    for (int i = 0; i < panel_timeline->ghosts.size(); i++) {
-      const Ghost& g = panel_timeline->ghosts.at(i);
-      if (same_sign(g.old_track, panel_timeline->drag_track_start)) {
-        while (!same_sign(g.old_track, g.old_track + track_diff)) {
-          if (g.old_track < 0) {
-            track_diff--;
-          } else {
-            track_diff++;
-          }
-        }
+    QVector<int> old_tracks;
+    for (const Ghost& g : panel_timeline->ghosts) {
+      // importing moves the other side by its own rule (applyGhostMovable), only the drag side is clamped there
+      if (!panel_timeline->importing || same_sign(g.old_track, panel_timeline->drag_track_start)) {
+        old_tracks.append(g.old_track);
       }
     }
+    track_diff = amber::timeline_layout::clamp_track_diff(old_tracks, panel_timeline->drag_track_start, track_diff);
   }
 
   // apply changes to ghosts
