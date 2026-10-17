@@ -39,6 +39,7 @@
 
 #include "core/appcontext.h"
 #include "core/path.h"
+#include "core/shortcutfile.h"
 #include "dialogs/debugdialog.h"
 #include "dialogs/footagerelinkdialog.h"
 #include "effects/internal/srtparser.h"
@@ -290,16 +291,10 @@ static void kbd_load_action(QByteArray& file, QAction* a, bool first) {
     a->setShortcut(a->property("default").toString());
   }
   if (a->property("id").isNull()) return;
-  QString comp_str = a->property("id").toString();
-  int shortcut_index = file.indexOf(comp_str.toUtf8());
-  if (shortcut_index != 0 && (shortcut_index < 0 || file.at(shortcut_index - 1) != '\n')) return;
-  shortcut_index += comp_str.size() + 1;
-  QString shortcut;
-  while (shortcut_index < file.size() && file.at(shortcut_index) != '\n') {
-    shortcut.append(file.at(shortcut_index++));
-  }
-  QKeySequence ks(shortcut);
-  if (!ks.isEmpty()) a->setShortcut(ks);
+  // Exact id match ("import" must not pick up an "importsubtitle" line), as the Preferences importer does
+  bool found = false;
+  QKeySequence ks(amber::find_shortcut_in_file(file, a->property("id").toString(), &found));
+  if (found && !ks.isEmpty()) a->setShortcut(ks);
 }
 
 void kbd_shortcut_processor(QByteArray& file, QMenu* menu, bool save, bool first) {
