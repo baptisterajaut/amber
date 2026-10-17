@@ -69,6 +69,7 @@ class LoadThread : public QThread {
   bool load_all_phases(QFile& file, QXmlStreamReader& stream);
   bool handle_load_result(QXmlStreamReader& stream, bool cont);
   void load_effect(QXmlStreamReader& stream, Clip* c);
+  void report_frei0r_effects();
 
   // Per-element parse helpers (called from load_worker)
   void parse_folder(QXmlStreamReader& stream);
@@ -116,6 +117,8 @@ class LoadThread : public QThread {
   std::atomic<bool> cancelled_{false};  // set by cancel() on the GUI thread
   bool question_answered_{false};
   bool xml_error;
+
+  int frei0r_effect_count_{0};  // effects named "Frei0r/..." met while loading
 
   // Answer to the last show_message() question: true = Yes
   bool question_answer_{false};

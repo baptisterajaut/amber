@@ -27,6 +27,8 @@
 
 QMutex effects_loaded_mutex;
 
+#include <atomic>
+
 #include <QDir>
 #include <QXmlStreamReader>
 #include <QLibrary>
@@ -300,3 +302,18 @@ void EffectInit::run() {
   effects_loaded_mutex.unlock();
   qInfo() << "Finished initializing effects";
 }
+
+// Set from the LoadThread worker, read on the GUI thread
+static std::atomic<bool> project_frei0r_flag{false};
+
+bool is_frei0r_effect_name(const QString& saved_name) { return saved_name.startsWith(QLatin1String("Frei0r/")); }
+
+bool frei0r_effects_visible(bool show_preference, bool project_uses_frei0r) {
+  return show_preference || project_uses_frei0r;
+}
+
+bool frei0r_effects_visible() {
+  return frei0r_effects_visible(amber::CurrentConfig.show_frei0r_effects, project_frei0r_flag);
+}
+
+void set_project_uses_frei0r(bool uses) { project_frei0r_flag = uses; }
