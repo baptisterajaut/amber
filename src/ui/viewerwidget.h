@@ -166,7 +166,7 @@ class ViewerWidget : public QRhiWidget {
   // Half resolution while scrubbing: Auto decision state and the settle timer (restarted by each scrub render)
   amber::ScrubResolution scrub_res_;
   QTimer settle_timer_;
-  int last_requested_divider_{1};  // divider of the last viewer render requested, reused by the retry
+  int last_requested_divider_{1};  // divider of the last viewer render requested, reused by the retries and checked by the settle
  public slots:
   void queue_repaint();
 

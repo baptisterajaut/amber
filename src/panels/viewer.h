@@ -74,7 +74,7 @@ class Viewer : public Panel {
   bool playing{false};
   // One-shot hint set by single-step actions (arrow keys, prev/next frame buttons)
   // so the next render fetches the exact frame instead of falling back to the
-  // scrubbing fast-bail path. Consumed (cleared) by ViewerWidget::frame_update().
+  // scrubbing fast-bail path. Consumed (cleared) by ViewerWidget::request_render().
   bool precise_next_render_{false};
   bool scrub_next_render_{false};  // set by seek(), consumed by the next ViewerWidget::request_render()
   long playhead_start;
