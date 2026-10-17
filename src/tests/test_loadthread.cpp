@@ -214,6 +214,40 @@ class TestLoadThread : public QObject {
     QVERIFY(!vs.video_preview.isNull());
   }
 
+  // A relative footage url resolves against the project's folder, never against the process's working directory,
+  // even when the working directory holds a file of the same name
+  void relativeFootageIgnoresWorkingDir() {
+    const QString clip = QStringLiteral(SOURCE_DIR "/tests/fixtures/t1_yuv_input.mp4");
+    QVERIFY(QDir(dir_.path()).mkpath("proj"));
+    QVERIFY(QDir(dir_.path()).mkpath("cwd"));
+    const QString proj_copy = dir_.filePath("proj/same.mp4");
+    QVERIFY(QFile::exists(proj_copy) || QFile::copy(clip, proj_copy));
+    QVERIFY(QFile::exists(dir_.filePath("cwd/same.mp4")) || QFile::copy(clip, dir_.filePath("cwd/same.mp4")));
+    QString path = write_fixture("proj/relative.ove", amber::kSaveVersion, "same.mp4");
+    QVERIFY(!path.isEmpty());
+
+    const QString old_cwd = QDir::currentPath();
+    QVERIFY(QDir::setCurrent(dir_.filePath("cwd")));
+    bool succeeded = false;
+    int failed = 0;  // error() emissions
+    run_load(path, false, &succeeded, &failed);
+    QDir::setCurrent(old_cwd);
+    QVERIFY(succeeded);
+    QVERIFY(!failed);
+
+    Media* folder = amber::project_model.child(0);
+    Media* item = nullptr;
+    for (int i = 0; i < amber::project_model.childCount(folder); i++) {
+      Media* m = amber::project_model.child(i, folder);
+      if (m->get_type() == MEDIA_TYPE_FOOTAGE) item = m;
+    }
+    QVERIFY(item != nullptr);
+    Footage* f = item->to_footage();
+    QPointer<PreviewGenerator> gen(f->preview_gen.load());
+    QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+    QCOMPARE(f->url, proj_copy);
+  }
+
   void versionMismatchAsksAndAborts() {
     QString path = write_fixture("old.ove", 1);
     QVERIFY(!path.isEmpty());
