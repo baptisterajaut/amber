@@ -35,6 +35,7 @@ extern "C" {
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPushButton>
+#include <QSaveFile>
 #include <QSizePolicy>
 #include <QVBoxLayout>
 #include <QXmlStreamReader>
@@ -1341,15 +1342,29 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
   }
 }
 
-void Project::save_project(bool autorecovery) {
+bool Project::save_project(bool autorecovery) {
   folder_id = 1;
   media_id = 1;
   sequence_id = 1;
 
-  QFile file(autorecovery ? autorecovery_filename : amber::ActiveProjectFilename);
+  const QString target = autorecovery ? autorecovery_filename : amber::ActiveProjectFilename;
+  // Auto-recovery runs on a timer: log only, a modal every few minutes would be worse than a missed backup
+  auto report_failure = [this, autorecovery, &target]() {
+    qCritical() << "Could not save project to" << target;
+    if (!autorecovery) {
+      QMessageBox::critical(this, tr("Save Failed"),
+                            tr("Could not save the project to \"%1\". The file on disk was not changed.").arg(target),
+                            QMessageBox::Ok);
+    }
+  };
+
+  // QSaveFile writes to a temp file and renames it over `target` on commit(): a failed save leaves the old file intact
+  QSaveFile file(target);
+  // A writable file in a read-only directory has no room for the temp file: write it in place there, as before
+  file.setDirectWriteFallback(true);
   if (!file.open(QIODevice::WriteOnly)) {
-    qCritical() << "Could not open file";
-    return;
+    report_failure();
+    return false;
   }
 
   QXmlStreamWriter stream(&file);
@@ -1384,12 +1399,17 @@ void Project::save_project(bool autorecovery) {
 
   stream.writeEndDocument();  // doc
 
-  file.close();
+  // No commit() on a write error: the destructor discards the temp file
+  if (stream.hasError() || !file.commit()) {
+    report_failure();
+    return false;
+  }
 
   if (!autorecovery) {
     add_recent_project(amber::ActiveProjectFilename);
     amber::Global->set_modified(false);
   }
+  return true;
 }
 
 void Project::update_view_type() {

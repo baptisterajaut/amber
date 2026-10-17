@@ -299,9 +299,12 @@ bool OliveGlobal::save_project_as() {
     if (!fn.endsWith(".ove", Qt::CaseInsensitive)) {
       fn += ".ove";
     }
+    // The save resolves relative media paths against the new filename, so it is set first; a failed save puts the
+    // previous one back so the title bar never shows a file that was not written
+    const QString previous_fn = amber::ActiveProjectFilename;
     update_project_filename(fn);
-    panel_project->save_project(false);
-    return true;
+    if (panel_project->save_project(false)) return true;
+    update_project_filename(previous_fn);
   }
   return false;
 }
@@ -310,8 +313,7 @@ bool OliveGlobal::save_project() {
   if (amber::ActiveProjectFilename.isEmpty()) {
     return save_project_as();
   } else {
-    panel_project->save_project(false);
-    return true;
+    return panel_project->save_project(false);
   }
 }
 
