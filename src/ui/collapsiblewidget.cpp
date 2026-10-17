@@ -84,7 +84,7 @@ bool CollapsibleWidget::IsFocused() {
 }
 
 bool CollapsibleWidget::IsExpanded() {
-  return contents->isVisible();
+  return !contents->isHidden();  // isVisible() is false until the panel is shown
 }
 
 void CollapsibleWidget::SetExpanded(bool s)
