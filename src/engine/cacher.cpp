@@ -530,7 +530,10 @@ void Cacher::run() {
 
   while (caching_) {
     if (!queued_) {
-      wait_cond_.wait(&clip->cache_lock);
+      // Bounded wait: Cache() and Close() set their flag and wake without taking cache_lock, so a wake landing
+      // between the check above and this wait is lost. Re-check the flags every 50 ms instead of sleeping forever.
+      wait_cond_.wait(&clip->cache_lock, 50);
+      if (!queued_ && caching_) continue;
     }
     queued_ = false;
     if (!caching_) {
