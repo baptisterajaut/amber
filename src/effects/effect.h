@@ -32,6 +32,7 @@
 #include <QVector>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
+#include <deque>
 #include <memory>
 #include <random>
 
@@ -53,7 +54,7 @@ struct EffectMeta {
   int type;
   int subtype;
 };
-extern QVector<EffectMeta> effects;
+extern std::deque<EffectMeta> effects;  // deque: push_back keeps EffectMeta* (Effect::meta, menu data) valid
 
 enum EffectType : uint8_t {
   EFFECT_TYPE_INVALID,

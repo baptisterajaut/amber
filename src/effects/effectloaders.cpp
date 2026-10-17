@@ -54,86 +54,86 @@ void load_internal_effects() {
 
   em.name = "Volume";
   em.internal = EFFECT_INTERNAL_VOLUME;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Pan";
   em.internal = EFFECT_INTERNAL_PAN;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "VST Plugin 2.x";
   em.internal = EFFECT_INTERNAL_VST;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Tone";
   em.internal = EFFECT_INTERNAL_TONE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Noise";
   em.internal = EFFECT_INTERNAL_NOISE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Fill Left/Right";
   em.internal = EFFECT_INTERNAL_FILLLEFTRIGHT;
-  effects.append(em);
+  effects.push_back(em);
 
   em.subtype = EFFECT_TYPE_VIDEO;
 
   em.name = "Transform";
   em.category = "Distort";
   em.internal = EFFECT_INTERNAL_TRANSFORM;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Corner Pin";
   em.internal = EFFECT_INTERNAL_CORNERPIN;
-  effects.append(em);
+  effects.push_back(em);
 
   /*em.name = "Mask";
   em.internal = EFFECT_INTERNAL_MASK;
-  effects.append(em);*/
+  effects.push_back(em);*/
 
   em.name = "Shake";
   em.internal = EFFECT_INTERNAL_SHAKE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Text";
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_TEXT;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Rich Text";
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_RICHTEXT;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Timecode";
   em.internal = EFFECT_INTERNAL_TIMECODE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Solid";
   em.internal = EFFECT_INTERNAL_SOLID;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Subtitle";
   em.internal = EFFECT_INTERNAL_SUBTITLE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Gradient";
   em.category = "Render";
   em.internal = EFFECT_INTERNAL_GRADIENT;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Timer";
   em.internal = EFFECT_INTERNAL_TIMER;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Progress Bar";
   em.internal = EFFECT_INTERNAL_PROGRESSBAR;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Drop Shadow";
   em.category = "Stylize";
   em.internal = EFFECT_INTERNAL_DROPSHADOW;
-  effects.append(em);
+  effects.push_back(em);
 
   // internal transitions
   em.type = EFFECT_TYPE_TRANSITION;
@@ -141,21 +141,21 @@ void load_internal_effects() {
 
   em.name = "Cross Dissolve";
   em.internal = TRANSITION_INTERNAL_CROSSDISSOLVE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.subtype = EFFECT_TYPE_AUDIO;
 
   em.name = "Linear Fade";
   em.internal = TRANSITION_INTERNAL_LINEARFADE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Exponential Fade";
   em.internal = TRANSITION_INTERNAL_EXPONENTIALFADE;
-  effects.append(em);
+  effects.push_back(em);
 
   em.name = "Logarithmic Fade";
   em.internal = TRANSITION_INTERNAL_LOGARITHMICFADE;
-  effects.append(em);
+  effects.push_back(em);
 }
 
 void load_shader_effects_worker(const QString& effects_path) {
@@ -195,7 +195,7 @@ void load_shader_effects_worker(const QString& effects_path) {
               em.filename = file.fileName();
               em.path = effects_path;
               em.internal = -1;
-              effects.append(em);
+              effects.push_back(em);
             } else {
               qCritical() << "Invalid effect found in" << entrie;
             }
@@ -255,7 +255,7 @@ void load_frei0r_effects_worker(const QString& dir, EffectMeta& em, QVector<QStr
 
               loaded_names.append(em.name);
 
-              effects.append(em);
+              effects.push_back(em);
             }
           }
           effect.unload();

@@ -67,7 +67,7 @@
 #include "effects/internal/volumeeffect.h"
 #include "effects/internal/vsthost.h"
 
-QVector<EffectMeta> effects;
+std::deque<EffectMeta> effects;
 
 namespace {
 

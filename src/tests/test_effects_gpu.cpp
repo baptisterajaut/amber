@@ -223,11 +223,11 @@ void TestEffectsGpu::solidColorPassthrough() {
 void TestEffectsGpu::effectPassthroughSweep_data() {
   QTest::addColumn<int>("effect_index");
 
-  // `effects` is the global QVector<EffectMeta> from effect.h:60 (no namespace).
+  // `effects` is the global std::deque<EffectMeta> from effect.h (no namespace).
   // We pass the vector index — looking up by name via get_meta_from_name() fails
   // for effect names containing '/' (e.g. "Hue/Saturation/Brightness"), since
   // that function interprets the first '/' as a category/name separator.
-  for (int i = 0; i < effects.size(); ++i) {
+  for (int i = 0; i < int(effects.size()); ++i) {
     const EffectMeta& meta = effects[i];
     // Skip transitions (they need a different setup with two clips).
     if (meta.type != EFFECT_TYPE_EFFECT) continue;

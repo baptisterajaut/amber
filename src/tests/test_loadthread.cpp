@@ -445,7 +445,7 @@ class TestLoadThread : public QObject {
   // A VST plugin path set by a project load or a paste (a field change, as LoadFieldElement does) only loads when
   // trusted. The paths don't exist: a load attempt shows up as one "failed to load" message, no attempt as none.
   void vstPluginLoadsOnlyTrustedPaths() {
-    if (effects.isEmpty()) load_internal_effects();
+    if (effects.empty()) load_internal_effects();
     const EffectMeta* meta = get_meta_from_name("VST Plugin 2.x");
     QVERIFY(meta != nullptr);
     const QString dir = dir_.filePath("no-such-dir");
