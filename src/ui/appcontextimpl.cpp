@@ -143,11 +143,14 @@ int AppContextImpl::showMessage(const QString& title, const QString& text, int t
   return exec_message_box(title, text, type);
 }
 
-bool AppContextImpl::showQuestion(const QString& title, const QString& text, bool warning) {
+bool AppContextImpl::showQuestion(const QString& title, const QString& text, bool warning, bool default_no) {
   if (warning) {
-    return QMessageBox::warning(amber::MainWindow, title, text, QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes;
+    return QMessageBox::warning(amber::MainWindow, title, text, QMessageBox::Yes | QMessageBox::No,
+                                default_no ? QMessageBox::No : QMessageBox::NoButton) == QMessageBox::Yes;
   }
-  return QMessageBox::question(nullptr, title, text, QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes;
+  // Same buttons and default (No) as the old question(..., Yes, No) overload
+  return QMessageBox::question(nullptr, title, text, QMessageBox::Yes | QMessageBox::No, QMessageBox::No) ==
+         QMessageBox::Yes;
 }
 
 QString AppContextImpl::showSaveFileDialog(const QString& title, const QString& filter) {

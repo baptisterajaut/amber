@@ -24,7 +24,7 @@ class AppContextImpl : public AppContext {
   void setModified(bool modified) override;
   void updateUi(bool modified) override;
   int showMessage(const QString& title, const QString& text, int type) override;
-  bool showQuestion(const QString& title, const QString& text, bool warning) override;
+  bool showQuestion(const QString& title, const QString& text, bool warning, bool default_no) override;
   bool isInteractive() override { return true; }
   QString showSaveFileDialog(const QString& title, const QString& filter) override;
   QString showOpenFileDialog(const QString& title, const QString& filter) override;

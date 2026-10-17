@@ -612,7 +612,7 @@ bool VSTHost::PluginPathTrusted(const QString& path) {
       tr("This project or pasted clip uses the VST plugin:\n\n%1\n\nLoading it runs the native code in that library "
          "with your permissions. Only load plugins you trust.\n\nLoad it?")
           .arg(path),
-      true);
+      true, true);
   asking.remove(path);
   // CBA: the config is written when Amber closes, a crash before that asks again next time
   if (yes) {

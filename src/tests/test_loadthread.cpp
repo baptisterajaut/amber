@@ -31,11 +31,13 @@ class CountingAppContext : public TestAppContext {
   int messages = 0;
   bool interactive = false;  // pretend a user answers (VST trust question)
   bool answer = false;
+  bool last_default_no = false;  // default button of the last question
   bool isInteractive() override { return interactive; }
   int recents = 0;
   void addRecentProject(const QString&) override { recents++; }
-  bool showQuestion(const QString&, const QString&, bool) override {
+  bool showQuestion(const QString&, const QString&, bool, bool default_no) override {
     questions++;
+    last_default_no = default_no;
     return answer;
   }
   int showMessage(const QString&, const QString&, int) override {
@@ -292,6 +294,7 @@ class TestLoadThread : public QObject {
 
     // The worker blocked on the question, the main thread answered "No" through app_ctx, loading stopped
     QCOMPARE(ctx_.questions, 1);
+    QVERIFY(!ctx_.last_default_no);
     QVERIFY(!succeeded);
     // error() once (the app clears the project on it), no message box: the user chose to stop
     QCOMPARE(failed, 1);
@@ -352,6 +355,7 @@ class TestLoadThread : public QObject {
     EffectPtr no2 = set_path(dir + "/no.so");
     QCOMPARE(ctx_.questions, 1);
     QCOMPARE(ctx_.messages, 0);
+    QVERIFY(ctx_.last_default_no);  // Enter must not load native code
 
     // Answered Yes: loaded (and failed), trusted from now on, even headless
     ctx_.answer = true;

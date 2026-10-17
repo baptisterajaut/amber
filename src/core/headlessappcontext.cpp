@@ -13,7 +13,7 @@ int HeadlessAppContext::showMessage(const QString& title, const QString& text, i
   return 0;
 }
 
-bool HeadlessAppContext::showQuestion(const QString& title, const QString& text, bool) {
+bool HeadlessAppContext::showQuestion(const QString& title, const QString& text, bool, bool) {
   qWarning().noquote() << title + ":" << text << "-> answered Yes (headless)";
   return true;
 }
