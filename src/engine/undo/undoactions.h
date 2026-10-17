@@ -67,11 +67,6 @@ private:
      * @brief Setting whether to change the windowModified state of MainWindow
      */
   bool set_window_modified;
-
-  /**
-     * @brief Cache previous window modified value to return to if the user undoes this action
-     */
-  bool old_window_modified;
 };
 
 #endif // UNDOACTIONS_H

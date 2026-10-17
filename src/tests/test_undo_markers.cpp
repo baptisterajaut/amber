@@ -2,6 +2,7 @@
 
 #include "core/marker.h"
 #include "engine/undo/undo_timeline.h"
+#include "tests/test_appcontext_stub.h"
 
 namespace {
 
@@ -24,6 +25,14 @@ bool same_markers(const QVector<Marker>& a, const QVector<Marker>& b) {
   return true;
 }
 
+// Tracks the project's modified flag like ProjectIO does.
+class ModifiedAppContext : public TestAppContext {
+ public:
+  bool modified = false;
+  bool isModified() override { return modified; }
+  void setModified(bool m) override { modified = m; }
+};
+
 }  // namespace
 
 class TestUndoMarkers : public QObject {
@@ -34,6 +43,7 @@ class TestUndoMarkers : public QObject {
   void moveRedoUndo();
   void moveUndoSurvivesReallocation();
   void deleteIsIndexOrderIndependent();
+  void undoAfterSaveMarksModified();
 };
 
 void TestUndoMarkers::addAtEmptyTimeAppends() {
@@ -117,6 +127,20 @@ void TestUndoMarkers::deleteIsIndexOrderIndependent() {
     action.redo();
     QVERIFY(same_markers(markers, after_delete));
   }
+}
+
+// Edit, save (flag cleared), undo: the project now differs from the file on disk, so it must stay modified.
+void TestUndoMarkers::undoAfterSaveMarksModified() {
+  ModifiedAppContext ctx;
+  amber::app_ctx = &ctx;
+  QVector<Marker> markers = make_markers(1);
+  AddMarkerAction action(&markers, 20, "new");
+  action.redo();
+  QVERIFY(ctx.modified);
+  ctx.modified = false;  // Ctrl+S
+  action.undo();
+  QVERIFY(ctx.modified);
+  amber::app_ctx = nullptr;
 }
 
 QTEST_GUILESS_MAIN(TestUndoMarkers)
