@@ -8,13 +8,13 @@ layout(location = 0) in vec2 vTexCoord;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-	float gamma = gamma_cent*0.01;
+	float gamma = max(gamma_cent, 0.01)*0.01;
 	vec4 color = texture(sceneTex, vTexCoord);
 	vec3 c = color.rgb;
 	c = pow(c, vec3(gamma, gamma, gamma));
-	c = c * numColors;
+	c = c * max(numColors, 1.0);
 	c = floor(c);
-	c = c / numColors;
+	c = c / max(numColors, 1.0);
 	c = pow(c, vec3(1.0/gamma));
 	fragColor = vec4(c, color.a);
 }

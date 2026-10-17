@@ -14,8 +14,8 @@ void main(void) {
 	} else {
 		vec2 p = vTexCoord;
 
-		p.x -= mod(p.x, 1.0 / pixels_x);
-		p.y -= mod(p.y, 1.0 / pixels_y);
+		p.x -= mod(p.x, 1.0 / max(pixels_x, 1.0));
+		p.y -= mod(p.y, 1.0 / max(pixels_y, 1.0));
 
 		fragColor = texture(input_tex, p);
 	}

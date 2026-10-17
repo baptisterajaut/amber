@@ -155,11 +155,11 @@ void main() {
 		float hue_divider = (360.0/colors);
 		vHSV.x = round(vHSV.x/hue_divider)*hue_divider;
 
-		float sat_divider = 100.0/sat_levels;
+		float sat_divider = 100.0/max(sat_levels, 1.0);
 		vHSV.y = round((vHSV.y*100.0)/sat_divider)*sat_divider/100.0;
 	}
 
-	float bri_divider = 100.0/bri_levels;
+	float bri_divider = 100.0/max(bri_levels, 1.0);
 	vHSV.z = round((vHSV.z*100.0)/bri_divider)*bri_divider/100.0;
 
 	float edg = IsEdge(uv);

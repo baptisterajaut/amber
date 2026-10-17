@@ -26,7 +26,7 @@ void main(void) {
 		coord.y = 1.0 - coord.y;
 	}*/
 
-	float adj_scale = scale*0.01;
+	float adj_scale = max(scale, 0.01)*0.01;
 
 	vec2 scaled_coords = (vTexCoord/adj_scale);
 	vec2 coord = scaled_coords-vec2(0.5/adj_scale, 0.5/adj_scale)+vec2(0.5, 0.5)+vec2(-centerx*0.01, -centery*0.01);
