@@ -173,6 +173,9 @@ class Clip {
   QRhiTexture* yuv_converted_tex{nullptr};
   QRhiTextureRenderTarget* yuv_rt{nullptr};
   QRhiRenderPassDescriptor* yuv_rpd{nullptr};
+  // Plane copies handed to the texture upload, kept across frames so steady-state decoding doesn't allocate.
+  // Render thread only, except Close(), which frees them under the cacher queue lock that Retrieve() holds.
+  QByteArray upload_staging[3];
 
   // RGBA texture (CPU path)
   QRhiTexture* rgba_tex{nullptr};

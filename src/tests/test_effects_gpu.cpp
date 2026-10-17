@@ -477,12 +477,22 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
   // Decoded footage: the YUV->RGB pass in Clip::retrieveYuvGpuPath (1-frame fixtures, so stay on frame 0)
   if (avcodec_find_decoder(AV_CODEC_ID_H264)) {
     SequencePtr yuv = h_->make_sequence(64, 64, 30);
-    h_->add_video_clip(yuv.get(), 0, 30,
-                       h_->import_video_media(SOURCE_DIR "/tests/fixtures/t1_yuv_input.mp4", 64, 64, 30));
+    Clip* yuv_clip = h_->add_video_clip(
+        yuv.get(), 0, 30, h_->import_video_media(SOURCE_DIR "/tests/fixtures/t1_yuv_input.mp4", 64, 64, 30));
     check_steady(yuv.get(), 0, 0, "yuv420p", frame0);
     if (QTest::currentTestFailed()) return;
     check_checkerboard(frame0);
     if (QTest::currentTestFailed()) return;
+    // The plane copies reuse the clip's staging buffers: no allocation per frame once warmed up (Y and UV/U, the
+    // planes both NV12 and YUV420P upload; the cacher hands this fixture over as either)
+    for (int plane = 0; plane < 2; plane++) {
+      const char* before = yuv_clip->upload_staging[plane].constData();
+      QVERIFY2(!yuv_clip->upload_staging[plane].isEmpty(),
+               qPrintable(QStringLiteral("plane %1 not staged").arg(plane)));
+      QVERIFY(!h_->render_frame(yuv.get(), 0).isEmpty());
+      QVERIFY2(yuv_clip->upload_staging[plane].constData() == before,
+               qPrintable(QStringLiteral("plane %1 staging buffer reallocated").arg(plane)));
+    }
   }
   if (avcodec_find_decoder(AV_CODEC_ID_RAWVIDEO)) {
     SequencePtr nv12 = h_->make_sequence(64, 64, 30);
