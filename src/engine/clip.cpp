@@ -23,6 +23,7 @@
 #include <QtMath>
 
 #include "cacher.h"
+#include "core/audio.h"
 #include "core/colorlabel.h"
 #include "effects/effect.h"
 #include "effects/transition.h"
@@ -476,6 +477,7 @@ void Clip::Open() {
   if (!open_ && state_change_lock.tryLock()) {
     open_ = true;
     cacher_uses_rgba_ = NeedsCpuRgba();
+    opened_for_export_ = audio_rendering;
 
     for (const auto& effect : effects) {
       effect->open();
@@ -735,7 +737,7 @@ bool Clip::retrieveCpuRgbaPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequence
         memcpy(data_buffer_1, frame->data[0], frame_size);
       }
       e->process_image(get_timecode(this, cacher_frame), using_db_1 ? data_buffer_1 : data_buffer_2,
-                       using_db_1 ? data_buffer_2 : data_buffer_1, frame_size);
+                       using_db_1 ? data_buffer_2 : data_buffer_1, frame->width, frame->height, frame->linesize[0]);
       using_db_1 = !using_db_1;
     }
   }
@@ -817,7 +819,9 @@ bool Clip::NeedsCpuRgba() const {
   return false;
 }
 
-bool Clip::NeedsCacherReconfigure() const { return open_ && (NeedsCpuRgba() != cacher_uses_rgba_); }
+bool Clip::NeedsCacherReconfigure() const {
+  return open_ && (NeedsCpuRgba() != cacher_uses_rgba_ || audio_rendering != opened_for_export_);
+}
 
 ClipSpeed::ClipSpeed()
 

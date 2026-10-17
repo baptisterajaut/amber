@@ -1085,7 +1085,7 @@ int Effect::getIterations() { return iterations; }
 
 void Effect::setIterations(int i) { iterations = i; }
 
-void Effect::process_image(double, uint8_t*, uint8_t*, int) {}
+void Effect::process_image(double, uint8_t*, uint8_t*, int, int, int) {}
 
 EffectPtr Effect::copy(Clip* c) {
   EffectPtr copy = Effect::Create(c, meta);

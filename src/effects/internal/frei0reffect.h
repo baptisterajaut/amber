@@ -24,6 +24,7 @@
 #ifndef NOFREI0R
 
 #include <QLibrary>
+#include <vector>
 #include "include/frei0r.h"
 
 #include "effects/effect.h"
@@ -39,7 +40,7 @@ class Frei0rEffect : public Effect {
   Frei0rEffect(Clip* c, const EffectMeta* em);
   ~Frei0rEffect() override;
 
-  void process_image(double timecode, uint8_t* input, uint8_t* output, int size) override;
+  void process_image(double timecode, uint8_t* input, uint8_t* output, int width, int height, int stride) override;
 
   void refresh() override;
 
@@ -52,10 +53,13 @@ class Frei0rEffect : public Effect {
   f0rSetParamValue set_param_func_{nullptr};
   f0rDestructFunc destruct_func_{nullptr};
   void destruct_module();
-  void construct_module();
+  void construct_module(int width, int height);
   bool open{false};
   int instance_width{0};
   int instance_height{0};
+  // Tightly packed copies of a frame whose rows are padded (Frei0r frames have no stride)
+  std::vector<uint32_t> packed_in_;
+  std::vector<uint32_t> packed_out_;
 };
 
 #endif

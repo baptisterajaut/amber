@@ -30,7 +30,6 @@
 
 #include <QAudioSink>
 #include <QDateTime>
-#include <QFileInfo>
 #include <QtMath>
 #include <cmath>
 
@@ -132,13 +131,8 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
     return false;
   }
 
-  // Resolve file path (proxy or original)
-  QByteArray ba;
-  if (m->proxy && !m->proxy_path.isEmpty() && QFileInfo::exists(m->proxy_path)) {
-    ba = m->proxy_path.toUtf8();
-  } else {
-    ba = m->url.toUtf8();
-  }
+  // Proxy or original, by the mode Clip::Open() recorded
+  QByteArray ba = m->decode_url(clip->OpenedForExport()).toUtf8();
   const char* filename = ba.constData();
 
   // For image sequences that don't start at 0, set the index where it does start

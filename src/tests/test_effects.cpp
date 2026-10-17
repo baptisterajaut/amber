@@ -1,6 +1,13 @@
 #include <QtTest>
 
 #include "core/math.h"
+#include "effects/effect.h"
+#include "engine/clip.h"
+#include "engine/sequence.h"
+
+#ifndef NOFREI0R
+#include "effects/internal/frei0reffect.h"
+#endif
 
 class TestEffects : public QObject {
   Q_OBJECT
@@ -45,6 +52,51 @@ class TestEffects : public QObject {
     QColor restored(name);
     QCOMPARE(restored, original);
   }
+
+#ifndef NOFREI0R
+  // A Frei0r effect processes the frame it is handed, whatever the clip's declared media size: a proxied clip decodes
+  // smaller frames than its footage stream says (here a 64x64 sequence-sized clip receives a 32x16 frame)
+  void frei0rProcessesActualFrameSize() {
+    const QString dir = "/usr/lib/frei0r-1";
+    if (!QFileInfo::exists(dir + "/invert0r.so")) QSKIP("invert0r Frei0r plugin not installed");
+    EffectMeta meta;
+    meta.name = "invert0r";
+    meta.path = dir;
+    meta.filename = "invert0r.so";
+    meta.internal = EFFECT_INTERNAL_FREI0R;
+
+    Sequence seq;
+    seq.width = 64;
+    seq.height = 64;
+    Clip clip(&seq);
+    QCOMPARE(clip.media_width(), 64);
+    Frei0rEffect effect(&clip, &meta);
+
+    constexpr int w = 32;
+    constexpr int h = 16;
+    QByteArray in(w * h * 4, char(40));
+    QByteArray out(w * h * 4, char(0));
+    effect.process_image(0.0, reinterpret_cast<uint8_t*>(in.data()), reinterpret_cast<uint8_t*>(out.data()), w, h,
+                         w * 4);
+    QCOMPARE(int(uchar(out[0])), 255 - 40);
+    QCOMPARE(int(uchar(out[out.size() - 4])), 255 - 40);
+
+    // Rows padded for alignment (a width that isn't a multiple of the decoder's alignment): each row is processed in
+    // place, the padding left alone. A row value per line shows a shear if the stride is ignored.
+    constexpr int pw = 30;
+    constexpr int ph = 8;
+    constexpr int stride = 32 * 4;
+    QByteArray pin(stride * ph, char(7));
+    QByteArray pout(stride * ph, char(0));
+    for (int y = 0; y < ph; y++) memset(pin.data() + y * stride, 10 + 20 * y, pw * 4);
+    effect.process_image(0.0, reinterpret_cast<uint8_t*>(pin.data()), reinterpret_cast<uint8_t*>(pout.data()), pw, ph,
+                         stride);
+    for (int y = 0; y < ph; y++) {
+      for (int x = 0; x < pw; x++) QCOMPARE(int(uchar(pout[y * stride + x * 4])), 255 - (10 + 20 * y));
+      QCOMPARE(int(uchar(pout[y * stride + pw * 4])), 0);  // padding untouched
+    }
+  }
+#endif
 
   // --- lerp boundary tests ---
 
