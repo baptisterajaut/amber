@@ -32,7 +32,7 @@ vec2 maskRect() {
 float maskAt(vec2 uv, vec2 rect) {
   vec2 m = (uv - vec2(pos_x, pos_y) * 0.01) / rect + 0.5;
   if (any(lessThan(m, vec2(0.0))) || any(greaterThan(m, vec2(1.0)))) return 0.0;
-  vec4 c = texture(maskTex, m);
+  vec4 c = textureLod(maskTex, m, 0.0);  // explicit LOD: called in divergent control flow (bounds test, feather loop)
   // The mask is straight alpha: luma of the colour times its alpha, so black-on-transparent and white-on-black work
   return channel == 1 ? dot(c.rgb, vec3(0.2126, 0.7152, 0.0722)) * c.a : c.a;
 }
