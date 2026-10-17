@@ -689,7 +689,14 @@ void LoadThread::run() {
 
   QFile file(filename_);
   if (!file.open(QIODevice::ReadOnly)) {
-    qCritical() << "Could not open file";
+    qCritical() << "Could not open file" << filename_ << file.errorString();
+    // Same exit as any other load error: error_func() reports it and the app resets to an empty project, so a later
+    // Ctrl+S can't write an empty project over the file under its old name
+    error_str = tr("Could not open '%1': %2").arg(filename_, file.errorString());
+    show_err = true;
+    xml_error = false;
+    mutex.unlock();
+    emit error();
     return;
   }
 
@@ -754,16 +761,15 @@ void LoadThread::run() {
     cont = load_worker(file, stream, MEDIA_TYPE_SEQUENCE);
   }
 
+  // On failure error() is emitted once, below; error_func() shows the message unless show_err was cleared
   if (!cancelled_) {
     if (!cont) {
       xml_error = false;
-      if (show_err) emit error();
     } else if (stream.hasError()) {
       error_str =
           tr("%1 - Line: %2 Col: %3")
               .arg(stream.errorString(), QString::number(stream.lineNumber()), QString::number(stream.columnNumber()));
       xml_error = true;
-      emit error();
       cont = false;
     } else {
       // attach nested sequence clips to their sequences
@@ -831,6 +837,7 @@ void LoadThread::question_func(const QString& title, const QString& text, int bu
 }
 
 void LoadThread::error_func() {
+  if (!show_err) return;  // the user chose to stop (version mismatch "No"): nothing to report
   if (xml_error) {
     qCritical() << "Error parsing XML." << error_str;
     QMessageBox::critical(amber::MainWindow, tr("XML Parsing Error"),
