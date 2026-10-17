@@ -4,7 +4,7 @@
 		<field type="double" min="0" default="60" max="100" id="threshold"/>
 	</row>
 	<row name="Radius">
-		<field type="double" min="0" default="20" max="200" id="radius"/>
+		<field type="double" min="0" default="20" max="100" id="radius"/>
 	</row>
 	<row name="Intensity">
 		<field type="double" min="0" default="100" max="400" id="intensity"/>
