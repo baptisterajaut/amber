@@ -19,6 +19,7 @@ extern "C" {
 #include <QFile>
 #include <QGuiApplication>
 #include <QPointer>
+#include <QScopeGuard>
 #include <QSurfaceFormat>
 #include <QTemporaryDir>
 #include <QTest>
@@ -37,6 +38,7 @@ extern "C" {
 #include "project/previewgenerator.h"
 #include "project/projectmodel.h"
 #include "rendering/exportthread.h"
+#include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
 
 // External entry point from effectloaders.cpp (no header export), as in test_render_harness.cpp
@@ -440,6 +442,58 @@ class TestHeadlessRender : public QObject {
     return error;
   }
 
+  // Load, as the active sequence, a checkerboard original whose footage has a finished uniform grey proxy, plus a tone
+  // clip, and wait for the probes. Callers return on QTest::currentTestFailed().
+  void load_proxied_project(const QString& name) {
+    const QString video = dir_.filePath(name + "_checkerboard.y4m");
+    {
+      QFile f(video);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(checkerboard_y4m());
+    }
+    const QString proxy = dir_.filePath(name + "_checkerboard.proxy.y4m");
+    {
+      QFile f(proxy);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(grey_proxy_y4m());
+    }
+    const QString audio = dir_.filePath(name + "_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath(name + ".ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio, proxy).toUtf8());
+    }
+
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    QVERIFY(vf->proxy);
+    QCOMPARE(vf->proxy_path, proxy);
+  }
+
  private slots:
   void initTestCase() {
     QVERIFY(dir_.isValid());
@@ -594,53 +648,9 @@ class TestHeadlessRender : public QObject {
   // Export decodes the original media even when the footage has a finished proxy (the proxy is a preview stand-in):
   // the proxy here is uniform grey, so a checkerboard in the output proves the original was read
   void exportIgnoresProxy() {
-    const QString video = dir_.filePath("proxied_checkerboard.y4m");
-    {
-      QFile f(video);
-      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(checkerboard_y4m());
-    }
-    const QString proxy = dir_.filePath("proxied_checkerboard.proxy.y4m");
-    {
-      QFile f(proxy);
-      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(grey_proxy_y4m());
-    }
-    const QString audio = dir_.filePath("proxied_tone.wav");
-    {
-      QFile f(audio);
-      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(sine_wav());
-    }
-    const QString project = dir_.filePath("proxied.ove");
-    {
-      QFile f(project);
-      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(fixture(project, video, audio, proxy).toUtf8());
-    }
-
-    bool succeeded = false;
-    auto* lt = new LoadThread(project, false);
-    QPointer<LoadThread> lt_guard(lt);
-    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
-    lt->start();
-    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
-    QVERIFY(succeeded);
-
+    load_proxied_project("proxied");
+    if (QTest::currentTestFailed()) return;
     SequencePtr seq = amber::ActiveSequence;
-    QVERIFY(seq != nullptr);
-    Footage* vf = nullptr;
-    for (const auto& c : seq->clips) {
-      QVERIFY(c->media() != nullptr);
-      Footage* f = c->media()->to_footage();
-      QPointer<PreviewGenerator> gen(f->preview_gen.load());
-      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
-      QVERIFY(f->ready);
-      if (c->track() < 0) vf = f;
-    }
-    QVERIFY(vf != nullptr);
-    QVERIFY(vf->proxy);
-    QCOMPARE(vf->proxy_path, proxy);
 
     ExportParams params;
     params.filename = dir_.filePath("proxied_out.mp4");
@@ -668,6 +678,59 @@ class TestHeadlessRender : public QObject {
 
     // Export leaves every clip closed, so the viewer reopens them outside export mode, on the proxy
     for (const auto& c : seq->clips) QVERIFY(!c->IsOpen());
+  }
+
+  // The viewer path (Save Frame renders the viewer's clips) follows Use Proxies live: the grey proxy while on, the
+  // checkerboard original once toggled off, the open clip reopening on the other file without being closed in between
+  void viewerFollowsUseProxies() {
+    const bool saved = amber::CurrentConfig.use_proxies;
+    const auto restore = qScopeGuard([saved] { amber::CurrentConfig.use_proxies = saved; });
+    amber::CurrentConfig.use_proxies = true;
+    load_proxied_project("toggled");
+    if (QTest::currentTestFailed()) return;
+    SequencePtr seq = amber::ActiveSequence;
+    Clip* video = nullptr;
+    for (const auto& c : seq->clips) {
+      if (c->track() < 0) video = c.get();
+    }
+    QVERIFY(video != nullptr);
+
+    QOffscreenSurface* surface = QRhiGles2InitParams::newFallbackSurface();
+    auto* rt = new RenderThread();
+    rt->setGlFallbackSurface(surface);
+    rt->start();
+    // Two pixels in horizontally adjacent checkerboard blocks: equal on the grey proxy, black and white on the
+    // original (in either order, whatever the frame's vertical orientation)
+    auto save_frame = [&](const QString& file, int& a, int& b) {
+      const QString fn = dir_.filePath(file);
+      QFile::remove(fn);
+      rt->start_render(seq.get(), 1, fn);  // re-queued until the clip's texture is ready
+      QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(fn), 10000);
+      QImage img(fn);
+      QCOMPARE(img.size(), QSize(kSize, kSize));
+      a = qGray(img.pixel(4, 4));
+      b = qGray(img.pixel(12, 4));
+    };
+    int a = 0, b = 0;
+    save_frame("proxies_on.png", a, b);
+    qInfo("proxies on: %d %d (grey proxy: ~128 for both)", a, b);
+    const bool on_ok = qAbs(a - 128) <= 16 && qAbs(b - 128) <= 16;
+    const bool opened_on_proxy = video->IsOpen() && video->OpenedWithProxies();
+
+    amber::CurrentConfig.use_proxies = false;
+    save_frame("proxies_off.png", a, b);
+    qInfo("proxies off: %d %d (checkerboard: one white, one black)", a, b);
+    const bool off_ok = qAbs(a - b) > 180;
+    const bool reopened = video->IsOpen() && !video->OpenedWithProxies();
+
+    close_active_clips(seq.get());  // before the render thread drains the deferred RHI deletions on shutdown
+    rt->cancel();
+    delete rt;
+    delete surface;
+    QVERIFY2(on_ok, "proxies on did not render the grey proxy");
+    QVERIFY(opened_on_proxy);
+    QVERIFY2(off_ok, "proxies off did not render the checkerboard original");
+    QVERIFY(reopened);
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer

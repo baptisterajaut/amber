@@ -88,9 +88,9 @@ struct Footage {
   bool proxy;
   QString proxy_path;
 
-  // The file to decode: the finished proxy for preview, always the original for export (a proxy is a reduced-quality
-  // preview stand-in)
-  [[nodiscard]] QString decode_url(bool exporting) const;
+  // The file to decode: the finished proxy for preview while proxies are in use, always the original for export (a
+  // proxy is a reduced-quality preview stand-in)
+  [[nodiscard]] QString decode_url(bool exporting, bool use_proxies) const;
 
   // thumbnail/waveform generation
   std::atomic<PreviewGenerator*> preview_gen;

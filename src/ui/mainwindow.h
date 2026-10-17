@@ -306,6 +306,7 @@ class MainWindow : public QMainWindow {
   QAction* lock_guides_;
   QAction* show_frame_rate_;
   QAction* show_pixel_sampler_;
+  QAction* use_proxies_;
   QMenu* guides_menu_;
 
   // playback menu

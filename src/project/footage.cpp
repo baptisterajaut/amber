@@ -42,8 +42,8 @@ Footage::Footage() {
   ready_lock.lock();
 }
 
-QString Footage::decode_url(bool exporting) const {
-  if (!exporting && proxy && !proxy_path.isEmpty() && QFileInfo::exists(proxy_path)) return proxy_path;
+QString Footage::decode_url(bool exporting, bool use_proxies) const {
+  if (!exporting && use_proxies && proxy && !proxy_path.isEmpty() && QFileInfo::exists(proxy_path)) return proxy_path;
   return url;
 }
 

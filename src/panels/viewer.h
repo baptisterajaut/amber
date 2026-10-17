@@ -127,6 +127,8 @@ class Viewer : public Panel {
   void next_frames();
   void go_to_out();
   void go_to_end();
+  // Flip Use Proxies (View menu and the preview resolution menu): open clips switch file on their next frame
+  void toggle_use_proxies();
   void close_media();
   void update_viewer();
 
@@ -178,6 +180,7 @@ class Viewer : public Panel {
   QPushButton* video_only_button;
   QPushButton* audio_only_button;
   QToolButton* preview_res_button_;
+  QAction* use_proxies_action_;
 
   bool cue_recording_internal{false};
   QTimer recording_flasher;

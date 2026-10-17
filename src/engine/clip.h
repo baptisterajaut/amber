@@ -161,10 +161,12 @@ class Clip {
 
   [[nodiscard]] bool NeedsCpuRgba() const;
   // True when the open cacher no longer fits the clip: ImageFlag effects added/removed (YUV vs RGBA pipeline), or
-  // export started/ended since Open() (original vs proxy file)
+  // export started/ended or Use Proxies was toggled since Open() (original vs proxy file)
   [[nodiscard]] bool NeedsCacherReconfigure() const;
   // Whether the clip was opened during an export: its cacher then decodes the original media, never the proxy
   [[nodiscard]] bool OpenedForExport() const { return opened_for_export_; }
+  // Whether Use Proxies was on when the clip was opened: its cacher then decodes the footage's proxy, if finished
+  [[nodiscard]] bool OpenedWithProxies() const { return opened_with_proxies_; }
 
   // video playback variables (QRhi)
   void* fbo_rhi{nullptr};  // ClipRhiResources* — opaque to avoid circular includes
@@ -211,6 +213,7 @@ class Clip {
   std::atomic<bool> open_{false};
   bool cacher_uses_rgba_{false};
   bool opened_for_export_{false};
+  bool opened_with_proxies_{true};
 
   // reset_audio() with the nested sequences already being reset, to stop on a sequence that nests itself
   void reset_audio(QVector<Sequence*>& chain);

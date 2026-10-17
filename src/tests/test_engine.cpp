@@ -27,6 +27,7 @@
 #include "core/audio.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
+#include "global/config.h"
 #include "project/footage.h"
 #include "project/media.h"
 #include "rendering/renderfunctions.h"
@@ -52,19 +53,63 @@ class TestEngine : public QObject {
     Footage f;
     f.url = dir.filePath("original.mov");
 
-    QCOMPARE(f.decode_url(false), f.url);  // no proxy
+    QCOMPARE(f.decode_url(false, true), f.url);  // no proxy
 
     f.proxy = true;  // being generated: flagged, no path yet
-    QCOMPARE(f.decode_url(false), f.url);
+    QCOMPARE(f.decode_url(false, true), f.url);
 
     f.proxy_path = proxy;  // path recorded, file missing
-    QCOMPARE(f.decode_url(false), f.url);
+    QCOMPARE(f.decode_url(false, true), f.url);
 
     QFile file(proxy);
     QVERIFY(file.open(QFile::WriteOnly));
     file.close();
-    QCOMPARE(f.decode_url(false), proxy);
-    QCOMPARE(f.decode_url(true), f.url);
+    QCOMPARE(f.decode_url(false, true), proxy);
+    QCOMPARE(f.decode_url(true, true), f.url);
+
+    // Use Proxies off: the original, in preview too
+    QCOMPARE(f.decode_url(false, false), f.url);
+    QCOMPARE(f.decode_url(true, false), f.url);
+  }
+
+  // Toggling Use Proxies reconfigures an open clip whose footage has a proxy, so it switches file on its next frame;
+  // a clip without a proxy decodes the original either way and stays open
+  void useProxiesToggleReconfiguresOpenClip() {
+    const bool saved = amber::CurrentConfig.use_proxies;
+    const auto restore = qScopeGuard([saved] { amber::CurrentConfig.use_proxies = saved; });
+    amber::CurrentConfig.use_proxies = true;
+
+    // Footage with no streams: the cacher thread starts, finds no stream to open and idles until Close()
+    auto footage = std::make_shared<Footage>();
+    footage->url = "/nonexistent/original.mov";
+    Media media;
+    media.set_footage(footage);
+    Sequence seq;
+    Clip c(&seq);
+    c.set_track(-1);
+    c.set_media(&media, 0);
+
+    c.Open();
+    QVERIFY(c.IsOpen());
+    QVERIFY(c.OpenedWithProxies());
+    amber::CurrentConfig.use_proxies = false;
+    QVERIFY(!c.NeedsCacherReconfigure());  // no proxy: nothing to switch
+
+    footage->proxy = true;
+    QVERIFY(c.NeedsCacherReconfigure());
+    // Close() is a no-op until the cacher thread has finished opening and released state_change_lock
+    QVERIFY(QTest::qWaitFor([&c] { return c.state_change_lock.tryLock(); }));  // not QTRY: it re-evaluates
+    c.state_change_lock.unlock();
+    c.Close(true);
+    c.Open();
+    QVERIFY(!c.OpenedWithProxies());
+    QVERIFY(!c.NeedsCacherReconfigure());
+    amber::CurrentConfig.use_proxies = true;
+    QVERIFY(c.NeedsCacherReconfigure());
+    QVERIFY(QTest::qWaitFor([&c] { return c.state_change_lock.tryLock(); }));  // not QTRY: it re-evaluates
+    c.state_change_lock.unlock();
+    c.Close(true);
+    QVERIFY(!c.IsOpen());
   }
 
   // A clip left open across the start or end of an export (its close skipped while it was still opening) is

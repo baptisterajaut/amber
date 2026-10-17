@@ -226,6 +226,7 @@ void ViewerWidget::save_frame() {
     }
 
     save_frame_last_dir_ = QFileInfo(fn).absolutePath();
+    // CBA: Save Frame renders the viewer's clips, so it saves the proxy while proxies are on
     renderer->start_render(viewer->seq.get(), 1, fn);
   }
 }

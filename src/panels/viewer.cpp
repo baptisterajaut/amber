@@ -726,12 +726,18 @@ void Viewer::setup_ui() {
   add_res_action(tr("Full"), 1);
   add_res_action(tr("1/2"), 2);
   add_res_action(tr("1/4"), 4);
-  connect(preview_res_menu, &QMenu::triggered, this, &Viewer::set_preview_resolution);
-  connect(preview_res_menu, &QMenu::aboutToShow, this, [preview_res_menu]() {
+  connect(preview_res_group, &QActionGroup::triggered, this, &Viewer::set_preview_resolution);
+  preview_res_menu->addSeparator();
+  use_proxies_action_ = preview_res_menu->addAction(tr("Use Proxies"));
+  use_proxies_action_->setCheckable(true);
+  use_proxies_action_->setChecked(amber::CurrentConfig.use_proxies);
+  connect(use_proxies_action_, &QAction::triggered, this, &Viewer::toggle_use_proxies);
+  connect(preview_res_menu, &QMenu::aboutToShow, this, [this, preview_res_group]() {
     int div = amber::CurrentConfig.preview_resolution_divider;
-    for (QAction* a : preview_res_menu->actions()) {
+    for (QAction* a : preview_res_group->actions()) {
       a->setChecked(a->data().toInt() == div);
     }
+    use_proxies_action_->setChecked(amber::CurrentConfig.use_proxies);
   });
   preview_res_button_->setMenu(preview_res_menu);
   update_preview_res_label();
@@ -924,6 +930,14 @@ void Viewer::set_preview_resolution(QAction* action) {
   amber::CurrentConfig.preview_resolution_divider = action->data().toInt();
   update_preview_res_label();
   panel_sequence_viewer->update_parents();
+}
+
+void Viewer::toggle_use_proxies() {
+  amber::CurrentConfig.use_proxies = !amber::CurrentConfig.use_proxies;
+  // compose_sequence() reopens the clips with a proxy on their next frame (Clip::NeedsCacherReconfigure()); redraw
+  // both viewers now so a paused frame switches file too
+  panel_sequence_viewer->update_parents();
+  panel_footage_viewer->update_viewer();
 }
 
 void Viewer::update_preview_res_label() {
