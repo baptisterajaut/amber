@@ -15,6 +15,9 @@ extern std::atomic<bool> audio_scrub_data_ready;
 
 int scrub_grain_samples(int sample_rate);
 int scrub_grain_bytes(int sample_rate);
+// Export in progress, video and audio alike: set for the whole export by ExportDialog (before it closes the open
+// clips) through OliveGlobal::set_rendering_state(), cleared once the export thread's final close is done. Clips opened
+// while it is set decode the original media instead of the proxy.
 extern std::atomic<bool> audio_rendering;
 extern std::atomic<int> audio_rendering_rate;
 extern QMutex audio_write_lock;

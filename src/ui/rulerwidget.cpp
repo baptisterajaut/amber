@@ -56,13 +56,15 @@ int RulerWidget::thickness() const { return kRulerThickness; }
 double RulerWidget::video_to_widget(int video_pos) const {
   if (container_->child == nullptr || viewer_->seq == nullptr) return -1;
 
+  // The frame as the viewer draws it: past a zoom it overflows the viewer widget, panned by the scrollbars
+  const QRectF fr = container_->child->frame_rect();
   if (orientation_ == Guide::Horizontal) {
-    double ppvp = double(container_->child->width()) / double(viewer_->seq->width);
-    double container_pos = double(video_pos) * ppvp + container_->child->x();
+    double ppvp = fr.width() / double(viewer_->seq->width);
+    double container_pos = double(video_pos) * ppvp + fr.left() + container_->child->x();
     return container_pos - x();  // container coords → ruler-local coords
   } else {
-    double ppvp = double(container_->child->height()) / double(viewer_->seq->height);
-    double container_pos = double(video_pos) * ppvp + container_->child->y();
+    double ppvp = fr.height() / double(viewer_->seq->height);
+    double container_pos = double(video_pos) * ppvp + fr.top() + container_->child->y();
     return container_pos - y();  // container coords → ruler-local coords
   }
 }
@@ -70,16 +72,17 @@ double RulerWidget::video_to_widget(int video_pos) const {
 int RulerWidget::widget_to_video(double widget_pos) const {
   if (container_->child == nullptr || viewer_->seq == nullptr) return -1;
 
+  const QRectF fr = container_->child->frame_rect();
   if (orientation_ == Guide::Horizontal) {
-    double ppvp = double(container_->child->width()) / double(viewer_->seq->width);
+    double ppvp = fr.width() / double(viewer_->seq->width);
     if (ppvp <= 0) return -1;
     double container_pos = widget_pos + x();  // ruler-local → container coords
-    return qRound((container_pos - container_->child->x()) / ppvp);
+    return qRound((container_pos - fr.left() - container_->child->x()) / ppvp);
   } else {
-    double ppvp = double(container_->child->height()) / double(viewer_->seq->height);
+    double ppvp = fr.height() / double(viewer_->seq->height);
     if (ppvp <= 0) return -1;
     double container_pos = widget_pos + y();  // ruler-local → container coords
-    return qRound((container_pos - container_->child->y()) / ppvp);
+    return qRound((container_pos - fr.top() - container_->child->y()) / ppvp);
   }
 }
 
@@ -92,12 +95,13 @@ void RulerWidget::paintEvent(QPaintEvent*) {
   int video_size = (orientation_ == Guide::Horizontal) ? viewer_->seq->width : viewer_->seq->height;
   if (video_size <= 0) return;
 
-  // Compute pixels-per-video-pixel from the child widget geometry
+  // Pixels per video pixel of the frame as the viewer draws it, which past a zoom overflows the child widget
+  const QRectF fr = container_->child->frame_rect();
   double ppvp;
   if (orientation_ == Guide::Horizontal) {
-    ppvp = double(container_->child->width()) / double(video_size);
+    ppvp = fr.width() / double(video_size);
   } else {
-    ppvp = double(container_->child->height()) / double(video_size);
+    ppvp = fr.height() / double(video_size);
   }
   if (ppvp <= 0) return;
 

@@ -2,6 +2,8 @@
 # Added to the main amber-editor target via OBJECT pattern.
 
 target_sources(${OLIVE_TARGET} PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/alpha.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/alpha.h
   ${CMAKE_CURRENT_SOURCE_DIR}/audio.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/audio.h
   ${CMAKE_CURRENT_SOURCE_DIR}/appcontext.cpp
@@ -10,6 +12,8 @@ target_sources(${OLIVE_TARGET} PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/math.h
   ${CMAKE_CURRENT_SOURCE_DIR}/path.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/path.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/pixelsampler.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/pixelsampler.h
   ${CMAKE_CURRENT_SOURCE_DIR}/shortcutfile.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/shortcutfile.h
   ${CMAKE_CURRENT_SOURCE_DIR}/style.h

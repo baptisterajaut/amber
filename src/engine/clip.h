@@ -165,7 +165,11 @@ public:
   QMutex cache_lock;
 
   [[nodiscard]] bool NeedsCpuRgba() const;
+  // True when the open cacher no longer fits the clip: ImageFlag effects added/removed (YUV vs RGBA pipeline), or
+  // export started/ended since Open() (original vs proxy file)
   [[nodiscard]] bool NeedsCacherReconfigure() const;
+  // Whether the clip was opened during an export: its cacher then decodes the original media, never the proxy
+  [[nodiscard]] bool OpenedForExport() const { return opened_for_export_; }
 
   // video playback variables (QRhi)
   void* fbo_rhi{nullptr};  // ClipRhiResources* — opaque to avoid circular includes
@@ -208,6 +212,7 @@ private:
   int loop_mode_{kLoopNone};
   std::atomic<bool> open_{false};
   bool cacher_uses_rgba_{false};
+  bool opened_for_export_{false};
 
   // reset_audio() with the nested sequences already being reset, to stop on a sequence that nests itself
   void reset_audio(QVector<Sequence*>& chain);

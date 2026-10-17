@@ -377,11 +377,14 @@ void RenderThread::paint() {
     } else {
       QByteArray& data = cpu_frame_[active_idx];
       if (!data.isEmpty()) {
+        // The composite is premultiplied alpha. PNG keeps alpha: label it premultiplied and QImage straightens it on
+        // save. The other formats Save Frame offers drop alpha, and must get the composite over black, as an opaque
+        // export does: QImage would straighten a premultiplied image before dropping alpha.
+        const QImage::Format fmt = save_fn.endsWith(".png", Qt::CaseInsensitive) ? QImage::Format_RGBA8888_Premultiplied
+                                                                                 : QImage::Format_RGBA8888;
         // Copy the QImage so it owns its pixels — save_fn is cleared below and
         // cpu_frame_ may be overwritten before the PNG/JPEG encoder finishes.
-        QImage img =
-            QImage(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height, QImage::Format_RGBA8888)
-                .copy();
+        QImage img = QImage(reinterpret_cast<const uchar*>(data.constData()), tex_width, tex_height, fmt).copy();
         if (!img.save(save_fn)) {
           qWarning() << "Failed to save frame to" << save_fn;
           emit frame_save_failed(save_fn);

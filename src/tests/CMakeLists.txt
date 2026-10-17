@@ -1,6 +1,8 @@
 find_package(Qt6 REQUIRED COMPONENTS Test Core)
 
 set(AMBER_CORE_SOURCES
+  ${CMAKE_SOURCE_DIR}/core/alpha.cpp
+  ${CMAKE_SOURCE_DIR}/core/alpha.h
   ${CMAKE_SOURCE_DIR}/core/audio.cpp
   ${CMAKE_SOURCE_DIR}/core/audio.h
   ${CMAKE_SOURCE_DIR}/core/math.cpp
@@ -96,6 +98,27 @@ add_executable(amber-test-shortcutfile
 target_include_directories(amber-test-shortcutfile PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-shortcutfile PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-shortcutfile COMMAND amber-test-shortcutfile)
+
+add_executable(amber-test-pixel-sampler
+  test_pixel_sampler.cpp
+  ${CMAKE_SOURCE_DIR}/core/pixelsampler.cpp
+  ${CMAKE_SOURCE_DIR}/core/pixelsampler.h
+)
+target_include_directories(amber-test-pixel-sampler PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-pixel-sampler PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-pixel-sampler COMMAND amber-test-pixel-sampler)
+
+# Footage::decode_url(). footage.cpp needs only PreviewGenerator::cancel(), stubbed in the test; Clip-side export
+# mode (OpenedForExport, NeedsCacherReconfigure) needs the engine and is not covered here.
+add_executable(amber-test-footage
+  test_footage.cpp
+  ${CMAKE_SOURCE_DIR}/project/footage.cpp
+  ${CMAKE_SOURCE_DIR}/project/footage.h
+)
+target_include_directories(amber-test-footage PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-footage PRIVATE Qt6::Test Qt6::Widgets Qt6::GuiPrivate FFMPEG::avutil FFMPEG::avcodec FFMPEG::avformat
+  FFMPEG::swscale FFMPEG::swresample)
+add_test(NAME amber-test-footage COMMAND amber-test-footage)
 
 add_executable(amber-test-config
   test_config.cpp

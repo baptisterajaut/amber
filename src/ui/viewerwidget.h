@@ -34,6 +34,7 @@
 #include "rendering/renderthread.h"
 #include "engine/clip.h"
 #include "core/guide.h"
+#include "core/pixelsampler.h"
 #include "ui/viewercontainer.h"
 #include "ui/viewerwindow.h"
 
@@ -79,6 +80,9 @@ class ViewerWidget : public QRhiWidget {
   // Use this when overlay-only state changes (e.g. voice-over pre-roll countdown)
   // so we don't trigger a full RHI re-render.
   void update_overlay();
+  // Where render() draws the frame, widget coordinates: the widget itself, or larger past the zoom where the container
+  // stops growing it, panned by the scrollbars. Overlays, hit tests and the rulers map through it.
+  QRectF frame_rect() const;
 
  signals:
   void colorPicked(const QColor& color);
@@ -121,7 +125,10 @@ class ViewerWidget : public QRhiWidget {
   int creating_guide_pos_{0};
   bool color_pick_mode_{false};
   void exitColorPickMode();
-  QColor readPixelAt(int widget_x, int widget_y);
+  // Colour of the shown frame at a widget position, straight alpha. Invalid with no frame or off the frame.
+  QColor readPixelAt(const QPointF& pos);
+  // Widget size, zoom, scrolls and sequence size, as render() lays the frame out (empty sequence size with none open)
+  amber::ViewerFrameGeometry frame_geometry() const;
   void seek_from_click(int x);
   Effect* gizmos{nullptr};
   int drag_start_x;

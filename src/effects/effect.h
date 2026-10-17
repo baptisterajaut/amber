@@ -217,7 +217,8 @@ class Effect : public QObject {
 
   const char* ffmpeg_filter;
 
-  virtual void process_image(double timecode, uint8_t* input, uint8_t* output, int size);
+  // CPU RGBA frame of width x height pixels, rows stride bytes apart (input and output alike)
+  virtual void process_image(double timecode, uint8_t* input, uint8_t* output, int width, int height, int stride);
   virtual void process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData,
                               QSize renderSize = QSize());
   virtual void process_coords(double timecode, GLTextureCoords& coords, int data);
