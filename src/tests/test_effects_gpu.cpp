@@ -18,6 +18,7 @@ extern "C" {
 #include "effects/internal/srtparser.h"
 #include "effects/internal/subtitleeffect.h"
 #include "engine/clip.h"
+#include "rendering/renderfunctions.h"
 #include "tests/test_render_harness.h"
 #include "tests/test_gpu_required.h"
 
@@ -154,6 +155,13 @@ class TestEffectsGpu : public QObject {
   void alphaAdjustInvert();
   void alphaAdjustThreshold();
   void alphaAdjustShowAlpha();
+
+  // F-1 batch 3 — original input for multipass shaders, Glow.
+  void glowIntensityZeroIdentity();
+  void glowThresholdFullIdentity();
+  void glowCheckerboardHalo();
+  void glowScreenMode();
+  void glowSnapshotPingPongInput();
 
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
@@ -449,8 +457,14 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
   h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 40, 20));
   h_->attach_xml_shader(c, "Box Blur");
   h_->attach_xml_shader(c, "Hue/Saturation/Brightness");
+  h_->attach_xml_shader(c, "Glow");  // original="1" on a ping-pong input: copy into the lazy ClipRhiResources::orig
   check_steady(seq.get(), 5, 1, "generator", frame0);
   if (QTest::currentTestFailed()) return;
+  // Textures aren't counted above: the snapshot target must be created once, then reused
+  QRhiTexture* orig = c->fbo_rhi ? static_cast<ClipRhiResources*>(c->fbo_rhi)->orig : nullptr;
+  QVERIFY2(orig != nullptr, "Glow after Box Blur should snapshot its input into ClipRhiResources::orig");
+  QVERIFY(!h_->render_frame(seq.get(), 20).isEmpty());
+  QCOMPARE(static_cast<ClipRhiResources*>(c->fbo_rhi)->orig, orig);
 
   // Decoded footage: the YUV->RGB pass in Clip::retrieveYuvGpuPath (1-frame fixtures, so stay on frame 0)
   if (avcodec_find_decoder(AV_CODEC_ID_H264)) {
@@ -3033,6 +3047,7 @@ void TestEffectsGpu::colorShadersKeepTransparentClipTransparent() {
       {"Threshold", [this](Effect* e) { h_->set_field_bool(e, 1, 0, true); }},              // invert: black → white
       {"Find Edges", [this](Effect* e) { h_->set_field_bool(e, 2, 0, true); }},             // invert: no edge → white
       {"Colorize", [this](Effect* e) { h_->set_field_double(e, 2, 0, 50.0); }},             // lightness 50
+      {"Glow", [](Effect*) {}},  // defaults: bright pass of zeros is zero, a = max(0, max(rgb)) = 0
   };
 
   auto make_bottom = [this](Sequence* seq) {
@@ -3062,6 +3077,126 @@ void TestEffectsGpu::colorShadersKeepTransparentClipTransparent() {
                             .arg(mid.b)
                             .arg(buf_diff(reference, pixels))));
   }
+}
+
+// ---------------------------------------------------------------------------
+// F-1 batch 3 — original input for multipass shaders (original="1"), Glow
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Glow rows: 0 Threshold, 1 Radius, 2 Intensity, 3 Blend (0 Add, 1 Screen)
+EffectPtr attach_glow(TestRenderHarness* h, Clip* c, double threshold, double radius, double intensity, int blend) {
+  EffectPtr fx = h->attach_xml_shader(c, "Glow");
+  h->set_field_double(fx.get(), 0, 0, threshold);
+  h->set_field_double(fx.get(), 1, 0, radius);
+  h->set_field_double(fx.get(), 2, 0, intensity);
+  h->set_field_combo(fx.get(), 3, 0, blend);
+  return fx;
+}
+
+// Probes of the white/black checkerboard (cell (0,0) black, x 0..15) under Glow threshold 60, radius 4, intensity
+// 100, Add. sigma = 4/3, one tap per texel over x = -4..4, w(x) = exp(-x^2 * 9/32): w0 = 1, w1 = 0.75484,
+// w2 = 0.32465, w3 = 0.07956, w4 = 0.01111, sum = 3.34032. White taps are bright 1 ((1 - 0.6) / 0.4), black 0.
+// (14,8): white texels 16..18 = x 2..4 → 0.41532 / 3.34032 = 0.12434 → 32 after the RGBA8 pass, the vertical pass
+// stays inside the cell (rows 4..12), so 0 + 32 = 32. (8,8): taps 4..12 all black → 0. (24,8) white: 1 + g → 255.
+struct GlowProbe {
+  int x, y, expected;
+};
+const GlowProbe kGlowCheckerProbes[] = {{14, 8, 32}, {8, 8, 0}, {24, 8, 255}};
+
+void check_glow_probes(const QByteArray& pixels, const char* label) {
+  for (const GlowProbe& p : kGlowCheckerProbes) {
+    Rgba px = pixel_at(pixels, 64, p.x, p.y);
+    QVERIFY2(qAbs(px.r - p.expected) <= 4 && qAbs(px.g - p.expected) <= 4 && qAbs(px.b - p.expected) <= 4,
+             qPrintable(QString("%1 (%2,%3): expected %4, got (%5,%6,%7)")
+                            .arg(label)
+                            .arg(p.x)
+                            .arg(p.y)
+                            .arg(p.expected)
+                            .arg(px.r)
+                            .arg(px.g)
+                            .arg(px.b)));
+  }
+}
+
+}  // namespace
+
+void TestEffectsGpu::glowIntensityZeroIdentity() {
+  // Intensity 0 → g = 0, rgb = o.rgb, a = max(o.a, max(o.rgb)) = o.a (premultiplied): the input exactly.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+  attach_glow(h_.get(), c, 0.0, 20.0, 0.0, 0);
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/2),
+           qPrintable(QString("expected identity, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::glowThresholdFullIdentity() {
+  // Threshold 100 → k = max(luma - 1, 0) / 1e-4 = 0 for every pixel: no halo, the input comes out unchanged.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+  attach_glow(h_.get(), c, 100.0, 20.0, 400.0, 0);
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/2),
+           qPrintable(QString("expected identity, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::glowCheckerboardHalo() {
+  // The Solid's own texture is the Glow input here (not a ping-pong texture): bound directly, no snapshot.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_checkerboard(h_.get(), seq.get(), QColor(255, 255, 255));
+  attach_glow(h_.get(), c, 60.0, 4.0, 100.0, 0);
+  check_glow_probes(h_->render_frame(seq.get(), 0), "direct input");
+}
+
+void TestEffectsGpu::glowScreenMode() {
+  // Flat (204,204,204) = 0.8: k = (0.8 - 0.6) / 0.4 = 0.5 → g = 0.4 everywhere (a flat blur stays flat).
+  // Add: 0.8 + 0.4 = 1.2 → 255. Screen: 1 - (1 - 0.8)(1 - 0.4) = 0.88 → 224.
+  const int modes[] = {0, 1};
+  for (int mode : modes) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(c->effects[1].get(), 2, 0, QColor(204, 204, 204));
+    attach_glow(h_.get(), c, 60.0, 4.0, 100.0, mode);
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    const int expected = mode == 0 ? 255 : 224;
+    Rgba mid = pixel_at(pixels, 64, 32, 32);
+    QVERIFY2(
+        qAbs(mid.r - expected) <= 4 && qAbs(mid.g - expected) <= 4 && qAbs(mid.b - expected) <= 4,
+        qPrintable(
+            QString("blend %1: expected %2, got (%3,%4,%5)").arg(mode).arg(expected).arg(mid.r).arg(mid.g).arg(mid.b)));
+  }
+}
+
+void TestEffectsGpu::glowSnapshotPingPongInput() {
+  // Invert at amount 0 changes nothing but leaves the Glow input in one of the clip's ping-pong textures, which the
+  // Glow passes overwrite: binding 3 must read the copy in ClipRhiResources::orig. Without the snapshot, pass 2
+  // reads pass 1's output as the "original" (halo added twice: (14,8) ≈ 64 instead of 32).
+  auto ref_seq = h_->make_sequence(64, 64, 30.0);
+  Clip* ref = add_checkerboard(h_.get(), ref_seq.get(), QColor(255, 255, 255));
+  attach_glow(h_.get(), ref, 60.0, 4.0, 100.0, 0);
+  QByteArray reference = h_->render_frame(ref_seq.get(), 0);
+
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_checkerboard(h_.get(), seq.get(), QColor(255, 255, 255));
+  EffectPtr invert = h_->attach_xml_shader(c, "Invert");
+  h_->set_field_double(invert.get(), 0, 0, 0.0);
+  attach_glow(h_.get(), c, 60.0, 4.0, 100.0, 0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  check_glow_probes(pixels, "ping-pong input");
+  QVERIFY2(buffers_within(reference, pixels, /*tolerance=*/2),
+           qPrintable(QString("ping-pong input differs from direct input, diff=%1").arg(buf_diff(reference, pixels))));
 }
 
 // Phase 4 — only test that exercises the YUV decode path (yuv2rgb.frag.qsb).
