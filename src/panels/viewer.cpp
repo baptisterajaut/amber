@@ -781,10 +781,7 @@ void Viewer::set_media(Media* m) {
       case MEDIA_TYPE_FOOTAGE: {
         Footage* footage = media->to_footage();
 
-        marker_ref = &footage->markers;
-
         new_sequence = std::make_shared<Sequence>();
-        created_sequence = true;
         new_sequence->wrapper_sequence = true;
         new_sequence->name = footage->name;
 
@@ -852,6 +849,13 @@ void Viewer::set_media(Media* m) {
   }
 
   set_sequence(false, new_sequence);
+
+  // After set_sequence(): it clears created_sequence (cleaning up the previous wrapper) and points marker_ref at the
+  // new sequence. The wrapper is throwaway, so its markers go on the footage, which is saved and outlives it (undo too).
+  if (media != nullptr && media->get_type() == MEDIA_TYPE_FOOTAGE) {
+    created_sequence = true;
+    marker_ref = &media->to_footage()->markers;
+  }
 }
 
 void Viewer::update_playhead() { seek(current_timecode_slider->value()); }
@@ -873,6 +877,10 @@ void Viewer::check_playback_end() {
     }
     if (seq->using_workarea && seq->playhead >= seq->workarea_out) {
       if (amber::CurrentConfig.loop) {
+        // play() pauses a playing viewer first, which resets the speed to 1x: keep 2x/3x across the wrap
+        int speed = playback_speed;
+        pause();
+        playback_speed = speed;
         play();
       } else if (playing_in_to_out) {
         pause();
@@ -994,6 +1002,8 @@ void Viewer::set_sequence(bool main, SequencePtr s) {
       marker_ref = &seq->markers;
     }
   } else {
+    // The footage/sequence it pointed at may be about to be deleted; the header still paints markers
+    marker_ref = nullptr;
     update_playhead_timecode(0);
     update_end_timecode();
   }

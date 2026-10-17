@@ -39,6 +39,9 @@ SequencePtr Sequence::copy() {
   s->frame_rate = frame_rate;
   s->audio_frequency = audio_frequency;
   s->audio_layout = audio_layout;
+  s->using_workarea = using_workarea;
+  s->workarea_in = workarea_in;
+  s->workarea_out = workarea_out;
 
   // deep copy all of the sequence's clips
   s->clips.resize(clips.size());

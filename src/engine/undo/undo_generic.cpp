@@ -32,8 +32,10 @@ AmberAction::~AmberAction() = default;
 void AmberAction::undo() {
   doUndo();
 
+  // Always modified: restoring the pre-action state only matches the file on disk if nothing was saved since
+  // (undo after Ctrl+S would otherwise mark a project that differs from its file as clean)
   if (set_window_modified && amber::app_ctx) {
-    amber::app_ctx->setModified(old_window_modified);
+    amber::app_ctx->setModified(true);
   }
 }
 
@@ -41,9 +43,6 @@ void AmberAction::redo() {
   doRedo();
 
   if (set_window_modified && amber::app_ctx) {
-
-    // store current modified state
-    old_window_modified = amber::app_ctx->isModified();
 
     // set modified to true
     amber::app_ctx->setModified(true);

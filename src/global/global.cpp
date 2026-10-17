@@ -207,7 +207,7 @@ void AmberGlobal::SetNativeStyling(QWidget* w) {
 #endif
 }
 
-void AmberGlobal::LoadProject(const QString& fn, bool autorecovery) {
+void AmberGlobal::LoadProject(const QString& fn, bool autorecovery, bool import) {
   // QSortFilterProxyModels are not thread-safe, and as we'll be loading in another thread, leaving it connected
   // can cause glitches in its presentation. Therefore for the duration of the loading process, we disconnect it,
   // and reconnect it later once the loading is complete.
@@ -218,11 +218,14 @@ void AmberGlobal::LoadProject(const QString& fn, bool autorecovery) {
 
   ld.open();
 
-  LoadThread* lt = new LoadThread(fn, autorecovery);
+  LoadThread* lt = new LoadThread(fn, autorecovery, import);
   connect(&ld, &LoadDialog::cancel, lt, &LoadThread::cancel);
   connect(lt, &LoadThread::success, &ld, &QDialog::accept);
   connect(lt, &LoadThread::error, &ld, &QDialog::reject);
-  connect(lt, &LoadThread::error, this, &AmberGlobal::new_project);
+  // An import failing must not clear the project it was being imported into
+  if (!import) {
+    connect(lt, &LoadThread::error, this, &AmberGlobal::new_project);
+  }
   connect(lt, &LoadThread::report_progress, &ld, &LoadDialog::setValue);
   connect(lt, &LoadThread::found_invalid_footage, this, [](QVector<QPair<Media*, Footage*>> invalid) {
     FootageRelinkDialog dlg(amber::MainWindow, invalid);
@@ -267,7 +270,7 @@ void AmberGlobal::ClearProject() {
 }
 
 void AmberGlobal::ImportProject(const QString& fn) {
-  LoadProject(fn, false);
+  LoadProject(fn, false, true);
   set_modified(true);
 }
 

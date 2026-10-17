@@ -35,7 +35,8 @@
 class LoadThread : public QThread {
   Q_OBJECT
  public:
-  LoadThread(const QString& filename, bool autorecovery);
+  // import: merge into the open project (stays modified; recents and active sequence untouched)
+  LoadThread(const QString& filename, bool autorecovery, bool import = false);
   void run() override;
  public slots:
   void cancel();
@@ -52,6 +53,7 @@ class LoadThread : public QThread {
 
  private:
   bool autorecovery_;
+  bool import_;
   QString filename_;
 
   bool load_worker(QFile& f, QXmlStreamReader& stream, int type);
