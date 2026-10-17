@@ -116,7 +116,12 @@ bool AppContextImpl::isModified() { return amber::Global->is_modified(); }
 
 void AppContextImpl::setModified(bool modified) { amber::Global->set_modified(modified); }
 
-void AppContextImpl::updateUi(bool modified) { update_ui(modified); }
+void AppContextImpl::updateUi(bool modified) {
+  // Off the GUI thread (every effect field LoadThread loads emits Changed()): never touch the panels from there. A
+  // loaded project's panels are rebuilt on the GUI thread by the sequenceChanged handler once loading ends.
+  if (QThread::currentThread() != qApp->thread()) return;
+  update_ui(modified);
+}
 
 static int exec_message_box(const QString& title, const QString& text, int type) {
   QMessageBox box;
