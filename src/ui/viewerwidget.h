@@ -89,6 +89,9 @@ class ViewerWidget : public QRhiWidget {
   // Playback stopped: empties the frame rate window, so the next play never averages across the pause, and hides
   // the label (no new frame repaints the overlay after a pause)
   void reset_frame_rate();
+  // Where render() draws the frame, widget coordinates: the widget itself, or larger past the zoom where the container
+  // stops growing it, panned by the scrollbars. Overlays, hit tests and the rulers map through it.
+  QRectF frame_rect() const;
 
  signals:
   void colorPicked(const QColor& color);
@@ -155,6 +158,8 @@ class ViewerWidget : public QRhiWidget {
   // Colour of the shown frame at a widget position, as stored in the front buffer, and the sequence pixel there.
   // Invalid with no frame or off the frame.
   QColor readPixelAt(const QPointF& pos, QPoint* seq_pos = nullptr);
+  // Widget size, zoom, scrolls and sequence size, as render() lays the frame out (empty sequence size with none open)
+  amber::ViewerFrameGeometry frame_geometry() const;
   void seek_from_click(int x);
   Effect* gizmos{nullptr};
   int drag_start_x;

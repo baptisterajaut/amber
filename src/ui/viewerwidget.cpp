@@ -441,6 +441,18 @@ void ViewerWidget::set_scroll(double x, double y) {
   if (overlay_) overlay_->update();
 }
 
+amber::ViewerFrameGeometry ViewerWidget::frame_geometry() const {
+  amber::ViewerFrameGeometry g;
+  g.widget = QSizeF(width(), height());
+  g.zoom = container->zoom;
+  g.x_scroll = x_scroll;
+  g.y_scroll = y_scroll;
+  if (viewer->seq != nullptr) g.sequence = QSize(viewer->seq->width, viewer->seq->height);
+  return g;
+}
+
+QRectF ViewerWidget::frame_rect() const { return amber::viewer_frame_rect(frame_geometry()); }
+
 void ViewerWidget::seek_from_click(int x) { viewer->seek(getFrameFromScreenPoint(waveform_zoom, x + waveform_scroll)); }
 
 void ViewerWidget::context_destroy() {
@@ -451,10 +463,12 @@ void ViewerWidget::context_destroy() {
 }
 
 EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
-  if (gizmos != nullptr) {
-    double multiplier_x = double(viewer->seq->width) / double(width());
-    double multiplier_y = double(viewer->seq->height) / double(height());
-    QPoint mouse_pos(qRound(x * multiplier_x), qRound((height() - y) * multiplier_y));
+  const QRectF fr = frame_rect();
+  if (gizmos != nullptr && !fr.isEmpty()) {
+    // Gizmo screen_pos is in sequence pixels with Y=0 at the bottom
+    QPointF sp = amber::viewer_to_sequence(frame_geometry(), QPointF(x, y));
+    QPoint mouse_pos(qRound(sp.x()), qRound(viewer->seq->height - sp.y()));
+    double multiplier_x = double(viewer->seq->width) / fr.width();
     int dot_size = 2 * qRound(GIZMO_DOT_SIZE * multiplier_x);
     int target_size = 2 * qRound(GIZMO_TARGET_SIZE * multiplier_x);
     for (int i = 0; i < gizmos->gizmo_count(); i++) {
@@ -487,9 +501,12 @@ EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
 }
 
 void ViewerWidget::move_gizmos(QMouseEvent* event, bool done) {
-  if (selected_gizmo != nullptr) {
-    double multiplier_x = double(viewer->seq->width) / double(width());
-    double multiplier_y = double(viewer->seq->height) / double(height());
+  const QRectF fr = frame_rect();
+  if (selected_gizmo != nullptr && !fr.isEmpty()) {
+    // CBA: rounded per mouse event, so past 100% zoom a 1 px move is 0 or 1 sequence pixel; carry the remainder if
+    // slow drags feel off
+    double multiplier_x = double(viewer->seq->width) / fr.width();
+    double multiplier_y = double(viewer->seq->height) / fr.height();
 
     int x_movement = qRound((event->position().toPoint().x() - drag_start_x) * multiplier_x);
     int y_movement = qRound((event->position().toPoint().y() - drag_start_y) * multiplier_y);
@@ -590,10 +607,9 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
     container->dragScrollPress(event->position().toPoint() * container->zoom);
   } else if (viewer->seq != nullptr && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
-    double multiplier_x = double(viewer->seq->width) / double(width());
-    double multiplier_y = double(viewer->seq->height) / double(height());
-    int video_x = qRound(event->position().x() * multiplier_x);
-    int image_y = qRound(event->position().y() * multiplier_y);
+    QPointF sp = amber::viewer_to_sequence(frame_geometry(), event->position());
+    int video_x = qRound(sp.x());
+    int image_y = qRound(sp.y());
     if (press_handle_guide(video_x, image_y, event)) return;
     if (event->buttons() & Qt::LeftButton) press_set_gizmo_drag(event);
   } else if (event->buttons() & Qt::LeftButton) {
@@ -667,10 +683,9 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
   if (panel_timeline->tool == TIMELINE_TOOL_HAND) setCursor(Qt::OpenHandCursor);
 
   if (viewer->seq != nullptr && width() > 0) {
-    double multiplier_x = double(viewer->seq->width) / double(width());
-    double multiplier_y = double(viewer->seq->height) / double(height());
-    int video_x = qRound(event->position().x() * multiplier_x);
-    int image_y = qRound(event->position().y() * multiplier_y);
+    QPointF sp = amber::viewer_to_sequence(frame_geometry(), event->position());
+    int video_x = qRound(sp.x());
+    int image_y = qRound(sp.y());
 
     if (move_handle_guide_drag(video_x, image_y)) return;
     hovered_guide_index_ = -1;
@@ -760,23 +775,26 @@ void ViewerWidget::draw_waveform_func(QPainter& p) {
 }
 
 void ViewerWidget::draw_title_safe_area(QPainter& p) {
-  int w = width();
-  int h = height();
+  // On the frame as render() draws it, which past a zoom overflows the widget
+  const QRectF fr = frame_rect();
+  if (fr.isEmpty()) return;
+  double w = fr.width();
+  double h = fr.height();
 
   // Compute effective area (respecting custom aspect ratio)
-  double viewportAr = double(w) / double(h);
+  double viewportAr = w / h;
   double areaW = w;
   double areaH = h;
-  double offsetX = 0;
-  double offsetY = 0;
+  double offsetX = fr.left();
+  double offsetY = fr.top();
 
   if (amber::CurrentConfig.use_custom_title_safe_ratio && amber::CurrentConfig.custom_title_safe_ratio > 0) {
     if (amber::CurrentConfig.custom_title_safe_ratio > viewportAr) {
       areaH = w / amber::CurrentConfig.custom_title_safe_ratio;
-      offsetY = (h - areaH) * 0.5;
+      offsetY += (h - areaH) * 0.5;
     } else {
       areaW = h * amber::CurrentConfig.custom_title_safe_ratio;
-      offsetX = (w - areaW) * 0.5;
+      offsetX += (w - areaW) * 0.5;
     }
   }
 
@@ -812,16 +830,9 @@ void ViewerWidget::draw_title_safe_area(QPainter& p) {
 void ViewerWidget::draw_guides(QPainter& p) {
   if (viewer->seq == nullptr || !amber::CurrentConfig.show_guides) return;
 
-  // Compute image→widget coordinate transform
-  // container->zoom maps image-space pixels to widget-space pixels directly
-  double scale = container->zoom;
-  double tx = (viewer->seq->width - (width() / container->zoom)) * x_scroll;
-  double ty = (viewer->seq->height - (height() / container->zoom)) * (1.0 - y_scroll);
-
-  auto toWidget = [&](double ix, double iy) -> QPointF {
-    // image-space (0=top-left, Y down) → widget-space
-    return QPointF((ix - tx) * scale, (iy - ty) * scale);
-  };
+  // image-space (0=top-left, Y down) → where render() draws it in the widget
+  const amber::ViewerFrameGeometry fg = frame_geometry();
+  auto toWidget = [&](double ix, double iy) -> QPointF { return amber::sequence_to_viewer(fg, QPointF(ix, iy)); };
 
   QPen guidePen(QColor(0, 204, 204, 178));
   guidePen.setWidth(1);
@@ -864,15 +875,10 @@ void ViewerWidget::draw_gizmos(QPainter& p) {
   double dot_size_px = GIZMO_DOT_SIZE;
   double target_size_px = GIZMO_TARGET_SIZE;
 
-  // container->zoom maps image-space pixels to widget-space pixels directly
-  double scale = container->zoom;
-  double tx = (viewer->seq->width - (width() / container->zoom)) * x_scroll;
-  double ty = (viewer->seq->height - (height() / container->zoom)) * (1.0 - y_scroll);
-
   // Gizmo screen_pos is in image-space with Y=0 at bottom. Convert to widget-space (Y=0 at top).
+  const amber::ViewerFrameGeometry fg = frame_geometry();
   auto toWidget = [&](double ix, double iy) -> QPointF {
-    double iy_topdown = viewer->seq->height - iy;
-    return QPointF((ix - tx) * scale, (iy_topdown - ty) * scale);
+    return amber::sequence_to_viewer(fg, QPointF(ix, viewer->seq->height - iy));
   };
 
   p.setRenderHint(QPainter::Antialiasing, true);
@@ -985,8 +991,9 @@ void ViewerWidget::draw_pixel_sampler(QPainter& p) {
 }
 
 int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {
-  if (viewer->seq == nullptr) return -1;
-  int threshold = qMax(3, int(5.0 * viewer->seq->width / width()));
+  const QRectF fr = frame_rect();
+  if (viewer->seq == nullptr || fr.isEmpty()) return -1;
+  int threshold = qMax(3, int(5.0 * viewer->seq->width / fr.width()));
   for (int i = 0; i < viewer->seq->guides.size(); i++) {
     const Guide& g = viewer->seq->guides[i];
     if (g.orientation == Guide::Horizontal) {
@@ -1159,14 +1166,8 @@ QColor ViewerWidget::readPixelAt(const QPointF& pos, QPoint* seq_pos) {
 
   // Where render() draws the frame: past a zoom the widget stops growing and the frame overflows it, panned by the
   // scrollbars. The buffer is seq size / preview divider.
-  amber::ViewerFrameGeometry g;
-  g.widget = QSizeF(width(), height());
-  g.zoom = container->zoom;
-  g.x_scroll = x_scroll;
-  g.y_scroll = y_scroll;
-  g.sequence = QSize(viewer->seq->width, viewer->seq->height);
   amber::FramePoint pt;
-  if (!amber::map_viewer_point(g, pos, QSize(fw, fh), &pt)) {
+  if (!amber::map_viewer_point(frame_geometry(), pos, QSize(fw, fh), &pt)) {
     return QColor();
   }
   if (seq_pos != nullptr) *seq_pos = QPoint(pt.seq_x, pt.seq_y);
