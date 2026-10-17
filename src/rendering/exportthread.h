@@ -117,6 +117,7 @@ class ExportThread : public QThread {
   AVFrame* video_frame{nullptr};
   AVFrame* sws_frame{nullptr};
   SwsContext* sws_ctx{nullptr};
+  bool unpremultiply_{false};  // the encoder's pixel format has alpha: straighten the premultiplied composite
   AVStream* audio_stream{nullptr};
   const AVCodec* acodec{nullptr};
   AVFrame* audio_frame{nullptr};

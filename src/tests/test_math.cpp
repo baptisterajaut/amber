@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "core/alpha.h"
 #include "core/math.h"
 
 class TestMath : public QObject {
@@ -109,6 +110,33 @@ class TestMath : public QObject {
   void testQuadFromTMidpoint() {
     double result = quad_from_t(0.0, 0.5, 1.0, 0.5);
     QVERIFY(qAbs(result - 0.5) < 0.001);
+  }
+
+  void testUnpremultiplyRgba8() {
+    // Two rows of 3 pixels, stride 16 bytes: the 4 padding bytes per row must stay untouched
+    const uchar in[32] = {
+        128, 128, 128, 128, 0,  0,  0, 0, 255, 0,   10, 255, 7, 7, 7, 7,  //
+        64,  32,  0,   128, 50, 60, 9, 0, 1,   250, 0,  200, 7, 7, 7, 7,  //
+    };
+    const uchar expected[32] = {
+        255, 255, 255, 128, 0, 0, 0, 0, 255, 0,   10, 255, 7, 7, 7, 7,  // half white, transparent, opaque
+        128, 64,  0,   128, 0, 0, 0, 0, 1,   255, 0,  200, 7, 7, 7, 7,  // round(c*255/a), A=0 -> 0, clamped
+    };
+    uchar px[32];
+    memcpy(px, in, sizeof(px));
+    amber::unpremultiply_rgba8(px, 3, 2, 16);
+    for (int i = 0; i < 32; i++) {
+      QVERIFY2(px[i] == expected[i], qPrintable(QString("byte %1: %2 != %3").arg(i).arg(px[i]).arg(expected[i])));
+    }
+    // Every (c, a) with c <= a: rounding to nearest, and premultiplying back gives c again
+    for (int a = 1; a < 256; a++) {
+      for (int c = 0; c <= a; c++) {
+        uchar p[4] = {uchar(c), uchar(c), uchar(c), uchar(a)};
+        amber::unpremultiply_rgba8(p, 1, 1, 4);
+        QCOMPARE(int(p[0]), qRound(c * 255.0 / a));
+        QCOMPARE(qRound(p[0] * a / 255.0), c);
+      }
+    }
   }
 };
 

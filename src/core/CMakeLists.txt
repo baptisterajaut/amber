@@ -2,6 +2,8 @@
 # Added to the main amber-editor target via OBJECT pattern.
 
 target_sources(amber-engine PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/alpha.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/alpha.h
   ${CMAKE_CURRENT_SOURCE_DIR}/blur.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/blur.h
   ${CMAKE_CURRENT_SOURCE_DIR}/audio.cpp
