@@ -304,6 +304,26 @@ class TestLoadThread : public QObject {
     QCOMPARE(pio_->isModified(), true);
   }
 
+  // AmberGlobal::LoadProject() closes its dialog on finished() and tells a cancelled load by neither success() nor
+  // error() having been emitted
+  void cancelledLoadFinishesSilently() {
+    QString path = write_fixture("cancel.ove", amber::kSaveVersion);
+    QVERIFY(!path.isEmpty());
+    auto* lt = new LoadThread(path, false);
+    QPointer<LoadThread> guard(lt);
+    bool succeeded = false;
+    int failed = 0;
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    connect(lt, &LoadThread::error, this, [&failed]() { ++failed; });
+    lt->cancel();
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(guard.isNull(), 10000);
+    QVERIFY(!succeeded);
+    QCOMPARE(failed, 0);
+    QCOMPARE(ctx_.messages, 0);
+    QCOMPARE(ctx_.recents, 0);
+  }
+
   // A file that can't be opened is a load error like any other: error() once, one message
   void unreadableFileEmitsErrorOnce() {
     bool succeeded = false;

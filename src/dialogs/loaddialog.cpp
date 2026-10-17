@@ -21,6 +21,7 @@
 #include "loaddialog.h"
 
 #include <QVBoxLayout>
+#include <QFileInfo>
 #include <QLabel>
 #include <QPushButton>
 
@@ -31,7 +32,7 @@
 #include "ui/sourcetable.h"
 #include "ui/mainwindow.h"
 
-LoadDialog::LoadDialog(QWidget *parent) :
+LoadDialog::LoadDialog(QWidget *parent, const QString &filename) :
   QDialog(parent)
 {
   setWindowTitle(tr("Loading..."));
@@ -39,7 +40,7 @@ LoadDialog::LoadDialog(QWidget *parent) :
 
   QVBoxLayout* layout = new QVBoxLayout(this);
 
-  layout->addWidget(new QLabel(tr("Loading '%1'...").arg(amber::ActiveProjectFilename.mid(amber::ActiveProjectFilename.lastIndexOf('/')+1)), this));
+  layout->addWidget(new QLabel(tr("Loading '%1'...").arg(QFileInfo(filename).fileName()), this));
 
   bar = new QProgressBar(this);
   bar->setValue(0);
@@ -60,4 +61,9 @@ LoadDialog::LoadDialog(QWidget *parent) :
 void LoadDialog::setValue(int i)
 {
   bar->setValue(i);
+}
+
+void LoadDialog::reject()
+{
+  emit cancel();
 }
