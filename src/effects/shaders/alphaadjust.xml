@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <effect name="Alpha Adjust" category="Keying">
 	<row name="Mode">
-		<field type="combo" default="0" id="mode">
+		<field type="combo" default="1" id="mode">
 			<option>Invert</option>
 			<option>Threshold</option>
 			<option>Show Alpha</option>

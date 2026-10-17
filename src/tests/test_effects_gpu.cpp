@@ -204,9 +204,6 @@ void TestEffectsGpu::effectPassthroughSweep_data() {
     if (meta.internal == EFFECT_INTERNAL_FREI0R) continue;
     if (meta.internal == EFFECT_INTERNAL_VST) continue;
     if (meta.internal == EFFECT_INTERNAL_MASK) continue;  // disabled
-    // Default mode Invert turns the opaque Solid fully transparent: all-zero output is correct there. Its three modes
-    // have their own slots (alphaAdjust*).
-    if (meta.name == QLatin1String("Alpha Adjust")) continue;
     QTest::newRow(qPrintable(meta.name)) << i;
   }
 }
