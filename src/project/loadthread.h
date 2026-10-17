@@ -110,6 +110,7 @@ class LoadThread : public QThread {
 
   int current_element_count;
   int total_element_count;
+  bool counting_progress_{false};  // a collection phase is parsing its own elements (see load_worker)
 
   QMutex mutex;
   QWaitCondition waitCond;
