@@ -609,10 +609,10 @@ bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
       QRect test_rect(key_x - KEYFRAME_SIZE, key_y - KEYFRAME_SIZE, KEYFRAME_SIZE + KEYFRAME_SIZE,
                       KEYFRAME_SIZE + KEYFRAME_SIZE);
       QRect pre_rect(qRound(key_x + key.pre_handle_x * x_zoom - kBezierHandleSize),
-                     qRound(key_y + key.pre_handle_y * y_zoom - kBezierHandleSize),
+                     qRound(key_y - key.pre_handle_y * y_zoom - kBezierHandleSize),
                      kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
       QRect post_rect(qRound(key_x + key.post_handle_x * x_zoom - kBezierHandleSize),
-                      qRound(key_y + key.post_handle_y * y_zoom - kBezierHandleSize),
+                      qRound(key_y - key.post_handle_y * y_zoom - kBezierHandleSize),
                       kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
 
       if (test_rect.contains(pos) || pre_rect.contains(pos) || post_rect.contains(pos)) {
