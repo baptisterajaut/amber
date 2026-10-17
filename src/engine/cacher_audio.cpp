@@ -334,6 +334,10 @@ bool Cacher::cacheAudioFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_a
     if (!reached_end) {
       int loop = 0;
 
+      // A reverse decode hands back the reverse buffer (queue_.at(1)) in frame: decode into queue_.at(0) again, or
+      // the next decode unrefs the reverse buffer and accumulates into itself
+      frame = queue_.at(0);
+
       if (reverse_audio && !audio_just_reset) {
         avcodec_flush_buffers(codecCtx);
         reached_end = false;
