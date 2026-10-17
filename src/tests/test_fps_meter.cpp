@@ -46,8 +46,19 @@ class TestFpsMeter : public QObject {
     m.add_frame(100);  // same millisecond: no span to divide by
     QVERIFY(!m.rate(&fps));
     QCOMPARE(fps, -1.0);
-    m.add_frame(2000);  // a frame after a long stall leaves it alone in the window
-    QVERIFY(!m.rate(&fps));
+  }
+  void slowPlaybackStaysRed() {
+    FpsMeter m;
+    m.add_frame(0);
+    m.add_frame(2000);  // 0.5 fps: each frame is alone in its window
+    double fps = 0;
+    QVERIFY(m.rate(&fps));
+    QVERIFY(qAbs(fps - 0.5) < 1e-9);
+    QVERIFY(m.window_full());
+    QVERIFY(amber::below_target(fps, 30));
+    m.add_frame(4000);
+    QVERIFY(m.rate(&fps));
+    QVERIFY(qAbs(fps - 0.5) < 1e-9);
   }
   void resetClears() {
     FpsMeter m;
@@ -57,7 +68,10 @@ class TestFpsMeter : public QObject {
     double fps = 0;
     QVERIFY(!m.rate(&fps));
     QVERIFY(!m.window_full());
-    feed(m, 5, 30, 10000);  // the next play starts over: a few frames don't make a full window
+    m.add_frame(20000);  // the previous stamp is gone too: a lone first frame has no rate
+    QVERIFY(!m.rate(&fps));
+    m.reset();
+    feed(m, 5, 30, 30000);  // the next play starts over: a few frames don't make a full window
     QVERIFY(m.rate(&fps));
     QVERIFY(!m.window_full());
   }
