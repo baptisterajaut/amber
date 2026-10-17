@@ -195,7 +195,6 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) :
   shadow_opacity->SetDefault(100);
   shadow_softness->SetDefault(5);
   shadow_distance->SetDefault(5);
-  shadow_opacity->SetDefault(80);
   outline_width->SetDefault(20);
   reveal_val->SetDefault(100);
   animate_duration->SetDefault(0.5);
