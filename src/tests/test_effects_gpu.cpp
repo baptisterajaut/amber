@@ -28,6 +28,8 @@ class TestEffectsGpu : public QObject {
 
   void solidColorPassthrough();
   void multiEffectChain();
+  void multiFrameConsistency();
+  void sceneSwitchConsistency();
 
   void effectPassthroughSweep_data();
   void effectPassthroughSweep();
@@ -288,6 +290,50 @@ void TestEffectsGpu::multiEffectChain() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(mid.r < 30 && mid.g > 200 && mid.b > 200,
            qPrintable(QString("expected red -> cyan after chain, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::multiFrameConsistency() {
+  // Same frame rendered three times must be byte-identical: guards pooled/cached RHI resources (a stale vertex
+  // buffer or UBO from a previous frame or pass only shows across frames).
+  SequencePtr seq = h_->make_sequence(64, 64, 30);
+  Clip* bottom = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(bottom->effects[1].get(), 2, 0, QColor(200, 40, 20));
+  h_->attach_xml_shader(bottom, "Box Blur");  // default radius 10
+  h_->attach_xml_shader(bottom, "Hue/Saturation/Brightness");
+  // Second clip, shifted right, so its edge (blurred against transparency) and the srcover onto the bottom clip
+  // carry real per-pixel content: a stale vertex buffer or UBO would move or recolour it
+  Clip* top = h_->add_generator_clip(seq.get(), -2, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(top->effects[1].get(), 2, 0, QColor(20, 60, 220));
+  h_->set_field_double(top->effects[0].get(), 0, 0, 64.0 / 2 + 16);  // posx
+  h_->attach_xml_shader(top, "Box Blur");
+  QByteArray f1 = h_->render_frame(seq.get(), 5);
+  QByteArray f2 = h_->render_frame(seq.get(), 5);
+  QByteArray f3 = h_->render_frame(seq.get(), 5);
+  QVERIFY(!f1.isEmpty());
+  // Non-uniform content: bottom-only area (8,32) vs top-clip area (56,32)
+  QVERIFY(f1.mid((32 * 64 + 8) * 4, 4) != f1.mid((32 * 64 + 56) * 4, 4));
+  QCOMPARE(f2, f1);
+  QCOMPARE(f3, f1);
+}
+
+void TestEffectsGpu::sceneSwitchConsistency() {
+  // make_sequence() points amber::ActiveSequence at the newest sequence (B); harmless here because Solid,
+  // Box Blur and Hue/Saturation/Brightness don't read it. Don't add Timecode-like effects to this test.
+  SequencePtr a = h_->make_sequence(64, 64, 30);
+  Clip* ca = h_->add_generator_clip(a.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(ca->effects[1].get(), 2, 0, QColor(250, 200, 10));
+  h_->set_field_double(ca->effects[0].get(), 0, 0, 64.0 / 2 + 16);  // posx
+  h_->attach_xml_shader(ca, "Box Blur");
+  SequencePtr b = h_->make_sequence(64, 64, 30);
+  Clip* cb = h_->add_generator_clip(b.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(cb->effects[1].get(), 2, 0, QColor(10, 120, 90));
+  h_->attach_xml_shader(cb, "Hue/Saturation/Brightness");
+  QByteArray a1 = h_->render_frame(a.get(), 5);
+  QByteArray b1 = h_->render_frame(b.get(), 5);
+  QByteArray a2 = h_->render_frame(a.get(), 5);
+  QVERIFY(!a1.isEmpty() && !b1.isEmpty());
+  QVERIFY(a1 != b1);  // the switch really changes what the pooled buffers hold
+  QCOMPARE(a2, a1);
 }
 
 void TestEffectsGpu::transformTranslate() {
