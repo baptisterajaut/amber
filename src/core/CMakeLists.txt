@@ -20,6 +20,8 @@ target_sources(amber-engine PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/scrubresolution.h
   ${CMAKE_CURRENT_SOURCE_DIR}/scopes.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/scopes.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/shadertoy.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/shadertoy.h
   ${CMAKE_CURRENT_SOURCE_DIR}/timerformat.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/timerformat.h
   ${CMAKE_CURRENT_SOURCE_DIR}/path.cpp
