@@ -190,9 +190,6 @@ TextEffect::TextEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
 
   connect(shadow_bool, &BoolField::Toggled, this, &TextEffect::shadow_enable);
   connect(outline_bool, &BoolField::Toggled, this, &TextEffect::outline_enable);
-
-  vertPath = "common.vert";
-  fragPath = "dropshadow.frag";
 }
 
 void TextEffect::ApplyWordWrap(QStringList& lines, const QFontMetrics& fm, int width) {

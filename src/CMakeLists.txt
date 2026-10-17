@@ -340,7 +340,6 @@ set(AMBER_EFFECTS
   effects/shaders/despill.xml
   effects/shaders/directionalblur.frag
   effects/shaders/directionalblur.xml
-  effects/shaders/dropshadow.xml.disabled
   effects/shaders/emboss.frag
   effects/shaders/emboss.xml
   effects/shaders/findedges.frag
