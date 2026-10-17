@@ -1197,17 +1197,16 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
   // frame now and then (30.3 "new" frames a second at 29.97).
   // CBA: the serial is bumped just before the front buffer flips, so a paint landing in between counts the frame one
   // paint early; the count over the window is unchanged.
-  RenderThread::FrameTiming shown = renderer->last_frame_timing();
-  bool new_frame = false;
-  if (shown.serial != fps_last_serial_) {
-    new_frame = has_frame && shown.playhead != fps_last_playhead_;
-    fps_last_serial_ = shown.serial;
-    fps_last_playhead_ = shown.playhead;
-  }
-  if (!frame_rate_shown()) {
+  // CBA: a stall with no new frame keeps the last label until the next frame lands (no timer, by design)
+  if (frame_rate_shown()) {
+    RenderThread::FrameTiming shown = renderer->last_frame_timing();
+    if (shown.serial != fps_last_serial_) {
+      if (has_frame && shown.playhead != fps_last_playhead_) fps_meter_.add_frame(fps_clock_.elapsed());
+      fps_last_serial_ = shown.serial;
+      fps_last_playhead_ = shown.playhead;
+    }
+  } else {
     fps_meter_.reset();  // label off (or stopped, which Viewer::pause() already reset)
-  } else if (new_frame) {
-    fps_meter_.add_frame(fps_clock_.elapsed());
   }
 
   // Compute zoom/scroll quad in NDC
