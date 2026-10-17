@@ -472,6 +472,8 @@ void Effect::parseShaderElement(QXmlStreamReader& reader) {
       fragPath = attr.value().toString();
     } else if (attr.name() == QLatin1String("iterations")) {
       setIterations(attr.value().toInt());
+    } else if (attr.name() == QLatin1String("original")) {
+      needsOriginal_ = (attr.value() == QLatin1String("1"));
     }
   }
 }
@@ -495,6 +497,12 @@ void Effect::parseEffectXml() {
   }
 
   effect_file.close();
+
+  // The LUT and the original input both sit at binding 3
+  if (needsOriginal_ && needsLut()) {
+    qWarning() << "Effect" << name << "uses a LUT, ignoring original=\"1\" (both need texture binding 3)";
+    needsOriginal_ = false;
+  }
 }
 
 Effect::~Effect() {

@@ -292,7 +292,9 @@ static ClipRhiResources* get_or_create_clip_resources(Clip* c, QRhi* rhi, int wi
     ClipRhiResources* res = new ClipRhiResources();
     res->count = fbo_count;
     for (int j = 0; j < fbo_count; j++) {
-      res->tex[j] = rhi->newTexture(QRhiTexture::RGBA8, QSize(width, height), 1, QRhiTexture::RenderTarget);
+      // UsedAsTransferSource: copied into ClipRhiResources::orig by effects with original="1"
+      res->tex[j] = rhi->newTexture(QRhiTexture::RGBA8, QSize(width, height), 1,
+                                    QRhiTexture::RenderTarget | QRhiTexture::UsedAsTransferSource);
       res->tex[j]->create();
       res->rt[j] = rhi->newTextureRenderTarget({res->tex[j]}, QRhiTextureRenderTarget::PreserveColorContents);
       if (j == 0) {
@@ -405,13 +407,34 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
       }
     }
 
+    // original="1": the effect's input at binding 3 in every pass (never together with a LUT, see parseEffectXml).
+    // A ping-pong input gets overwritten by the passes (and would be a feedback loop as their target), so it is
+    // copied first; any other input (decoder/superimpose texture, ...) is left untouched by the passes.
+    // CBA: one snapshot per clip, two such effects on a clip re-copy in turn (each one's passes finish first).
+    QRhiTexture* extraTexture = lutTexture;
+    if (e->needsOriginal()) {
+      extraTexture = composite_texture;
+      for (int j = 0; j < res->count; j++) {
+        if (composite_texture != res->tex[j]) continue;
+        if (res->orig == nullptr) {
+          res->orig = params.rhi->newTexture(QRhiTexture::RGBA8, res->tex[0]->pixelSize());
+          res->orig->create();
+        }
+        QRhiResourceUpdateBatch* copy = params.rhi->nextResourceUpdateBatch();
+        copy->copyTexture(res->orig, composite_texture);
+        params.cb->resourceUpdate(copy);  // between passes: process_effect never runs inside one
+        extraTexture = res->orig;
+        break;
+      }
+    }
+
     for (int i = 0; i < e->getIterations(); i++) {
       QByteArray uboData;
       uboData.resize(qMax(e->fragUboSize(), e->vertUboSize()));
       uboData.fill(0);
       e->process_shader(timecode, coords, i, uboData, res->tex[0]->pixelSize());
       rhi_blit(params, res->rt[fbo_switcher], res->rpd, composite_texture, e->vertexShader(), e->fragmentShader(),
-               blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()), lutTexture ? 2 : 1, lutTexture, nullptr,
+               blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()), extraTexture ? 2 : 1, extraTexture, nullptr,
                /*skipClipSpaceCorr=*/true);
       composite_texture = res->tex[fbo_switcher];
       fbo_switcher = !fbo_switcher;
@@ -604,6 +627,7 @@ static void ensure_clip_fbo(Clip* c, QRhi* rhi, const QSize& comp_size) {
       }
       if (existing->clear_rpd) to_delete.append(existing->clear_rpd);
       if (existing->rpd) to_delete.append(existing->rpd);
+      if (existing->orig) to_delete.append(existing->orig);
       RenderThread::DeferRhiResourceDeletion(to_delete);
       delete existing;
       c->fbo_rhi = nullptr;

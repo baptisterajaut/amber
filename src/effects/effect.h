@@ -239,6 +239,8 @@ class Effect : public QObject {
   static const EffectMeta* GetInternalMeta(int internal_id, int type);
 
  public:
+  // <shader original="1">: every pass also samples the effect's own input at binding 3 (exclusive with the LUT)
+  bool needsOriginal() const { return needsOriginal_; }
   bool needsLut();
   QString currentLutPath(double timecode);
   QString loadedLutPath() const { return loadedLutPath_; }
@@ -295,6 +297,7 @@ class Effect : public QObject {
   QVector<EffectGizmo*> gizmos;
   bool bound{false};
   int iterations{1};
+  bool needsOriginal_{false};
 
   bool enabled_{true};
   bool expanded_{true};

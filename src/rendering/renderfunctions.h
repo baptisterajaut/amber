@@ -46,6 +46,9 @@ struct ClipRhiResources {
   QRhiRenderPassDescriptor* rpd = nullptr;
   QRhiRenderPassDescriptor* clear_rpd = nullptr;
   int count = 0;
+  // Snapshot of an effect's input for shaders with original="1" when that input is one of tex[] (the passes
+  // overwrite it). RGBA8, same size as tex[0], created on first need and kept for the clip's lifetime.
+  QRhiTexture* orig = nullptr;
 };
 
 class RhiResourceCache;
