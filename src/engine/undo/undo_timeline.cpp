@@ -253,26 +253,27 @@ void AddMarkerAction::doRedo() {
   }
 }
 
-MoveMarkerAction::MoveMarkerAction(Marker* m, long o, long n) {
-  marker = m;
+MoveMarkerAction::MoveMarkerAction(QVector<Marker>* m, int i, long o, long n) {
+  active_array = m;
+  index = i;
   old_time = o;
   new_time = n;
 }
 
 void MoveMarkerAction::doUndo() {
-  if (!marker) {
-    qWarning() << "MoveMarkerAction::doUndo: marker is null";
+  if (!active_array || index < 0 || index >= active_array->size()) {
+    qWarning() << "MoveMarkerAction::doUndo: marker index out of range";
     return;
   }
-  marker->frame = old_time;
+  (*active_array)[index].frame = old_time;
 }
 
 void MoveMarkerAction::doRedo() {
-  if (!marker) {
-    qWarning() << "MoveMarkerAction::doRedo: marker is null";
+  if (!active_array || index < 0 || index >= active_array->size()) {
+    qWarning() << "MoveMarkerAction::doRedo: marker index out of range";
     return;
   }
-  marker->frame = new_time;
+  (*active_array)[index].frame = new_time;
 }
 
 DeleteMarkerAction::DeleteMarkerAction(QVector<Marker> *m) {
