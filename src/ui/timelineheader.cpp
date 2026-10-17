@@ -205,7 +205,7 @@ void TimelineHeader::mousePressEvent(QMouseEvent* event) {
     for (int i = 0; i < selected_markers.size(); i++) {
       selected_marker_original_times[i] = viewer->marker_ref->at(selected_markers.at(i)).frame;
     }
-    drag_start = pos.x();
+    drag_start_frame = getHeaderFrameFromScreenPoint(pos.x());
     dragging_markers = true;
   } else {
     if (!selected_markers.isEmpty() && !shift) {
@@ -229,7 +229,7 @@ void TimelineHeader::move_drag_workarea(int mouse_x) {
 }
 
 void TimelineHeader::move_drag_markers(int mouse_x) {
-  long frame_movement = getHeaderFrameFromScreenPoint(mouse_x) - getHeaderFrameFromScreenPoint(drag_start);
+  long frame_movement = getHeaderFrameFromScreenPoint(mouse_x) - drag_start_frame;
   for (int i = 0; i < selected_markers.size(); i++) {
     long fm = selected_marker_original_times.at(i) + frame_movement;
     if (snapping && panel_timeline->snap_to_timeline(&fm, true, false, true)) {

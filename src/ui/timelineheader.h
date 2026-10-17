@@ -94,7 +94,8 @@ class TimelineHeader : public QWidget {
 
   QFontMetrics fm;
 
-  int drag_start;
+  // frame under the cursor when a marker drag started (a frame, not a pixel, so edge auto-scroll moves the markers)
+  long drag_start_frame;
   bool dragging_markers{false};
   QVector<int> selected_markers;
   QVector<long> selected_marker_original_times;
