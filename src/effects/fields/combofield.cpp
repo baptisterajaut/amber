@@ -34,7 +34,11 @@ QWidget *ComboField::CreateWidget(QWidget *existing)
     cb = static_cast<ComboBoxEx*>(existing);
   }
 
-  connect(cb, qOverload<int>(&QComboBox::activated), this, &ComboField::UpdateFromWidget);
+  if (existing == nullptr) {
+    connect(cb, qOverload<int>(&QComboBox::activated), this, &ComboField::UpdateFromWidget);
+  } else {
+    FollowWidget(cb);
+  }
   connect(this, &EffectField::EnabledChanged, cb, &QWidget::setEnabled);
 
   return cb;
@@ -62,11 +66,16 @@ void ComboField::UpdateWidgetValue(QWidget *widget, double timecode)
 
 void ComboField::UpdateFromWidget(int index)
 {
+  PushEdit(sender(), [index](EffectField* f) { return static_cast<ComboField*>(f)->ApplyValue(index); });
+}
+
+QUndoCommand* ComboField::ApplyValue(int index)
+{
   KeyframeDataChange* kdc = new KeyframeDataChange(this);
 
   SetValueAt(Now(), items_.at(index).data);
 
   kdc->SetNewKeyframes();
   kdc->setText(QObject::tr("Change Value"));
-  amber::UndoStack.push(kdc);
+  return kdc;
 }

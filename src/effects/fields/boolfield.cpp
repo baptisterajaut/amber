@@ -26,7 +26,11 @@ QWidget *BoolField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(cb, &QCheckBox::toggled, this, &BoolField::UpdateFromWidget);
+  if (existing == nullptr) {
+    connect(cb, &QCheckBox::toggled, this, &BoolField::UpdateFromWidget);
+  } else {
+    FollowWidget(cb);
+  }
   connect(this, &EffectField::EnabledChanged, cb, &QWidget::setEnabled);
   connect(cb, &QCheckBox::toggled, this, &BoolField::Toggled);
 
@@ -67,11 +71,16 @@ QString BoolField::ConvertValueToString(const QVariant &v)
 
 void BoolField::UpdateFromWidget(bool b)
 {
+  PushEdit(sender(), [b](EffectField* f) { return static_cast<BoolField*>(f)->ApplyValue(b); });
+}
+
+QUndoCommand* BoolField::ApplyValue(bool b)
+{
   KeyframeDataChange* kdc = new KeyframeDataChange(this);
 
   SetValueAt(Now(), b);
 
   kdc->SetNewKeyframes();
   kdc->setText(QObject::tr("Change Value"));
-  amber::UndoStack.push(kdc);
+  return kdc;
 }

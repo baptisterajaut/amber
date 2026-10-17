@@ -59,6 +59,11 @@ private slots:
   void UpdateFromWidget(const QString& b);
 private:
   /**
+   * @brief Set the value edited in a widget on this field and return its undo command
+   */
+  QUndoCommand* ApplyValue(const QString& s);
+
+  /**
    * @brief Internal value for whether this field is in rich text or plain text mode
    */
   bool rich_text_;

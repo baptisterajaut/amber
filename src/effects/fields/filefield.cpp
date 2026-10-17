@@ -23,7 +23,11 @@ QWidget *FileField::CreateWidget(QWidget *existing)
 {
   EmbeddedFileChooser* efc = (existing != nullptr) ? static_cast<EmbeddedFileChooser*>(existing) : new EmbeddedFileChooser();
 
-  connect(efc, &EmbeddedFileChooser::changed, this, &FileField::UpdateFromWidget);
+  if (existing == nullptr) {
+    connect(efc, &EmbeddedFileChooser::changed, this, &FileField::UpdateFromWidget);
+  } else {
+    FollowWidget(efc);
+  }
   connect(this, &EffectField::EnabledChanged, efc, &QWidget::setEnabled);
 
   return efc;
@@ -40,6 +44,11 @@ void FileField::UpdateWidgetValue(QWidget *widget, double timecode)
 
 void FileField::UpdateFromWidget(const QString &s)
 {
+  PushEdit(sender(), [s](EffectField* f) { return static_cast<FileField*>(f)->ApplyValue(s); });
+}
+
+QUndoCommand* FileField::ApplyValue(const QString &s)
+{
   // Only emitted when the user picks a file: picking a VST plugin is consent to run it, so trust its path before the
   // field change loads it (VSTHost::PluginPathTrusted)
   const Effect* e = GetParentRow()->GetParentEffect();
@@ -54,5 +63,5 @@ void FileField::UpdateFromWidget(const QString &s)
 
   kdc->SetNewKeyframes();
   kdc->setText(QObject::tr("Change Value"));
-  amber::UndoStack.push(kdc);
+  return kdc;
 }

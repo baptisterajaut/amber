@@ -106,3 +106,34 @@ add_executable(amber-test-config
 target_include_directories(amber-test-config PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-config PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-config COMMAND amber-test-config)
+
+# The effect fields' widget wiring that Effect Controls uses for multi-selected clips. Effect, EffectRow and Clip
+# pull most of the app, so test_fieldwidgets_stubs.cpp stands in for what the fields and undo commands touch.
+add_executable(amber-test-fieldwidgets
+  test_fieldwidgets.cpp
+  test_fieldwidgets_stubs.cpp
+  ${CMAKE_SOURCE_DIR}/effects/effect.h
+  ${CMAKE_SOURCE_DIR}/effects/effectrow.h
+  ${CMAKE_SOURCE_DIR}/engine/cacher.h
+  ${CMAKE_SOURCE_DIR}/effects/effectfield.cpp
+  ${CMAKE_SOURCE_DIR}/effects/fields/boolfield.cpp
+  ${CMAKE_SOURCE_DIR}/effects/fields/combofield.cpp
+  ${CMAKE_SOURCE_DIR}/effects/fields/doublefield.cpp
+  ${CMAKE_SOURCE_DIR}/engine/undo/comboaction.cpp
+  ${CMAKE_SOURCE_DIR}/engine/undo/undo_effect.cpp
+  ${CMAKE_SOURCE_DIR}/engine/undo/undo_generic.cpp
+  ${CMAKE_SOURCE_DIR}/engine/undo/undostack.cpp
+  ${CMAKE_SOURCE_DIR}/global/config.cpp
+  ${CMAKE_SOURCE_DIR}/rendering/clipqueue.cpp
+  ${CMAKE_SOURCE_DIR}/ui/comboboxex.cpp
+  ${CMAKE_SOURCE_DIR}/ui/labelslider.cpp
+  ${CMAKE_SOURCE_DIR}/ui/menu.cpp
+  ${CMAKE_SOURCE_DIR}/ui/styling.cpp
+  ${AMBER_CORE_SOURCES}
+)
+target_include_directories(amber-test-fieldwidgets PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-fieldwidgets PRIVATE Qt6::Test Qt6::Widgets Qt6::GuiPrivate FFMPEG::avutil
+  FFMPEG::avcodec FFMPEG::avformat FFMPEG::avfilter FFMPEG::swscale FFMPEG::swresample)
+set_target_properties(amber-test-fieldwidgets PROPERTIES AUTOMOC ON)
+add_test(NAME amber-test-fieldwidgets COMMAND amber-test-fieldwidgets)
+set_tests_properties(amber-test-fieldwidgets PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

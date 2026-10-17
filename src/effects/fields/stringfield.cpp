@@ -41,7 +41,11 @@ QWidget *StringField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(text_edit, &TextEditEx::textModified, this, &StringField::UpdateFromWidget);
+  if (existing == nullptr) {
+    connect(text_edit, &TextEditEx::textModified, this, &StringField::UpdateFromWidget);
+  } else {
+    FollowWidget(text_edit);
+  }
   connect(this, &EffectField::EnabledChanged, text_edit, &QWidget::setEnabled);
 
   return text_edit;
@@ -70,11 +74,16 @@ void StringField::UpdateWidgetValue(QWidget *widget, double timecode)
 
 void StringField::UpdateFromWidget(const QString &s)
 {
+  PushEdit(sender(), [s](EffectField* f) { return static_cast<StringField*>(f)->ApplyValue(s); });
+}
+
+QUndoCommand* StringField::ApplyValue(const QString &s)
+{
   KeyframeDataChange* kdc = new KeyframeDataChange(this);
 
   SetValueAt(Now(), s);
 
   kdc->SetNewKeyframes();
   kdc->setText(QObject::tr("Change Value"));
-  amber::UndoStack.push(kdc);
+  return kdc;
 }

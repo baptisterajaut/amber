@@ -21,6 +21,7 @@
 #include "effectfield.h"
 
 #include <QDateTime>
+#include <QPointer>
 #include <QtMath>
 
 #include "rendering/renderfunctions.h"
@@ -37,6 +38,11 @@
 #include "core/math.h"
 
 #include "global/debug.h"
+
+namespace {
+// Fields attached to a widget another field created, so its creator applies their edits too
+const char* const kFollowersProperty = "amber_effect_field_followers";
+}  // namespace
 
 EffectField::EffectField(EffectRow* parent, const QString &i, EffectFieldType t) :
   QObject(parent),
@@ -56,6 +62,40 @@ EffectField::EffectField(EffectRow* parent, const QString &i, EffectFieldType t)
 
   // Connect this field to the effect's changed function
   connect(this, &EffectField::Changed, parent->GetParentEffect(), &Effect::FieldChanged);
+}
+
+void EffectField::FollowWidget(QObject *widget)
+{
+  QVariantList followers = widget->property(kFollowersProperty).toList();
+  for (const QVariant& v : followers) {
+    if (v.value<QPointer<QObject>>() == this) return;
+  }
+  followers.append(QVariant::fromValue(QPointer<QObject>(this)));
+  widget->setProperty(kFollowersProperty, followers);
+}
+
+void EffectField::PushEdit(QObject *widget, const std::function<QUndoCommand *(EffectField *)> &apply)
+{
+  QVector<QUndoCommand*> changes;
+  if (QUndoCommand* c = apply(this)) changes.append(c);
+
+  const QVariantList followers = widget->property(kFollowersProperty).toList();
+  for (const QVariant& v : followers) {
+    EffectField* follower = qobject_cast<EffectField*>(v.value<QPointer<QObject>>().data());
+    if (follower == nullptr) continue;
+    if (QUndoCommand* c = apply(follower)) changes.append(c);
+  }
+
+  if (changes.isEmpty()) return;
+  if (changes.size() == 1) {
+    amber::UndoStack.push(changes.first());
+    return;
+  }
+
+  // Several clips' fields changed together: one entry, under the text a single one would have had
+  ComboAction* ca = new ComboAction(changes.first()->text());
+  for (QUndoCommand* c : changes) ca->append(c);
+  amber::UndoStack.push(ca);
 }
 
 EffectRow *EffectField::GetParentRow()

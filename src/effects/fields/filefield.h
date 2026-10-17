@@ -54,6 +54,11 @@ private slots:
    * is connected to the TextEditEx::textModified() signal.
    */
   void UpdateFromWidget(const QString &s);
+private:
+  /**
+   * @brief Set the value edited in a widget on this field and return its undo command
+   */
+  QUndoCommand* ApplyValue(const QString& s);
 };
 
 #endif // FILEFIELD_H

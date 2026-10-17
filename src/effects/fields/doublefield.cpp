@@ -84,7 +84,11 @@ QWidget *DoubleField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(ls, &LabelSlider::valueChanged, this, &DoubleField::UpdateFromWidget);
+  if (existing == nullptr) {
+    connect(ls, &LabelSlider::valueChanged, this, &DoubleField::UpdateFromWidget);
+  } else {
+    FollowWidget(ls);
+  }
   connect(ls, &LabelSlider::clicked, this, &EffectField::Clicked);
   connect(this, &EffectField::EnabledChanged, ls, &QWidget::setEnabled);
   connect(this, &DoubleField::MaximumChanged, ls, &LabelSlider::SetMaximum);
@@ -109,8 +113,13 @@ void DoubleField::ValueHasBeenSet()
 
 void DoubleField::UpdateFromWidget(double d)
 {
+  // Fields following the slider are called directly, so they get it from here rather than from sender()
   LabelSlider* ls = static_cast<LabelSlider*>(sender());
+  PushEdit(ls, [d, ls](EffectField* f) { return static_cast<DoubleField*>(f)->ApplyValue(d, ls); });
+}
 
+QUndoCommand* DoubleField::ApplyValue(double d, LabelSlider* ls)
+{
   // A drag opens the undo entry on its first move and pushes it on release; a typed value or "Reset to Default"
   // arrives as a single non-drag change and gets its own entry
   bool single_change = (kdc_ == nullptr && !ls->IsDragging());
@@ -126,15 +135,17 @@ void DoubleField::UpdateFromWidget(double d)
   if (single_change && old_value == d && old_key_count == keyframes.size()) {
     delete kdc_;
     kdc_ = nullptr;
-    return;
+    return nullptr;
   }
 
   if (!ls->IsDragging() && kdc_ != nullptr) {
     kdc_->SetNewKeyframes();
     kdc_->setText(QObject::tr("Change Value"));
 
-    amber::UndoStack.push(kdc_);
-
+    KeyframeDataChange* kdc = kdc_;
     kdc_ = nullptr;
+    return kdc;
   }
+
+  return nullptr;
 }

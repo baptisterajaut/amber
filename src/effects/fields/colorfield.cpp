@@ -74,7 +74,11 @@ QWidget *ColorField::CreateWidget(QWidget *existing)
     });
   }
 
-  connect(cb, &ColorButton::color_changed, this, &ColorField::UpdateFromWidget);
+  if (existing == nullptr) {
+    connect(cb, &ColorButton::color_changed, this, &ColorField::UpdateFromWidget);
+  } else {
+    FollowWidget(cb);
+  }
   connect(this, &EffectField::EnabledChanged, wrapper, &QWidget::setEnabled);
 
   return wrapper;
@@ -100,11 +104,16 @@ QString ColorField::ConvertValueToString(const QVariant &v)
 
 void ColorField::UpdateFromWidget(const QColor& c)
 {
+  PushEdit(sender(), [c](EffectField* f) { return static_cast<ColorField*>(f)->ApplyValue(c); });
+}
+
+QUndoCommand* ColorField::ApplyValue(const QColor& c)
+{
   KeyframeDataChange* kdc = new KeyframeDataChange(this);
 
   SetValueAt(Now(), c);
 
   kdc->SetNewKeyframes();
   kdc->setText(QObject::tr("Change Color"));
-  amber::UndoStack.push(kdc);
+  return kdc;
 }

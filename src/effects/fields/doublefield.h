@@ -183,6 +183,13 @@ private slots:
    * to the LabelSlider::valueChanged() signal.
    */
   void UpdateFromWidget(double d);
+private:
+  /**
+   * @brief Set the value edited in `ls` on this field and return its undo command once the edit is complete
+   *
+   * A drag returns nullptr until its release, which returns the command covering the whole drag.
+   */
+  QUndoCommand* ApplyValue(double d, LabelSlider* ls);
 };
 
 #endif // DOUBLEFIELD_H

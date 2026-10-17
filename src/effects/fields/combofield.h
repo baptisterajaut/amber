@@ -88,6 +88,11 @@ private slots:
    * QComboBox's indices will match precisely to the items_ array. Outside of this function, QVariant data is preferred.
    */
   void UpdateFromWidget(int index);
+private:
+  /**
+   * @brief Set the value edited in a widget on this field and return its undo command
+   */
+  QUndoCommand* ApplyValue(int index);
 };
 
 #endif // COMBOFIELD_H

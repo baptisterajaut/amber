@@ -76,6 +76,11 @@ private slots:
    * to the QCheckBox::toggled() signal.
    */
   void UpdateFromWidget(bool b);
+private:
+  /**
+   * @brief Set the value edited in a widget on this field and return its undo command
+   */
+  QUndoCommand* ApplyValue(bool b);
 };
 
 #endif // BOOLFIELD_H

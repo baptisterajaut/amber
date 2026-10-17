@@ -63,6 +63,11 @@ private slots:
    * is connected to the QComboBox::currentTextChanged() signal.
    */
   void UpdateFromWidget(const QString& index);
+private:
+  /**
+   * @brief Set the value edited in a widget on this field and return its undo command
+   */
+  QUndoCommand* ApplyValue(const QString& s);
 };
 
 #endif // FONTFIELD_H

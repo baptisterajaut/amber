@@ -38,7 +38,11 @@ QWidget *FontField::CreateWidget(QWidget *existing)
 
   }
 
-  connect(fcb, &QComboBox::currentTextChanged, this, &FontField::UpdateFromWidget);
+  if (existing == nullptr) {
+    connect(fcb, &QComboBox::currentTextChanged, this, &FontField::UpdateFromWidget);
+  } else {
+    FollowWidget(fcb);
+  }
   connect(this, &EffectField::EnabledChanged, fcb, &QWidget::setEnabled);
 
   return fcb;
@@ -64,11 +68,16 @@ void FontField::UpdateWidgetValue(QWidget *widget, double timecode)
 
 void FontField::UpdateFromWidget(const QString& s)
 {
+  PushEdit(sender(), [s](EffectField* f) { return static_cast<FontField*>(f)->ApplyValue(s); });
+}
+
+QUndoCommand* FontField::ApplyValue(const QString& s)
+{
   KeyframeDataChange* kdc = new KeyframeDataChange(this);
 
   SetValueAt(Now(), s);
 
   kdc->SetNewKeyframes();
   kdc->setText(QObject::tr("Change Font"));
-  amber::UndoStack.push(kdc);
+  return kdc;
 }

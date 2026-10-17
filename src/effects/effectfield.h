@@ -24,6 +24,7 @@
 #include <QObject>
 #include <QVariant>
 #include <QVector>
+#include <functional>
 
 #include "effects/keyframe.h"
 #include "engine/undo/undo.h"
@@ -440,6 +441,34 @@ signals:
    * setEnabled() slot of any QWidget's created (or attached) in CreateWidget().
    */
   void EnabledChanged(bool);
+
+protected:
+  /**
+   * @brief Attach this field to a widget another field created (EffectUI::AddAdditionalEffect)
+   *
+   * A widget shared by several effects (multi-selected clips) is driven by the field that created it: the others
+   * follow it instead of connecting its value-change signal themselves, so one edit makes one undo entry for all of
+   * them (see PushEdit()).
+   *
+   * @param widget
+   *
+   * The object emitting the value-change signal the creating field is connected to.
+   */
+  void FollowWidget(QObject* widget);
+
+  /**
+   * @brief Apply one widget edit to this field and every field following the widget, as one undo entry
+   *
+   * @param widget
+   *
+   * The object that emitted the edit (the one passed to FollowWidget()).
+   *
+   * @param apply
+   *
+   * Edits the field it is given (always of this field's class) and returns the undo command it would have pushed
+   * alone, or nullptr when that field needs none. Nothing is pushed if no field needs one.
+   */
+  void PushEdit(QObject* widget, const std::function<QUndoCommand*(EffectField*)>& apply);
 
 private:
   /**

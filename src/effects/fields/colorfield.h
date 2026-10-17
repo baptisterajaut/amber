@@ -67,6 +67,11 @@ private slots:
   void UpdateFromWidget(const QColor &c);
 
 private:
+  /**
+   * @brief Set the value edited in a widget on this field and return its undo command
+   */
+  QUndoCommand* ApplyValue(const QColor& c);
+
   QMetaObject::Connection pick_connection_;
   QMetaObject::Connection cancel_connection_;
   void disconnectPick();
