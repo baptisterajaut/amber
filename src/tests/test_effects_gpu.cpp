@@ -28,6 +28,9 @@ class TestEffectsGpu : public QObject {
 
   void solidColorPassthrough();
   void multiEffectChain();
+  void multiFrameConsistency();
+  void sceneSwitchConsistency();
+  void steadyStateCreatesNothing();
 
   void effectPassthroughSweep_data();
   void effectPassthroughSweep();
@@ -129,7 +132,8 @@ class TestEffectsGpu : public QObject {
 };
 
 void TestEffectsGpu::initTestCase() {
-  h_ = std::make_unique<TestRenderHarness>();
+  h_ = std::make_unique<TestRenderHarness>(
+      qEnvironmentVariable("AMBER_TEST_RHI") == QLatin1String("vulkan") ? QRhi::Vulkan : QRhi::OpenGLES2);
   if (!h_->initialized()) AMBER_SKIP_NO_GPU("QRhi OpenGLES2 unavailable");
 }
 
@@ -293,6 +297,147 @@ void TestEffectsGpu::multiEffectChain() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(mid.r < 30 && mid.g > 200 && mid.b > 200,
            qPrintable(QString("expected red -> cyan after chain, got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::multiFrameConsistency() {
+  // Same frame rendered three times must be byte-identical AND match pixels pinned from the pre-cache build: guards
+  // pooled/cached RHI resources (a stale or shared vertex buffer/UBO, a wrong cached pipeline). Bottom clip is a
+  // checkerboard so both Box Blur passes (iteration 0 = horizontal, 1 = vertical) and the HSB hue shift change pixels;
+  // the semi-transparent top clip exercises the srcover blend onto it.
+  SequencePtr seq = h_->make_sequence(64, 64, 30);
+  Clip* bottom = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  Effect* checker = bottom->effects[1].get();
+  h_->set_field_combo(checker, 0, 0, 2);                     // Type = SOLID_TYPE_CHECKERBOARD
+  h_->set_field_color(checker, 2, 0, QColor(240, 120, 30));  // odd cells; (0,0) cell is black
+  h_->set_field_double(checker, 3, 0, 16.0);                 // cell size 16 px
+  EffectPtr blur = h_->attach_xml_shader(bottom, "Box Blur");
+  h_->set_field_double(blur.get(), 0, 0, 8.0);  // radius
+  EffectPtr hsb = h_->attach_xml_shader(bottom, "Hue/Saturation/Brightness");
+  h_->set_field_double(hsb.get(), 0, 0, 60.0);  // hue
+  // Second clip, semi-transparent, shifted right by 24 px (covers x >= 24), with its own Box Blur passes in the pool
+  Clip* top = h_->add_generator_clip(seq.get(), -2, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_double(top->effects[1].get(), 1, 0, 50.0);  // Solid opacity 50%
+  h_->set_field_color(top->effects[1].get(), 2, 0, QColor(20, 60, 220));
+  h_->set_field_double(top->effects[0].get(), 0, 0, 64.0 / 2 + 24);  // posx
+  h_->attach_xml_shader(top, "Box Blur");
+  QByteArray f1 = h_->render_frame(seq.get(), 5);
+  QByteArray f2 = h_->render_frame(seq.get(), 5);
+  QByteArray f3 = h_->render_frame(seq.get(), 5);
+  QVERIFY(!f1.isEmpty());
+  // Values captured from the pre-cache build (per-pass pipeline/buffer create+destroy), tolerance +/-2
+  // (15,8) horizontal pass only, (8,15) vertical pass only, (15,15) both, (8,24) cell interior: HSB only
+  h_->assert_pixel(f1, 64, 15, 8, QColor(65, 105, 13, 255), 2);
+  h_->assert_pixel(f1, 64, 8, 15, QColor(65, 105, 13, 255), 2);
+  h_->assert_pixel(f1, 64, 15, 15, QColor(73, 118, 15, 255), 2);
+  h_->assert_pixel(f1, 64, 8, 24, QColor(150, 240, 30, 255), 2);
+  // (22,8) bottom only near the top clip's edge (x=24), (26,8) and (40,24) srcover of the 50% top clip
+  h_->assert_pixel(f1, 64, 22, 8, QColor(131, 210, 26, 255), 2);
+  h_->assert_pixel(f1, 64, 26, 8, QColor(76, 135, 123, 255), 2);
+  h_->assert_pixel(f1, 64, 40, 24, QColor(85, 150, 125, 255), 2);
+  QCOMPARE(f2, f1);
+  QCOMPARE(f3, f1);
+}
+
+void TestEffectsGpu::sceneSwitchConsistency() {
+  // make_sequence() points amber::ActiveSequence at the newest sequence (B); harmless here because Solid,
+  // Box Blur and Hue/Saturation/Brightness don't read it. Don't add Timecode-like effects to this test.
+  // A and B use different shaders and UBOs: a cache key that ignored the shader or a buffer reused across scenes
+  // would give B A's pipeline (or the reverse), which the pinned pixels catch even when a2 == a1.
+  SequencePtr a = h_->make_sequence(64, 64, 30);
+  Clip* ca = h_->add_generator_clip(a.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  Effect* checker = ca->effects[1].get();
+  h_->set_field_combo(checker, 0, 0, 2);  // Type = SOLID_TYPE_CHECKERBOARD
+  h_->set_field_color(checker, 2, 0, QColor(250, 200, 10));
+  h_->set_field_double(checker, 3, 0, 16.0);
+  h_->set_field_double(ca->effects[0].get(), 0, 0, 64.0 / 2 + 16);  // posx: covers x >= 16
+  EffectPtr blur = h_->attach_xml_shader(ca, "Box Blur");
+  h_->set_field_double(blur.get(), 0, 0, 8.0);  // radius
+  SequencePtr b = h_->make_sequence(64, 64, 30);
+  Clip* cb = h_->add_generator_clip(b.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(cb->effects[1].get(), 2, 0, QColor(10, 120, 90));
+  EffectPtr hsb = h_->attach_xml_shader(cb, "Hue/Saturation/Brightness");
+  h_->set_field_double(hsb.get(), 0, 0, 90.0);  // hue
+  QByteArray a1 = h_->render_frame(a.get(), 5);
+  QByteArray b1 = h_->render_frame(b.get(), 5);
+  QByteArray a2 = h_->render_frame(a.get(), 5);
+  QVERIFY(!a1.isEmpty() && !b1.isEmpty());
+  // Values captured from the pre-cache build (per-pass pipeline/buffer create+destroy), tolerance +/-2
+  // A: (8,32) left of the shifted clip (cleared), (31,8) horizontal blur edge, (24,40) black cell, (56,24) colour
+  h_->assert_pixel(a1, 64, 8, 32, QColor(0, 0, 0, 0), 2);
+  h_->assert_pixel(a1, 64, 31, 8, QColor(109, 88, 4, 255), 2);
+  h_->assert_pixel(a1, 64, 24, 40, QColor(0, 0, 0, 255), 2);
+  h_->assert_pixel(a1, 64, 56, 24, QColor(250, 200, 10, 255), 2);
+  // B: hue-shifted solid, so B drawn with A's pipeline (or no HSB) shows
+  h_->assert_pixel(b1, 64, 32, 32, QColor(35, 10, 120, 255), 2);
+  QVERIFY(a1 != b1);  // the switch really changes what the pooled buffers hold
+  QCOMPARE(a2, a1);
+}
+
+void TestEffectsGpu::steadyStateCreatesNothing() {
+  // After warm-up, frames of an unchanged scene must create no pipeline and no buffer: neither through the cache
+  // (cache_stats) nor per pass outside it (pipelines/buffers left in transientResources).
+  // Each scene starts on an empty cache, so its warm-up must create pipelines and buffers itself (NV12 would
+  // otherwise reuse the YUV420P scene's pipeline, and earlier slots' entries would hide a scene missing the cache).
+  auto check_steady = [this](Sequence* seq, long first, long step, const char* scene, QByteArray& frame0) {
+    h_->reset_cache();
+    frame0 = h_->render_frame(seq, first);
+    QVERIFY(!frame0.isEmpty());
+    h_->render_frame(seq, first + step);  // warm-up
+    const RhiResourceCache::Stats before = h_->cache_stats();
+    QVERIFY2(before.pipelinesCreated > 0 && before.buffersCreated > 0,
+             qPrintable(QStringLiteral("%1: warm-up created %2 pipelines, %3 buffers through the cache")
+                            .arg(scene)
+                            .arg(before.pipelinesCreated)
+                            .arg(before.buffersCreated)));
+    for (int i = 2; i < 12; i++) {
+      QVERIFY(!h_->render_frame(seq, first + i * step).isEmpty());
+      QVERIFY2(h_->last_frame_transient_pipelines_and_buffers() == 0,
+               qPrintable(QStringLiteral("%1: frame %2 created %3 pipelines/buffers outside the cache")
+                              .arg(scene)
+                              .arg(i)
+                              .arg(h_->last_frame_transient_pipelines_and_buffers())));
+    }
+    const RhiResourceCache::Stats after = h_->cache_stats();
+    QVERIFY2(after.pipelinesCreated == before.pipelinesCreated && after.buffersCreated == before.buffersCreated,
+             qPrintable(QStringLiteral("%1: steady state created %2 pipelines, %3 buffers")
+                            .arg(scene)
+                            .arg(after.pipelinesCreated - before.pipelinesCreated)
+                            .arg(after.buffersCreated - before.buffersCreated)));
+  };
+  // The 8x8-block checkerboard fixtures really decoded and drew: block (4,4) white, block (3,4) black, both opaque
+  auto check_checkerboard = [this](const QByteArray& frame0) {
+    h_->assert_pixel(frame0, 64, 36, 36, QColor(255, 255, 255, 255), 55);
+    h_->assert_pixel(frame0, 64, 28, 36, QColor(0, 0, 0, 255), 55);
+  };
+  QByteArray frame0;
+
+  // Generator clip + two XML effects: render_clip_to_backbuffer, rhi_blit and rhi_blit_srcover
+  SequencePtr seq = h_->make_sequence(64, 64, 30);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 40, 20));
+  h_->attach_xml_shader(c, "Box Blur");
+  h_->attach_xml_shader(c, "Hue/Saturation/Brightness");
+  check_steady(seq.get(), 5, 1, "generator", frame0);
+  if (QTest::currentTestFailed()) return;
+
+  // Decoded footage: the YUV->RGB pass in Clip::retrieveYuvGpuPath (1-frame fixtures, so stay on frame 0)
+  if (avcodec_find_decoder(AV_CODEC_ID_H264)) {
+    SequencePtr yuv = h_->make_sequence(64, 64, 30);
+    h_->add_video_clip(yuv.get(), 0, 30,
+                       h_->import_video_media(SOURCE_DIR "/tests/fixtures/t1_yuv_input.mp4", 64, 64, 30));
+    check_steady(yuv.get(), 0, 0, "yuv420p", frame0);
+    if (QTest::currentTestFailed()) return;
+    check_checkerboard(frame0);
+    if (QTest::currentTestFailed()) return;
+  }
+  if (avcodec_find_decoder(AV_CODEC_ID_RAWVIDEO)) {
+    SequencePtr nv12 = h_->make_sequence(64, 64, 30);
+    h_->add_video_clip(nv12.get(), 0, 30,
+                       h_->import_video_media(SOURCE_DIR "/tests/fixtures/t2_nv12_input.mkv", 64, 64, 30));
+    check_steady(nv12.get(), 0, 0, "nv12", frame0);
+    if (QTest::currentTestFailed()) return;
+    check_checkerboard(frame0);
+  }
 }
 
 void TestEffectsGpu::transformTranslate() {
@@ -2421,7 +2566,8 @@ void TestEffectsGpu::yuvDecodeNV12() {
 }
 
 int main(int argc, char* argv[]) {
-  qputenv("QT_QPA_PLATFORM", "offscreen");
+  // Offscreen QPA can't create a QVulkanInstance: AMBER_TEST_RHI=vulkan needs a real platform (xcb under xvfb-run)
+  if (qEnvironmentVariable("AMBER_TEST_RHI") != QLatin1String("vulkan")) qputenv("QT_QPA_PLATFORM", "offscreen");
 
   // Force OpenGL 3.2 core profile so the QRhi(OpenGLES2) backend's offscreen
   // context exposes a GLSL 150 binding. Without this, Qt's offscreen platform

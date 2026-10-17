@@ -75,6 +75,12 @@ target_include_directories(amber-test-rhi-smoke PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-rhi-smoke PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-rhi-smoke COMMAND amber-test-rhi-smoke)
 
+# RhiResourceCache — pipeline cache and per-frame dynamic buffer pool (AMBER_TEST_RHI=vulkan for a local Vulkan run)
+add_executable(amber-test-rhi-cache test_rhi_cache.cpp)
+target_include_directories(amber-test-rhi-cache PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-rhi-cache PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-rhi-cache COMMAND amber-test-rhi-cache)
+
 # Rendering integration test — exercises QRhi pipeline with real engine types
 add_executable(amber-test-rendering test_rendering.cpp)
 target_include_directories(amber-test-rendering PRIVATE ${CMAKE_SOURCE_DIR})

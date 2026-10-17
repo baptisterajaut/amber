@@ -37,6 +37,7 @@ extern "C" {
 
 #include "rendering/audio.h"
 #include "rendering/renderthread.h"
+#include "rendering/rhiresourcecache.h"
 
 #include "core/math.h"
 #include "global/config.h"
@@ -97,21 +98,16 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
   QRhi* rhi = params.rhi;
   QRhiCommandBuffer* cb = params.cb;
 
-  // Dedicated buffers per pass — QRhi dynamic buffers are NOT snapshotted at record time,
-  // so sharing params.vertUbo/vbuf across passes with different MVPs causes all passes to
-  // see the last-written value at endOffscreenFrame(). This broke shader effects: the
-  // effect's depthCorrMatrix MVP was overwritten by the final srcover's clipSpaceCorrMatrix.
-  QRhiBuffer* vbuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
-  vbuf->create();
-  QRhiBuffer* vertUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
-  vertUbo->create();
+  // Dedicated buffers per pass (pooled across frames) — QRhi dynamic buffers are NOT snapshotted at record time,
+  // so sharing one buffer across passes with different MVPs makes all passes see the last-written value at
+  // endOffscreenFrame(). This broke shader effects: the effect's depthCorrMatrix MVP was overwritten by the final
+  // srcover's clipSpaceCorrMatrix.
+  QRhiBuffer* vbuf = params.cache->dynamicBuffer(QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+  QRhiBuffer* vertUbo = params.cache->dynamicBuffer(QRhiBuffer::UniformBuffer, 64);
 
-  // Create fragment UBO (skip if shader has no fragment uniforms)
+  // Fragment UBO (skip if shader has no fragment uniforms)
   QRhiBuffer* fragUbo = nullptr;
-  if (fragUboSize > 0) {
-    fragUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, fragUboSize);
-    fragUbo->create();
-  }
+  if (fragUboSize > 0) fragUbo = params.cache->dynamicBuffer(QRhiBuffer::UniformBuffer, fragUboSize);
 
   // Build SRB
   QVector<QRhiShaderResourceBinding> bindings;
@@ -134,25 +130,14 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
   srb->setBindings(bindings.cbegin(), bindings.cend());
   srb->create();
 
-  // Build pipeline
-  QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
-  pipeline->setShaderStages({{QRhiShaderStage::Vertex, vertShader}, {QRhiShaderStage::Fragment, fragShader}});
-  QRhiVertexInputLayout inputLayout;
-  inputLayout.setBindings({{4 * sizeof(float)}});
-  inputLayout.setAttributes({
-      {0, 0, QRhiVertexInputAttribute::Float2, 0},
-      {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
-  });
-  pipeline->setVertexInputLayout(inputLayout);
-  pipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
-  QRhiGraphicsPipeline::TargetBlend noBlend;
-  noBlend.enable = false;
-  pipeline->setTargetBlends({noBlend});
-  pipeline->setShaderResourceBindings(srb);
-  pipeline->setRenderPassDescriptor(rpd);
-  if (!pipeline->create()) {
-    qWarning() << "[RHI-PIPELINE] rhi_blit pipeline creation FAILED";
-  }
+  // Cached pipeline (looked up every pass, never stored). The texture bindings above are contiguous from 2 as
+  // long as extraTex2 is never passed without extraTex1 — true for every caller (only the LUT, as extraTex1).
+  Q_ASSERT(!extraTex2 || extraTex1);
+  RhiResourceCache::SrbLayout layout;
+  layout.paramUbo = fragUboSize > 0;
+  layout.textures = 1 + ((texBindingCount >= 2 && extraTex1) ? 1 : 0) + ((texBindingCount >= 3 && extraTex2) ? 1 : 0);
+  QRhiGraphicsPipeline* pipeline =
+      params.cache->pipeline(vertShader, fragShader, RhiResourceCache::Blend::None, layout, rpd);
 
   // Fullscreen quad vertex data
   float blitQuad[] = {
@@ -181,20 +166,18 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
   QSize sz = target->pixelSize();
   QColor clearColor(0, 0, 0, 0);
   cb->beginPass(target, clearColor, {1.0f, 0}, u);
-  cb->setGraphicsPipeline(pipeline);
-  cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
-  cb->setShaderResources(srb);
-  const QRhiCommandBuffer::VertexInput vbufBinding(vbuf, 0);
-  cb->setVertexInput(0, 1, &vbufBinding);
-  cb->draw(4);
+  if (pipeline) {
+    cb->setGraphicsPipeline(pipeline);
+    cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
+    cb->setShaderResources(srb);
+    const QRhiCommandBuffer::VertexInput vbufBinding(vbuf, 0);
+    cb->setVertexInput(0, 1, &vbufBinding);
+    cb->draw(4);
+  }
   cb->endPass();
 
-  // Defer cleanup — resources must survive until endOffscreenFrame()
-  params.transientResources.append(pipeline);
+  // Defer cleanup — the SRB must survive until endOffscreenFrame(); pipeline and buffers belong to params.cache
   params.transientResources.append(srb);
-  params.transientResources.append(vbuf);
-  params.transientResources.append(vertUbo);
-  if (fragUbo) params.transientResources.append(fragUbo);
 }
 
 // Blit with hardware SrcOver alpha blending (One/OneMinusSrcAlpha for premultiplied sources).
@@ -206,13 +189,10 @@ static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTar
   QRhi* rhi = params.rhi;
   QRhiCommandBuffer* cb = params.cb;
 
-  // Dedicated buffers per pass (same rationale as rhi_blit — see comment there).
-  QRhiBuffer* vbuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
-  vbuf->create();
-  QRhiBuffer* vertUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
-  vertUbo->create();
-  QRhiBuffer* fragUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
-  fragUbo->create();
+  // Dedicated buffers per pass, pooled across frames (same rationale as rhi_blit — see comment there).
+  QRhiBuffer* vbuf = params.cache->dynamicBuffer(QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+  QRhiBuffer* vertUbo = params.cache->dynamicBuffer(QRhiBuffer::UniformBuffer, 64);
+  QRhiBuffer* fragUbo = params.cache->dynamicBuffer(QRhiBuffer::UniformBuffer, 16);
 
   QRhiShaderResourceBindings* srb = rhi->newShaderResourceBindings();
   srb->setBindings({
@@ -222,32 +202,11 @@ static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTar
   });
   srb->create();
 
-  QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
-  pipeline->setShaderStages(
-      {{QRhiShaderStage::Vertex, params.passthroughVert}, {QRhiShaderStage::Fragment, params.passthroughFrag}});
-  QRhiVertexInputLayout inputLayout;
-  inputLayout.setBindings({{4 * sizeof(float)}});
-  inputLayout.setAttributes({
-      {0, 0, QRhiVertexInputAttribute::Float2, 0},
-      {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
-  });
-  pipeline->setVertexInputLayout(inputLayout);
-  pipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
-
-  // SrcOver for premultiplied alpha: result = src + dst * (1 - srcAlpha)
-  QRhiGraphicsPipeline::TargetBlend blend;
-  blend.enable = true;
-  blend.srcColor = QRhiGraphicsPipeline::One;
-  blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
-  blend.srcAlpha = QRhiGraphicsPipeline::One;
-  blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
-  pipeline->setTargetBlends({blend});
-
-  pipeline->setShaderResourceBindings(srb);
-  pipeline->setRenderPassDescriptor(rpd);
-  if (!pipeline->create()) {
-    qWarning() << "[RHI-PIPELINE] rhi_blit_srcover pipeline creation FAILED";
-  }
+  // SrcOver for premultiplied alpha: result = src + dst * (1 - srcAlpha). Default layout (UBO 1 on the fragment
+  // stage + one texture) matches the SRB above.
+  QRhiGraphicsPipeline* pipeline =
+      params.cache->pipeline(params.passthroughVert, params.passthroughFrag,
+                             RhiResourceCache::Blend::PremultipliedOver, RhiResourceCache::SrbLayout{}, rpd);
 
   float blitQuad[] = {
       -1, -1, 0, 0, -1, 1, 0, 1, 1, -1, 1, 0, 1, 1, 1, 1,
@@ -275,19 +234,18 @@ static void rhi_blit_srcover(ComposeSequenceParams& params, QRhiTextureRenderTar
   QSize sz = target->pixelSize();
   QColor clearColor(0, 0, 0, 0);
   cb->beginPass(target, clearColor, {1.0f, 0}, u);
-  cb->setGraphicsPipeline(pipeline);
-  cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
-  cb->setShaderResources(srb);
-  const QRhiCommandBuffer::VertexInput vbufBinding(vbuf, 0);
-  cb->setVertexInput(0, 1, &vbufBinding);
-  cb->draw(4);
+  if (pipeline) {
+    cb->setGraphicsPipeline(pipeline);
+    cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
+    cb->setShaderResources(srb);
+    const QRhiCommandBuffer::VertexInput vbufBinding(vbuf, 0);
+    cb->setVertexInput(0, 1, &vbufBinding);
+    cb->draw(4);
+  }
   cb->endPass();
 
-  params.transientResources.append(pipeline);
+  // The SRB must survive until endOffscreenFrame(); pipeline and buffers belong to params.cache
   params.transientResources.append(srb);
-  params.transientResources.append(vbuf);
-  params.transientResources.append(vertUbo);
-  params.transientResources.append(fragUbo);
 }
 
 // Simplified blit: passthrough shader, identity MVP
@@ -579,15 +537,11 @@ static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture
     clipParams = QByteArray(reinterpret_cast<const char*>(colorMult), sizeof(colorMult));
   }
 
-  // Dedicated buffers per pass — QRhi dynamic buffers are NOT snapshotted at
+  // Dedicated buffers per pass (pooled across frames) — QRhi dynamic buffers are NOT snapshotted at
   // record time (all blit helpers also use per-pass buffers for the same reason).
-  QRhiBuffer* clipVbuf = params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, sizeof(quad_verts));
-  clipVbuf->create();
-  QRhiBuffer* clipVertUbo = params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
-  clipVertUbo->create();
-  QRhiBuffer* clipFragUbo =
-      params.rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, quint32(clipParams.size()));
-  clipFragUbo->create();
+  QRhiBuffer* clipVbuf = params.cache->dynamicBuffer(QRhiBuffer::VertexBuffer, sizeof(quad_verts));
+  QRhiBuffer* clipVertUbo = params.cache->dynamicBuffer(QRhiBuffer::UniformBuffer, 64);
+  QRhiBuffer* clipFragUbo = params.cache->dynamicBuffer(QRhiBuffer::UniformBuffer, quint32(clipParams.size()));
 
   QRhiShaderResourceBinding::StageFlags paramStages = QRhiShaderResourceBinding::FragmentStage;
   if (clip_shader) paramStages |= QRhiShaderResourceBinding::VertexStage;
@@ -600,30 +554,15 @@ static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture
   });
   srb->create();
 
-  QRhiGraphicsPipeline* pipeline = params.rhi->newGraphicsPipeline();
-  if (clip_shader) {
-    pipeline->setShaderStages({{QRhiShaderStage::Vertex, clip_shader->vertexShader()},
-                               {QRhiShaderStage::Fragment, clip_shader->fragmentShader()}});
-  } else {
-    pipeline->setShaderStages(
-        {{QRhiShaderStage::Vertex, params.passthroughVert}, {QRhiShaderStage::Fragment, params.passthroughFrag}});
-  }
-  QRhiVertexInputLayout inputLayout;
-  inputLayout.setBindings({{4 * sizeof(float)}});
-  inputLayout.setAttributes({
-      {0, 0, QRhiVertexInputAttribute::Float2, 0},
-      {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
-  });
-  pipeline->setVertexInputLayout(inputLayout);
-  pipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
-  QRhiGraphicsPipeline::TargetBlend noBlend;
-  noBlend.enable = false;
-  pipeline->setTargetBlends({noBlend});
-  pipeline->setShaderResourceBindings(srb);
-  pipeline->setRenderPassDescriptor(back_rpd);
-  if (!pipeline->create()) {
-    qWarning() << "[RHI-PIPELINE] clip rendering pipeline FAILED";
-  }
+  // Cached pipeline (looked up every pass, never stored); the layout (UBO 1 on paramStages + one texture) matches
+  // the SRB above.
+  RhiResourceCache::SrbLayout layout;
+  layout.paramStages = paramStages;
+  QRhiGraphicsPipeline* pipeline =
+      clip_shader ? params.cache->pipeline(clip_shader->vertexShader(), clip_shader->fragmentShader(),
+                                           RhiResourceCache::Blend::None, layout, back_rpd)
+                  : params.cache->pipeline(params.passthroughVert, params.passthroughFrag,
+                                           RhiResourceCache::Blend::None, layout, back_rpd);
 
   // Apply clip-space correction (Y-flip + depth remap for Vulkan/Metal/D3D)
   QMatrix4x4 corrected_clip_mvp = params.rhi->clipSpaceCorrMatrix() * clip_mvp;
@@ -636,20 +575,18 @@ static void render_clip_to_backbuffer(ComposeSequenceParams& params, QRhiTexture
   QSize sz = back_target1->pixelSize();
   QColor clearColor(0, 0, 0, 0);
   params.cb->beginPass(back_target1, clearColor, {1.0f, 0}, u);
-  params.cb->setGraphicsPipeline(pipeline);
-  params.cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
-  params.cb->setShaderResources(srb);
-  const QRhiCommandBuffer::VertexInput vbufBinding(clipVbuf, 0);
-  params.cb->setVertexInput(0, 1, &vbufBinding);
-  params.cb->draw(4);
+  if (pipeline) {
+    params.cb->setGraphicsPipeline(pipeline);
+    params.cb->setViewport({0, 0, float(sz.width()), float(sz.height())});
+    params.cb->setShaderResources(srb);
+    const QRhiCommandBuffer::VertexInput vbufBinding(clipVbuf, 0);
+    params.cb->setVertexInput(0, 1, &vbufBinding);
+    params.cb->draw(4);
+  }
   params.cb->endPass();
 
-  // Defer cleanup -- resources must survive until endOffscreenFrame()
-  params.transientResources.append(pipeline);
+  // Defer cleanup -- the SRB must survive until endOffscreenFrame(); pipeline and buffers belong to params.cache
   params.transientResources.append(srb);
-  params.transientResources.append(clipVbuf);
-  params.transientResources.append(clipVertUbo);
-  params.transientResources.append(clipFragUbo);
 }
 
 // Ensure clip FBO resources exist at the given compositing resolution, invalidating if resolution changed.
@@ -955,6 +892,11 @@ static void resolve_nested_sequence(ComposeSequenceParams& params, Sequence*& s,
 QRhiTexture* amber::rendering::compose_sequence(ComposeSequenceParams& params) {
   if (!params.seq) {
     qWarning() << "compose_sequence: params.seq is null";
+    return nullptr;
+  }
+  // compose_audio() builds params with video=false, no QRhi and no cache: only the video path needs one
+  if (params.video && !params.cache) {
+    qWarning() << "compose_sequence: params.cache is null";
     return nullptr;
   }
   QRhiTextureRenderTarget* final_target = params.main_target;

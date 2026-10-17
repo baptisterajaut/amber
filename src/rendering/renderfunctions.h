@@ -48,6 +48,8 @@ struct ClipRhiResources {
   int count = 0;
 };
 
+class RhiResourceCache;
+
 struct ComposeSequenceParams {
   QRhi* rhi;
   QRhiCommandBuffer* cb;
@@ -65,6 +67,9 @@ struct ComposeSequenceParams {
 
   // Shared sampler (created by RenderThread, reused across all blit passes)
   QRhiSampler* sampler;
+
+  // Pipeline cache + dynamic buffer pool of this QRhi (owned by RenderThread / the test harness). Required.
+  RhiResourceCache* cache{nullptr};
 
   // Core shaders (loaded from QRC .qsb)
   QShader passthroughVert;

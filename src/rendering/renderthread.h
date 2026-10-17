@@ -28,9 +28,12 @@
 #include <QThread>
 #include <QWaitCondition>
 #include <atomic>
+#include <memory>
 
 #include "effects/effect.h"
 #include "engine/sequence.h"
+
+class RhiResourceCache;
 
 class RenderThread : public QThread {
   Q_OBJECT
@@ -103,6 +106,7 @@ class RenderThread : public QThread {
   QShader yuvFrag_;
 
   QRhiSampler* sampler_{nullptr};
+  std::unique_ptr<RhiResourceCache> cache_;  // reset before sampler_ and rhi_ in delete_ctx()
 
   // Main compositing target (double-buffered)
   QRhiTexture* front_tex_[2] = {};

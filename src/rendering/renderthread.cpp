@@ -38,6 +38,7 @@
 #include "engine/sequence.h"
 #include "global/config.h"
 #include "rendering/renderfunctions.h"
+#include "rendering/rhiresourcecache.h"
 
 static QShader loadQsb(const QString& path) {
   QFile f(path);
@@ -146,6 +147,7 @@ void RenderThread::init_rhi_resources() {
   sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None, QRhiSampler::ClampToEdge,
                               QRhiSampler::ClampToEdge);
   sampler_->create();
+  cache_ = std::make_unique<RhiResourceCache>(rhi_);
 }
 
 // Attempt to create QRhi using the configured backend, with OpenGL and software Vulkan fallbacks.
@@ -303,6 +305,7 @@ void RenderThread::paint() {
   params.scrubbing = scrubbing_;
 
   params.sampler = sampler_;
+  params.cache = cache_.get();
 
   params.passthroughVert = passthroughVert_;
   params.passthroughFrag = passthroughFrag_;
@@ -337,6 +340,7 @@ void RenderThread::paint() {
 
     qDeleteAll(params.transientResources);
     params.transientResources.clear();
+    cache_->endFrame();
 
     // Drain deferred deletes from other threads (e.g. Clip::Close on main thread)
     drainDeferredDeletes();
@@ -503,6 +507,7 @@ void RenderThread::delete_ctx() {
   drainDeferredDeletes();  // Clean up anything queued before shutdown
   delete_buffers();
 
+  cache_.reset();  // destroys cached pipelines/buffers: must run before the QRhi goes away
   delete sampler_;
   sampler_ = nullptr;
 

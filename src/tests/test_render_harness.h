@@ -20,6 +20,7 @@
 #include "effects/effect.h"
 #include "engine/sequence.h"
 #include "project/media.h"
+#include "rendering/rhiresourcecache.h"
 #include "tests/test_appcontext_stub.h"
 
 class Clip;
@@ -120,6 +121,17 @@ class TestRenderHarness {
   // production minus the threading.
   QByteArray render_audio(Clip* clip, double timecode_start, int duration_ms);
 
+  // Pipeline/buffer counters of the harness's RHI resource cache (zeroes when there is no QRhi).
+  RhiResourceCache::Stats cache_stats() const { return cache_ ? cache_->stats() : RhiResourceCache::Stats{}; }
+  // Fresh, empty cache (and zeroed stats) so a test can see what one scene creates on its own. Between frames only.
+  void reset_cache() {
+    if (rhi_) cache_ = std::make_unique<RhiResourceCache>(rhi_.get());
+  }
+  // Pipelines and buffers the last render_frame() found in params.transientResources: those created per frame outside
+  // the cache (which cache_stats() can't see) AND deferred through transientResources. Not a complete count — one
+  // created and destroyed within the frame never shows here. Zero once every pass goes through the cache.
+  int last_frame_transient_pipelines_and_buffers() const { return last_transient_pipelines_and_buffers_; }
+
   // Pixel assertions. `pixels` is the QByteArray from render_frame.
   // `w` is the sequence width (needed to compute the row offset for (x, y)).
   void assert_pixel(const QByteArray& pixels, int w, int x, int y, QColor expected, int tolerance = 2);
@@ -144,6 +156,8 @@ class TestRenderHarness {
   std::unique_ptr<QRhi> rhi_;
   QShader passthrough_vert_, passthrough_frag_, blending_frag_, premultiply_frag_, yuv_frag_;
   QRhiSampler* sampler_ = nullptr;
+  std::unique_ptr<RhiResourceCache> cache_;
+  int last_transient_pipelines_and_buffers_ = 0;
 
   int buf_w_ = 0, buf_h_ = 0;
   QRhiTexture* main_tex_ = nullptr;
