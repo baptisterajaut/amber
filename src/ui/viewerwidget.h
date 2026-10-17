@@ -32,6 +32,7 @@
 
 #include "core/fpsmeter.h"
 #include "core/guide.h"
+#include "core/pixelsampler.h"
 #include "core/scrubresolution.h"
 #include "effects/effect.h"
 #include "engine/clip.h"
@@ -103,6 +104,7 @@ class ViewerWidget : public QRhiWidget {
   void mousePressEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
+  void leaveEvent(QEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
 
  private:
@@ -116,6 +118,11 @@ class ViewerWidget : public QRhiWidget {
   // View > Show Frame Rate: true while the label is due (sequence viewer, playing)
   bool frame_rate_shown() const;
   void draw_frame_rate(QPainter& p);
+  // View > Show Pixel Sampler: true while the readout is due (pointer over a frame, no eyedropper)
+  bool pixel_sampler_shown() const;
+  void draw_pixel_sampler(QPainter& p);
+  // Reads the pixel under the last pointer position into the readout and repaints the overlay
+  void sample_pixel();
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
   void move_gizmos(QMouseEvent* event, bool done);
   // Body of frame_update(); with_audio = false skips the audio scrub grain
@@ -145,7 +152,9 @@ class ViewerWidget : public QRhiWidget {
   int creating_guide_pos_{0};
   bool color_pick_mode_{false};
   void exitColorPickMode();
-  QColor readPixelAt(int widget_x, int widget_y);
+  // Colour of the shown frame at a widget position, as stored in the front buffer, and the sequence pixel there.
+  // Invalid with no frame or off the frame.
+  QColor readPixelAt(const QPointF& pos, QPoint* seq_pos = nullptr);
   void seek_from_click(int x);
   Effect* gizmos{nullptr};
   int drag_start_x;
@@ -184,6 +193,11 @@ class ViewerWidget : public QRhiWidget {
   QElapsedTimer fps_clock_;
   quint64 fps_last_serial_{0};
   long fps_last_playhead_{-1};
+  // Pixel sampler: last pointer position over the widget and the pixel read there (invalid colour: nothing to show)
+  bool sampler_hover_{false};
+  QPointF sampler_pos_;
+  QColor sampler_color_;
+  QPoint sampler_seq_pos_;
  public slots:
   void queue_repaint();
 

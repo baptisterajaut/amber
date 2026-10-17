@@ -27,6 +27,11 @@ target_include_directories(amber-test-fps-meter PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-fps-meter PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-fps-meter COMMAND amber-test-fps-meter)
 
+add_executable(amber-test-pixel-sampler test_pixel_sampler.cpp)
+target_include_directories(amber-test-pixel-sampler PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-pixel-sampler PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-pixel-sampler COMMAND amber-test-pixel-sampler)
+
 add_executable(amber-test-shadertoy test_shadertoy.cpp)
 target_include_directories(amber-test-shadertoy PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_definitions(amber-test-shadertoy PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")

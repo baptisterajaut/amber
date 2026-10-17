@@ -43,6 +43,8 @@ class TestConfig : public QObject {
     Config saved;
     QVERIFY(!saved.show_frame_rate);  // off by default
     saved.show_frame_rate = true;
+    QVERIFY(!saved.show_pixel_sampler);
+    saved.show_pixel_sampler = true;
     saved.lock_guides = true;  // was loaded but never saved
     HeadlessAppContext ctx;
     amber::app_ctx = &ctx;  // save() asks it for the project toolbar state
@@ -51,6 +53,7 @@ class TestConfig : public QObject {
     Config loaded;
     loaded.load(path);
     QVERIFY(loaded.show_frame_rate);
+    QVERIFY(loaded.show_pixel_sampler);
     QVERIFY(loaded.lock_guides);
   }
 };

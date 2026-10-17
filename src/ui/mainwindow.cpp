@@ -692,6 +692,11 @@ void MainWindow::setup_menus() {
   show_frame_rate_->setCheckable(true);
   show_frame_rate_->setData(reinterpret_cast<quintptr>(&amber::CurrentConfig.show_frame_rate));
 
+  show_pixel_sampler_ =
+      MenuHelper::create_menu_action(view_menu, "showpixelsampler", &amber::MenuHelper, SLOT(toggle_bool_action()));
+  show_pixel_sampler_->setCheckable(true);
+  show_pixel_sampler_->setData(reinterpret_cast<quintptr>(&amber::CurrentConfig.show_pixel_sampler));
+
   view_menu->addSeparator();
 
   full_screen =
@@ -1001,6 +1006,7 @@ void MainWindow::Retranslate() {
   guides_menu_->setTitle(tr("Guides"));
   lock_guides_->setText(tr("Lock Guides"));
   show_frame_rate_->setText(tr("Show Frame Rate"));
+  show_pixel_sampler_->setText(tr("Show Pixel Sampler"));
   panel_sequence_viewer->viewer_widget->guide_delete_action_->setText(tr("Delete Guide"));
   panel_sequence_viewer->viewer_widget->guide_mirror_action_->setText(tr("Toggle Mirror"));
 
@@ -1304,6 +1310,7 @@ void MainWindow::viewMenu_About_To_Be_Shown() {
   amber::MenuHelper.set_bool_action_checked(show_guides_);
   amber::MenuHelper.set_bool_action_checked(lock_guides_);
   amber::MenuHelper.set_bool_action_checked(show_frame_rate_);
+  amber::MenuHelper.set_bool_action_checked(show_pixel_sampler_);
 
   full_screen->setChecked(windowState() == Qt::WindowFullScreen);
 

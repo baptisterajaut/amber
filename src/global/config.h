@@ -646,6 +646,11 @@ struct Config {
   bool show_frame_rate{false};
 
   /**
+   * @brief Show the colour and position of the pixel under the pointer in the viewers
+   */
+  bool show_pixel_sampler{false};
+
+  /**
    * @brief Show color labels on clips and markers
    *
    * **TRUE** if clips and markers should display their assigned color label

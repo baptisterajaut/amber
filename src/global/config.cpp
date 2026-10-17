@@ -87,6 +87,7 @@ constexpr BoolEntry kBoolEntries[] = {
     {"ShowGuides", &Config::show_guides},
     {"LockGuides", &Config::lock_guides},
     {"ShowFrameRate", &Config::show_frame_rate},
+    {"ShowPixelSampler", &Config::show_pixel_sampler},
     {"SnapToOutgoingClip", &Config::snap_to_outgoing_clip},
     {"EffectPanelShrinkable", &Config::effect_panel_shrinkable},
     {"ShowColorLabels", &Config::show_color_labels},
@@ -292,6 +293,7 @@ void Config::save(QString path) {
   stream.writeTextElement("FrameSkipStep", QString::number(frame_skip_step));
   stream.writeTextElement("ShowGuides", QString::number(show_guides));
   stream.writeTextElement("ShowFrameRate", QString::number(show_frame_rate));
+  stream.writeTextElement("ShowPixelSampler", QString::number(show_pixel_sampler));
   stream.writeTextElement("LockGuides", QString::number(lock_guides));
   stream.writeTextElement("SnapToOutgoingClip", QString::number(snap_to_outgoing_clip));
   stream.writeTextElement("SnapOutgoingModifier", QString::number(snap_outgoing_modifier));

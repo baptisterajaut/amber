@@ -12,6 +12,8 @@ target_sources(amber-engine PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/curves.h
   ${CMAKE_CURRENT_SOURCE_DIR}/fpsmeter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/fpsmeter.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/pixelsampler.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/pixelsampler.h
   ${CMAKE_CURRENT_SOURCE_DIR}/shortcutfile.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/shortcutfile.h
   ${CMAKE_CURRENT_SOURCE_DIR}/appcontext.cpp

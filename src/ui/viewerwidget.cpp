@@ -540,7 +540,7 @@ void ViewerWidget::keyPressEvent(QKeyEvent* event) {
 bool ViewerWidget::press_handle_color_pick(QMouseEvent* event) {
   if (!color_pick_mode_) return false;
   if (event->button() == Qt::LeftButton) {
-    QColor c = readPixelAt(qRound(event->position().x()), qRound(event->position().y()));
+    QColor c = readPixelAt(event->position());
     emit c.isValid() ? colorPicked(c) : colorPickCancelled();
     exitColorPickMode();
   } else if (event->button() == Qt::RightButton) {
@@ -656,6 +656,13 @@ void ViewerWidget::move_handle_dragging(QMouseEvent* event) {
 void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
   if (color_pick_mode_) return;
 
+  // Before the guide/gizmo handling below, which can return early
+  if (amber::CurrentConfig.show_pixel_sampler) {
+    sampler_hover_ = true;
+    sampler_pos_ = event->position();
+    sample_pixel();
+  }
+
   unsetCursor();
   if (panel_timeline->tool == TIMELINE_TOOL_HAND) setCursor(Qt::OpenHandCursor);
 
@@ -717,6 +724,12 @@ void ViewerWidget::mouseReleaseEvent(QMouseEvent* event) {
     move_gizmos(event, true);
   }
   dragging = false;
+}
+
+void ViewerWidget::leaveEvent(QEvent* event) {
+  sampler_hover_ = false;
+  update_overlay();
+  QRhiWidget::leaveEvent(event);
 }
 
 void ViewerWidget::wheelEvent(QWheelEvent* event) { container->parseWheelEvent(event); }
@@ -930,6 +943,47 @@ void ViewerWidget::draw_frame_rate(QPainter& p) {
   p.drawText(box, Qt::AlignCenter, text);
 }
 
+bool ViewerWidget::pixel_sampler_shown() const {
+  return amber::CurrentConfig.show_pixel_sampler && sampler_hover_ && !color_pick_mode_ && !waveform &&
+         viewer->seq != nullptr && sampler_color_.isValid();
+}
+
+// CBA: single pixel, 8-bit; an averaging radius or pinned probes if colourists ask
+void ViewerWidget::sample_pixel() {
+  sampler_color_ = readPixelAt(sampler_pos_, &sampler_seq_pos_);
+  update_overlay();
+}
+
+void ViewerWidget::draw_pixel_sampler(QPainter& p) {
+  const QColor& c = sampler_color_;
+  QString text =
+      amber::format_pixel_sample(sampler_seq_pos_.x(), sampler_seq_pos_.y(), c.red(), c.green(), c.blue(), c.alpha());
+
+  QFont f = font();
+  f.setBold(true);
+  p.setFont(f);
+  QFontMetrics fm(f);
+  const int margin = 8;
+  const int pad = 4;
+  const int swatch = 12;
+  const int box_h = qMax(fm.height(), swatch) + pad * 2;
+  QRect box(margin, height() - margin - box_h, pad + swatch + pad + fm.horizontalAdvance(text) + pad, box_h);
+
+  p.setRenderHint(QPainter::Antialiasing, true);
+  p.setPen(Qt::NoPen);
+  p.setBrush(QColor(0, 0, 0, 160));
+  p.drawRoundedRect(box, 4, 4);
+
+  // Opaque: the alpha is in the text
+  p.setRenderHint(QPainter::Antialiasing, false);
+  p.setPen(QColor(220, 220, 220));
+  p.setBrush(QColor(c.red(), c.green(), c.blue()));
+  p.drawRect(box.left() + pad, box.top() + (box_h - swatch) / 2, swatch - 1, swatch - 1);
+
+  p.setPen(Qt::white);
+  p.drawText(box.adjusted(pad + swatch + pad, 0, -pad, 0), Qt::AlignLeft | Qt::AlignVCenter, text);
+}
+
 int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {
   if (viewer->seq == nullptr) return -1;
   int threshold = qMax(3, int(5.0 * viewer->seq->width / width()));
@@ -1078,6 +1132,7 @@ void ViewerWidget::startColorPick() {
   }
   color_pick_mode_ = true;
   setCursor(Qt::CrossCursor);
+  update_overlay();  // hides the pixel sampler
 }
 
 void ViewerWidget::exitColorPickMode() {
@@ -1085,7 +1140,7 @@ void ViewerWidget::exitColorPickMode() {
   unsetCursor();
 }
 
-QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
+QColor ViewerWidget::readPixelAt(const QPointF& pos, QPoint* seq_pos) {
   if (viewer->seq == nullptr || width() <= 0 || height() <= 0) {
     return QColor();
   }
@@ -1102,13 +1157,24 @@ QColor ViewerWidget::readPixelAt(int widget_x, int widget_y) {
     return QColor();
   }
 
-  // Map to buffer pixels, not sequence pixels: the buffer is seq size / preview divider.
-  // CBA: assumes the frame fills the widget (ignores viewer zoom/scroll), as before
-  int video_x = qBound(0, qRound(widget_x * double(fw) / double(width())), fw - 1);
-  int video_y = qBound(0, qRound(widget_y * double(fh) / double(height())), fh - 1);
+  // Where render() draws the frame: past a zoom the widget stops growing and the frame overflows it, panned by the
+  // scrollbars. The buffer is seq size / preview divider.
+  amber::ViewerFrameGeometry g;
+  g.widget = QSizeF(width(), height());
+  g.zoom = container->zoom;
+  g.x_scroll = x_scroll;
+  g.y_scroll = y_scroll;
+  g.sequence = QSize(viewer->seq->width, viewer->seq->height);
+  amber::FramePoint pt;
+  if (!amber::map_viewer_point(g, pos, QSize(fw, fh), &pt)) {
+    return QColor();
+  }
+  if (seq_pos != nullptr) *seq_pos = QPoint(pt.seq_x, pt.seq_y);
 
-  // RGBA8888, no Y-flip — readBackTexture() is top-to-bottom on all backends
-  int offset = (video_y * fw + video_x) * 4;
+  // RGBA8888, no Y-flip — readBackTexture() is top-to-bottom on all backends. Premultiplied (compose_sequence()
+  // blends premultiplied over a transparent clear), kept as is: export and Save Frame write these bytes unchanged
+  // (PNG's default rgb24 drops A, rgba and Save Frame store them as straight)
+  int offset = (pt.buf_y * fw + pt.buf_x) * 4;
   return QColor(static_cast<unsigned char>(data[offset]), static_cast<unsigned char>(data[offset + 1]),
                 static_cast<unsigned char>(data[offset + 2]), static_cast<unsigned char>(data[offset + 3]));
 }
@@ -1209,6 +1275,12 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
     fps_meter_.reset();  // label off (or stopped, which Viewer::pause() already reset)
   }
 
+  // Pixel sampler: a new frame under a still pointer (playback, an edit) refreshes the readout, which the overlay
+  // repaint at the end shows. CBA: re-read on every paint, not only on a new frame: one lock and one pixel
+  if (amber::CurrentConfig.show_pixel_sampler && sampler_hover_) {
+    sampler_color_ = readPixelAt(sampler_pos_, &sampler_seq_pos_);
+  }
+
   // Compute zoom/scroll quad in NDC
   float zoom_left = -1.0f, zoom_right = 1.0f, zoom_bottom = -1.0f, zoom_top = 1.0f;
   if (viewer->seq != nullptr) {
@@ -1296,6 +1368,9 @@ void ViewerOverlay::paintEvent(QPaintEvent*) {
     }
     if (vw_->frame_rate_shown()) {
       vw_->draw_frame_rate(p);  // last, so no gizmo covers it
+    }
+    if (vw_->pixel_sampler_shown()) {
+      vw_->draw_pixel_sampler(p);  // bottom-left, clear of the frame rate label
     }
   }
 }
