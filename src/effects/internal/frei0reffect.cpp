@@ -168,9 +168,10 @@ void ApplyFrei0rParam(f0r_instance_t instance, f0rSetParamValue set_param, Effec
       set_param(instance, &fcolor, param_index);
     } break;
     case F0R_PARAM_POSITION: {
+      // The fields show 0-100 like the double params; Frei0r expects positions in [0, 1].
       f0r_param_position pos;
-      pos.x = param_row->Field(0)->GetValueAt(timecode).toDouble();
-      pos.y = param_row->Field(1)->GetValueAt(timecode).toDouble();
+      pos.x = param_row->Field(0)->GetValueAt(timecode).toDouble() * 0.01;
+      pos.y = param_row->Field(1)->GetValueAt(timecode).toDouble() * 0.01;
       set_param(instance, &pos, param_index);
     } break;
     case F0R_PARAM_STRING: {
