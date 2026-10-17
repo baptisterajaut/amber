@@ -301,6 +301,8 @@ bool Timeline::split_all_clips_at_point(ComboAction* ca, long point) {
 }
 
 void Timeline::split_at_playhead() {
+  if (amber::ActiveSequence == nullptr) return;
+
   ComboAction* ca = new ComboAction(tr("Split Clip(s)"));
   bool split_selected = false;
   split_cache.clear();
