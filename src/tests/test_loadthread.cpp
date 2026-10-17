@@ -79,11 +79,11 @@ class TestLoadThread : public QObject {
 
   // Start a LoadThread and pump the event loop until it has finished and deleted itself (which happens after its
   // queued success/error handlers have run on this thread).
-  void run_load(const QString& path, bool autorecovery, bool* succeeded, bool* failed) {
+  void run_load(const QString& path, bool autorecovery, bool* succeeded, int* failed) {
     auto* lt = new LoadThread(path, autorecovery);
     QPointer<LoadThread> guard(lt);
     connect(lt, &LoadThread::success, this, [succeeded]() { *succeeded = true; });
-    connect(lt, &LoadThread::error, this, [failed]() { *failed = true; });
+    connect(lt, &LoadThread::error, this, [failed]() { ++*failed; });
     lt->start();
     QTRY_VERIFY_WITH_TIMEOUT(guard.isNull(), 10000);
   }
@@ -122,7 +122,7 @@ class TestLoadThread : public QObject {
     QVERIFY(!path.isEmpty());
 
     bool succeeded = false;
-    bool failed = false;
+    int failed = 0;  // error() emissions
     run_load(path, false, &succeeded, &failed);
     QVERIFY(succeeded);
     QVERIFY(!failed);
@@ -159,7 +159,7 @@ class TestLoadThread : public QObject {
     QVERIFY(!path.isEmpty());
 
     bool succeeded = false;
-    bool failed = false;
+    int failed = 0;  // error() emissions
     run_load(path, true, &succeeded, &failed);
     QVERIFY(succeeded);
     QVERIFY(!failed);
@@ -178,7 +178,7 @@ class TestLoadThread : public QObject {
     QVERIFY(!path.isEmpty());
 
     bool succeeded = false;
-    bool failed = false;
+    int failed = 0;  // error() emissions
     run_load(path, false, &succeeded, &failed);
     QVERIFY(succeeded);
     QVERIFY(!failed);
@@ -219,16 +219,43 @@ class TestLoadThread : public QObject {
     QVERIFY(!path.isEmpty());
 
     bool succeeded = false;
-    bool failed = false;
+    int failed = 0;  // error() emissions
     run_load(path, false, &succeeded, &failed);
 
     // The worker blocked on the question, the main thread answered "No" through app_ctx, loading stopped
     QCOMPARE(ctx_.questions, 1);
     QVERIFY(!succeeded);
-    QVERIFY(failed);
+    // error() once (the app clears the project on it), no message box: the user chose to stop
+    QCOMPARE(failed, 1);
+    QCOMPARE(ctx_.messages, 0);
     QCOMPARE(amber::project_model.childCount(), 0);
     QVERIFY(amber::ActiveSequence == nullptr);
     QCOMPARE(pio_->isModified(), true);
+  }
+
+  // A file that can't be opened is a load error like any other: error() once, one message
+  void unreadableFileEmitsErrorOnce() {
+    bool succeeded = false;
+    int failed = 0;  // error() emissions
+    run_load(dir_.filePath("does-not-exist.ove"), false, &succeeded, &failed);
+    QVERIFY(!succeeded);
+    QCOMPARE(failed, 1);
+    QCOMPARE(ctx_.messages, 1);
+  }
+
+  void malformedXmlEmitsErrorOnce() {
+    QString path = dir_.filePath("broken.ove");
+    {
+      QFile f(path);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write("<?xml version=\"1.0\"?>\n<project>\n<version>190219</version>\n<folders><folder id=\"1\"</project>\n");
+    }
+    bool succeeded = false;
+    int failed = 0;  // error() emissions
+    run_load(path, false, &succeeded, &failed);
+    QVERIFY(!succeeded);
+    QCOMPARE(failed, 1);
+    QCOMPARE(ctx_.messages, 1);
   }
 };
 

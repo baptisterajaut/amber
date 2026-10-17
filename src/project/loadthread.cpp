@@ -789,12 +789,12 @@ bool LoadThread::load_all_phases(QFile& file, QXmlStreamReader& stream) {
   return load_worker(file, stream, MEDIA_TYPE_SEQUENCE);
 }
 
-// Handle post-load success/error state. Returns true if loading succeeded.
+// Handle post-load success/error state. Returns true if loading succeeded. On failure the caller emits error() once;
+// error_func() shows the message unless show_err was cleared.
 bool LoadThread::handle_load_result(QXmlStreamReader& stream, bool cont) {
   if (cancelled_) return false;
   if (!cont) {
     xml_error = false;
-    if (show_err) emit error();
     return false;
   }
   if (stream.hasError()) {
@@ -802,7 +802,6 @@ bool LoadThread::handle_load_result(QXmlStreamReader& stream, bool cont) {
         tr("%1 - Line: %2 Col: %3")
             .arg(stream.errorString(), QString::number(stream.lineNumber()), QString::number(stream.columnNumber()));
     xml_error = true;
-    emit error();
     return false;
   }
   link_nested_sequence_clips();
@@ -814,8 +813,14 @@ void LoadThread::run() {
 
   QFile file(filename_);
   if (!file.open(QIODevice::ReadOnly)) {
-    qCritical() << "Could not open file";
+    qCritical() << "Could not open file" << filename_ << file.errorString();
+    // Same exit as any other load error: error_func() reports it and the app resets to an empty project, so a later
+    // Ctrl+S can't write an empty project over the file under its old name
+    error_str = tr("Could not open '%1': %2").arg(filename_, file.errorString());
+    show_err = true;
+    xml_error = false;
     mutex.unlock();
+    emit error();
     return;
   }
 
@@ -862,6 +867,7 @@ void LoadThread::question_func(const QString& title, const QString& text) {
 }
 
 void LoadThread::error_func() {
+  if (!show_err) return;  // the user chose to stop (version mismatch "No"): nothing to report
   if (xml_error) {
     qCritical() << "Error parsing XML." << error_str;
     amber::app_ctx->showMessage(tr("XML Parsing Error"), tr("Couldn't load '%1'. %2").arg(filename_, error_str), 3);
