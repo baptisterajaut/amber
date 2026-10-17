@@ -9,6 +9,7 @@
 
 #include "effects/effect.h"
 #include "effects/effectfield.h"
+#include "effects/effectloaders.h"
 #include "effects/effectrow.h"
 #include "engine/sequence.h"
 #include "global/config.h"
@@ -47,13 +48,24 @@ class CountingAppContext : public TestAppContext {
 };
 
 // Same layout Project::save_project() writes. Folder 1 sits at the root; sequence 1 lives in it and is the open one.
-// A non-empty footage_url adds footage 1 to folder 1.
-QString fixture(int version, const QString& url, const QString& footage_url = QString()) {
+// A non-empty footage_url adds footage 1 to folder 1. Non-empty clip_effects (<effect> elements) put a clip carrying
+// them in the sequence.
+QString fixture(int version, const QString& url, const QString& footage_url = QString(),
+                const QString& clip_effects = QString()) {
   QString media = footage_url.isEmpty() ? QStringLiteral("<media/>")
                                         : QString(R"(<media>
         <footage id="1" folder="1" name="clip" url="%1"/>
     </media>)")
                                               .arg(footage_url.toHtmlEscaped());
+  QString sequence_body = clip_effects.isEmpty() ? QStringLiteral("/>")
+                                                 : QString(R"(>
+            <clip id="0" enabled="1" name="title" clipin="0" in="0" out="30" track="-1" r="192" g="128" b="128"
+                  autoscale="1" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+                %1
+            </clip>
+        </sequence>)")
+                                                       .arg(clip_effects);
   return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <version>%1</version>
@@ -65,11 +77,11 @@ QString fixture(int version, const QString& url, const QString& footage_url = QS
     %3
     <sequences>
         <sequence id="1" folder="1" name="Main Edit" width="1280" height="720" framerate="25" afreq="48000"
-                  alayout="3" open="1" label="4"/>
+                  alayout="3" open="1" label="4"%4
     </sequences>
 </project>
 )")
-      .arg(QString::number(version), url.toHtmlEscaped(), media);
+      .arg(QString::number(version), url.toHtmlEscaped(), media, sequence_body);
 }
 
 }  // namespace
@@ -82,11 +94,12 @@ class TestLoadThread : public QObject {
   ProjectIO* pio_ = nullptr;
   QTemporaryDir dir_;
 
-  QString write_fixture(const QString& name, int version, const QString& footage_url = QString()) {
+  QString write_fixture(const QString& name, int version, const QString& footage_url = QString(),
+                        const QString& clip_effects = QString()) {
     QString path = dir_.filePath(name);
     QFile f(path);
     if (!f.open(QFile::WriteOnly | QFile::Truncate)) return {};
-    f.write(fixture(version, path, footage_url).toUtf8());
+    f.write(fixture(version, path, footage_url, clip_effects).toUtf8());
     return path;
   }
 
@@ -131,6 +144,8 @@ class TestLoadThread : public QObject {
     ctx_.interactive = false;
     ctx_.answer = false;
     ctx_.recents = 0;
+    set_project_uses_frei0r(false);  // what AmberGlobal::ClearProject() does before each open
+    amber::CurrentConfig.show_frei0r_effects = false;
   }
 
   void loadsFolderAndSequence() {
@@ -188,6 +203,84 @@ class TestLoadThread : public QObject {
     QVERIFY(amber::ActiveSequence == nullptr);  // the imported open="1" sequence isn't activated
     QCOMPARE(ctx_.recents, 0);
     QCOMPARE(pio_->projectFilename(), QString());
+  }
+
+  void frei0rEffectName() {
+    QVERIFY(is_frei0r_effect_name("Frei0r/Glow"));
+    QVERIFY(!is_frei0r_effect_name("Distort/Transform"));
+    QVERIFY(!is_frei0r_effect_name("Glow"));
+    QVERIFY(!is_frei0r_effect_name("frei0r/Glow"));  // Effect::save writes the category as registered
+    QVERIFY(!is_frei0r_effect_name(QString()));
+  }
+
+  void frei0rVisibilityRule() {
+    QVERIFY(!frei0r_effects_visible(false, false));
+    QVERIFY(frei0r_effects_visible(true, false));
+    QVERIFY(frei0r_effects_visible(false, true));
+    QVERIFY(frei0r_effects_visible(true, true));
+
+    QVERIFY(!frei0r_effects_visible());
+    amber::CurrentConfig.show_frei0r_effects = true;
+    QVERIFY(frei0r_effects_visible());
+    amber::CurrentConfig.show_frei0r_effects = false;
+    set_project_uses_frei0r(true);
+    QVERIFY(frei0r_effects_visible());
+    QVERIFY(!amber::CurrentConfig.show_frei0r_effects);  // the project override never touches the preference
+    set_project_uses_frei0r(false);
+    QVERIFY(!frei0r_effects_visible());
+  }
+
+  // A project with Frei0r effects shows them in the add-effect menus (built with Frei0r), or says once that they
+  // won't render (built without). Either way they load as effects of the clip. The plugins aren't loaded here, so
+  // they are "Missing Effect" placeholders in both builds.
+  void frei0rProjectShowsFrei0rEffects() {
+    QString path = write_fixture(
+        "frei0r.ove", amber::kSaveVersion, QString(),
+        R"(<effect name="Frei0r/Glow" enabled="1"></effect><effect name="Frei0r/Vertigo" enabled="1"></effect>)");
+    QVERIFY(!path.isEmpty());
+
+    bool succeeded = false;
+    int failed = 0;  // error() emissions
+    run_load(path, false, &succeeded, &failed);
+    QVERIFY(succeeded);
+    QVERIFY(!failed);
+    QVERIFY(amber::ActiveSequence != nullptr);
+    QCOMPARE(amber::ActiveSequence->clips.size(), 1);
+    QCOMPARE(amber::ActiveSequence->clips.at(0)->effects.size(), 2);
+    QVERIFY(!amber::CurrentConfig.show_frei0r_effects);
+#ifdef NOFREI0R
+    QCOMPARE(ctx_.messages, 1);
+    QVERIFY(!frei0r_effects_visible());
+#else
+    QCOMPARE(ctx_.messages, 0);
+    QVERIFY(frei0r_effects_visible());
+#endif
+  }
+
+  // Importing a project with Frei0r effects into the open one shows them too; a project without any leaves them hidden
+  void frei0rImportShowsFrei0rEffects() {
+    QString plain = write_fixture("plain.ove", amber::kSaveVersion, QString(),
+                                  R"(<effect name="Distort/Transform" enabled="1"></effect>)");
+    bool succeeded = false;
+    int failed = 0;  // error() emissions
+    run_load(plain, false, &succeeded, &failed);
+    QVERIFY(succeeded);
+    QVERIFY(!frei0r_effects_visible());
+    QCOMPARE(ctx_.messages, 0);
+
+    QString path = write_fixture("frei0r-import.ove", amber::kSaveVersion, QString(),
+                                 R"(<effect name="Frei0r/Glow" enabled="1"></effect>)");
+    succeeded = false;
+    run_load(path, false, &succeeded, &failed, true);
+    QVERIFY(succeeded);
+    QVERIFY(!failed);
+#ifdef NOFREI0R
+    QCOMPARE(ctx_.messages, 1);
+    QVERIFY(!frei0r_effects_visible());
+#else
+    QCOMPARE(ctx_.messages, 0);
+    QVERIFY(frei0r_effects_visible());
+#endif
   }
 
   void autorecoveryRenamesProject() {
