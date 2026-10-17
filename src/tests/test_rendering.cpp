@@ -7,6 +7,7 @@
 #include "engine/sequence.h"
 #include "global/config.h"
 #include "tests/test_appcontext_stub.h"
+#include "tests/test_gpu_required.h"
 
 class TestRendering : public QObject {
   Q_OBJECT
@@ -49,7 +50,7 @@ void TestRendering::rhiClearAndReadback() {
     std::unique_ptr<QRhi> rhi(QRhi::create(QRhi::OpenGLES2, &params));
     if (!rhi) {
       delete params.fallbackSurface;
-      QSKIP("QRhi OpenGLES2 not available");
+      AMBER_SKIP_NO_GPU("QRhi OpenGLES2 not available");
     }
 
     // Create 320x240 RGBA8 texture

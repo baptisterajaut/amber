@@ -65,12 +65,12 @@ QByteArray checkerboard_y4m() {
   return y4m;
 }
 
-// 1 s of a 440 Hz stereo sine at half scale, S16 PCM
-QByteArray sine_wav() {
+// 1 s of a stereo sine (by default 440 Hz at half scale), S16 PCM
+QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5) {
   const int frames = kAudioRate;
   QByteArray pcm(frames * 4, Qt::Uninitialized);
   for (int i = 0; i < frames; i++) {
-    qint16 v = qint16(qRound(16384.0 * qSin(2.0 * M_PI * 440.0 * i / kAudioRate)));
+    qint16 v = qint16(qRound(32768.0 * amplitude * qSin(2.0 * M_PI * freq * i / kAudioRate)));
     qToLittleEndian(v, pcm.data() + i * 4);
     qToLittleEndian(v, pcm.data() + i * 4 + 2);
   }
@@ -135,6 +135,56 @@ QString fixture(const QString& url, const QString& video, const QString& audio) 
            QString::number(kClipOut));
 }
 
+// Three sequences over two WAVs (footage 1 and 2): Inner holds both on audio tracks 0 and 1, Nested holds one clip of
+// Inner, Flat holds the same two WAV clips directly
+QString nested_fixture(const QString& url, const QString& wav_a, const QString& wav_b) {
+  return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <version>%1</version>
+    <url>%2</url>
+    <folders>
+        <folder id="1" name="Bin" parent="0"/>
+    </folders>
+    <media>
+        <footage id="1" folder="1" name="a" url="%3"/>
+        <footage id="2" folder="1" name="b" url="%4"/>
+    </media>
+    <sequences>
+        <sequence id="1" folder="0" name="Inner" width="%5" height="%5" framerate="%6" afreq="%7" alayout="3">
+            <clip id="0" enabled="1" name="a" clipin="0" in="0" out="%8" track="0" r="128" g="192" b="128"
+                  autoscale="1" type="0" media="1" stream="0" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+            </clip>
+            <clip id="1" enabled="1" name="b" clipin="0" in="0" out="%8" track="1" r="128" g="192" b="128"
+                  autoscale="1" type="0" media="2" stream="0" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+            </clip>
+        </sequence>
+        <sequence id="2" folder="0" name="Nested" width="%5" height="%5" framerate="%6" afreq="%7" alayout="3">
+            <clip id="0" enabled="1" name="Inner" clipin="0" in="0" out="%8" track="0" r="192" g="128" b="128"
+                  autoscale="1" type="%9" sequence="1" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+            </clip>
+        </sequence>
+        <sequence id="3" folder="0" name="Flat" width="%5" height="%5" framerate="%6" afreq="%7" alayout="3"
+                  open="1">
+            <clip id="0" enabled="1" name="a" clipin="0" in="0" out="%8" track="0" r="128" g="192" b="128"
+                  autoscale="1" type="0" media="1" stream="0" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+            </clip>
+            <clip id="1" enabled="1" name="b" clipin="0" in="0" out="%8" track="1" r="128" g="192" b="128"
+                  autoscale="1" type="0" media="2" stream="0" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+            </clip>
+        </sequence>
+    </sequences>
+</project>
+)")
+      .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), wav_a.toHtmlEscaped(), wav_b.toHtmlEscaped(),
+           QString::number(kSize), QString::number(kFps, 'f', 10), QString::number(kAudioRate),
+           QString::number(kClipOut), QString::number(MEDIA_TYPE_SEQUENCE));
+}
+
 // RGBA8 copy of a decoded video frame (BT.601 through swscale's defaults, same for source and output)
 QByteArray to_rgba(const AVFrame* f) {
   QByteArray out(f->width * f->height * 4, Qt::Uninitialized);
@@ -159,6 +209,8 @@ struct Decoded {
   int audio_channels = 0;
   long audio_samples = 0;  // per channel
   double audio_peak = 0;   // max |sample|, 0..1
+  // Channel 0 samples, -1..1
+  QVector<float> audio_left;
 };
 
 void read_audio_frame(const AVFrame* f, Decoded& d) {
@@ -183,6 +235,7 @@ void read_audio_frame(const AVFrame* f, Decoded& d) {
           return;  // unexpected format: peak stays 0 and the test fails on it
       }
       d.audio_peak = qMax(d.audio_peak, qAbs(v));
+      if (c == 0) d.audio_left.append(float(v));
     }
   }
   d.audio_samples += f->nb_samples;
@@ -275,6 +328,30 @@ class TestHeadlessRender : public QObject {
   ProjectIO* pio_ = nullptr;
   QTemporaryDir dir_;
 
+  // Export the way ExportDialog::launch_export_thread() / export_thread_finished() do it. Returns the error, empty on
+  // success.
+  QString export_sequence(Sequence* seq, const ExportParams& params) {
+    VideoCodecParams vparams;
+    vparams.pix_fmt = AV_PIX_FMT_YUV420P;
+    vparams.threads = 0;
+
+    auto* et = new ExportThread(seq, params, vparams);
+    bool finished = false;
+    connect(et, &QThread::finished, this, [&finished]() { finished = true; });
+    QOffscreenSurface* surface = prepare_export(et, seq, params);
+    if (surface == nullptr) return "no GL fallback surface";
+    et->start();
+    // ExportThread's render and audio wake-ups are queued to this thread: qWaitFor keeps the event loop running
+    if (!QTest::qWaitFor([&finished]() { return finished; }, 60000)) return "export timed out";
+    et->wait();
+    finish_export(surface);
+    QString error = et->GetError();
+    const bool interrupted = et->WasInterrupted();
+    delete et;
+    if (error.isEmpty() && interrupted) error = "export interrupted";
+    return error;
+  }
+
  private slots:
   void initTestCase() {
     QVERIFY(dir_.isValid());
@@ -348,7 +425,7 @@ class TestHeadlessRender : public QObject {
     }
     QCOMPARE(seq->getEndFrame(), kClipOut);
 
-    // --- Export, the way ExportDialog::launch_export_thread() / export_thread_finished() do it
+    // --- Export
     ExportParams params;
     params.filename = dir_.filePath("out.mp4");
     params.video_enabled = true;
@@ -364,25 +441,8 @@ class TestHeadlessRender : public QObject {
     params.audio_bitrate = 128;  // kbps
     params.start_frame = 0;
     params.end_frame = seq->getEndFrame();
-    VideoCodecParams vparams;
-    vparams.pix_fmt = AV_PIX_FMT_YUV420P;
-    vparams.threads = 0;
-
-    auto* et = new ExportThread(seq.get(), params, vparams);
-    bool finished = false;
-    connect(et, &QThread::finished, this, [&finished]() { finished = true; });
-    QOffscreenSurface* surface = prepare_export(et, seq.get(), params);
-    QVERIFY(surface != nullptr);
-    et->start();
-    // ExportThread's render and audio wake-ups are queued to this thread: QTRY keeps the event loop running
-    QTRY_VERIFY_WITH_TIMEOUT(finished, 60000);
-    et->wait();
-    finish_export(surface);
-    const QString error = et->GetError();
-    const bool interrupted = et->WasInterrupted();
-    delete et;
+    const QString error = export_sequence(seq.get(), params);
     QVERIFY2(error.isEmpty(), qPrintable(error));
-    QVERIFY(!interrupted);
     QVERIFY(QFileInfo::exists(params.filename));
 
     // --- Decode the export and the source
@@ -439,6 +499,105 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(out.audio_peak > 0.25, qPrintable(QString("audio peak %1").arg(out.audio_peak)));
 
     qInfo("load + export + decode: %lld ms", timer.elapsed());
+  }
+
+  // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
+  // mix pulls the nested clip's inner streams at the same timecode
+  void nestedAudioMatchesFlat() {
+    // --- Fixture: two sines a quarter scale each (the mix stays below full scale) + .ove
+    const QString wav_a = dir_.filePath("tone_a.wav");
+    {
+      QFile f(wav_a);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav(330.0, 0.25));
+    }
+    const QString wav_b = dir_.filePath("tone_b.wav");
+    {
+      QFile f(wav_b);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav(1000.0, 0.25));
+    }
+    const QString project = dir_.filePath("nested.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(nested_fixture(project, wav_a, wav_b).toUtf8());
+    }
+
+    // --- Load, find the sequences, wait for both media probes
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+
+    auto find_sequence = [](const QString& name) -> SequencePtr {
+      for (int i = 0; i < amber::project_model.childCount(); i++) {
+        Media* m = amber::project_model.child(i);
+        if (m->get_type() == MEDIA_TYPE_SEQUENCE && m->to_sequence()->name == name) return m->to_sequence();
+      }
+      return nullptr;
+    };
+    SequencePtr nested_seq = find_sequence("Nested");
+    SequencePtr flat_seq = find_sequence("Flat");
+    QVERIFY(nested_seq != nullptr);
+    QVERIFY(flat_seq != nullptr);
+    QCOMPARE(nested_seq->clips.size(), 1);
+    QVERIFY(nested_seq->clips.at(0)->media() != nullptr);
+    QCOMPARE(nested_seq->clips.at(0)->media()->get_type(), int(MEDIA_TYPE_SEQUENCE));
+    QCOMPARE(flat_seq->clips.size(), 2);
+    for (const auto& c : flat_seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      QVERIFY(!f->invalid);
+      QVERIFY2(c->media_length() >= kClipOut, qPrintable(QString("media length %1").arg(c->media_length())));
+    }
+    QCOMPARE(nested_seq->getEndFrame(), kClipOut);
+    QCOMPARE(flat_seq->getEndFrame(), kClipOut);
+
+    // --- Export both, audio only, lossless
+    auto export_audio = [this](Sequence* seq, const QString& name, QString& path) -> QString {
+      ExportParams params{};
+      params.filename = dir_.filePath(name + ".wav");
+      params.video_enabled = false;
+      params.audio_enabled = true;
+      params.audio_codec = AV_CODEC_ID_PCM_S16LE;
+      params.audio_sampling_rate = kAudioRate;
+      params.audio_bitrate = 1536;  // ignored by PCM
+      params.start_frame = 0;
+      params.end_frame = seq->getEndFrame();
+      path = params.filename;
+      return export_sequence(seq, params);
+    };
+    QString nested_path;
+    QString flat_path;
+    QString error = export_audio(nested_seq.get(), "nested", nested_path);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    error = export_audio(flat_seq.get(), "flat", flat_path);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    // --- Decode and compare the left channels sample by sample
+    Decoded nested = decode_file(nested_path);
+    Decoded flat = decode_file(flat_path);
+    QVERIFY(nested.ok);
+    QVERIFY(flat.ok);
+    QVERIFY(nested.has_audio);
+    QVERIFY(flat.has_audio);
+    qInfo("samples per channel: nested %ld, flat %ld", nested.audio_samples, flat.audio_samples);
+    QVERIFY(nested.audio_left.size() > kAudioRate / 10);
+    const int n = qMin(nested.audio_left.size(), flat.audio_left.size());
+    float max_delta = 0;
+    for (int i = 0; i < n; i++) max_delta = qMax(max_delta, qAbs(nested.audio_left[i] - flat.audio_left[i]));
+    qInfo("nested vs flat: %d samples, max |delta| = %f, peaks %f / %f", n, max_delta, nested.audio_peak,
+          flat.audio_peak);
+    QVERIFY2(flat.audio_peak > 0.3, "flat mix is silent or too quiet");
+    QVERIFY2(max_delta <= 2.0f / 32768, qPrintable(QString("max delta %1").arg(max_delta)));
+    QCOMPARE(nested.audio_samples, flat.audio_samples);
   }
 };
 

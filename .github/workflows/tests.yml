@@ -1,0 +1,97 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, 2.0.x]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QT_QPA_PLATFORM: offscreen
+  AMBER_TEST_REQUIRE_GPU: "1"
+
+jobs:
+  ubuntu:
+    # Pinned toolchain, same Qt as the AppImage: catches regressions in Amber's own code
+    name: Ubuntu 24.04 (Qt 6.10.2, FFmpeg 6.1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential python3-venv \
+            libgl-dev libegl-dev \
+            libfontconfig1-dev libfreetype-dev \
+            libx11-dev libx11-xcb-dev libxcb1-dev \
+            libxcb-glx0-dev libxcb-cursor-dev \
+            libxcb-icccm4-dev libxcb-image0-dev libxcb-keysyms1-dev \
+            libxcb-randr0-dev libxcb-render-util0-dev libxcb-shape0-dev \
+            libxcb-shm0-dev libxcb-sync-dev libxcb-util-dev \
+            libxcb-xfixes0-dev libxcb-xkb-dev \
+            libxext-dev libxfixes-dev libxi-dev libxrandr-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libxrender-dev \
+            libavformat-dev libavcodec-dev libavutil-dev \
+            libswscale-dev libswresample-dev libavfilter-dev \
+            libvulkan-dev libwayland-dev \
+            libgl1-mesa-dri libegl1 xvfb xauth fonts-dejavu-core
+
+      - name: Cache Qt
+        id: qt-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/qt
+          key: qt-6.10.2-linux_gcc_64-qtmultimedia-qtshadertools
+
+      - name: Install Qt 6.10.2
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/aqt"
+          "$RUNNER_TEMP/aqt/bin/pip" install aqtinstall==3.3.0
+          "$RUNNER_TEMP/aqt/bin/aqt" install-qt linux desktop 6.10.2 linux_gcc_64 \
+            -m qtmultimedia qtshadertools --outputdir "$RUNNER_TEMP/qt"
+
+      - name: Configure
+        run: cmake -S src -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/qt/6.10.2/gcc_64"
+
+      - name: Build
+        run: cmake --build build --parallel "$(nproc)"
+
+      - name: Test
+        run: |
+          export LD_LIBRARY_PATH="$RUNNER_TEMP/qt/6.10.2/gcc_64/lib"
+          xvfb-run -a ctest --test-dir build --output-on-failure
+
+  arch:
+    # Rolling toolchain (today's Qt and FFmpeg, as Arch/PKGBUILD users get them): catches breakage brought by
+    # upstream updates, e.g. FFmpeg 9 dropping the last exported frame. Red here + green on ubuntu = upstream change.
+    name: Arch Linux (latest Qt and FFmpeg)
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git cmake \
+            qt6-base qt6-multimedia qt6-svg qt6-shadertools qt6-tools vulkan-headers \
+            ffmpeg frei0r-plugins mesa xorg-server-xvfb xorg-xauth ttf-dejavu
+
+      - uses: actions/checkout@v7
+
+      - name: Configure
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          cmake -S src -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel "$(nproc)"
+
+      - name: Test
+        run: xvfb-run -a ctest --test-dir build --output-on-failure

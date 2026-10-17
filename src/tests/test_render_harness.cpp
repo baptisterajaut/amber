@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QOffscreenSurface>
 #include <QTest>
+#include <QVersionNumber>
 #include <QtMath>
 
 #include "core/appcontext.h"
@@ -34,7 +35,7 @@ QShader loadQsb(const QString& path) {
 
 }  // namespace
 
-TestRenderHarness::TestRenderHarness() {
+TestRenderHarness::TestRenderHarness(QRhi::Implementation backend) {
   // 1. Set the env var BEFORE shader effect discovery so XML effects from the
   //    source tree are found regardless of where the test binary lives.
   qputenv("AMBER_EFFECTS_PATH", QByteArray(SOURCE_DIR "/effects/shaders"));
@@ -60,14 +61,30 @@ TestRenderHarness::TestRenderHarness() {
     load_shader_effects();
   }
 
-  // 6. QRhi(OpenGLES2) with fallback surface.
-  QRhiGles2InitParams params;
-  fallback_surface_.reset(QRhiGles2InitParams::newFallbackSurface());
-  params.fallbackSurface = fallback_surface_.get();
-  rhi_.reset(QRhi::create(QRhi::OpenGLES2, &params));
-  if (!rhi_) {
-    qWarning("QRhi OpenGLES2 unavailable; tests will QSKIP");
-    return;
+  // 6. QRhi: OpenGLES2 with a fallback surface, or Vulkan offscreen (no window needed)
+  if (backend == QRhi::Vulkan) {
+#if AMBER_HAS_VULKAN
+    vulkan_instance_ = std::make_unique<QVulkanInstance>();
+    vulkan_instance_->setApiVersion(QVersionNumber(1, 1));
+    if (vulkan_instance_->create()) {
+      QRhiVulkanInitParams vparams;
+      vparams.inst = vulkan_instance_.get();
+      rhi_.reset(QRhi::create(QRhi::Vulkan, &vparams));
+    }
+#endif
+    if (!rhi_) {
+      qWarning("QRhi Vulkan unavailable");
+      return;
+    }
+  } else {
+    QRhiGles2InitParams params;
+    fallback_surface_.reset(QRhiGles2InitParams::newFallbackSurface());
+    params.fallbackSurface = fallback_surface_.get();
+    rhi_.reset(QRhi::create(QRhi::OpenGLES2, &params));
+    if (!rhi_) {
+      qWarning("QRhi OpenGLES2 unavailable; tests will skip (fail with AMBER_TEST_REQUIRE_GPU=1)");
+      return;
+    }
   }
 
   // 7. Core shaders + shared sampler.
@@ -85,6 +102,9 @@ TestRenderHarness::~TestRenderHarness() {
     sampler_ = nullptr;
   }
   rhi_.reset();
+#if AMBER_HAS_VULKAN
+  vulkan_instance_.reset();
+#endif
   fallback_surface_.reset();
   amber::app_ctx = nullptr;
 }
@@ -116,9 +136,12 @@ void TestRenderHarness::ensure_buffers(int w, int h) {
   main_target_->create();
 
   // main_target_clear: same texture, NO preserve flag — used for the initial clear pass.
-  // (beginPass(clearColor) on a PreserveColorContents target is a no-op.)
+  // (beginPass(clearColor) on a PreserveColorContents target is a no-op.) It needs its own
+  // render pass descriptor, like RenderThread's front_clear_rpd_: on Vulkan the load op is
+  // baked into the descriptor, and main_rpd_ (from the preserve target) loads instead of clearing.
   main_target_clear_ = rhi_->newTextureRenderTarget({att});
-  main_target_clear_->setRenderPassDescriptor(main_rpd_);
+  main_clear_rpd_ = main_target_clear_->newCompatibleRenderPassDescriptor();
+  main_target_clear_->setRenderPassDescriptor(main_clear_rpd_);
   main_target_clear_->create();
 
   // backend_tex: scratch, no preserve.
@@ -138,6 +161,8 @@ void TestRenderHarness::release_buffers() {
   main_target_ = nullptr;
   delete main_rpd_;
   main_rpd_ = nullptr;
+  delete main_clear_rpd_;
+  main_clear_rpd_ = nullptr;
   delete main_tex_;
   main_tex_ = nullptr;
   delete backend_target_;

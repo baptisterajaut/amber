@@ -487,6 +487,7 @@ void Cacher::CacheWorker() {
   } else {
     // clip is audio
     CacheAudioWorker();
+    SignalAudioFill();  // here, not in CacheAudioWorker(): its early returns must signal too or the export stalls
   }
 }
 
@@ -638,10 +639,10 @@ void Cacher::cacheWaitForResponse() {
 // ---------------------------------------------------------------------------
 // Cache
 // ---------------------------------------------------------------------------
-void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
+bool Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
                    bool nonblocking) {
-  if (!is_valid_state_) return;
-  if (cacheServeStillImage()) return;
+  if (!is_valid_state_) return false;
+  if (cacheServeStillImage()) return false;
 
   playhead_ = playhead;
   nests_ = nests;
@@ -660,6 +661,7 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
     // just wake the cacher without blocking
     wait_cond_.wakeAll();
   }
+  return true;
 }
 
 AVFrame* Cacher::Retrieve() {

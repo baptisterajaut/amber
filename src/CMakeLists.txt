@@ -188,6 +188,7 @@ add_library(amber-engine OBJECT
   project/previewgenerator.cpp project/previewgenerator.h
   project/projectelements.h
   project/projectmodel.cpp project/projectmodel.h
+  project/projectsaver.cpp project/projectsaver.h
   # global/ (config/projectio/debug)
   global/config.cpp global/config.h
   global/debug.cpp global/debug.h

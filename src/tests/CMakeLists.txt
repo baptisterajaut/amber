@@ -117,9 +117,22 @@ target_compile_definitions(amber-test-loadthread PRIVATE SOURCE_DIR="${CMAKE_SOU
 target_link_libraries(amber-test-loadthread PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-loadthread COMMAND amber-test-loadthread)
 
+# .ove round trip — LoadThread + project/projectsaver, save -> load -> save must be byte-identical
+add_executable(amber-test-projectsaver test_projectsaver.cpp)
+target_include_directories(amber-test-projectsaver PRIVATE ${CMAKE_SOURCE_DIR})
+target_compile_definitions(amber-test-projectsaver PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(amber-test-projectsaver PRIVATE amber-engine Qt6::Gui Qt6::Test)
+add_test(NAME amber-test-projectsaver COMMAND amber-test-projectsaver)
+
 # Headless export — loads a hand-written .ove and exports it through prepare_export() + ExportThread, then decodes
 # the file. Proof that the engine renders without the UI: amber-engine + Qt Gui/Test only, no QtWidgets.
 add_executable(amber-test-headless-render test_headless_render.cpp)
 target_include_directories(amber-test-headless-render PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-headless-render PRIVATE amber-engine Qt6::Gui Qt6::Test)
 add_test(NAME amber-test-headless-render COMMAND amber-test-headless-render)
+
+# Render benchmark — run by hand (amber-bench-render --help), deliberately not an add_test()
+add_executable(amber-bench-render bench_render.cpp test_render_harness.cpp test_render_harness.h)
+target_include_directories(amber-bench-render PRIVATE ${CMAKE_SOURCE_DIR})
+target_compile_definitions(amber-bench-render PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(amber-bench-render PRIVATE amber-engine Qt6::Test)

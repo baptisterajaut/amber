@@ -1,7 +1,11 @@
 #include <QGuiApplication>
 #include <QSet>
 #include <QSurfaceFormat>
+#include <QTemporaryDir>
 #include <QTest>
+#include <QTextStream>
+#include <QVector3D>
+#include <functional>
 
 #include <memory>
 
@@ -14,6 +18,7 @@ extern "C" {
 #include "effects/internal/subtitleeffect.h"
 #include "engine/clip.h"
 #include "tests/test_render_harness.h"
+#include "tests/test_gpu_required.h"
 
 class TestEffectsGpu : public QObject {
   Q_OBJECT
@@ -38,6 +43,8 @@ class TestEffectsGpu : public QObject {
   void shakeChangesOutput();
   void timecodeRenders();
   void cornerpinDistorts();
+  void cornerpinDefaultsPassthrough();
+  void cornerpinMovesOneCorner();
   void subtitleActiveEntry();
   void gradientRendersTwoStops();
 
@@ -79,6 +86,9 @@ class TestEffectsGpu : public QObject {
 
   // Phase 3c — Color & key (XML shader effects).
   void invertSwapsChannels();
+  void lutIdentityPassthrough();
+  void lutInvertFullStrength();
+  void lutHalfStrengthBlends();
   void huesatbriSaturationZero();
   void huesatbriContrast();
   void huesatbriHueRotate();
@@ -114,7 +124,7 @@ class TestEffectsGpu : public QObject {
 
 void TestEffectsGpu::initTestCase() {
   h_ = std::make_unique<TestRenderHarness>();
-  if (!h_->initialized()) QSKIP("QRhi OpenGLES2 unavailable");
+  if (!h_->initialized()) AMBER_SKIP_NO_GPU("QRhi OpenGLES2 unavailable");
 }
 
 void TestEffectsGpu::cleanupTestCase() { h_.reset(); }
@@ -238,6 +248,23 @@ inline bool buffers_within(const QByteArray& a, const QByteArray& b, int toleran
   for (int i = 0; i < a.size(); ++i) {
     if (qAbs(static_cast<int>(static_cast<uchar>(a[i])) - static_cast<int>(static_cast<uchar>(b[i]))) > tolerance) {
       return false;
+    }
+  }
+  return true;
+}
+
+// Writes a 3D .cube LUT of `size`^3 entries, red fastest, mapping each grid point through `fn`.
+bool write_cube(const QString& path, int size, const std::function<QVector3D(QVector3D)>& fn) {
+  QFile f(path);
+  if (!f.open(QFile::WriteOnly | QFile::Truncate | QFile::Text)) return false;
+  QTextStream out(&f);
+  out << "LUT_3D_SIZE " << size << "\n";
+  for (int b = 0; b < size; b++) {
+    for (int g = 0; g < size; g++) {
+      for (int r = 0; r < size; r++) {
+        const QVector3D v = fn(QVector3D(r, g, b) / float(size - 1));
+        out << v.x() << ' ' << v.y() << ' ' << v.z() << "\n";
+      }
     }
   }
   return true;
@@ -564,6 +591,35 @@ void TestEffectsGpu::cornerpinDistorts() {
   // Corner is outside → transparent (no draw).
   QVERIFY2(alpha_of(pixels, 64, 1, 1) < 50,
            qPrintable(QString("expected transparent outside warp, alpha=%1").arg(alpha_of(pixels, 64, 1, 1))));
+}
+
+void TestEffectsGpu::cornerpinDefaultsPassthrough() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(50, 100, 150, 255));
+  h_->attach_internal(c, EFFECT_INTERNAL_CORNERPIN, EFFECT_TYPE_EFFECT);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  h_->assert_solid_color(pixels, 64, 64, QColor(50, 100, 150, 255));
+}
+
+void TestEffectsGpu::cornerpinMovesOneCorner() {
+  // Only TR moves, by (-16, +16): from pixel (64,0) to (48,16). The quad becomes (0,0) (48,16) (64,64) (0,64).
+  // Near TR (60,4) is now outside; near BL (4,60) and the centre-left (16,40) are untouched.
+  // Row 1 = TR, fields 0/1 = x/y (cornerpineffect.cpp:35-36); +y moves down, as in cornerpinDistorts.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(50, 100, 150, 255));
+  EffectPtr corner = h_->attach_internal(c, EFFECT_INTERNAL_CORNERPIN, EFFECT_TYPE_EFFECT);
+  h_->set_field_double(corner.get(), 1, 0, -16.0);  // TR x
+  h_->set_field_double(corner.get(), 1, 1, +16.0);  // TR y
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY2(alpha_of(pixels, 64, 60, 4) < 50,
+           qPrintable(QString("expected transparent near moved TR, alpha(60,4)=%1 (56,8)=%2 (48,20)=%3")
+                          .arg(alpha_of(pixels, 64, 60, 4))
+                          .arg(alpha_of(pixels, 64, 56, 8))
+                          .arg(alpha_of(pixels, 64, 48, 20))));
+  h_->assert_pixel(pixels, 64, 4, 60, QColor(50, 100, 150, 255), 3);
+  h_->assert_pixel(pixels, 64, 16, 40, QColor(50, 100, 150, 255), 3);
 }
 
 void TestEffectsGpu::subtitleActiveEntry() {
@@ -1422,6 +1478,53 @@ void TestEffectsGpu::invertSwapsChannels() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(qAbs(mid.r - 205) <= 4 && qAbs(mid.g - 155) <= 4 && qAbs(mid.b - 105) <= 4,
            qPrintable(QString("expected (205,155,105), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::lutIdentityPassthrough() {
+  QTemporaryDir dir;
+  const QString cube = dir.filePath("t.cube");
+  QVERIFY(write_cube(cube, 2, [](QVector3D v) { return v; }));
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(50, 100, 150, 255));
+  EffectPtr lut = h_->attach_xml_shader(c, "LUT");
+  h_->set_field_string(lut.get(), 0, 0, cube);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 50) <= 3 && qAbs(mid.g - 100) <= 3 && qAbs(mid.b - 150) <= 3,
+           qPrintable(QString("expected (50,100,150), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::lutInvertFullStrength() {
+  QTemporaryDir dir;
+  const QString cube = dir.filePath("t.cube");
+  QVERIFY(write_cube(cube, 2, [](QVector3D v) { return QVector3D(1, 1, 1) - v; }));
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(50, 100, 150, 255));
+  EffectPtr lut = h_->attach_xml_shader(c, "LUT");
+  h_->set_field_string(lut.get(), 0, 0, cube);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 205) <= 3 && qAbs(mid.g - 155) <= 3 && qAbs(mid.b - 105) <= 3,
+           qPrintable(QString("expected (205,155,105), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::lutHalfStrengthBlends() {
+  // Strength 50 blends original and LUT output: (50+205)/2, (100+155)/2, (150+105)/2 = 127.5 each.
+  QTemporaryDir dir;
+  const QString cube = dir.filePath("t.cube");
+  QVERIFY(write_cube(cube, 2, [](QVector3D v) { return QVector3D(1, 1, 1) - v; }));
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(50, 100, 150, 255));
+  EffectPtr lut = h_->attach_xml_shader(c, "LUT");
+  h_->set_field_string(lut.get(), 0, 0, cube);
+  h_->set_field_double(lut.get(), 1, 0, 50.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 128) <= 3 && qAbs(mid.g - 128) <= 3 && qAbs(mid.b - 128) <= 3,
+           qPrintable(QString("expected ~(128,128,128), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
 }
 
 void TestEffectsGpu::huesatbriSaturationZero() {

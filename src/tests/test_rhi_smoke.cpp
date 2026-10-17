@@ -3,6 +3,8 @@
 #include <QOffscreenSurface>
 #include <QTest>
 
+#include "tests/test_gpu_required.h"
+
 class TestRhiSmoke : public QObject {
   Q_OBJECT
  private slots:
@@ -21,7 +23,7 @@ void TestRhiSmoke::canCreateRhi() {
 
     if (!rhi) {
       delete surface;
-      QSKIP("QRhi OpenGLES2 creation failed (no GL context available). Install Mesa llvmpipe.");
+      AMBER_SKIP_NO_GPU("QRhi OpenGLES2 creation failed (no GL context available). Install Mesa llvmpipe.");
     }
 
     QVERIFY(rhi->backend() == QRhi::OpenGLES2);
@@ -41,7 +43,7 @@ void TestRhiSmoke::canCreateTexture() {
 
     if (!rhi) {
       delete surface;
-      QSKIP("QRhi not available");
+      AMBER_SKIP_NO_GPU("QRhi not available");
     }
 
     std::unique_ptr<QRhiTexture> tex(rhi->newTexture(QRhiTexture::RGBA8, QSize(64, 64), 1,

@@ -921,7 +921,7 @@ static void process_audio_clip(Clip* c, long playhead, ComposeSequenceParams& pa
 
     if (got_mutex2) {
       c->cache_lock.unlock();
-      c->Cache(playhead, params.scrubbing, params.nests, params.playback_speed);
+      if (c->Cache(playhead, params.scrubbing, params.nests, params.playback_speed)) params.audio_cachers_triggered++;
     }
   }
 }
@@ -1022,10 +1022,10 @@ QRhiTexture* amber::rendering::compose_sequence(ComposeSequenceParams& params) {
   return nullptr;
 }
 
-void amber::rendering::compose_audio(Sequence* seq, bool scrubbing, int playback_speed, bool wait_for_mutexes) {
+int amber::rendering::compose_audio(Sequence* seq, bool scrubbing, int playback_speed, bool wait_for_mutexes) {
   if (!seq) {
     qWarning() << "compose_audio: seq is null";
-    return;
+    return 0;
   }
   ComposeSequenceParams params;
   params.rhi = nullptr;
@@ -1037,6 +1037,7 @@ void amber::rendering::compose_audio(Sequence* seq, bool scrubbing, int playback
   params.playback_speed = playback_speed;
   params.scrubbing = scrubbing;
   compose_sequence(params);
+  return params.audio_cachers_triggered;
 }
 
 long rescale_frame_number(long framenumber, double source_frame_rate, double target_frame_rate) {

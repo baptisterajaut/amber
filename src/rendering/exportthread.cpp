@@ -406,9 +406,18 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
 
 // Drain audio buffer and encode frames up to timecode_secs. Returns false on error (caller should goto
 // cleanup_renderer).
-bool ExportThread::EncodeAudioFrames(long& file_audio_samples, double timecode_secs) {
-  while (waiting_for_audio_ && !interrupt_) {
-    waitCond.wait(&mutex);
+bool ExportThread::EncodeAudioFrames(long& file_audio_samples, double timecode_secs, int audio_cachers) {
+  // Reading before every triggered cacher has mixed loses that clip's first samples (or replays them a ring lap
+  // later). Release the export mutex meanwhile so Interrupt() doesn't block the GUI thread.
+  // CBA: a cacher that never signals costs the full timeout on every frame and delays a cancel by as much; poll
+  // interrupt_ in slices if that ever shows up. After a timeout the stalled pass's late signal lands after the next
+  // frame's reset and releases that frame early (the original bug, for a frame or two); a cumulative target would
+  // fix it.
+  mutex.unlock();
+  bool mixed = WaitForAudioFills(audio_cachers, 5000);
+  mutex.lock();
+  if (!mixed) {
+    qWarning() << "Export: timed out waiting for" << audio_cachers << "audio clip(s) to mix, audio may have gaps";
   }
 
   audio_write_lock.lock();
@@ -448,10 +457,10 @@ bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samp
   while (seq_->playhead <= params_.end_frame && !interrupt_) {
     qint64 frame_start_time = QDateTime::currentMSecsSinceEpoch();
 
+    int audio_cachers = 0;
     if (params_.audio_enabled) {
-      waiting_for_audio_ = true;
-      SetAudioWakeObject(this);
-      amber::rendering::compose_audio(seq_, false, 1, true);
+      ResetAudioFillCount();
+      audio_cachers = amber::rendering::compose_audio(seq_, false, 1, true);
     }
 
     double timecode_secs = double(seq_->playhead - params_.start_frame) / seq_->frame_rate;
@@ -461,7 +470,7 @@ bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samp
     }
 
     if (params_.audio_enabled) {
-      if (!EncodeAudioFrames(file_audio_samples, timecode_secs)) return false;
+      if (!EncodeAudioFrames(file_audio_samples, timecode_secs, audio_cachers)) return false;
     }
 
     qint64 frame_time = QDateTime::currentMSecsSinceEpoch() - frame_start_time;
@@ -642,13 +651,6 @@ bool ExportThread::WasInterrupted() { return interrupt_; }
 void ExportThread::Interrupt() {
   mutex.lock();
   interrupt_ = true;
-  waitCond.wakeAll();
-  mutex.unlock();
-}
-
-void ExportThread::play_wake() {
-  mutex.lock();
-  waiting_for_audio_ = false;
   waitCond.wakeAll();
   mutex.unlock();
 }

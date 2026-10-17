@@ -8,6 +8,14 @@
 #include <QByteArray>
 #include <QColor>
 #include <QString>
+// Same Vulkan availability guard as rendering/renderthread.cpp: QT_CONFIG(vulkan) can be set without a real
+// vulkan.h, in which case QVulkanInstance is stub-only.
+#if QT_CONFIG(vulkan)
+#include <QVulkanInstance>
+#endif
+#if QT_CONFIG(vulkan) && defined(VK_VERSION_1_0)
+#define AMBER_HAS_VULKAN 1
+#endif
 
 #include "effects/effect.h"
 #include "engine/sequence.h"
@@ -17,19 +25,21 @@
 class Clip;
 class QOffscreenSurface;
 
-// TestRenderHarness — encapsulates QRhi(OpenGLES2) setup, sequence/clip/effect
+// TestRenderHarness — encapsulates QRhi setup (OpenGLES2 or Vulkan), sequence/clip/effect
 // construction, and compose_sequence() wiring for headless effect integration tests.
 //
 // Lifetime: constructed once per QTest fixture in initTestCase(), reused across all
-// slots, destroyed in cleanupTestCase(). Initialisation can fail silently if
-// QRhi(OpenGLES2) is unavailable — call initialized() and QSKIP() in that case.
+// slots, destroyed in cleanupTestCase(). Initialisation can fail silently if the
+// QRhi backend is unavailable — call initialized() and AMBER_SKIP_NO_GPU()
+// (tests/test_gpu_required.h: skip locally, fail when AMBER_TEST_REQUIRE_GPU=1).
 class TestRenderHarness {
  public:
-  TestRenderHarness();
+  // backend: QRhi::OpenGLES2 (default, every test) or QRhi::Vulkan (amber-bench-render --rhi vulkan)
+  explicit TestRenderHarness(QRhi::Implementation backend = QRhi::OpenGLES2);
   ~TestRenderHarness();
 
-  // Returns true if QRhi(OpenGLES2) initialisation succeeded.
-  // If false, tests should QSKIP() — the host can't run GL.
+  // Returns true if QRhi initialisation succeeded.
+  // If false, tests should AMBER_SKIP_NO_GPU() — the host can't run the backend.
   bool initialized() const { return rhi_ != nullptr; }
 
   // Build a 1-clip-track sequence, no media. Caller owns the SequencePtr.
@@ -128,6 +138,9 @@ class TestRenderHarness {
   void release_buffers();
 
   std::unique_ptr<QOffscreenSurface> fallback_surface_;
+#if AMBER_HAS_VULKAN
+  std::unique_ptr<QVulkanInstance> vulkan_instance_;  // Vulkan backend only; must outlive rhi_
+#endif
   std::unique_ptr<QRhi> rhi_;
   QShader passthrough_vert_, passthrough_frag_, blending_frag_, premultiply_frag_, yuv_frag_;
   QRhiSampler* sampler_ = nullptr;
@@ -137,6 +150,7 @@ class TestRenderHarness {
   QRhiTextureRenderTarget* main_target_ = nullptr;        // PreserveColorContents
   QRhiTextureRenderTarget* main_target_clear_ = nullptr;  // non-preserve alias (for initial clear)
   QRhiRenderPassDescriptor* main_rpd_ = nullptr;
+  QRhiRenderPassDescriptor* main_clear_rpd_ = nullptr;  // own rpd: main_rpd_ loads (Vulkan bakes it in)
   QRhiTexture* backend_tex_ = nullptr;
   QRhiTextureRenderTarget* backend_target_ = nullptr;
   QRhiRenderPassDescriptor* backend_rpd_ = nullptr;

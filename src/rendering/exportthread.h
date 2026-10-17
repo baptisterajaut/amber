@@ -90,8 +90,6 @@ class ExportThread : public QThread {
  public slots:
   void Interrupt();
 
-  void play_wake();
-
  private:
   bool Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, AVFrame* frame, AVPacket* packet, AVStream* stream);
   bool SetupVideo();
@@ -100,7 +98,7 @@ class ExportThread : public QThread {
   bool Export();
   void Cleanup();
   bool EncodeVideoFrame(RenderThread* renderer, double timecode_secs);
-  bool EncodeAudioFrames(long& file_audio_samples, double timecode_secs);
+  bool EncodeAudioFrames(long& file_audio_samples, double timecode_secs, int audio_cachers);
   bool EncodeAllFrames(RenderThread* renderer, long& file_audio_samples);
   bool FlushSwrAudio(long& file_audio_samples);
   void FlushEncoders();
@@ -140,7 +138,6 @@ class ExportThread : public QThread {
 
   QString export_error;
 
-  std::atomic<bool> waiting_for_audio_;
   QOffscreenSurface* gl_fallback_surface_{nullptr};
  private slots:
   void wake();
