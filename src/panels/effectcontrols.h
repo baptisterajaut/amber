@@ -119,6 +119,8 @@ class EffectControls : public Panel {
   void DeleteEffect(ComboAction* ca, Effect* effect_ref);
 
   void show_effect_menu(int type, int subtype);
+  // Adds `meta` (an effect or a transition, per effect_menu_type/subtype) to the selected clips, one undo entry
+  void add_effect_to_selected_clips(const EffectMeta* meta);
   void load_keyframes();
   void open_effect(QVBoxLayout* hlayout, Effect* e);
   void UpdateTitle();

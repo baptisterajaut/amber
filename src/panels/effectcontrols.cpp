@@ -32,6 +32,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include "dialogs/shadertoyimportdialog.h"
 #include "effects/effect.h"
 #include "effects/effectloaders.h"
 #include "effects/transition.h"
@@ -97,10 +98,22 @@ void EffectControls::set_zoom(bool in) {
 }
 
 void EffectControls::menu_select(QAction* q) {
+  const EffectMeta* meta = reinterpret_cast<const EffectMeta*>(q->data().value<quintptr>());
+  if (meta == nullptr) {
+    // "Import ShaderToy Shader...", the only action without a meta
+    ShaderToyImportDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted && dialog.imported_meta() != nullptr) {
+      add_effect_to_selected_clips(dialog.imported_meta());
+    }
+    return;
+  }
+  add_effect_to_selected_clips(meta);
+}
+
+void EffectControls::add_effect_to_selected_clips(const EffectMeta* meta) {
   ComboAction* ca = new ComboAction(tr("Add Effect"));
   for (auto c : selected_clips_) {
     if ((c->track() < 0) == (effect_menu_subtype == EFFECT_TYPE_VIDEO)) {
-      const EffectMeta* meta = reinterpret_cast<const EffectMeta*>(q->data().value<quintptr>());
       if (effect_menu_type == EFFECT_TYPE_TRANSITION) {
         if (c->opening_transition == nullptr) {
           ca->append(
@@ -234,6 +247,11 @@ void EffectControls::show_effect_menu(int type, int subtype) {
   }
 
   effects_loaded_mutex.unlock();
+
+  if (type == EFFECT_TYPE_EFFECT && subtype == EFFECT_TYPE_VIDEO) {
+    effects_menu.addSeparator();
+    effects_menu.addAction(tr("Import ShaderToy Shader..."));  // no data: menu_select opens the import dialog
+  }
 
   connect(&effects_menu, &QMenu::triggered, this, &EffectControls::menu_select);
   effects_menu.exec(QCursor::pos());

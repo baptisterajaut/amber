@@ -35,7 +35,7 @@ static QString transition_display_name(Transition* t) {
   return QCoreApplication::translate("EffectUI", "%1 (Closing)").arg(t->name);
 }
 
-EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr) {
+EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr), shader_error_icon_(nullptr) {
   Q_ASSERT(e != nullptr);
 
   QString effect_name;
@@ -72,6 +72,16 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr) {
     // Insert after header label (index 3 = after collapse_button, enabled_check, header)
     tbl->insertWidget(3, effect_reset_button_);
     connect(effect_reset_button_, &QPushButton::clicked, this, &EffectUI::ResetToDefaults);
+  }
+
+  // Shader error indicator, after the header label (before the reset button): set by open() on the render thread
+  {
+    QHBoxLayout* tbl = static_cast<QHBoxLayout*>(title_bar->layout());
+    shader_error_icon_ = new QLabel(title_bar);
+    shader_error_icon_->setPixmap(amber::icon::MediaError.pixmap(QSize(16, 16)));
+    tbl->insertWidget(3, shader_error_icon_);
+    UpdateShaderError();
+    connect(e, &Effect::ShaderErrorChanged, this, &EffectUI::UpdateShaderError, Qt::QueuedConnection);
   }
 
   int maximum_column = 0;
@@ -189,6 +199,18 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr) {
     amber::UndoStack.push(cmd);
     update_ui(false);
   });
+}
+
+void EffectUI::UpdateShaderError() {
+  const QString error = effect_->shaderError();
+  shader_error_icon_->setVisible(!error.isEmpty());
+  // The baker can report many lines, the tooltip keeps the first 20
+  QStringList lines = error.split('\n');
+  if (lines.size() > 20) {
+    lines.resize(20);
+    lines.append(QStringLiteral("..."));
+  }
+  shader_error_icon_->setToolTip(tr("Shader error:\n%1").arg(lines.join('\n')));
 }
 
 void EffectUI::AddAdditionalEffect(Effect* e) {
