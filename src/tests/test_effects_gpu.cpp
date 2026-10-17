@@ -126,7 +126,8 @@ class TestEffectsGpu : public QObject {
 };
 
 void TestEffectsGpu::initTestCase() {
-  h_ = std::make_unique<TestRenderHarness>();
+  h_ = std::make_unique<TestRenderHarness>(
+      qEnvironmentVariable("AMBER_TEST_RHI") == QLatin1String("vulkan") ? QRhi::Vulkan : QRhi::OpenGLES2);
   if (!h_->initialized()) AMBER_SKIP_NO_GPU("QRhi OpenGLES2 unavailable");
 }
 
@@ -2346,7 +2347,8 @@ void TestEffectsGpu::yuvDecodeNV12() {
 }
 
 int main(int argc, char* argv[]) {
-  qputenv("QT_QPA_PLATFORM", "offscreen");
+  // Offscreen QPA can't create a QVulkanInstance: AMBER_TEST_RHI=vulkan needs a real platform (xcb under xvfb-run)
+  if (qEnvironmentVariable("AMBER_TEST_RHI") != QLatin1String("vulkan")) qputenv("QT_QPA_PLATFORM", "offscreen");
 
   // Force OpenGL 3.2 core profile so the QRhi(OpenGLES2) backend's offscreen
   // context exposes a GLSL 150 binding. Without this, Qt's offscreen platform
