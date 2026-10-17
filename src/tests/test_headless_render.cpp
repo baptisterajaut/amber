@@ -66,6 +66,21 @@ QByteArray checkerboard_y4m() {
   return y4m;
 }
 
+// kSourceFrames frames of a uniform mid-grey picture, half the source size: a stand-in proxy of checkerboard_y4m()
+QByteArray grey_proxy_y4m() {
+  constexpr int s = kSize / 2;
+  const QByteArray luma(s * s, char(128));
+  const QByteArray chroma(s * s / 2, char(128));
+  QByteArray y4m = QByteArray("YUV4MPEG2 W") + QByteArray::number(s) + " H" + QByteArray::number(s) + " F" +
+                   QByteArray::number(int(kFps)) + ":1 Ip A1:1 C420jpeg\n";
+  for (int i = 0; i < kSourceFrames; i++) {
+    y4m += "FRAME\n";
+    y4m += luma;
+    y4m += chroma;
+  }
+  return y4m;
+}
+
 // 1 s of a stereo sine (by default 440 Hz at half scale), S16 PCM. With ramp, the amplitude rises linearly from 0 so
 // the signal isn't symmetric in time.
 QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5, bool ramp = false) {
@@ -105,8 +120,11 @@ QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5, bool ramp = fal
 }
 
 // Same layout Project::save_project() writes: footage 1 (video) and 2 (audio) in folder 1, the open sequence at the
-// root. Loop mode 2 (clamp) holds the fixture's single frame for the clip's whole length.
-QString fixture(const QString& url, const QString& video, const QString& audio) {
+// root. Loop mode 2 (clamp) holds the fixture's single frame for the clip's whole length. A non-empty proxy marks the
+// video footage as having that finished proxy file.
+QString fixture(const QString& url, const QString& video, const QString& audio, const QString& proxy = QString()) {
+  const QString proxy_attrs =
+      proxy.isEmpty() ? QString() : QString(R"( proxy="1" proxypath="%1")").arg(proxy.toHtmlEscaped());
   return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <version>%1</version>
@@ -115,7 +133,7 @@ QString fixture(const QString& url, const QString& video, const QString& audio) 
         <folder id="1" name="Bin" parent="0"/>
     </folders>
     <media>
-        <footage id="1" folder="1" name="video" url="%3"/>
+        <footage id="1" folder="1" name="video" url="%3"%9/>
         <footage id="2" folder="1" name="audio" url="%4"/>
     </media>
     <sequences>
@@ -135,7 +153,7 @@ QString fixture(const QString& url, const QString& video, const QString& audio) 
 )")
       .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), video.toHtmlEscaped(), audio.toHtmlEscaped(),
            QString::number(kSize), QString::number(kFps, 'f', 10), QString::number(kAudioRate),
-           QString::number(kClipOut));
+           QString::number(kClipOut), proxy_attrs);
 }
 
 // Three sequences over two WAVs (footage 1 and 2): Inner holds both on audio tracks 0 and 1, Nested holds one clip of
@@ -539,6 +557,85 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(out.audio_peak > 0.25, qPrintable(QString("audio peak %1").arg(out.audio_peak)));
 
     qInfo("load + export + decode: %lld ms", timer.elapsed());
+  }
+
+  // Export decodes the original media even when the footage has a finished proxy (the proxy is a preview stand-in):
+  // the proxy here is uniform grey, so a checkerboard in the output proves the original was read
+  void exportIgnoresProxy() {
+    const QString video = dir_.filePath("proxied_checkerboard.y4m");
+    {
+      QFile f(video);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(checkerboard_y4m());
+    }
+    const QString proxy = dir_.filePath("proxied_checkerboard.proxy.y4m");
+    {
+      QFile f(proxy);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(grey_proxy_y4m());
+    }
+    const QString audio = dir_.filePath("proxied_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("proxied.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio, proxy).toUtf8());
+    }
+
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    QVERIFY(vf->proxy);
+    QCOMPARE(vf->proxy_path, proxy);
+
+    ExportParams params;
+    params.filename = dir_.filePath("proxied_out.mp4");
+    params.video_enabled = true;
+    params.video_codec = AV_CODEC_ID_MPEG4;
+    params.video_width = kSize;
+    params.video_height = kSize;
+    params.video_compression_type = COMPRESSION_TYPE_CBR;
+    params.video_bitrate = 2.0;
+    params.audio_enabled = false;
+    params.start_frame = 0;
+    params.end_frame = seq->getEndFrame();
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    Decoded out = decode_file(params.filename);
+    QVERIFY(out.ok);
+    QVERIFY(out.has_video);
+    QCOMPARE(out.width, kSize);
+    const int white = uchar(out.first_rgba[(4 * kSize + 4) * 4]);
+    const int black = uchar(out.first_rgba[(4 * kSize + 12) * 4]);
+    qInfo("exported block (0,0) = %d, block (1,0) = %d (grey proxy would give ~128 for both)", white, black);
+    QVERIFY(white > 200);
+    QVERIFY(black < 55);
+
+    // Export leaves every clip closed, so the viewer reopens them outside export mode, on the proxy
+    for (const auto& c : seq->clips) QVERIFY(!c->IsOpen());
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
