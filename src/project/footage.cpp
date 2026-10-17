@@ -21,6 +21,7 @@
 #include "footage.h"
 
 #include <QDebug>
+#include <QFileInfo>
 #include <QtMath>
 #include <QPainter>
 
@@ -39,6 +40,11 @@ Footage::Footage() {
   start_number = 0;
 
   ready_lock.lock();
+}
+
+QString Footage::decode_url(bool exporting) const {
+  if (!exporting && proxy && !proxy_path.isEmpty() && QFileInfo::exists(proxy_path)) return proxy_path;
+  return url;
 }
 
 Footage::~Footage() {

@@ -22,6 +22,7 @@
 
 #include <QtMath>
 
+#include "core/audio.h"
 #include "effects/effect.h"
 #include "effects/transition.h"
 #include "project/footage.h"
@@ -463,6 +464,7 @@ void Clip::Open() {
   if (!open_ && state_change_lock.tryLock()) {
     open_ = true;
     cacher_uses_rgba_ = NeedsCpuRgba();
+    opened_for_export_ = audio_rendering;
 
     for (const auto& effect : effects) {
       effect->open();
@@ -842,7 +844,9 @@ bool Clip::NeedsCpuRgba() const {
   return false;
 }
 
-bool Clip::NeedsCacherReconfigure() const { return open_ && (NeedsCpuRgba() != cacher_uses_rgba_); }
+bool Clip::NeedsCacherReconfigure() const {
+  return open_ && (NeedsCpuRgba() != cacher_uses_rgba_ || audio_rendering != opened_for_export_);
+}
 
 ClipSpeed::ClipSpeed()
 
