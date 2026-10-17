@@ -32,6 +32,7 @@
 #include <QXmlStreamWriter>
 #include <QWindow>
 
+#include <cmath>
 #include <cstring>
 
 #include "rendering/audio.h"
@@ -375,12 +376,16 @@ void VSTHost::process_audio(double, double, quint8* samples, int nb_bytes, int) 
       // send to VST
       processAudio(process_size>>2);
 
-      // convert back to int16
+      // convert back to int16, clipping: a plugin output above 0 dBFS would wrap around, a NaN/inf is UB to convert
+      auto to_int16 = [](float v) -> qint16 {
+        if (!std::isfinite(v)) return 0;
+        return qint16(qRound(qBound(-1.0f, v, 1.0f) * INT16_MAX));
+      };
       for (int j=i;j<lim;j+=4) {
         int index = (j-i)>>2;
 
-        qint16 left_sample = qint16(qRound(outputs[0][index] * INT16_MAX));
-        qint16 right_sample = qint16(qRound(outputs[1][index] * INT16_MAX));
+        qint16 left_sample = to_int16(outputs[0][index]);
+        qint16 right_sample = to_int16(outputs[1][index]);
 
         samples[j+3] = quint8(right_sample >> 8);
         samples[j+2] = quint8(right_sample);
