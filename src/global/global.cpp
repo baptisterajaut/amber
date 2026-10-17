@@ -203,7 +203,10 @@ void OliveGlobal::LoadProject(const QString &fn, bool autorecovery, bool import)
   connect(&ld, &LoadDialog::cancel, lt, &LoadThread::cancel);
   connect(lt, &LoadThread::success, &ld, &QDialog::accept);
   connect(lt, &LoadThread::error, &ld, &QDialog::reject);
-  connect(lt, &LoadThread::error, this, &OliveGlobal::new_project);
+  // An import failing must not clear the project it was being imported into
+  if (!import) {
+    connect(lt, &LoadThread::error, this, &OliveGlobal::new_project);
+  }
   connect(lt, &LoadThread::report_progress, &ld, &LoadDialog::setValue);
   connect(lt, &LoadThread::found_invalid_footage, this,
           [](QVector<QPair<Media*, Footage*>> invalid) {
