@@ -40,12 +40,15 @@ void ExponentialFadeTransition::process_audio(double timecode_start, double time
 			samp *= qSqrt(1 - (timecode_start + (interval * i)));
 			break;
 		}*/
+		// progress through the transition, 0..1; clamped as the chunk can run past either edge (a factor
+		// above 1 wraps the sample)
+		double progress = qBound(0.0, timecode_start + (interval * i), 1.0);
 		switch (type) {
         case kTransitionOpening:
-			samp *= qPow(timecode_start + (interval * i), 2);
+			samp *= qPow(progress, 2);
 			break;
         case kTransitionClosing:
-			samp *= qPow(1 - (timecode_start + (interval * i)), 2);
+			samp *= qPow(1 - progress, 2);
 			break;
 		}
 
