@@ -22,7 +22,7 @@ QWidget* BoolFieldWidget::CreateWidget(QWidget* existing) {
     cb = static_cast<QCheckBox*>(existing);
   }
 
-  connect(cb, &QCheckBox::toggled, this, &BoolFieldWidget::UpdateFromWidget);
+  if (AttachToWidget(cb)) connect(cb, &QCheckBox::toggled, this, &BoolFieldWidget::UpdateFromWidget);
   connect(bf, &EffectField::EnabledChanged, cb, &QWidget::setEnabled);
   connect(cb, &QCheckBox::toggled, bf, &BoolField::Toggled);
 
@@ -49,6 +49,10 @@ void BoolFieldWidget::UpdateWidgetValue(QWidget* widget, double timecode) {
 }
 
 void BoolFieldWidget::UpdateFromWidget(bool b) {
+  PushEdit([b](EffectFieldWidget* w) { return static_cast<BoolFieldWidget*>(w)->ApplyValue(b); });
+}
+
+QUndoCommand* BoolFieldWidget::ApplyValue(bool b) {
   BoolField* bf = static_cast<BoolField*>(field_);
   KeyframeDataChange* kdc = new KeyframeDataChange(bf);
 
@@ -56,5 +60,5 @@ void BoolFieldWidget::UpdateFromWidget(bool b) {
 
   kdc->SetNewKeyframes();
   kdc->setText(QObject::tr("Change Value"));
-  amber::UndoStack.push(kdc);
+  return kdc;
 }

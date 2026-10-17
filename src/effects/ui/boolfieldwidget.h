@@ -15,6 +15,9 @@ public:
 
 private slots:
   void UpdateFromWidget(bool b);
+
+private:
+  QUndoCommand* ApplyValue(bool b);
 };
 
 #endif  // BOOLFIELDWIDGET_H

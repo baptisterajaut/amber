@@ -71,7 +71,7 @@ QWidget* ColorFieldWidget::CreateWidget(QWidget* existing) {
     });
   }
 
-  connect(cb, &ColorButton::color_changed, this, &ColorFieldWidget::UpdateFromWidget);
+  if (AttachToWidget(wrapper)) connect(cb, &ColorButton::color_changed, this, &ColorFieldWidget::UpdateFromWidget);
   connect(cf, &EffectField::EnabledChanged, wrapper, &QWidget::setEnabled);
 
   return wrapper;
@@ -86,6 +86,10 @@ void ColorFieldWidget::UpdateWidgetValue(QWidget* widget, double timecode) {
 }
 
 void ColorFieldWidget::UpdateFromWidget(const QColor& c) {
+  PushEdit([c](EffectFieldWidget* w) { return static_cast<ColorFieldWidget*>(w)->ApplyValue(c); });
+}
+
+QUndoCommand* ColorFieldWidget::ApplyValue(const QColor& c) {
   ColorField* cf = static_cast<ColorField*>(field_);
   KeyframeDataChange* kdc = new KeyframeDataChange(cf);
 
@@ -93,5 +97,5 @@ void ColorFieldWidget::UpdateFromWidget(const QColor& c) {
 
   kdc->SetNewKeyframes();
   kdc->setText(QObject::tr("Change Color"));
-  amber::UndoStack.push(kdc);
+  return kdc;
 }

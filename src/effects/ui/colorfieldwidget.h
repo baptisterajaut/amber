@@ -18,6 +18,8 @@ private slots:
   void UpdateFromWidget(const QColor& c);
 
 private:
+  QUndoCommand* ApplyValue(const QColor& c);
+
   QMetaObject::Connection pick_connection_;
   QMetaObject::Connection cancel_connection_;
   void disconnectPick();
