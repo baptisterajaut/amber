@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Find Edges" category="Stylize">
+	<row name="Strength">
+		<field type="double" min="0" default="100" max="400" id="strength"/>
+	</row>
+	<row name="Mode">
+		<field type="combo" default="0" id="mode">
+			<option>Luma</option>
+			<option>Color</option>
+		</field>
+	</row>
+	<row name="Invert">
+		<field type="bool" default="0" id="invert"/>
+	</row>
+	<shader vert="common.vert" frag="findedges.frag"/>
+</effect>

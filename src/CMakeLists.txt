@@ -334,7 +334,7 @@ set(AMBER_EFFECTS
   effects/shaders/emboss.frag
   effects/shaders/emboss.xml
   effects/shaders/findedges.frag
-  effects/shaders/findedges.xml.disabled
+  effects/shaders/findedges.xml
   effects/shaders/fisheye.frag
   effects/shaders/fisheye.xml
   effects/shaders/flip.frag
