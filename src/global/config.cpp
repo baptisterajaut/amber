@@ -116,6 +116,7 @@ constexpr IntEntry kIntEntries[] = {
     {"AutorecoveryMax", &Config::autorecovery_max},
     {"DefaultKeyframeType", &Config::default_keyframe_type},
     {"PreviewResolutionDivider", &Config::preview_resolution_divider},
+    {"ScrubHalfResolution", &Config::scrub_half_resolution},
 };
 
 constexpr DoubleEntry kDoubleEntries[] = {
@@ -204,6 +205,11 @@ void Config::load(QString path) {
   if (preview_resolution_divider != 1 && preview_resolution_divider != 2 && preview_resolution_divider != 4) {
     preview_resolution_divider = 1;
   }
+
+  // Unknown scrub mode -> Auto
+  if (scrub_half_resolution < 0 || scrub_half_resolution > 2) {
+    scrub_half_resolution = 0;
+  }
 }
 
 void Config::save(QString path) {
@@ -264,6 +270,7 @@ void Config::save(QString path) {
   stream.writeTextElement("PreferredAudioInput", preferred_audio_input);
   stream.writeTextElement("LanguageFile", language_file);
   stream.writeTextElement("ThumbnailResolution", QString::number(thumbnail_resolution));
+  stream.writeTextElement("ScrubHalfResolution", QString::number(scrub_half_resolution));
   stream.writeTextElement("WaveformResolution", QString::number(waveform_resolution));
   stream.writeTextElement("AddDefaultEffectsToClips", QString::number(add_default_effects_to_clips));
   stream.writeTextElement("Style", QString::number(style));

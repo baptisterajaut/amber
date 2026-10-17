@@ -718,6 +718,11 @@ struct Config {
   int preview_resolution_divider{1};
 
   /**
+   * @brief Half resolution while scrubbing (amber::ScrubHalfRes: 0 Auto, 1 Always, 2 Never)
+   */
+  int scrub_half_resolution{0};
+
+  /**
    * @brief Save config to file
    *
    * Save current configuration parameters to file
