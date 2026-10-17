@@ -53,11 +53,23 @@ void DoubleFieldWidget::UpdateFromWidget(double d) {
   DoubleField* df = static_cast<DoubleField*>(field_);
   LabelSlider* ls = static_cast<LabelSlider*>(sender());
 
-  if (ls->IsDragging() && kdc_ == nullptr) {
+  // A drag opens the undo entry on its first move and pushes it on release; a typed value or "Reset to Default"
+  // arrives as a single non-drag change and gets its own entry
+  bool single_change = (kdc_ == nullptr && !ls->IsDragging());
+  double old_value = df->GetDoubleAt(df->Now());
+  int old_key_count = df->keyframes.size();
+  if (kdc_ == nullptr) {
     kdc_ = new KeyframeDataChange(df);
   }
 
   df->SetValueAt(df->Now(), d);
+
+  // Same value typed again (or Reset on a field already at default) and no keyframe added: nothing to undo
+  if (single_change && old_value == d && old_key_count == df->keyframes.size()) {
+    delete kdc_;
+    kdc_ = nullptr;
+    return;
+  }
 
   if (!ls->IsDragging() && kdc_ != nullptr) {
     kdc_->SetNewKeyframes();
