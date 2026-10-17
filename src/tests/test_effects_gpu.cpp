@@ -371,10 +371,19 @@ void TestEffectsGpu::sceneSwitchConsistency() {
 void TestEffectsGpu::steadyStateCreatesNothing() {
   // After warm-up, frames of an unchanged scene must create no pipeline and no buffer: neither through the cache
   // (cache_stats) nor per pass outside it (pipelines/buffers left in transientResources).
-  auto check_steady = [this](Sequence* seq, long first, long step, const char* scene) {
-    h_->render_frame(seq, first);
+  // Each scene starts on an empty cache, so its warm-up must create pipelines and buffers itself (NV12 would
+  // otherwise reuse the YUV420P scene's pipeline, and earlier slots' entries would hide a scene missing the cache).
+  auto check_steady = [this](Sequence* seq, long first, long step, const char* scene, QByteArray& frame0) {
+    h_->reset_cache();
+    frame0 = h_->render_frame(seq, first);
+    QVERIFY(!frame0.isEmpty());
     h_->render_frame(seq, first + step);  // warm-up
     const RhiResourceCache::Stats before = h_->cache_stats();
+    QVERIFY2(before.pipelinesCreated > 0 && before.buffersCreated > 0,
+             qPrintable(QStringLiteral("%1: warm-up created %2 pipelines, %3 buffers through the cache")
+                            .arg(scene)
+                            .arg(before.pipelinesCreated)
+                            .arg(before.buffersCreated)));
     for (int i = 2; i < 12; i++) {
       QVERIFY(!h_->render_frame(seq, first + i * step).isEmpty());
       QVERIFY2(h_->last_frame_transient_pipelines_and_buffers() == 0,
@@ -389,8 +398,13 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
                             .arg(scene)
                             .arg(after.pipelinesCreated - before.pipelinesCreated)
                             .arg(after.buffersCreated - before.buffersCreated)));
-    QVERIFY(after.pipelinesCreated > 0);  // the cache is actually in use
   };
+  // The 8x8-block checkerboard fixtures really decoded and drew: block (4,4) white, block (3,4) black, both opaque
+  auto check_checkerboard = [this](const QByteArray& frame0) {
+    h_->assert_pixel(frame0, 64, 36, 36, QColor(255, 255, 255, 255), 55);
+    h_->assert_pixel(frame0, 64, 28, 36, QColor(0, 0, 0, 255), 55);
+  };
+  QByteArray frame0;
 
   // Generator clip + two XML effects: render_clip_to_backbuffer, rhi_blit and rhi_blit_srcover
   SequencePtr seq = h_->make_sequence(64, 64, 30);
@@ -398,7 +412,7 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
   h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 40, 20));
   h_->attach_xml_shader(c, "Box Blur");
   h_->attach_xml_shader(c, "Hue/Saturation/Brightness");
-  check_steady(seq.get(), 5, 1, "generator");
+  check_steady(seq.get(), 5, 1, "generator", frame0);
   if (QTest::currentTestFailed()) return;
 
   // Decoded footage: the YUV->RGB pass in Clip::retrieveYuvGpuPath (1-frame fixtures, so stay on frame 0)
@@ -406,14 +420,18 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
     SequencePtr yuv = h_->make_sequence(64, 64, 30);
     h_->add_video_clip(yuv.get(), 0, 30,
                        h_->import_video_media(SOURCE_DIR "/tests/fixtures/t1_yuv_input.mp4", 64, 64, 30));
-    check_steady(yuv.get(), 0, 0, "yuv420p");
+    check_steady(yuv.get(), 0, 0, "yuv420p", frame0);
+    if (QTest::currentTestFailed()) return;
+    check_checkerboard(frame0);
     if (QTest::currentTestFailed()) return;
   }
   if (avcodec_find_decoder(AV_CODEC_ID_RAWVIDEO)) {
     SequencePtr nv12 = h_->make_sequence(64, 64, 30);
     h_->add_video_clip(nv12.get(), 0, 30,
                        h_->import_video_media(SOURCE_DIR "/tests/fixtures/t2_nv12_input.mkv", 64, 64, 30));
-    check_steady(nv12.get(), 0, 0, "nv12");
+    check_steady(nv12.get(), 0, 0, "nv12", frame0);
+    if (QTest::currentTestFailed()) return;
+    check_checkerboard(frame0);
   }
 }
 
