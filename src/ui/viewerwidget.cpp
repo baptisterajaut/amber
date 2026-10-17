@@ -42,6 +42,7 @@ extern "C" {
 #include <QStandardPaths>
 #include <QtMath>
 
+#include "core/alpha.h"
 #include "core/math.h"
 #include "engine/cacher.h"
 #include "engine/undo/comboaction.h"
@@ -1172,11 +1173,11 @@ QColor ViewerWidget::readPixelAt(const QPointF& pos, QPoint* seq_pos) {
   if (seq_pos != nullptr) *seq_pos = QPoint(pt.seq_x, pt.seq_y);
 
   // RGBA8888, no Y-flip — readBackTexture() is top-to-bottom on all backends. Premultiplied (compose_sequence()
-  // blends premultiplied over a transparent clear), kept as is: export and Save Frame write these bytes unchanged
-  // (PNG's default rgb24 drops A, rgba and Save Frame store them as straight)
-  int offset = (pt.buf_y * fw + pt.buf_x) * 4;
-  return QColor(static_cast<unsigned char>(data[offset]), static_cast<unsigned char>(data[offset + 1]),
-                static_cast<unsigned char>(data[offset + 2]), static_cast<unsigned char>(data[offset + 3]));
+  // blends premultiplied over a transparent clear): straightened like export and Save Frame do for formats with alpha
+  uchar px[4];
+  memcpy(px, data + (pt.buf_y * fw + pt.buf_x) * 4, 4);
+  amber::unpremultiply_rgba8(px, 1, 1, 4);
+  return QColor(px[0], px[1], px[2], px[3]);
 }
 
 void ViewerWidget::render_update_frame_texture(QRhiResourceUpdateBatch* u, const char* frame_data, int fw, int fh) {
