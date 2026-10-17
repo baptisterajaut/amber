@@ -158,6 +158,7 @@ add_library(amber-engine OBJECT
   effects/internal/linearfadetransition.cpp effects/internal/linearfadetransition.h
   effects/internal/logarithmicfadetransition.cpp effects/internal/logarithmicfadetransition.h
   effects/internal/paneffect.cpp effects/internal/paneffect.h
+  effects/internal/progressbareffect.cpp effects/internal/progressbareffect.h
   effects/internal/richtexteffect.cpp effects/internal/richtexteffect.h
   effects/internal/shakeeffect.cpp effects/internal/shakeeffect.h
   effects/internal/solideffect.cpp effects/internal/solideffect.h
@@ -165,6 +166,7 @@ add_library(amber-engine OBJECT
   effects/internal/subtitleeffect.cpp effects/internal/subtitleeffect.h
   effects/internal/texteffect.cpp effects/internal/texteffect.h
   effects/internal/timecodeeffect.cpp effects/internal/timecodeeffect.h
+  effects/internal/timereffect.cpp effects/internal/timereffect.h
   effects/internal/toneeffect.cpp effects/internal/toneeffect.h
   effects/internal/transformeffect.cpp effects/internal/transformeffect.h
   effects/internal/voideffect.cpp effects/internal/voideffect.h

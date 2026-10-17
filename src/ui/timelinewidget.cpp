@@ -486,6 +486,8 @@ void TimelineWidget::mousePressCreating() {
     case ADD_OBJ_SOLID:
     case ADD_OBJ_BARS:
     case ADD_OBJ_GRADIENT:
+    case ADD_OBJ_TIMER:
+    case ADD_OBJ_PROGRESS:
       comp = -1;
       break;
     case ADD_OBJ_TONE:
@@ -809,6 +811,15 @@ bool TimelineWidget::mouseReleaseCreating(ComboAction* ca, bool shift) {
     case ADD_OBJ_GRADIENT:
       c->set_name(tr("Gradient"));
       c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_GRADIENT, EFFECT_TYPE_EFFECT)));
+      break;
+    case ADD_OBJ_TIMER:
+      c->set_name(tr("Timer"));
+      c->effects.append(Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TIMER, EFFECT_TYPE_EFFECT)));
+      break;
+    case ADD_OBJ_PROGRESS:
+      c->set_name(tr("Progress Bar"));
+      c->effects.append(
+          Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_PROGRESSBAR, EFFECT_TYPE_EFFECT)));
       break;
     case ADD_OBJ_TONE:
       c->set_name(tr("Tone"));

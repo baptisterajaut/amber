@@ -1326,6 +1326,16 @@ void Timeline::add_btn_click() {
   gradientMenuItem->setData(ADD_OBJ_GRADIENT);
   add_menu.addAction(gradientMenuItem);
 
+  QAction* timerMenuItem = new QAction(&add_menu);
+  timerMenuItem->setText(tr("Timer..."));
+  timerMenuItem->setData(ADD_OBJ_TIMER);
+  add_menu.addAction(timerMenuItem);
+
+  QAction* progressMenuItem = new QAction(&add_menu);
+  progressMenuItem->setText(tr("Progress Bar..."));
+  progressMenuItem->setData(ADD_OBJ_PROGRESS);
+  add_menu.addAction(progressMenuItem);
+
   add_menu.addSeparator();
 
   QAction* toneMenuItem = new QAction(&add_menu);

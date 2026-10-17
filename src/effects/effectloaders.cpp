@@ -120,6 +120,14 @@ void load_internal_effects() {
   em.internal = EFFECT_INTERNAL_GRADIENT;
   effects.append(em);
 
+  em.name = "Timer";
+  em.internal = EFFECT_INTERNAL_TIMER;
+  effects.append(em);
+
+  em.name = "Progress Bar";
+  em.internal = EFFECT_INTERNAL_PROGRESSBAR;
+  effects.append(em);
+
   // internal transitions
   em.type = EFFECT_TYPE_TRANSITION;
   em.category = "";
