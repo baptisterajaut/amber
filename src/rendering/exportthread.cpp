@@ -91,6 +91,7 @@ bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, 
     av_packet_unref(packet);
     if (ret < 0) {
       qCritical() << "Failed to write packet." << ret;
+      export_error = tr("failed to write packet to output file (%1)").arg(QString::number(ret));
       return false;
     }
   }
@@ -652,11 +653,15 @@ cleanup_state:
   }
 
   // Flush remaining packets out of video and audio encoders by sending a null frame
+  // Encode() also returns false on the AVERROR_EOF that ends a normal drain; only a set export_error is a failure
   if (params_.video_enabled) {
     Encode(fmt_ctx, vcodec_ctx, nullptr, video_pkt, video_stream);
   }
   if (params_.audio_enabled) {
     Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
+  }
+  if (!export_error.isEmpty()) {
+    return false;
   }
 
   // Write container trailer
@@ -674,7 +679,12 @@ cleanup_state:
 void ExportThread::Cleanup()
 {
   if (fmt_ctx != nullptr) {
-    avio_closep(&fmt_ctx->pb);
+    // The final buffered write happens here: a full disk can fail it after a clean trailer
+    int close_ret = avio_closep(&fmt_ctx->pb);
+    if (close_ret < 0 && export_error.isEmpty() && !interrupt_) {
+      qCritical() << "Could not close output file." << close_ret;
+      export_error = tr("could not close output file (%1)").arg(QString::number(close_ret));
+    }
     avformat_free_context(fmt_ctx);
   }
 
@@ -737,6 +747,12 @@ void ExportThread::run() {
 
   // Clean up anything that was allocated in Export() (whether it succeeded or not)
   Cleanup();
+  if (!export_error.isEmpty()) succeeded = false;  // Cleanup() reports a failed close
+
+  // Callers judge success by !WasInterrupted() && GetError().isEmpty(): a failure must never leave both clear
+  if (!succeeded && !interrupt_ && export_error.isEmpty()) {
+    export_error = tr("unknown error");  // shown as "Export failed - unknown error"
+  }
 
   // Don't leave a truncated file behind. Cleanup() has already closed the AVIO handle, which Windows needs before
   // the file can be deleted.
