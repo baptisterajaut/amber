@@ -2,7 +2,8 @@ find_package(Qt6 REQUIRED COMPONENTS Test)
 
 # All test targets link amber-engine which provides core, engine, effects,
 # rendering, project, and global sources via OBJECT library. amber-engine
-# references no UI symbol and pulls no QtWidgets, so no test links UI code.
+# references no UI symbol and pulls no QtWidgets, so no test links UI code, except amber-test-scopewidget which
+# compiles the self-contained ui/scopewidget.cpp (QPainter drawing over core/scopes) into its own executable.
 
 add_executable(amber-tests test_math.cpp)
 target_include_directories(amber-tests PRIVATE ${CMAKE_SOURCE_DIR})
@@ -23,6 +24,14 @@ add_executable(amber-test-scopes test_scopes.cpp)
 target_include_directories(amber-test-scopes PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-scopes PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-scopes COMMAND amber-test-scopes)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+add_executable(amber-test-scopewidget test_scopewidget.cpp ${CMAKE_SOURCE_DIR}/ui/scopewidget.cpp)
+target_include_directories(amber-test-scopewidget PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-scopewidget PRIVATE amber-engine Qt6::Widgets Qt6::Test)
+set_target_properties(amber-test-scopewidget PROPERTIES AUTOMOC ON)
+add_test(NAME amber-test-scopewidget COMMAND amber-test-scopewidget)
+set_tests_properties(amber-test-scopewidget PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(amber-test-timer-format test_timer_format.cpp)
 target_include_directories(amber-test-timer-format PRIVATE ${CMAKE_SOURCE_DIR})
