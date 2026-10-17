@@ -56,7 +56,7 @@ Safe fixes can be applied immediately (on a dedicated branch). Behavioral fixes 
 
 ## Code style
 
-clang-format with `.clang-format` in repo root (Google-based, 2-space indent, 120-col limit, attached braces, left pointer alignment). Run `clang-format -i <file>` to format.
+clang-format with `src/.clang-format` (not at the repo root; Google-based, 2-space indent, 120-col limit, attached braces, left pointer alignment). Run `clang-format --style=file:src/.clang-format -i <file>` from the repo root. Many sources are CRLF: never run `git clang-format`, it rewrites whole files to LF.
 
 ## Architecture
 
