@@ -23,6 +23,7 @@
 
 #include <QList>
 #include <QMutex>
+#include <QString>
 #include <QThread>
 
 /**
@@ -52,5 +53,19 @@ protected:
 /// EffectInit locks it at construction and unlocks it when loading finishes.
 /// Code that needs effects to be available should lock/unlock this mutex.
 extern QMutex effects_loaded_mutex;
+
+/// True for an effect name as a project saves it ("category/name", Effect::save) that belongs to a Frei0r plugin.
+bool is_frei0r_effect_name(const QString& saved_name);
+
+/// The rule for listing Frei0r effects in the add-effect menus: the preference is on, or the open project uses some.
+bool frei0r_effects_visible(bool show_preference, bool project_uses_frei0r);
+
+/// Frei0r effects (CPU plugins, slower) are hidden from the add-effect menus unless Config::show_frei0r_effects is on
+/// or the open project uses some. Hidden effects still load, render, copy and paste.
+bool frei0r_effects_visible();
+
+/// Session flag, never saved: set when a loaded or imported project contains Frei0r effects, cleared when the
+/// project is cleared (new project, before each open).
+void set_project_uses_frei0r(bool uses);
 
 #endif // EFFECTLOADERS_H

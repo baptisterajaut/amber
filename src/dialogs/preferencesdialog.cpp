@@ -599,6 +599,15 @@ void PreferencesDialog::setup_ui() {
   AddBoolPair(add_default_effects_to_clips, &amber::CurrentConfig.add_default_effects_to_clips);
   behavior_tab_layout->Add(add_default_effects_to_clips);
 
+#ifndef NOFREI0R
+  QCheckBox* show_frei0r_effects = new QCheckBox(tr("Show Frei0r effects (CPU, slower)"));
+  show_frei0r_effects->setToolTip(
+      tr("List Frei0r plugins in the add-effect menus. They run on the CPU and slow playback down. A project that uses "
+         "Frei0r effects shows them while it is open, whatever this setting."));
+  AddBoolPair(show_frei0r_effects, &amber::CurrentConfig.show_frei0r_effects);
+  behavior_tab_layout->Add(show_frei0r_effects);
+#endif
+
   QCheckBox* auto_seek_to_beginning =
       new QCheckBox(tr("Automatically Seek to the Beginning When Playing at the End of a Sequence"));
   auto_seek_to_beginning->setToolTip(
