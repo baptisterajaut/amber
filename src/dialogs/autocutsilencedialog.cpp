@@ -202,6 +202,7 @@ static void analyse_clip_audio(Clip* clip, int attack_threshold, int attack_time
   const FootageStream* ms = clip->media_stream();
 
   long media_length = clip->media_length();
+  if (media_length <= 0) return;  // no data to analyse (and no division by zero below)
   int preview_size = ms->audio_preview.length();
   float chunk_size = (float)preview_size / media_length;
 
@@ -220,7 +221,8 @@ static void analyse_clip_audio(Clip* clip, int attack_threshold, int attack_time
     int circular_index = i % sample_size;
 
     qint8 tmp = 0;
-    for (int k = start; k < start + chunk_size; k++) {
+    // A looped or stretched clip maps past the end of the preview: those frames read as silence
+    for (int k = qMax(0L, start); k < start + chunk_size && k < preview_size; k++) {
       tmp = qMax(tmp, qint8(qRound(double(ms->audio_preview.at(k)))));
     }
     vols[circular_index] = tmp;
