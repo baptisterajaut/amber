@@ -216,10 +216,11 @@ void EffectUI::AddAdditionalEffect(Effect* e) {
     AttachKeyframeNavigationToRow(e->row(i), keyframe_navigators_.at(i));
 
     for (int j = 0; j < row->FieldCount(); j++) {
-      // Attach existing field widget to this effect's field
-      QWidget* existing_widget = Widget(i, j);
+      // Attach the existing widget to this effect's own field, through a wrapper of its own (owned by this EffectUI,
+      // like field_widgets_): the shown value stays the first effect's, edits reach every effect
       if (i < field_widgets_.size() && j < field_widgets_[i].size() && field_widgets_[i][j]) {
-        field_widgets_[i][j]->CreateWidget(existing_widget);
+        EffectFieldWidget* fw = EffectFieldWidget::Create(e->row(i)->Field(j), this);
+        if (fw != nullptr) fw->CreateWidget(Widget(i, j));
       }
     }
   }
