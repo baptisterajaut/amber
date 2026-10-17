@@ -65,18 +65,32 @@ NewSequenceDialog::NewSequenceDialog(QWidget *parent, Media *existing, Sequence*
     width_numeric->setValue(existing_sequence->width);
     height_numeric->setValue(existing_sequence->height);
     int comp_rate = qRound(existing_sequence->frame_rate*100);
+    bool found_rate = false;
     for (int i=0;i<frame_rate_combobox->count();i++) {
       if (qRound(frame_rate_combobox->itemData(i).toDouble()*100) == comp_rate) {
         frame_rate_combobox->setCurrentIndex(i);
+        found_rate = true;
         break;
       }
     }
+    if (!found_rate) {
+      // Not a preset (48, 100, 120 fps...): offer the sequence's own rate, or OK would re-time it to the default
+      frame_rate_combobox->addItem(QString("%1 FPS").arg(existing_sequence->frame_rate), existing_sequence->frame_rate);
+      frame_rate_combobox->setCurrentIndex(frame_rate_combobox->count() - 1);
+    }
     sequence_name_edit->setText(existing_sequence->name);
+    bool found_frequency = false;
     for (int i=0;i<audio_frequency_combobox->count();i++) {
       if (audio_frequency_combobox->itemData(i) == existing_sequence->audio_frequency) {
         audio_frequency_combobox->setCurrentIndex(i);
+        found_frequency = true;
         break;
       }
+    }
+    if (!found_frequency) {
+      audio_frequency_combobox->addItem(QString("%1 Hz").arg(existing_sequence->audio_frequency),
+                                        existing_sequence->audio_frequency);
+      audio_frequency_combobox->setCurrentIndex(audio_frequency_combobox->count() - 1);
     }
   } else {
     existing_sequence = nullptr;
@@ -95,6 +109,12 @@ void NewSequenceDialog::SetNameEditable(bool enabled)
 }
 
 void NewSequenceDialog::accept() {
+  double frame_rate = frame_rate_combobox->currentData().toDouble();
+  // The constructor matches the existing rate to 2 decimals (23.976024 selects "23.976"): keep it exactly, no re-time
+  if (existing_sequence != nullptr && qAbs(frame_rate - existing_sequence->frame_rate) < 0.005) {
+    frame_rate = existing_sequence->frame_rate;
+  }
+
   if (existing_sequence == nullptr) {
 
     // The dialog wasn't given an existing Sequence object, so we'll make a new one
@@ -118,13 +138,13 @@ void NewSequenceDialog::accept() {
 
     ComboAction* ca = new ComboAction(tr("Edit Sequence"));
 
-    double multiplier = frame_rate_combobox->currentData().toDouble() / existing_sequence->frame_rate;
+    double multiplier = frame_rate / existing_sequence->frame_rate;
 
     EditSequenceCommand* esc = new EditSequenceCommand(existing_item, existing_item->to_sequence());
     esc->name = sequence_name_edit->text();
     esc->width = width_numeric->value();
     esc->height = height_numeric->value();
-    esc->frame_rate = frame_rate_combobox->currentData().toDouble();
+    esc->frame_rate = frame_rate;
     esc->audio_frequency = audio_frequency_combobox->currentData().toInt();
     esc->audio_layout = AV_CH_LAYOUT_STEREO;
     ca->append(esc);
@@ -144,7 +164,7 @@ void NewSequenceDialog::accept() {
     existing_sequence->name = sequence_name_edit->text();
     existing_sequence->width = width_numeric->value();
     existing_sequence->height = height_numeric->value();
-    existing_sequence->frame_rate = frame_rate_combobox->currentData().toDouble();
+    existing_sequence->frame_rate = frame_rate;
     existing_sequence->audio_frequency = audio_frequency_combobox->currentData().toInt();
     existing_sequence->audio_layout = AV_CH_LAYOUT_STEREO;
 
