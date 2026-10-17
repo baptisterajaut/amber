@@ -163,6 +163,14 @@ class TestEffectsGpu : public QObject {
   void glowScreenMode();
   void glowSnapshotPingPongInput();
 
+  // F-1 batch 4 — Denoise (spatial bilateral).
+  void denoiseStrengthZeroIdentity();
+  void denoiseFlatSolid();
+  void denoiseReducesNoise();
+  void denoiseKeepsHardEdge();
+  void denoiseBilateralWeights();
+  void denoiseIgnoresTransparentTaps();
+
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
   void yuvDecodeNV12();
@@ -3048,6 +3056,7 @@ void TestEffectsGpu::colorShadersKeepTransparentClipTransparent() {
       {"Find Edges", [this](Effect* e) { h_->set_field_bool(e, 2, 0, true); }},             // invert: no edge → white
       {"Colorize", [this](Effect* e) { h_->set_field_double(e, 2, 0, 50.0); }},             // lightness 50
       {"Glow", [](Effect*) {}},  // defaults: bright pass of zeros is zero, a = max(0, max(rgb)) = 0
+      {"Denoise", [this](Effect* e) { h_->set_field_double(e, 1, 0, 100.0); }},  // strength 100
   };
 
   auto make_bottom = [this](Sequence* seq) {
@@ -3197,6 +3206,192 @@ void TestEffectsGpu::glowSnapshotPingPongInput() {
   check_glow_probes(pixels, "ping-pong input");
   QVERIFY2(buffers_within(reference, pixels, /*tolerance=*/2),
            qPrintable(QString("ping-pong input differs from direct input, diff=%1").arg(buf_diff(reference, pixels))));
+}
+
+// ---------------------------------------------------------------------------
+// F-1 batch 4 — Denoise (spatial bilateral)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Denoise rows: 0 Radius (render-target px, rounded down), 1 Strength, 2 Detail
+EffectPtr attach_denoise(TestRenderHarness* h, Clip* c, double radius, double strength, double detail) {
+  EffectPtr fx = h->attach_xml_shader(c, "Denoise");
+  h->set_field_double(fx.get(), 0, 0, radius);
+  h->set_field_double(fx.get(), 1, 0, strength);
+  h->set_field_double(fx.get(), 2, 0, detail);
+  return fx;
+}
+
+// Sum over the 32x32 centre block of |r - mean r|: how grainy the picture is.
+long block_abs_deviation(const QByteArray& pixels) {
+  long sum = 0;
+  for (int y = 16; y < 48; y++) {
+    for (int x = 16; x < 48; x++) sum += pixel_at(pixels, 64, x, y).r;
+  }
+  const double mean = sum / 1024.0;
+  double dev = 0.0;
+  for (int y = 16; y < 48; y++) {
+    for (int x = 16; x < 48; x++) dev += std::abs(pixel_at(pixels, 64, x, y).r - mean);
+  }
+  return long(dev);
+}
+
+}  // namespace
+
+void TestEffectsGpu::denoiseStrengthZeroIdentity() {
+  // Strength 0 skips the filter and outputs the input texel unchanged, even at the widest radius.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 3, 0, 90.0);
+  QByteArray baseline = h_->render_frame(seq.get(), 0);
+  attach_denoise(h_.get(), c, 6.0, 0.0, 0.0);
+  QByteArray with_fx = h_->render_frame(seq.get(), 0);
+  QVERIFY2(buffers_within(baseline, with_fx, /*tolerance=*/2),
+           qPrintable(QString("expected identity, diff=%1").arg(buf_diff(baseline, with_fx))));
+}
+
+void TestEffectsGpu::denoiseFlatSolid() {
+  // Flat colour: every tap equals the centre, so the weighted mean is the centre whatever the weights.
+  // Opaque (200,100,50) stays (200,100,50). At 50% opacity (alpha 128/255 = 0.502) over an opaque (50,100,150) track,
+  // the straight colour is filtered then premultiplied again: R 200 * 0.502 + 50 * 0.498 = 125, G 100,
+  // B 50 * 0.502 + 150 * 0.498 = 100. Without the re-multiply the straight colour would be added: R 200 + 25 = 225.
+  struct Case {
+    double opacity, strength;
+    QColor expected;
+  };
+  const Case cases[] = {{100.0, 30.0, QColor(200, 100, 50)},
+                        {100.0, 100.0, QColor(200, 100, 50)},
+                        {50.0, 30.0, QColor(125, 100, 100)},
+                        {50.0, 100.0, QColor(125, 100, 100)}};
+  for (const Case& k : cases) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* bottom = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_color(bottom->effects[1].get(), 2, 0, QColor(50, 100, 150));
+    Clip* top = h_->add_generator_clip(seq.get(), -2, 0, 30, EFFECT_INTERNAL_SOLID);
+    h_->set_field_double(top->effects[1].get(), 1, 0, k.opacity);
+    h_->set_field_color(top->effects[1].get(), 2, 0, QColor(200, 100, 50));
+    attach_denoise(h_.get(), top, 6.0, k.strength, 0.0);
+    QByteArray pixels = h_->render_frame(seq.get(), 0);
+    Rgba mid = pixel_at(pixels, 64, 32, 32);
+    QVERIFY2(qAbs(mid.r - k.expected.red()) <= 4 && qAbs(mid.g - k.expected.green()) <= 4 &&
+                 qAbs(mid.b - k.expected.blue()) <= 4,
+             qPrintable(QString("opacity %1, strength %2: expected (%3,%4,%5), got (%6,%7,%8)")
+                            .arg(k.opacity)
+                            .arg(k.strength)
+                            .arg(k.expected.red())
+                            .arg(k.expected.green())
+                            .arg(k.expected.blue())
+                            .arg(mid.r)
+                            .arg(mid.g)
+                            .arg(mid.b)));
+  }
+}
+
+void TestEffectsGpu::denoiseReducesNoise() {
+  // Grey 128 Solid with the Noise shader at amount 10 (row 0): grey grain uniform in +-0.1, mean |dev| ~13 per pixel.
+  // Denoise radius 2 (sigma_s 1), strength 100 (sigma_r 0.3), detail 0. Grey grain counts 3x in the rgb distance, so
+  // the range weights keep part of it: a CPU model of the shader on independent uniform grain gives ~0.34x the
+  // deviation (the GPU measured 13174 → 4254; at amount 20 only ~0.64x, 26398 → 16696). Assert at least halved.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
+  EffectPtr noise = h_->attach_xml_shader(c, "Noise");
+  h_->set_field_double(noise.get(), 0, 0, 10.0);
+  const long noisy = block_abs_deviation(h_->render_frame(seq.get(), 0));
+  QVERIFY2(noisy > 1024 * 5, qPrintable(QString("Noise shader barely changed the solid, deviation %1").arg(noisy)));
+  attach_denoise(h_.get(), c, 2.0, 100.0, 0.0);
+  const long denoised = block_abs_deviation(h_->render_frame(seq.get(), 0));
+  QVERIFY2(
+      denoised * 2 <= noisy,
+      qPrintable(QString("expected the deviation at least halved: noise %1, denoised %2").arg(noisy).arg(denoised)));
+}
+
+void TestEffectsGpu::denoiseKeepsHardEdge() {
+  // Black/white checkerboard, vertical edge between x = 15 (black) and 16 (white). Denoise radius 4 (sigma_s 2),
+  // strength 30 (sigma_r = 0.02 + 0.28 * 0.3 = 0.104): a tap across the edge has |d|^2 = 3, range weight
+  // exp(-3 / (2 * 0.104^2)) = exp(-139) ~ 0, so both sides keep their value (0 and 255). A Gaussian Blur of the same
+  // sigma 2 mixes the cells: (15,8) ~104, (16,8) ~154.
+  struct Probe {
+    int x, y;
+  };
+  const Probe probes[] = {{15, 8}, {16, 8}};
+
+  auto base_seq = h_->make_sequence(64, 64, 30.0);
+  add_checkerboard(h_.get(), base_seq.get(), QColor(255, 255, 255));
+  QByteArray baseline = h_->render_frame(base_seq.get(), 0);
+
+  auto den_seq = h_->make_sequence(64, 64, 30.0);
+  Clip* dc = add_checkerboard(h_.get(), den_seq.get(), QColor(255, 255, 255));
+  attach_denoise(h_.get(), dc, 4.0, 30.0, 50.0);
+  QByteArray denoised = h_->render_frame(den_seq.get(), 0);
+
+  auto blur_seq = h_->make_sequence(64, 64, 30.0);
+  Clip* bc = add_checkerboard(h_.get(), blur_seq.get(), QColor(255, 255, 255));
+  EffectPtr blur = h_->attach_xml_shader(bc, "Gaussian Blur");
+  h_->set_field_double(blur.get(), 0, 0, 2.0);  // sigma
+  QByteArray blurred = h_->render_frame(blur_seq.get(), 0);
+
+  for (const Probe& p : probes) {
+    const int base = pixel_at(baseline, 64, p.x, p.y).r;
+    const int den = pixel_at(denoised, 64, p.x, p.y).r;
+    const int gauss = pixel_at(blurred, 64, p.x, p.y).r;
+    QVERIFY2(qAbs(den - base) <= 10 && qAbs(gauss - base) >= 50,
+             qPrintable(QString("(%1,%2): no effect %3, Denoise %4 (want within 10), Gaussian Blur %5 (want 50+ away)")
+                            .arg(p.x)
+                            .arg(p.y)
+                            .arg(base)
+                            .arg(den)
+                            .arg(gauss)));
+  }
+}
+
+void TestEffectsGpu::denoiseBilateralWeights() {
+  // Black / grey g = 77/255 = 0.302 checkerboard, edge between x = 15 and 16, radius 2 (sigma_s 1), strength 100
+  // (sigma_r 0.3), detail 0. At y = 8 all 5 rows are in the same cell; per column dx the spatial weights sum to
+  // exp(-dx^2 / 2) * S, S = 1 + 2 * 0.60653 + 2 * 0.13534 = 2.48373. Same side: columns 0, -1, -2 (or 0, 1, 2)
+  // → S * 1.74187 = 4.32634. Other side: S * 0.74187 = 1.84260, times the range weight exp(-3 g^2 / 0.18) = 0.21880
+  // → 0.40316. (15,8): 0.40316 * g / 4.72950 = 0.02574 → 7. (16,8): 4.32634 * g / 4.72950 = 0.27622 → 70.
+  // Plain gaussian (no range weight): 23 and 54.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_checkerboard(h_.get(), seq.get(), QColor(77, 77, 77));
+  attach_denoise(h_.get(), c, 2.0, 100.0, 0.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  struct Probe {
+    int x, y, expected;
+  };
+  const Probe probes[] = {{15, 8, 7}, {16, 8, 70}};
+  for (const Probe& p : probes) {
+    Rgba px = pixel_at(pixels, 64, p.x, p.y);
+    QVERIFY2(qAbs(px.r - p.expected) <= 4 && qAbs(px.g - p.expected) <= 4 && qAbs(px.b - p.expected) <= 4,
+             qPrintable(QString("(%1,%2): expected %3, got (%4,%5,%6)")
+                            .arg(p.x)
+                            .arg(p.y)
+                            .arg(p.expected)
+                            .arg(px.r)
+                            .arg(px.g)
+                            .arg(px.b)));
+  }
+}
+
+void TestEffectsGpu::denoiseIgnoresTransparentTaps() {
+  // Grey (60,60,60) Solid, Crop left 25%: texels x <= 15 become (0,0,0,0), x = 16 is the first opaque column.
+  // Denoise radius 4, strength 100, detail 0 at (16,32): the transparent taps have weight 0, every remaining tap is
+  // the same grey → stays 60. Were they counted as black (range weight exp(-3 * 0.2353^2 / 0.18) = 0.397 on columns
+  // dx -1..-4 = 9.547 of spatial weight, vs 14.445 on the grey side) the pixel would drop to ~47.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(60, 60, 60));
+  EffectPtr crop = h_->attach_xml_shader(c, "Crop");
+  h_->set_field_double(crop.get(), 0, 0, 25.0);
+  attach_denoise(h_.get(), c, 4.0, 100.0, 0.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  Rgba px = pixel_at(pixels, 64, 16, 32);
+  QVERIFY2(qAbs(px.r - 60) <= 4 && qAbs(px.g - 60) <= 4 && qAbs(px.b - 60) <= 4,
+           qPrintable(QString("expected ~(60,60,60), got (%1,%2,%3)").arg(px.r).arg(px.g).arg(px.b)));
 }
 
 // Phase 4 — only test that exercises the YUV decode path (yuv2rgb.frag.qsb).
