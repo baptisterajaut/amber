@@ -247,6 +247,7 @@ set(UI_SOURCES
   effects/ui/curvefieldwidget.cpp effects/ui/curvefieldwidget.h
   effects/ui/doublefieldwidget.cpp effects/ui/doublefieldwidget.h
   effects/ui/effectfieldwidget.cpp effects/ui/effectfieldwidget.h
+  effects/ui/effectfieldwidgetfactory.cpp
   effects/ui/filefieldwidget.cpp effects/ui/filefieldwidget.h
   effects/ui/fontfieldwidget.cpp effects/ui/fontfieldwidget.h
   effects/ui/labelfieldwidget.cpp effects/ui/labelfieldwidget.h
