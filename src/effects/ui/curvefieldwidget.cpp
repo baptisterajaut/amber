@@ -22,6 +22,7 @@ QWidget* CurveFieldWidget::CreateWidget(QWidget* existing) {
   if (existing != nullptr) {
     CurveFieldWidget* owner = qobject_cast<CurveFieldWidget*>(existing->property(kOwnerProperty).value<QObject*>());
     if (owner != nullptr && !owner->fields_.contains(field_)) owner->fields_.append(field_);
+    connect(field_, &EffectField::EnabledChanged, existing, &QWidget::setEnabled);
     return existing;
   }
 
