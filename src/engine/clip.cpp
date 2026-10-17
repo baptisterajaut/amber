@@ -41,6 +41,18 @@ extern "C" {
 #include <libavutil/pixfmt.h>
 }
 
+namespace {
+
+// Copy `size` bytes into a staging buffer reused from the previous frame: resize() keeps the capacity, so this only
+// allocates when the frame grows. If the previous upload still shares the buffer, data() detaches (one allocation).
+const QByteArray& stage(QByteArray& buf, const uint8_t* src, qsizetype size) {
+  buf.resize(size);
+  memcpy(buf.data(), src, size);
+  return buf;
+}
+
+}  // namespace
+
 const int kRGBAComponentCount = 4;
 
 Clip::Clip(Sequence* s)
@@ -533,6 +545,11 @@ void Clip::Close(bool wait) {
   cached_rhi_tex = nullptr;
   rgba_tex = nullptr;
 
+  // A closed clip doesn't keep a frame's worth of staging memory (several MB at 1080p)
+  cacher.queue()->lock();
+  for (QByteArray& buf : upload_staging) buf = QByteArray();
+  cacher.queue()->unlock();
+
   // Close all effects
   for (const auto& effect : effects) {
     if (effect->is_open()) {
@@ -598,8 +615,7 @@ bool Clip::retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceP
 
   // Y plane
   {
-    QByteArray yData(reinterpret_cast<const char*>(frame->data[0]), frame->linesize[0] * y_h);
-    QRhiTextureSubresourceUploadDescription desc(yData);
+    QRhiTextureSubresourceUploadDescription desc(stage(upload_staging[0], frame->data[0], frame->linesize[0] * y_h));
     desc.setSourceSize(QSize(y_w, y_h));
     desc.setDataStride(frame->linesize[0]);
     u->uploadTexture(yuv_tex_y, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
@@ -607,8 +623,7 @@ bool Clip::retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceP
 
   // U/UV plane (NV12 and YUV420P use the same upload path — NV12 just has an RG8 texture)
   {
-    QByteArray uvData(reinterpret_cast<const char*>(frame->data[1]), frame->linesize[1] * c_h);
-    QRhiTextureSubresourceUploadDescription desc(uvData);
+    QRhiTextureSubresourceUploadDescription desc(stage(upload_staging[1], frame->data[1], frame->linesize[1] * c_h));
     desc.setSourceSize(QSize(c_w, c_h));
     desc.setDataStride(frame->linesize[1]);
     u->uploadTexture(yuv_tex_u, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
@@ -616,8 +631,7 @@ bool Clip::retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceP
 
   // V plane (YUV420P only)
   if (is_yuv420p) {
-    QByteArray vData(reinterpret_cast<const char*>(frame->data[2]), frame->linesize[2] * c_h);
-    QRhiTextureSubresourceUploadDescription desc(vData);
+    QRhiTextureSubresourceUploadDescription desc(stage(upload_staging[2], frame->data[2], frame->linesize[2] * c_h));
     desc.setSourceSize(QSize(c_w, c_h));
     desc.setDataStride(frame->linesize[2]);
     u->uploadTexture(yuv_tex_v, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
@@ -733,8 +747,7 @@ bool Clip::retrieveCpuRgbaPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequence
   // The buffers hold frame->height rows (frame_size): never read more than that or wider than the frame, see
   // retrieveYuvGpuPath(). CBA: same fixed texture size on a mid-stream size change.
   const int up_h = qMin(h, frame->height);
-  QByteArray texData(reinterpret_cast<const char*>(uploadData), stride * up_h);
-  QRhiTextureSubresourceUploadDescription desc(texData);
+  QRhiTextureSubresourceUploadDescription desc(stage(upload_staging[0], uploadData, stride * up_h));
   desc.setSourceSize(QSize(qMin(w, frame->width), up_h));
   desc.setDataStride(stride);
   u->uploadTexture(rgba_tex, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
