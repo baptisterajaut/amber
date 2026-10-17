@@ -89,6 +89,7 @@ class TestEffectsGpu : public QObject {
   void lutIdentityPassthrough();
   void lutInvertFullStrength();
   void lutHalfStrengthBlends();
+  void lutSemiTransparentGradesStraightColour();
   void lutNoFilePassthrough();
   void huesatbriSaturationZero();
   void huesatbriContrast();
@@ -1526,6 +1527,25 @@ void TestEffectsGpu::lutHalfStrengthBlends() {
   Rgba mid = pixel_at(pixels, 64, 32, 32);
   QVERIFY2(qAbs(mid.r - 128) <= 3 && qAbs(mid.g - 128) <= 3 && qAbs(mid.b - 128) <= 3,
            qPrintable(QString("expected ~(128,128,128), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
+}
+
+void TestEffectsGpu::lutSemiTransparentGradesStraightColour() {
+  // Premultiplied input: the LUT must grade the straight colour, so an invert LUT on (50,100,150) at half alpha gives
+  // (205,155,105) premultiplied by that alpha. Grading the premultiplied rgb gives rgb > alpha: a veil.
+  QTemporaryDir dir;
+  const QString cube = dir.filePath("t.cube");
+  QVERIFY(write_cube(cube, 2, [](QVector3D v) { return QVector3D(1, 1, 1) - v; }));
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_double(c->effects[1].get(), 1, 0, 50.0);  // Solid opacity 50% → alpha 128
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(50, 100, 150));
+  EffectPtr lut = h_->attach_xml_shader(c, "LUT");
+  h_->set_field_string(lut.get(), 0, 0, cube);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  // The readback forces alpha to 255 (never assert alpha), its rgb is the premultiplied value: (205,155,105) * 128/255
+  Rgba mid = pixel_at(pixels, 64, 32, 32);
+  QVERIFY2(qAbs(mid.r - 103) <= 4 && qAbs(mid.g - 78) <= 4 && qAbs(mid.b - 53) <= 4,
+           qPrintable(QString("expected ~(103,78,53), got (%1,%2,%3)").arg(mid.r).arg(mid.g).arg(mid.b)));
 }
 
 void TestEffectsGpu::lutNoFilePassthrough() {

@@ -24,6 +24,9 @@ vec3 sampleLut(vec3 color) {
 
 void main(void) {
   vec4 original = texture(image, vTexCoord);
-  vec3 graded = sampleLut(original.rgb);
-  fragColor = vec4(mix(original.rgb, graded, strength * 0.01), original.a);
+  // input is premultiplied: grade the straight colour, premultiply again on output
+  // (clamped: rounding can push rgb / a past 1, which would sample the next LUT slice)
+  vec3 rgb = original.a > 0.0 ? clamp(original.rgb / original.a, 0.0, 1.0) : vec3(0.0);
+  vec3 graded = sampleLut(rgb);
+  fragColor = vec4(clamp(mix(rgb, graded, strength * 0.01), 0.0, 1.0) * original.a, original.a);
 }
