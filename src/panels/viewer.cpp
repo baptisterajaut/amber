@@ -1021,7 +1021,10 @@ void Viewer::timer_update() {
       }
       if (seq->using_workarea && seq->playhead >= seq->workarea_out) {
         if (amber::CurrentConfig.loop) {
-          // loop
+          // loop. play() pauses a playing viewer first, which resets the speed to 1x: keep 2x/3x across the wrap
+          int speed = playback_speed;
+          pause();
+          playback_speed = speed;
           play();
         } else if (playing_in_to_out) {
           pause();
