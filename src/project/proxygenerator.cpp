@@ -454,17 +454,25 @@ void ProxyGenerator::run() {
     // loop through queue until the queue is empty
     while (proxy_queue.size() > 0) {
 
-      // grab proxy info
-      const ProxyInfo& info = proxy_queue.first();
-
-      // create directory for info
-      QFileInfo(info.path).dir().mkpath(".");
+      // grab proxy info (a copy: queue() may grow proxy_queue while the mutex is released below)
+      const ProxyInfo info = proxy_queue.first();
 
       // set skip to false
       skip = false;
 
+      // release the mutex during the transcode so queue() doesn't block the UI until it ends. The entry stays at
+      // first() meanwhile: queue() never removes it, it sets skip to abort it when the same footage is re-queued.
+      // CBA: skip is a plain bool read unlocked by the decode loop, as cancel() already relies on; std::atomic
+      // would need the helpers' bool& parameters changed
+      mutex.unlock();
+
+      // create directory for info
+      QFileInfo(info.path).dir().mkpath(".");
+
       // transcode proxy
       transcode(info);
+
+      mutex.lock();
 
       // we're finished with this proxy, remove it
       proxy_queue.removeFirst();
@@ -509,9 +517,12 @@ void ProxyGenerator::queue(const ProxyInfo &info) {
 
 // to be called from another thread to terminate the proxy generator thread and free it
 void ProxyGenerator::cancel() {
-  // signal to thread to cancel
+  // signal to thread to cancel. Under the mutex: run() holds it from its `cancelled` check until waitCond.wait()
+  // releases it, so the wake below can't land in between and be lost (the mutex is free during a transcode)
+  mutex.lock();
   cancelled = true;
   skip = true;
+  mutex.unlock();
 
   // if signal is sleeping, wake it to cancel correctly
   waitCond.wakeAll();
@@ -521,6 +532,8 @@ void ProxyGenerator::cancel() {
 }
 
 double ProxyGenerator::get_proxy_progress(Media* m) {
+  // only held briefly by the generator thread now, so the UI can take it
+  QMutexLocker locker(&mutex);
   if (!proxy_queue.isEmpty() && proxy_queue.first().media == m) {
     return current_progress;
   }
