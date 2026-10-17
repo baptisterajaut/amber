@@ -48,7 +48,8 @@ void main(void) {
 	//float luma = 0.33*rgb.r + 0.5*rgb.g + 0.16*rgb.b;
 	if (rgb.r < 0.5 && rgb.g < 0.5 && rgb.b < 0.5) {
 		float shadow_val = 1.0-(shadows*0.01);
-		rgb = vec3(pow(rgb.r*2.0, shadow_val)*0.5, pow(rgb.g*2.0, shadow_val)*0.5, pow(rgb.b*2.0, shadow_val)*0.5);
+		// contrast above 100 can push dark channels below 0, and pow() of a negative is NaN (black)
+		rgb = vec3(pow(max(rgb.r*2.0, 0.0), shadow_val)*0.5, pow(max(rgb.g*2.0, 0.0), shadow_val)*0.5, pow(max(rgb.b*2.0, 0.0), shadow_val)*0.5);
 	} else if (rgb.r > 0.5 && rgb.g > 0.5 && rgb.b > 0.5) {
 		float highlight_val = 1.0-(highlights*0.01);
 		rgb = vec3((pow((rgb.r-0.5)*2.0, highlight_val)*0.5)+0.5, (pow((rgb.g-0.5)*2.0, highlight_val)*0.5)+0.5, (pow((rgb.b-0.5)*2.0, highlight_val)*0.5)+0.5);
