@@ -957,6 +957,11 @@ QRhiTexture* amber::rendering::compose_sequence(ComposeSequenceParams& params) {
     qWarning() << "compose_sequence: params.seq is null";
     return nullptr;
   }
+  // compose_audio() builds params with video=false, no QRhi and no cache: only the video path needs one
+  if (params.video && !params.cache) {
+    qWarning() << "compose_sequence: params.cache is null";
+    return nullptr;
+  }
   QRhiTextureRenderTarget* final_target = params.main_target;
   QRhiTexture* final_tex = params.main_tex;
 

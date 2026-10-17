@@ -20,6 +20,7 @@
 #include "effects/effect.h"
 #include "engine/sequence.h"
 #include "project/media.h"
+#include "rendering/rhiresourcecache.h"
 #include "tests/test_appcontext_stub.h"
 
 class Clip;
@@ -122,6 +123,9 @@ class TestRenderHarness {
 
   // Pixel assertions. `pixels` is the QByteArray from render_frame.
   // `w` is the sequence width (needed to compute the row offset for (x, y)).
+  // Pipeline/buffer counters of the harness's RHI resource cache (zeroes when there is no QRhi).
+  RhiResourceCache::Stats cache_stats() const { return cache_ ? cache_->stats() : RhiResourceCache::Stats{}; }
+
   void assert_pixel(const QByteArray& pixels, int w, int x, int y, QColor expected, int tolerance = 2);
   void assert_solid_color(const QByteArray& pixels, int w, int h, QColor expected, int tolerance = 2);
 
@@ -144,6 +148,7 @@ class TestRenderHarness {
   std::unique_ptr<QRhi> rhi_;
   QShader passthrough_vert_, passthrough_frag_, blending_frag_, premultiply_frag_, yuv_frag_;
   QRhiSampler* sampler_ = nullptr;
+  std::unique_ptr<RhiResourceCache> cache_;
 
   int buf_w_ = 0, buf_h_ = 0;
   QRhiTexture* main_tex_ = nullptr;

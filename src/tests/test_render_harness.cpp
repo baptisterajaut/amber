@@ -92,12 +92,14 @@ TestRenderHarness::TestRenderHarness(QRhi::Implementation backend) {
   sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None, QRhiSampler::ClampToEdge,
                               QRhiSampler::ClampToEdge);
   sampler_->create();
+  cache_ = std::make_unique<RhiResourceCache>(rhi_.get());
 }
 
 TestRenderHarness::~TestRenderHarness() {
   amber::ActiveSequence = nullptr;
   if (rhi_) {
     release_buffers();
+    cache_.reset();
     delete sampler_;
     sampler_ = nullptr;
   }
@@ -353,6 +355,7 @@ QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead) {
   params.texture_failed = false;
   params.gizmos = nullptr;
   params.sampler = sampler_;
+  params.cache = cache_.get();
   params.passthroughVert = passthrough_vert_;
   params.passthroughFrag = passthrough_frag_;
   params.blendingFrag = blending_frag_;
@@ -381,6 +384,7 @@ QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead) {
   // Production code does the same drain in DeferRhiResourceDeletion's consumer.
   qDeleteAll(params.transientResources);
   params.transientResources.clear();
+  cache_->endFrame();
 
   if (!done || readback.data.isEmpty()) {
     QTest::qFail("readback failed", __FILE__, __LINE__);
