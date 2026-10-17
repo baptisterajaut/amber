@@ -2,9 +2,10 @@ find_package(Qt6 REQUIRED COMPONENTS Test)
 
 # All test targets link amber-engine which provides core, engine, effects,
 # rendering, project, and global sources via OBJECT library. amber-engine
-# references no UI symbol and pulls no QtWidgets, so no test links UI code, except amber-test-scopewidget and
-# amber-test-curveeditor, which compile the self-contained ui/scopewidget.cpp (QPainter drawing over core/scopes) and
-# ui/curveeditor.cpp (over core/curves) into their own executables.
+# references no UI symbol and pulls no QtWidgets, so no test links UI code, except amber-test-scopewidget,
+# amber-test-curveeditor and amber-test-fieldwidgets, which compile the self-contained ui/scopewidget.cpp (QPainter
+# drawing over core/scopes), ui/curveeditor.cpp (over core/curves) and a few effect field widgets into their own
+# executables.
 
 add_executable(amber-tests test_math.cpp)
 target_include_directories(amber-tests PRIVATE ${CMAKE_SOURCE_DIR})
@@ -52,6 +53,26 @@ target_link_libraries(amber-test-curveeditor PRIVATE amber-engine Qt6::Widgets Q
 set_target_properties(amber-test-curveeditor PROPERTIES AUTOMOC ON)
 add_test(NAME amber-test-curveeditor COMMAND amber-test-curveeditor)
 set_tests_properties(amber-test-curveeditor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Same pattern: the field widget wrappers Effect Controls uses for multi-selected clips, with the widgets they drive.
+# Not effectfieldwidgetfactory.cpp, whose color and text wrappers pull the viewer and the main window.
+add_executable(amber-test-fieldwidgets test_fieldwidgets.cpp
+  ${CMAKE_SOURCE_DIR}/effects/ui/effectfieldwidget.cpp
+  ${CMAKE_SOURCE_DIR}/effects/ui/boolfieldwidget.cpp
+  ${CMAKE_SOURCE_DIR}/effects/ui/combofieldwidget.cpp
+  ${CMAKE_SOURCE_DIR}/effects/ui/curvefieldwidget.cpp
+  ${CMAKE_SOURCE_DIR}/effects/ui/doublefieldwidget.cpp
+  ${CMAKE_SOURCE_DIR}/ui/comboboxex.cpp
+  ${CMAKE_SOURCE_DIR}/ui/curveeditor.cpp
+  ${CMAKE_SOURCE_DIR}/ui/labelslider.cpp
+  ${CMAKE_SOURCE_DIR}/ui/menu.cpp
+  ${CMAKE_SOURCE_DIR}/ui/styling.cpp
+)
+target_include_directories(amber-test-fieldwidgets PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-fieldwidgets PRIVATE amber-engine Qt6::Widgets Qt6::Test)
+set_target_properties(amber-test-fieldwidgets PROPERTIES AUTOMOC ON)
+add_test(NAME amber-test-fieldwidgets COMMAND amber-test-fieldwidgets)
+set_tests_properties(amber-test-fieldwidgets PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(amber-test-timer-format test_timer_format.cpp)
 target_include_directories(amber-test-timer-format PRIVATE ${CMAKE_SOURCE_DIR})

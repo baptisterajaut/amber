@@ -15,6 +15,9 @@ public:
 
 private slots:
   void UpdateFromWidget(const QString& s);
+
+private:
+  QUndoCommand* ApplyValue(const QString& s);
 };
 
 #endif  // FONTFIELDWIDGET_H
