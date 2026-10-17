@@ -32,6 +32,7 @@ class TestUndoMarkers : public QObject {
   void addAtEmptyTimeAppends();
   void addAtExistingTimeRenames();
   void moveRedoUndo();
+  void moveUndoSurvivesReallocation();
   void deleteIsIndexOrderIndependent();
 };
 
@@ -60,12 +61,34 @@ void TestUndoMarkers::addAtExistingTimeRenames() {
 
 void TestUndoMarkers::moveRedoUndo() {
   QVector<Marker> markers = make_markers(2);
-  MoveMarkerAction action(&markers[1], 10, 35);
+  MoveMarkerAction action(&markers, 1, 10, 35);
   action.redo();
   QCOMPARE(markers.at(1).frame, 35L);
   action.undo();
   QCOMPARE(markers.at(1).frame, 10L);
   action.redo();
+  QCOMPARE(markers.at(1).frame, 35L);
+}
+
+// The vector reallocates between the move and its undo (an appended marker, later undone):
+// the undo must still land on the marker, not on the freed buffer.
+void TestUndoMarkers::moveUndoSurvivesReallocation() {
+  QVector<Marker> markers = make_markers(2);
+  markers.squeeze();  // capacity == size, so the next append reallocates
+  MoveMarkerAction move(&markers, 1, 10, 35);
+  move.redo();
+  QCOMPARE(markers.at(1).frame, 35L);
+
+  const Marker* before = markers.constData();
+  AddMarkerAction add(&markers, 100, "late");
+  add.redo();
+  QVERIFY(markers.constData() != before);  // the append did reallocate
+  add.undo();
+  QCOMPARE(markers.size(), 2);
+
+  move.undo();
+  QCOMPARE(markers.at(1).frame, 10L);
+  move.redo();
   QCOMPARE(markers.at(1).frame, 35L);
 }
 
