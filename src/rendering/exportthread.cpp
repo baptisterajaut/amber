@@ -102,6 +102,12 @@ bool ExportThread::SetupVideo() {
   // if video is disabled, no setup necessary
   if (!params_.video_enabled) return true;
 
+  // The sequence gives the frame rate below and the frame size further down
+  if (amber::ActiveSequence == nullptr) {
+    export_error = tr("no active sequence");
+    return false;
+  }
+
   // find video encoder
   vcodec = avcodec_find_encoder(static_cast<enum AVCodecID>(params_.video_codec));
   if (!vcodec) {
@@ -135,7 +141,9 @@ bool ExportThread::SetupVideo() {
   vcodec_ctx->height = params_.video_height;
   vcodec_ctx->sample_aspect_ratio = {1, 1};
   vcodec_ctx->pix_fmt = static_cast<AVPixelFormat>(vcodec_params_.pix_fmt);
-  vcodec_ctx->framerate = av_d2q(params_.video_frame_rate, INT_MAX);
+  // Always the sequence rate: the encode loop stamps one frame per sequence frame, so any other rate gives
+  // duplicate pts (export fails) or uneven frame timing. A codec that can't encode it fails in avcodec_open2() below.
+  vcodec_ctx->framerate = av_d2q(amber::ActiveSequence->frame_rate, INT_MAX);
   if (params_.video_compression_type == COMPRESSION_TYPE_CBR) {
     vcodec_ctx->bit_rate = qRound(params_.video_bitrate * 1000000);
   }
@@ -199,10 +207,6 @@ bool ExportThread::SetupVideo() {
   }
 
   // Create raw AVFrame that will contain the RGBA buffer straight from compositing
-  if (amber::ActiveSequence == nullptr) {
-    export_error = tr("no active sequence");
-    return false;
-  }
   video_frame = av_frame_alloc();
   video_frame->format = AV_PIX_FMT_RGBA;
   video_frame->width = amber::ActiveSequence->width;
