@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Denoise" category="Blur">
+	<row name="Radius">
+		<field type="double" min="1" default="2" max="6" id="radius"/>
+	</row>
+	<row name="Strength">
+		<field type="double" min="0" default="30" max="100" id="strength"/>
+	</row>
+	<row name="Detail">
+		<field type="double" min="0" default="50" max="100" id="detail"/>
+	</row>
+	<shader vert="common.vert" frag="denoise.frag"/>
+</effect>
