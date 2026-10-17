@@ -183,9 +183,12 @@ void Config::load(QString path) {
 
   while (!stream.atEnd()) {
     stream.readNext();
-    if (!stream.isStartElement()) continue;
+    // The root element is skipped by name: reading past it would swallow the first setting when no whitespace
+    // follows <Configuration>
+    if (!stream.isStartElement() || stream.name() == QLatin1String("Configuration")) continue;
 
-    auto name = stream.name();
+    // Copied: the name view is only valid until the next readNext()
+    const QString name = stream.name().toString();
     stream.readNext();
     auto text = stream.text();
 
