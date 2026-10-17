@@ -373,6 +373,8 @@ set(AMBER_EFFECTS
   effects/shaders/swirl.xml
   effects/shaders/tile.frag
   effects/shaders/tile.xml
+  effects/shaders/tint.frag
+  effects/shaders/tint.xml
   effects/shaders/toonify.frag
   effects/shaders/toonify.xml
   effects/shaders/sharpen.frag

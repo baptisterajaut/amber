@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Tint" category="Color">
+	<row name="Shadows">
+		<field type="color" r="0" g="0" b="0" id="shadows"/>
+	</row>
+	<row name="Highlights">
+		<field type="color" r="255" g="224" b="178" id="highlights"/>
+	</row>
+	<row name="Amount">
+		<field type="double" min="0" default="100" max="100" id="amount"/>
+	</row>
+	<shader vert="common.vert" frag="tint.frag"/>
+</effect>
