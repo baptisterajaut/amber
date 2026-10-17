@@ -279,11 +279,12 @@ void TextEffect::DrawOutline(QPainter& p, const QVector<ClusterPath>& clusters, 
 }
 
 void TextEffect::redraw(double timecode) {
-  if (size_val->GetDoubleAt(timecode) <= 0) return;
-
   QColor bkg = set_color_button->GetColorAt(timecode);
   bkg.setAlpha(0);
   img.fill(bkg);
+
+  // Size 0 shows nothing: return only after the fill, or the previous text stays on screen
+  if (size_val->GetDoubleAt(timecode) <= 0) return;
 
   QPainter p(&img);
   p.setRenderHint(QPainter::Antialiasing);

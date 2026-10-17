@@ -39,6 +39,7 @@ class TestEffectsGpu : public QObject {
   void keyframedTransform();
   void boundaryTimecodes();
   void textRenders();
+  void textSizeZeroShowsNothing();
   void richTextRenders();
   void shakeChangesOutput();
   void timecodeRenders();
@@ -469,6 +470,32 @@ void TestEffectsGpu::textRenders() {
     }
   }
   QVERIFY2(central_bright, "expected at least one bright text pixel in central band");
+}
+
+void TestEffectsGpu::textSizeZeroShowsNothing() {
+  // Text drawn, then its size set to 0: the clip must go blank, not keep showing the previous text.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(0, 0, 0, 0));
+  EffectPtr text_eff = h_->attach_internal(c, EFFECT_INTERNAL_TEXT, EFFECT_TYPE_EFFECT);
+  // Rows: 0=text, 6=size, 7=colour
+  h_->set_field_string(text_eff.get(), 0, 0, "HELLO");
+  h_->set_field_double(text_eff.get(), 6, 0, 16.0);
+  h_->set_field_color(text_eff.get(), 7, 0, QColor(Qt::white));
+
+  auto count_bright = [](const QByteArray& buf) {
+    int n = 0;
+    for (int i = 0; i + 3 < buf.size(); i += 4) {
+      if (static_cast<uchar>(buf[i]) > 200 && static_cast<uchar>(buf[i + 1]) > 200) ++n;
+    }
+    return n;
+  };
+  QByteArray drawn = h_->render_frame(seq.get(), 0);
+  QVERIFY2(count_bright(drawn) > 20, "reference text missing");
+
+  h_->set_field_double(text_eff.get(), 6, 0, 0.0);
+  QByteArray blank = h_->render_frame(seq.get(), 0);
+  QCOMPARE(count_bright(blank), 0);
 }
 
 void TestEffectsGpu::richTextRenders() {
