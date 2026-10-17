@@ -96,3 +96,13 @@ add_executable(amber-test-shortcutfile
 target_include_directories(amber-test-shortcutfile PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-shortcutfile PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-shortcutfile COMMAND amber-test-shortcutfile)
+
+add_executable(amber-test-config
+  test_config.cpp
+  ${CMAKE_SOURCE_DIR}/global/config.cpp
+  ${CMAKE_SOURCE_DIR}/global/config.h
+  ${AMBER_CORE_SOURCES}
+)
+target_include_directories(amber-test-config PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-config PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-config COMMAND amber-test-config)
