@@ -58,6 +58,9 @@ class RenderThread : public QThread {
   int get_frame_height(int buffer_index) const;
 
   Effect* gizmos{nullptr};
+  // Gizmo effect of the selection the last frame was rendered for (Sequence::GetSelectedGizmo() when its paint()
+  // began), whether or not compose_sequence() could draw it (gizmos is nulled then)
+  Effect* rendered_gizmo_selection() const { return gizmo_selection_.load(); }
   void paint();
   // Returns the current front buffer index (snapshot of the atomic switcher).
   int front_buffer_index() const;
@@ -114,6 +117,7 @@ class RenderThread : public QThread {
   QShader blendingFrag_;
   QShader premultiplyFrag_;
   QShader yuvFrag_;
+  QShader shadowFrag_;
 
   QRhiSampler* sampler_{nullptr};
   std::unique_ptr<RhiResourceCache> cache_;  // reset before sampler_ and rhi_ in delete_ctx()
@@ -151,6 +155,7 @@ class RenderThread : public QThread {
   bool scrubbing_{false};
   bool running{true};
   std::atomic<bool> rhi_failed_{false};
+  std::atomic<Effect*> gizmo_selection_{nullptr};  // written by paint(), read by the viewer on the GUI thread
   QString save_fn;
   void* pixel_buffer{nullptr};
   int pixel_buffer_linesize{0};

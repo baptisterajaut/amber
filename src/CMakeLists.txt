@@ -347,7 +347,6 @@ set(AMBER_EFFECTS
   effects/shaders/despill.xml
   effects/shaders/directionalblur.frag
   effects/shaders/directionalblur.xml
-  effects/shaders/dropshadow.xml.disabled
   effects/shaders/emboss.frag
   effects/shaders/emboss.xml
   effects/shaders/findedges.frag
@@ -514,6 +513,7 @@ qt_add_shaders(amber-engine "amber_shaders"
     rendering/shaders/yuv2rgb.frag
     rendering/shaders/blending.frag
     rendering/shaders/premultiply.frag
+    rendering/shaders/dropshadow.frag
 )
 
 # Copy shader effects next to the binary so dev builds find them

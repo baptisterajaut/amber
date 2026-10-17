@@ -117,6 +117,7 @@ void TestRenderHarness::load_core_shaders() {
   blending_frag_ = loadQsb(QStringLiteral(":/shaders/blending.frag.qsb"));
   premultiply_frag_ = loadQsb(QStringLiteral(":/shaders/premultiply.frag.qsb"));
   yuv_frag_ = loadQsb(QStringLiteral(":/shaders/yuv2rgb.frag.qsb"));
+  shadow_frag_ = loadQsb(QStringLiteral(":/shaders/dropshadow.frag.qsb"));
 }
 
 void TestRenderHarness::ensure_buffers(int w, int h) {
@@ -279,6 +280,26 @@ Clip* TestRenderHarness::add_video_clip(Sequence* seq, long in, long out, Media*
   return c.get();
 }
 
+Clip* TestRenderHarness::add_nested_clip(Sequence* seq, const SequencePtr& inner, long in, long out) {
+  MediaPtr m = std::make_shared<Media>();
+  m->set_sequence(inner);
+  owned_media_.append(m);
+
+  ClipPtr c = std::make_shared<Clip>(seq);
+  c->set_media(m.get(), 0);
+  c->set_timeline_in(in);
+  c->set_timeline_out(out);
+  c->set_clip_in(0);
+  c->set_track(-1);
+  c->set_name("Nested");
+  const EffectMeta* transform_meta = Effect::GetInternalMeta(EFFECT_INTERNAL_TRANSFORM, EFFECT_TYPE_EFFECT);
+  Q_ASSERT(transform_meta);
+  c->effects.append(Effect::Create(c.get(), transform_meta));
+
+  seq->clips.append(c);
+  return c.get();
+}
+
 EffectPtr TestRenderHarness::attach_internal(Clip* clip, EffectInternal id, int type) {
   const EffectMeta* meta = Effect::GetInternalMeta(id, type);
   Q_ASSERT(meta);
@@ -325,12 +346,26 @@ void TestRenderHarness::set_field_combo(Effect* e, int row, int field, int index
   e->row(row)->Field(field)->SetValueAt(0.0, QVariant(index));
 }
 
-QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead) {
+QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead, int divider) {
+  // A footage clip's frame can miss the cacher (decode not done in time, e.g. under heavy parallel load): Retrieve()
+  // fails, compose_sequence() reports texture_failed and the clip isn't drawn. Re-render the same frame once the
+  // cacher had time to catch up, as the viewer's retry does. Steady-state frames render a clip whose frame is already
+  // queued, so the retries land in a scene's first frames, before its counters are read.
+  constexpr int kRetries = 5;
+  for (int retry = 0;; retry++) {
+    bool texture_failed = false;
+    QByteArray frame = render_frame_once(seq, playhead, divider, texture_failed);
+    if (!texture_failed || frame.isEmpty() || retry == kRetries) return frame;
+    QTest::qWait(20);
+  }
+}
+
+QByteArray TestRenderHarness::render_frame_once(Sequence* seq, long playhead, int divider, bool& texture_failed) {
   if (!rhi_) {
     QTest::qFail("render_frame called but QRhi unavailable", __FILE__, __LINE__);
     return {};
   }
-  ensure_buffers(seq->width, seq->height);
+  ensure_buffers(qMax(1, seq->width / divider), qMax(1, seq->height / divider));  // RenderThread::ensure_render_buffers
   seq->playhead = playhead;
 
   QRhiCommandBuffer* cb = nullptr;
@@ -361,6 +396,7 @@ QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead) {
   params.blendingFrag = blending_frag_;
   params.premultiplyFrag = premultiply_frag_;
   params.yuvFrag = yuv_frag_;
+  params.shadowFrag = shadow_frag_;
   params.main_tex = main_tex_;
   params.main_target = main_target_;
   params.main_rpd = main_rpd_;
@@ -392,6 +428,7 @@ QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead) {
   params.transientResources.clear();
   cache_->endFrame();
 
+  texture_failed = params.texture_failed;
   if (!done || readback.data.isEmpty()) {
     QTest::qFail("readback failed", __FILE__, __LINE__);
     return {};

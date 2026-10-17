@@ -51,6 +51,7 @@
 
 #include "effects/internal/audionoiseeffect.h"
 #include "effects/internal/cornerpineffect.h"
+#include "effects/internal/dropshadoweffect.h"
 #include "effects/internal/fillleftrighteffect.h"
 #include "effects/internal/frei0reffect.h"
 #include "effects/internal/gradienteffect.h"
@@ -271,6 +272,8 @@ static EffectPtr CreateInternalEffect(Clip* c, const EffectMeta* em) {
       return std::make_shared<TimerEffect>(c, em);
     case EFFECT_INTERNAL_PROGRESSBAR:
       return std::make_shared<ProgressBarEffect>(c, em);
+    case EFFECT_INTERNAL_DROPSHADOW:
+      return std::make_shared<DropShadowEffect>(c, em);
     default:
       return nullptr;
   }

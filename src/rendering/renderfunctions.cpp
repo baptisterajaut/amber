@@ -26,9 +26,11 @@ extern "C" {
 
 #include <QDebug>
 #include <QScreen>
+#include <QtMath>
 #include <utility>
 
 #include "effects/effect.h"
+#include "effects/internal/dropshadoweffect.h"
 #include "effects/transition.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
@@ -92,8 +94,8 @@ static bool rhi_blit_check_params(const char* caller, ComposeSequenceParams& par
 static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* target, QRhiRenderPassDescriptor* rpd,
                      QRhiTexture* srcTex, const QShader& vertShader, const QShader& fragShader, const QMatrix4x4& mvp,
                      const QByteArray& fragUboData, int fragUboSize, int texBindingCount = 1,
-                     QRhiTexture* extraTex1 = nullptr, QRhiTexture* extraTex2 = nullptr,
-                     bool skipClipSpaceCorr = false) {
+                     QRhiTexture* extraTex1 = nullptr, QRhiTexture* extraTex2 = nullptr, bool skipClipSpaceCorr = false,
+                     RhiResourceCache::Blend blend = RhiResourceCache::Blend::None) {
   if (!rhi_blit_check_params("rhi_blit:", params, target, rpd, srcTex)) return;
   QRhi* rhi = params.rhi;
   QRhiCommandBuffer* cb = params.cb;
@@ -136,8 +138,7 @@ static void rhi_blit(ComposeSequenceParams& params, QRhiTextureRenderTarget* tar
   RhiResourceCache::SrbLayout layout;
   layout.paramUbo = fragUboSize > 0;
   layout.textures = 1 + ((texBindingCount >= 2 && extraTex1) ? 1 : 0) + ((texBindingCount >= 3 && extraTex2) ? 1 : 0);
-  QRhiGraphicsPipeline* pipeline =
-      params.cache->pipeline(vertShader, fragShader, RhiResourceCache::Blend::None, layout, rpd);
+  QRhiGraphicsPipeline* pipeline = params.cache->pipeline(vertShader, fragShader, blend, layout, rpd);
 
   // Fullscreen quad vertex data
   float blitQuad[] = {
@@ -718,10 +719,80 @@ static void apply_clip_effects(Clip* c, long playhead, double timecode, GLTextur
   }
 }
 
+// Drop Shadow: draws the shadow of the clip just rendered into back_tex1 (sequence space, clip already transformed,
+// so it works on an opaque picture-in-picture) onto final_target, before the clip's own srcover lands over it.
+// Separable gaussian on alpha: horizontal pass into a free texture of the clip's ping-pong pair (intermediate,
+// orientation-neutral), then vertical pass + offset + colour, srcover onto final_target with rhi_blit_srcover's
+// orientation. Softness 0: that last pass alone, single tap. Distances are sequence pixels, scaled to the target.
+// CBA: ClampToEdge sampling, so a clip touching the frame edge smears its edge alpha outward through the blur, and
+// a clip entirely off-screen casts nothing into view (the back buffer is frame-sized).
+static void draw_drop_shadow(Clip* c, DropShadowEffect* effect, double timecode, ComposeSequenceParams& params,
+                             QRhiTexture* textureID, QRhiTexture* back_tex1, QRhiTextureRenderTarget* final_target,
+                             float clip_opacity, int seq_width) {
+  ClipRhiResources* res = static_cast<ClipRhiResources*>(c->fbo_rhi);
+  if (res == nullptr || seq_width <= 0) return;
+  const DropShadowEffect::Shadow shadow = effect->shadow_at(timecode);
+  const float alpha = float(shadow.opacity * shadow.color.alphaF()) * clip_opacity;
+  if (alpha <= 0.0f) return;  // nothing to see: no pass at all
+
+  // std140 layout of dropshadow.frag's ShadowParams
+  struct ShadowUbo {
+    float color[4];
+    float texel_step[2];
+    float offset[2];
+    float sigma;
+    qint32 radius;
+    float pad[2];
+  };
+  static_assert(sizeof(ShadowUbo) == 48, "dropshadow.frag ShadowParams");
+
+  const QSize sz = back_tex1->pixelSize();
+  const double scale = double(final_target->pixelSize().width()) / double(seq_width);  // preview divider
+  const double softness = shadow.softness * scale;
+  const int radius = qBound(0, qCeil(softness), 100);  // softness <= 100 and scale <= 1, clamped anyway
+  QMatrix4x4 mvp;
+  mvp.ortho(-1, 1, -1, 1, -1, 1);
+
+  QRhiTexture* src = back_tex1;
+  if (radius > 0) {
+    // Scratch: one of the clip's own ping-pong textures (comp_size, same render pass format), free once
+    // render_clip_to_backbuffer has drawn textureID; pick the one that isn't textureID anyway.
+    const int k = (textureID == res->tex[0]) ? 1 : 0;
+    ShadowUbo h{};
+    h.color[3] = 1.0f;  // (0, 0, 0, blurred alpha)
+    h.texel_step[0] = 1.0f / float(sz.width());
+    h.sigma = float(softness / 3.0);
+    h.radius = radius;
+    rhi_blit(params, res->rt[k], res->rpd, back_tex1, params.passthroughVert, params.shadowFrag, mvp,
+             QByteArray(reinterpret_cast<const char*>(&h), sizeof(h)), sizeof(h), 1, nullptr, nullptr,
+             /*skipClipSpaceCorr=*/true);
+    src = res->tex[k];
+  }
+
+  ShadowUbo v{};
+  v.color[0] = float(shadow.color.redF()) * alpha;
+  v.color[1] = float(shadow.color.greenF()) * alpha;
+  v.color[2] = float(shadow.color.blueF()) * alpha;
+  v.color[3] = alpha;
+  v.texel_step[1] = 1.0f / float(sz.height());
+  v.sigma = float(softness / 3.0);
+  v.radius = radius;
+  // The offset is in screen space (Y down). back_tex1, and the scratch (an orientation-neutral copy of it), hold
+  // the sequence's top row at texture row 0 only where the framebuffer is Y-up (OpenGL): elsewhere (Vulkan, D3D,
+  // Metal) render_clip_to_backbuffer's pass puts it at the last row, which the srcover orientation used below flips
+  // back. So screen-down is +V on OpenGL and -V on the others.
+  const double down_v = params.rhi->isYUpInFramebuffer() ? 1.0 : -1.0;
+  v.offset[0] = float(shadow.dx * scale / sz.width());
+  v.offset[1] = float(down_v * shadow.dy * scale / sz.height());
+  rhi_blit(params, final_target, params.main_rpd, src, params.passthroughVert, params.shadowFrag, mvp,
+           QByteArray(reinterpret_cast<const char*>(&v), sizeof(v)), sizeof(v), 1, nullptr, nullptr,
+           /*skipClipSpaceCorr=*/false, RhiResourceCache::Blend::PremultipliedOver);
+}
+
 // Apply Y-flip compensation for RGBA clips and then render+blend to final target.
 static void render_and_blend_clip(Clip* c, ComposeSequenceParams& params, QRhiTexture* textureID,
                                   GLTextureCoords& coords, const QMatrix4x4& clip_mvp,
-                                  QRhiTextureRenderTarget* final_target, double timecode) {
+                                  QRhiTextureRenderTarget* final_target, double timecode, int seq_width) {
   // Resolve back-buffer targets
   QRhiTextureRenderTarget* back_target1;
   QRhiTexture* back_tex1;
@@ -755,11 +826,15 @@ static void render_and_blend_clip(Clip* c, ComposeSequenceParams& params, QRhiTe
 
   // The last enabled clip-shader effect draws the clip instead of the passthrough pair.
   // CBA: only one applies; stacking two Corner Pins would need their homographies composed.
+  // Same for Drop Shadow (one per clip); like clip shaders it's GPU work the low-end "shaders off" mode drops.
   Effect* clip_shader = nullptr;
+  DropShadowEffect* drop_shadow = nullptr;
   if (amber::CurrentRuntimeConfig.shaders_are_enabled) {
     for (const auto& effect : c->effects) {
       Effect* e = effect.get();
-      if (!e || !e->IsEnabled() || !(e->Flags() & Effect::ClipShaderFlag)) continue;
+      if (!e || !e->IsEnabled()) continue;
+      if (auto* shadow = qobject_cast<DropShadowEffect*>(e)) drop_shadow = shadow;
+      if (!(e->Flags() & Effect::ClipShaderFlag)) continue;
       e->startEffect();  // effects added to an already open clip are opened (and their shaders baked) lazily
       if (e->is_glsl_linked()) clip_shader = e;
     }
@@ -768,6 +843,10 @@ static void render_and_blend_clip(Clip* c, ComposeSequenceParams& params, QRhiTe
   render_clip_to_backbuffer(params, textureID, coords, clip_mvp, back_target1, back_rpd, clip_shader, timecode);
 
   if (!amber::CurrentRuntimeConfig.disable_blending) {
+    // Without blending the clip's passthrough blit overwrites the whole target, shadow included: skipped there
+    if (drop_shadow) {
+      draw_drop_shadow(c, drop_shadow, timecode, params, textureID, back_tex1, final_target, coords.opacity, seq_width);
+    }
     rhi_blit_srcover(params, final_target, params.main_rpd, back_tex1, coords.opacity);
   } else {
     rhi_blit_passthrough(params, final_target, params.main_rpd, back_tex1, coords.opacity);
@@ -854,7 +933,7 @@ static void composite_video_clip(Clip* c, long playhead, Sequence* s, ComposeSeq
 
   if (textureID == nullptr) return;
 
-  render_and_blend_clip(c, params, textureID, coords, clip_mvp, final_target, timecode);
+  render_and_blend_clip(c, params, textureID, coords, clip_mvp, final_target, timecode, s->width);
 }
 
 // Process a single audio clip: handle nested sequences or cache audio data.
