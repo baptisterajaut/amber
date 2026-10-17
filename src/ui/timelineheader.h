@@ -71,7 +71,9 @@ class TimelineHeader : public QWidget {
   void update_parents();
   void move_drag_workarea(int mouse_x);
   void move_drag_markers(int mouse_x);
+  void move_drag_marker_end(int mouse_x);
   void hover_check_workarea(int mouse_x);
+  void hover_check_marker_end(const QPoint& pos);
   void paint_ticks(QPainter& p, int w, int h, int yoff);
   void paint_markers(QPainter& p, int yoff, int h);
   void add_marker_color_menu(Menu& menu);
@@ -99,6 +101,11 @@ class TimelineHeader : public QWidget {
   bool dragging_markers{false};
   QVector<int> selected_markers;
   QVector<long> selected_marker_original_times;
+
+  // dragging a range marker's end (or Alt-dragging a point marker's head): only that marker's duration changes
+  bool resizing_marker_{false};
+  int resize_marker_index_{-1};
+  long resize_marker_original_duration_{0};
 
   long getHeaderFrameFromScreenPoint(int x);
   int getHeaderScreenPointFromFrame(long frame);

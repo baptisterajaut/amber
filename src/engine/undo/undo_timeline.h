@@ -126,6 +126,18 @@ private:
   long new_time;
 };
 
+class ResizeMarkerAction : public AmberAction {
+public:
+  ResizeMarkerAction(QVector<Marker>* m, int i, long old_duration, long new_duration);
+  void doUndo() override;
+  void doRedo() override;
+private:
+  QVector<Marker>* active_array;
+  int index;
+  long old_duration;
+  long new_duration;
+};
+
 class DeleteMarkerAction : public AmberAction {
 public:
   explicit DeleteMarkerAction(QVector<Marker>* m);

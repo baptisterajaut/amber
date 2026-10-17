@@ -25,6 +25,7 @@ MarkerPropertiesDialog::MarkerPropertiesDialog(QWidget* parent, QVector<Marker*>
     originals_[i].name = markers_[i]->name;
     originals_[i].frame = markers_[i]->frame;
     originals_[i].color_label = markers_[i]->color_label;
+    originals_[i].duration = markers_[i]->duration;
   }
 
   QGridLayout* layout = new QGridLayout(this);
@@ -73,6 +74,31 @@ MarkerPropertiesDialog::MarkerPropertiesDialog(QWidget* parent, QVector<Marker*>
   }
   connect(frame_slider_, &LabelSlider::valueChanged, this, [this]() { frame_modified_ = true; });
   layout->addWidget(frame_slider_, row, 1);
+  row++;
+
+  // Duration field (0 = point marker)
+  layout->addWidget(new QLabel(tr("Duration:")), row, 0);
+  duration_slider_ = new LabelSlider(this);
+  duration_slider_->SetDisplayType(LabelSlider::FrameNumber);
+  duration_slider_->SetFrameRate(frame_rate);
+  duration_slider_->SetMinimum(0);
+
+  bool all_same_duration = true;
+  for (int i = 1; i < markers_.size(); i++) {
+    if (markers_[i]->duration != markers_[0]->duration) {
+      all_same_duration = false;
+      break;
+    }
+  }
+  if (all_same_duration) {
+    duration_slider_->SetDefault(markers_[0]->duration);
+    duration_slider_->SetValue(markers_[0]->duration);
+  } else {
+    duration_slider_->SetDefault(qSNaN());
+    duration_slider_->SetValue(qSNaN());
+  }
+  connect(duration_slider_, &LabelSlider::valueChanged, this, [this]() { duration_modified_ = true; });
+  layout->addWidget(duration_slider_, row, 1);
   row++;
 
   // Color Label field
@@ -136,6 +162,15 @@ void MarkerPropertiesDialog::accept() {
       long new_frame = qRound(frame_slider_->value());
       if (new_frame != m->frame) {
         ca->append(new SetLong(&m->frame, originals_[i].frame, new_frame));
+        any_change = true;
+      }
+    }
+
+    // Duration
+    if (duration_modified_ && !qIsNaN(duration_slider_->value())) {
+      long new_duration = qMax(0L, long(qRound(duration_slider_->value())));
+      if (new_duration != m->duration) {
+        ca->append(new SetLong(&m->duration, originals_[i].duration, new_duration));
         any_change = true;
       }
     }

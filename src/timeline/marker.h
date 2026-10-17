@@ -30,6 +30,8 @@ class Sequence;
 using SequencePtr = std::shared_ptr<Sequence>;
 
 void draw_marker(QPainter& p, int x, int y, int bottom, bool selected, int color_label = 0);
+// A range marker's band from x to end_x and its end tick, over the head's y range. Draw it before draw_marker.
+void draw_marker_range(QPainter& p, int x, int end_x, int y, int bottom, bool selected, int color_label = 0);
 
 void set_marker_internal(Sequence *seq, const QVector<int>& clips);
 void set_marker_internal(Sequence* seq);

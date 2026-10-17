@@ -265,7 +265,7 @@ set(UI_SOURCES
   project/proxygenerator.cpp project/proxygenerator.h
   project/sourcescommon.cpp project/sourcescommon.h
   rendering/audio_ui.cpp rendering/audio_ui.h
-  timeline/marker.cpp timeline/marker.h
+  timeline/marker.cpp timeline/marker.h timeline/marker_range.cpp timeline/marker_range.h
   ui/appcontextimpl.cpp ui/appcontextimpl.h
   ui/audiomonitor.cpp ui/audiomonitor.h
   ui/blur.cpp ui/blur.h

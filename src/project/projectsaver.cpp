@@ -33,6 +33,9 @@ static void save_marker(QXmlStreamWriter& stream, const Marker& m) {
   if (m.color_label > 0) {
     stream.writeAttribute("label", QString::number(m.color_label));
   }
+  if (m.duration > 0) {
+    stream.writeAttribute("duration", QString::number(m.duration));
+  }
   stream.writeEndElement();
 }
 

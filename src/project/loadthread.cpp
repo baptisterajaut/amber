@@ -203,6 +203,8 @@ Marker LoadThread::parse_marker(QXmlStreamReader& stream) {
       m.name = attr.value().toString();
     } else if (attr.name() == QLatin1String("label")) {
       m.color_label = attr.value().toInt();
+    } else if (attr.name() == QLatin1String("duration")) {
+      m.duration = qMax(0L, attr.value().toLong());
     }
   }
   return m;

@@ -1184,9 +1184,10 @@ static bool snap_to_clip_points(Timeline* tl, const ClipPtr& c, long* l, bool pr
     return true;
   }
   for (int j = 0; j < c->get_markers().size(); j++) {
-    if (tl->snap_to_point(c->get_markers().at(j).frame + c->timeline_in() - c->clip_in(), l)) {
-      return true;
-    }
+    const Marker& m = c->get_markers().at(j);
+    long marker_time = m.frame + c->timeline_in() - c->clip_in();
+    if (tl->snap_to_point(marker_time, l)) return true;
+    if (m.duration > 0 && tl->snap_to_point(marker_time + m.duration, l)) return true;
   }
   return false;
 }
@@ -1208,6 +1209,7 @@ bool Timeline::toolSupportsInsert() const {
 bool Timeline::snap_to_markers(long* l) {
   for (const auto& marker : amber::ActiveSequence->markers) {
     if (snap_to_point(marker.frame, l)) return true;
+    if (marker.duration > 0 && snap_to_point(marker.frame + marker.duration, l)) return true;
   }
   return false;
 }

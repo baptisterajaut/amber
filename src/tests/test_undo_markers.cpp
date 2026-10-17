@@ -42,6 +42,7 @@ class TestUndoMarkers : public QObject {
   void addAtExistingTimeRenames();
   void moveRedoUndo();
   void moveUndoSurvivesReallocation();
+  void resizeRedoUndo();
   void deleteIsIndexOrderIndependent();
   void undoAfterSaveMarksModified();
 };
@@ -100,6 +101,29 @@ void TestUndoMarkers::moveUndoSurvivesReallocation() {
   QCOMPARE(markers.at(1).frame, 10L);
   move.redo();
   QCOMPARE(markers.at(1).frame, 35L);
+}
+
+// Resizing changes only the duration; moving a range marker afterwards keeps it
+void TestUndoMarkers::resizeRedoUndo() {
+  QVector<Marker> markers = make_markers(2);
+  ResizeMarkerAction resize(&markers, 1, 0, 45);
+  resize.redo();
+  QCOMPARE(markers.at(1).duration, 45L);
+  QCOMPARE(markers.at(1).frame, 10L);
+  QCOMPARE(markers.at(0).duration, 0L);
+  MoveMarkerAction move(&markers, 1, 10, 20);
+  move.redo();
+  QCOMPARE(markers.at(1).duration, 45L);
+  move.undo();
+  resize.undo();
+  QCOMPARE(markers.at(1).duration, 0L);
+  resize.redo();
+  QCOMPARE(markers.at(1).duration, 45L);
+
+  ResizeMarkerAction out_of_range(&markers, 5, 0, 10);  // index went stale: no crash, nothing touched
+  out_of_range.redo();
+  out_of_range.undo();
+  QCOMPARE(markers.size(), 2);
 }
 
 void TestUndoMarkers::deleteIsIndexOrderIndependent() {

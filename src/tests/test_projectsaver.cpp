@@ -44,7 +44,7 @@ QString fixture(const QString& url, const QString& footage) {
     </folders>
     <media>
         <footage id="1" folder="1" name="clip" url="%3">
-            <marker frame="3" name="footage marker"/>
+            <marker frame="3" name="footage marker" duration="-4"/>
         </footage>
     </media>
     <sequences>
@@ -56,13 +56,14 @@ QString fixture(const QString& url, const QString& footage) {
             </clip>
             <clip id="1" enabled="1" name="title" clipin="0" in="0" out="30" track="-2" r="192" g="128" b="128"
                   autoscale="1" speed="1" maintainpitch="0" reverse="0">
-                <marker frame="2" name="clip marker"/>
+                <marker frame="2" name="clip marker" duration="10"/>
                 <linked><link id="0"/></linked>
                 <opening length="10" name="/Cross Dissolve" enabled="1"></opening>
                 <effect name="Distort/Transform" enabled="1"></effect>
                 <effect name="Render/Text" enabled="1"></effect>
             </clip>
-            <marker frame="5" name="sequence marker" label="3"/>
+            <marker frame="5" name="sequence marker" label="3" duration="45"/>
+            <marker frame="60" name="point marker"/>
         </sequence>
         <sequence id="2" folder="0" name="Outer" width="64" height="64" framerate="30" afreq="48000" alayout="3"
                   open="1">
@@ -228,6 +229,16 @@ class TestProjectSaver : public QObject {
     QVERIFY(fb.open(QFile::ReadOnly));
     const QByteArray ba = fa.readAll(), bb = fb.readAll();
     QVERIFY2(ba == bb, qPrintable(first_difference(ba, bb)));
+    // Range markers write a duration, point markers don't (the negative footage one loads as a point marker)
+    int marker_durations = 0;
+    for (const QByteArray& line : ba.split('\n')) {
+      if (line.contains("<marker ") && line.contains(" duration=")) marker_durations++;
+    }
+    QCOMPARE(marker_durations, 2);
+    QVERIFY(ba.contains(R"(name="sequence marker" label="3" duration="45")"));
+    QVERIFY(ba.contains(R"(name="clip marker" duration="10")"));
+    QVERIFY(ba.contains(R"(name="point marker"/>)"));
+    QVERIFY(ba.contains(R"(name="footage marker"/>)"));
 
     // The reloaded model holds what was set
     title = title_clip();
@@ -245,17 +256,21 @@ class TestProjectSaver : public QObject {
     QVERIFY(title->opening_transition != nullptr);
     QCOMPARE(title->opening_transition->get_true_length(), 10);
     QCOMPARE(title->get_markers().size(), 1);
+    QCOMPARE(title->get_markers().at(0).duration, 10L);
     QCOMPARE(title->linked.size(), 1);
 
     SequencePtr inner = find_media("Inner")->to_sequence();
     QCOMPARE(inner->guides.size(), 1);
-    QCOMPARE(inner->markers.size(), 1);
+    QCOMPARE(inner->markers.size(), 2);
     QCOMPARE(inner->markers.at(0).color_label, 3);
+    QCOMPARE(inner->markers.at(0).duration, 45L);
+    QCOMPARE(inner->markers.at(1).duration, 0L);
     SequencePtr outer2 = find_media("Outer")->to_sequence();
     QCOMPARE(outer2->clips.size(), 1);
     QVERIFY(outer2->clips.at(0)->media() != nullptr);
     QCOMPARE(outer2->clips.at(0)->media()->to_sequence(), inner);
     QCOMPARE(find_media("clip")->to_footage()->markers.size(), 1);
+    QCOMPARE(find_media("clip")->to_footage()->markers.at(0).duration, 0L);
   }
 
   // A new effect shows its defaults: otherwise its reset arrows are lit before any edit and Reset changes the
