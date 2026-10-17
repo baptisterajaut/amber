@@ -206,6 +206,8 @@ void Config::load(QString path) {
 void Config::save(QString path) {
   // Temp file + rename on commit(): a failed write keeps the previous config instead of truncating it
   QSaveFile f(path);
+  // A writable file in a read-only directory has no room for the temp file: write it in place there, as before
+  f.setDirectWriteFallback(true);
   if (!f.open(QIODevice::WriteOnly)) {
     qCritical() << "Could not save configuration";
     return;
