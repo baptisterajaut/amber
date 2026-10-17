@@ -430,6 +430,8 @@ set(OLIVE_EFFECTS
   effects/shaders/crop.xml
   effects/shaders/crossstitch.frag
   effects/shaders/crossstitch.xml
+  effects/shaders/despill.frag
+  effects/shaders/despill.xml
   effects/shaders/directionalblur.frag
   effects/shaders/directionalblur.xml
   effects/shaders/dropshadow.xml.disabled
