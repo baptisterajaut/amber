@@ -382,6 +382,12 @@ QByteArray TestRenderHarness::render_frame(Sequence* seq, long playhead) {
 
   // Now safe to delete transient pipelines/SRBs/UBOs that compose_sequence created.
   // Production code does the same drain in DeferRhiResourceDeletion's consumer.
+  last_transient_pipelines_and_buffers_ = 0;
+  for (QRhiResource* r : params.transientResources) {
+    if (r->resourceType() == QRhiResource::GraphicsPipeline || r->resourceType() == QRhiResource::Buffer) {
+      last_transient_pipelines_and_buffers_++;
+    }
+  }
   qDeleteAll(params.transientResources);
   params.transientResources.clear();
   cache_->endFrame();

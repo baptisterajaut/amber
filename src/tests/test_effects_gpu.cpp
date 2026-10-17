@@ -30,6 +30,7 @@ class TestEffectsGpu : public QObject {
   void multiEffectChain();
   void multiFrameConsistency();
   void sceneSwitchConsistency();
+  void steadyStateCreatesNothing();
 
   void effectPassthroughSweep_data();
   void effectPassthroughSweep();
@@ -365,6 +366,55 @@ void TestEffectsGpu::sceneSwitchConsistency() {
   h_->assert_pixel(b1, 64, 32, 32, QColor(35, 10, 120, 255), 2);
   QVERIFY(a1 != b1);  // the switch really changes what the pooled buffers hold
   QCOMPARE(a2, a1);
+}
+
+void TestEffectsGpu::steadyStateCreatesNothing() {
+  // After warm-up, frames of an unchanged scene must create no pipeline and no buffer: neither through the cache
+  // (cache_stats) nor per pass outside it (pipelines/buffers left in transientResources).
+  auto check_steady = [this](Sequence* seq, long first, long step, const char* scene) {
+    h_->render_frame(seq, first);
+    h_->render_frame(seq, first + step);  // warm-up
+    const RhiResourceCache::Stats before = h_->cache_stats();
+    for (int i = 2; i < 12; i++) {
+      QVERIFY(!h_->render_frame(seq, first + i * step).isEmpty());
+      QVERIFY2(h_->last_frame_transient_pipelines_and_buffers() == 0,
+               qPrintable(QStringLiteral("%1: frame %2 created %3 pipelines/buffers outside the cache")
+                              .arg(scene)
+                              .arg(i)
+                              .arg(h_->last_frame_transient_pipelines_and_buffers())));
+    }
+    const RhiResourceCache::Stats after = h_->cache_stats();
+    QVERIFY2(after.pipelinesCreated == before.pipelinesCreated && after.buffersCreated == before.buffersCreated,
+             qPrintable(QStringLiteral("%1: steady state created %2 pipelines, %3 buffers")
+                            .arg(scene)
+                            .arg(after.pipelinesCreated - before.pipelinesCreated)
+                            .arg(after.buffersCreated - before.buffersCreated)));
+    QVERIFY(after.pipelinesCreated > 0);  // the cache is actually in use
+  };
+
+  // Generator clip + two XML effects: render_clip_to_backbuffer, rhi_blit and rhi_blit_srcover
+  SequencePtr seq = h_->make_sequence(64, 64, 30);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(200, 40, 20));
+  h_->attach_xml_shader(c, "Box Blur");
+  h_->attach_xml_shader(c, "Hue/Saturation/Brightness");
+  check_steady(seq.get(), 5, 1, "generator");
+  if (QTest::currentTestFailed()) return;
+
+  // Decoded footage: the YUV->RGB pass in Clip::retrieveYuvGpuPath (1-frame fixtures, so stay on frame 0)
+  if (avcodec_find_decoder(AV_CODEC_ID_H264)) {
+    SequencePtr yuv = h_->make_sequence(64, 64, 30);
+    h_->add_video_clip(yuv.get(), 0, 30,
+                       h_->import_video_media(SOURCE_DIR "/tests/fixtures/t1_yuv_input.mp4", 64, 64, 30));
+    check_steady(yuv.get(), 0, 0, "yuv420p");
+    if (QTest::currentTestFailed()) return;
+  }
+  if (avcodec_find_decoder(AV_CODEC_ID_RAWVIDEO)) {
+    SequencePtr nv12 = h_->make_sequence(64, 64, 30);
+    h_->add_video_clip(nv12.get(), 0, 30,
+                       h_->import_video_media(SOURCE_DIR "/tests/fixtures/t2_nv12_input.mkv", 64, 64, 30));
+    check_steady(nv12.get(), 0, 0, "nv12");
+  }
 }
 
 void TestEffectsGpu::transformTranslate() {

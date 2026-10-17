@@ -34,6 +34,7 @@
 #include "project/media.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
+#include "rendering/rhiresourcecache.h"
 #include "sequence.h"
 
 extern "C" {
@@ -636,12 +637,10 @@ bool Clip::retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceP
     memcpy(fragData.data() + 4, &color_space_val, 4);
     memcpy(fragData.data() + 8, &color_range_val, 4);
 
-    QRhiBuffer* yuvVbuf = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
-    yuvVbuf->create();
-    QRhiBuffer* yuvVertUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 64);
-    yuvVertUbo->create();
-    QRhiBuffer* yuvFragUbo = rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 16);
-    yuvFragUbo->create();
+    // Per-pass buffers pooled across frames by params->cache (dynamic buffers are not snapshotted at record time)
+    QRhiBuffer* yuvVbuf = params->cache->dynamicBuffer(QRhiBuffer::VertexBuffer, 4 * 4 * sizeof(float));
+    QRhiBuffer* yuvVertUbo = params->cache->dynamicBuffer(QRhiBuffer::UniformBuffer, 64);
+    QRhiBuffer* yuvFragUbo = params->cache->dynamicBuffer(QRhiBuffer::UniformBuffer, 16);
 
     QRhiSampler* sampler = params->sampler;
     QRhiTexture* vTex = yuv_tex_v ? yuv_tex_v : yuv_tex_u;
@@ -656,23 +655,12 @@ bool Clip::retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceP
     });
     srb->create();
 
-    QRhiGraphicsPipeline* pipeline = rhi->newGraphicsPipeline();
-    pipeline->setShaderStages(
-        {{QRhiShaderStage::Vertex, params->passthroughVert}, {QRhiShaderStage::Fragment, params->yuvFrag}});
-    QRhiVertexInputLayout inputLayout;
-    inputLayout.setBindings({{4 * sizeof(float)}});
-    inputLayout.setAttributes({
-        {0, 0, QRhiVertexInputAttribute::Float2, 0},
-        {0, 1, QRhiVertexInputAttribute::Float2, 2 * sizeof(float)},
-    });
-    pipeline->setVertexInputLayout(inputLayout);
-    pipeline->setTopology(QRhiGraphicsPipeline::TriangleStrip);
-    QRhiGraphicsPipeline::TargetBlend noBlend;
-    noBlend.enable = false;
-    pipeline->setTargetBlends({noBlend});
-    pipeline->setShaderResourceBindings(srb);
-    pipeline->setRenderPassDescriptor(yuv_rpd);
-    pipeline->create();
+    // Cached pipeline (looked up every frame, never stored). Three textures on both paths: NV12 binds its UV
+    // plane at 3 and again at 4 (vTex above), so the SRB shape is the same as YUV420P.
+    RhiResourceCache::SrbLayout layout;
+    layout.textures = 3;
+    QRhiGraphicsPipeline* pipeline = params->cache->pipeline(params->passthroughVert, params->yuvFrag,
+                                                             RhiResourceCache::Blend::None, layout, yuv_rpd);
 
     float blitQuad[] = {-1, -1, 0, 0, -1, 1, 0, 1, 1, -1, 1, 0, 1, 1, 1, 1};
     QMatrix4x4 mvp = rhi->clipSpaceCorrMatrix();
@@ -683,19 +671,18 @@ bool Clip::retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceP
     u->updateDynamicBuffer(yuvFragUbo, 0, 16, fragData.constData());
 
     cb->beginPass(yuv_rt, QColor(0, 0, 0, 0), {1.0f, 0}, u);
-    cb->setGraphicsPipeline(pipeline);
-    cb->setViewport({0, 0, float(w), float(h)});
-    cb->setShaderResources(srb);
-    const QRhiCommandBuffer::VertexInput vbufBinding(yuvVbuf, 0);
-    cb->setVertexInput(0, 1, &vbufBinding);
-    cb->draw(4);
+    if (pipeline) {
+      cb->setGraphicsPipeline(pipeline);
+      cb->setViewport({0, 0, float(w), float(h)});
+      cb->setShaderResources(srb);
+      const QRhiCommandBuffer::VertexInput vbufBinding(yuvVbuf, 0);
+      cb->setVertexInput(0, 1, &vbufBinding);
+      cb->draw(4);
+    }
     cb->endPass();
 
-    params->transientResources.append(pipeline);
+    // The SRB must survive until endOffscreenFrame(); pipeline and buffers belong to params->cache
     params->transientResources.append(srb);
-    params->transientResources.append(yuvVbuf);
-    params->transientResources.append(yuvVertUbo);
-    params->transientResources.append(yuvFragUbo);
   }
 
   cached_rhi_tex = yuv_converted_tex;
