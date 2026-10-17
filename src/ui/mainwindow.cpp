@@ -131,6 +131,7 @@ void MainWindow::setup_layout(bool reset) {
     addDockWidget(Qt::TopDockWidgetArea, panel_sequence_viewer);
     addDockWidget(Qt::BottomDockWidgetArea, panel_timeline);
     tabifyDockWidget(panel_project, panel_undo_history);
+    tabifyDockWidget(panel_effect_controls, panel_scopes);
 
     panel_project->show();
     panel_effect_controls->show();
@@ -139,6 +140,7 @@ void MainWindow::setup_layout(bool reset) {
     panel_timeline->show();
     panel_graph_editor->hide();
     panel_undo_history->hide();
+    panel_scopes->hide();
 
     panel_project->setFloating(false);
     panel_effect_controls->setFloating(false);
@@ -788,6 +790,11 @@ void MainWindow::setup_menus() {
   window_undo_history_action->setCheckable(true);
   window_undo_history_action->setData(reinterpret_cast<quintptr>(panel_undo_history));
 
+  window_scopes_action =
+      MenuHelper::create_menu_action(window_menu, "panelscopes", this, SLOT(toggle_panel_visibility()));
+  window_scopes_action->setCheckable(true);
+  window_scopes_action->setData(reinterpret_cast<quintptr>(panel_scopes));
+
   window_menu->addSeparator();
 
   maximize_panel_ =
@@ -1025,6 +1032,7 @@ void MainWindow::Retranslate() {
   window_footageviewer_action->setText(tr("Media Viewer"));
   window_sequenceviewer_action->setText(tr("Sequence Viewer"));
   window_undo_history_action->setText(tr("Undo History"));
+  window_scopes_action->setText(tr("Scopes"));
 
   maximize_panel_->setText(tr("Maximize Panel"));
   lock_panels_->setText(tr("Lock Panels"));

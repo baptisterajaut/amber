@@ -9,6 +9,8 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 - **Half resolution while scrubbing**, in Preferences > Playback (Auto by default): when the viewer can't keep up while you drag the playhead, scrub frames render at half the preview resolution, and the frame is redrawn sharp a moment after you stop. Always and Never are there too.
 - **Undo history with times**: each step in the Undo History panel shows when it was done. Clicking a step goes back to it.
 - **Timer and Progress Bar generators**, in the timeline's Add menu (and in the effect list, under Render): a timer that counts up from the clip's start or down to 0 at its end, in minutes:seconds, hours, seconds or hundredths, with an optional prefix; and a bar along the bottom or top edge that fills over the clip's duration or follows a keyframeable value. Trimming the start of the clip doesn't make either jump.
+- **Drop Shadow effect** (under Stylize): the shadow is cast by the clip as it appears in the frame, so a scaled-down opaque video (picture-in-picture) gets one too, and it follows Corner Pin and keyed shapes. Colour, opacity, direction, distance and softness, all keyframeable; it looks the same in the viewer at any preview resolution and in the export.
+- **Scopes panel**, in Window > Scopes: a luma waveform, RGB parade, histogram or vectorscope (with 75% colour bar targets and a skin-tone line) of the sequence viewer's frame, updated as you scrub or play. It costs nothing while hidden or behind another tab.
 - **Gradient text**: the Gradient effect's new "As Mask" option fills the letters of the Text or Rich Text effect above it with the gradient. "Ignore Text Shadow" keeps the shadow in its own colour.
 - **Richer clip tooltip**: hovering a clip also shows its source file, speed and colour label.
 - **Vertical sequence presets**: 4K, 1080p and 720p portrait in New Sequence, for phone video.
@@ -30,7 +32,7 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 ## Under the hood
 
 - The engine is separated from the interface and builds as a library of its own, so rendering can be tested without a window.
-- A GPU test suite renders about 185 effect and decode cases on a real Qt RHI backend (OpenGL and Vulkan), to catch rendering regressions before they ship.
+- A GPU test suite renders about 195 effect and decode cases on a real Qt RHI backend (OpenGL and Vulkan), to catch rendering regressions before they ship.
 - Rendering reuses its GPU pipelines and buffers from one frame to the next instead of recreating them: a frame with effects composites about a third faster on OpenGL.
 - Decoded video frames are copied into buffers that each clip keeps, instead of new memory every frame.
 - The timeline drawing and mouse handling code was split into much smaller functions. This is the part of 2.0 most likely to hide regressions: if something in the timeline behaves differently from 1.x, please open an issue.

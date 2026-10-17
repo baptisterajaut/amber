@@ -87,7 +87,9 @@ class TestRenderHarness {
   // QFAIL on RHI errors (caller's QTest slot reports failure). A frame whose clip
   // texture failed (footage not decoded in time) is re-rendered up to 5 times,
   // 20 ms apart; the last attempt is returned.
-  QByteArray render_frame(Sequence* seq, long playhead);
+  // divider > 1 renders at the preview resolution RenderThread uses (w/divider x h/divider, at least 1x1): the
+  // readback is that size, so pass w/divider to the pixel helpers.
+  QByteArray render_frame(Sequence* seq, long playhead, int divider = 1);
 
   // Build a `Media*` of type MEDIA_TYPE_FOOTAGE backed by an on-disk video file
   // (e.g. a committed .mp4 fixture). The harness owns the MediaPtr+FootagePtr —
@@ -104,6 +106,10 @@ class TestRenderHarness {
   // clip's source is the decoded footage, not a GPU generator. Returns a
   // non-owning Clip*.
   Clip* add_video_clip(Sequence* seq, long in, long out, Media* media);
+
+  // Add a nested-sequence clip of `inner` on `seq`'s top video track (-1), with the default Transform. The harness
+  // owns the Media wrapping `inner` (and so keeps `inner` alive). Returns a non-owning Clip*.
+  Clip* add_nested_clip(Sequence* seq, const SequencePtr& inner, long in, long out);
 
   // Add an audio generator clip on an audio track (track >= 0). No media,
   // no Transform (video-only). Attaches the requested audio generator
@@ -148,7 +154,7 @@ class TestRenderHarness {
 
  private:
   // One compose + readback; texture_failed = compose_sequence() could not get a clip's texture
-  QByteArray render_frame_once(Sequence* seq, long playhead, bool& texture_failed);
+  QByteArray render_frame_once(Sequence* seq, long playhead, int divider, bool& texture_failed);
   void load_core_shaders();
   void ensure_buffers(int w, int h);  // allocate or re-allocate if size changed
   void release_buffers();
@@ -158,7 +164,7 @@ class TestRenderHarness {
   std::unique_ptr<QVulkanInstance> vulkan_instance_;  // Vulkan backend only; must outlive rhi_
 #endif
   std::unique_ptr<QRhi> rhi_;
-  QShader passthrough_vert_, passthrough_frag_, blending_frag_, premultiply_frag_, yuv_frag_;
+  QShader passthrough_vert_, passthrough_frag_, blending_frag_, premultiply_frag_, yuv_frag_, shadow_frag_;
   QRhiSampler* sampler_ = nullptr;
   std::unique_ptr<RhiResourceCache> cache_;
   int last_transient_pipelines_and_buffers_ = 0;

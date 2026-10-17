@@ -24,6 +24,7 @@
 #include "effectcontrols.h"
 #include "grapheditor.h"
 #include "project.h"
+#include "scopespanel.h"
 #include "timeline.h"
 #include "undohistorypanel.h"
 #include "viewer.h"
@@ -35,6 +36,7 @@ extern Viewer* panel_footage_viewer;
 extern Timeline* panel_timeline;
 extern GraphEditor* panel_graph_editor;
 extern UndoHistoryPanel* panel_undo_history;
+extern ScopesPanel* panel_scopes;
 
 void update_ui(bool modified, bool scrubbing = false);
 QDockWidget* get_focused_panel(bool force_hover = false);

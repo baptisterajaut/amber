@@ -53,6 +53,14 @@ class TestEffectsGpu : public QObject {
   void cornerpinDistorts();
   void cornerpinDefaultsPassthrough();
   void cornerpinMovesOneCorner();
+  void dropShadowHardPip();
+  void dropShadowOverOpaqueTrack();
+  void dropShadowDirection();
+  void dropShadowSoft();
+  void dropShadowOpacityZeroDrawsNothing();
+  void dropShadowTransparentClipCastsNothing();
+  void dropShadowNested();
+  void dropShadowPreviewDivider();
   void subtitleActiveEntry();
   void subtitleOutlineSurroundsText();
   void gradientRendersTwoStops();
@@ -321,6 +329,29 @@ inline bool buffers_within(const QByteArray& a, const QByteArray& b, int toleran
   return true;
 }
 
+// Drop Shadow tests' PiP scene, see the Drop Shadow section
+Clip* add_red_pip(TestRenderHarness* h, Sequence* seq, int track) {
+  Clip* c = h->add_generator_clip(seq, track, 0, 30, EFFECT_INTERNAL_SOLID);
+  h->set_field_color(c->effects[1].get(), 2, 0, QColor(255, 0, 0, 255));
+  h->set_field_double(c->effects[0].get(), 1, 0, 50.0);  // scalex (uniform)
+  h->set_field_double(c->effects[0].get(), 1, 1, 50.0);  // scaley
+  return c;
+}
+
+// Distance of an (8, 8) px offset at 135°
+constexpr double kDiagonal8 = 8.0 * M_SQRT2;
+
+Effect* add_shadow(TestRenderHarness* h, Clip* c, double direction, double softness = 0.0, double opacity = 100.0,
+                   double distance = kDiagonal8) {
+  EffectPtr shadow = h->attach_internal(c, EFFECT_INTERNAL_DROPSHADOW, EFFECT_TYPE_EFFECT);
+  h->set_field_color(shadow.get(), 0, 0, QColor(0, 0, 0, 255));
+  h->set_field_double(shadow.get(), 1, 0, opacity);
+  h->set_field_double(shadow.get(), 2, 0, direction);
+  h->set_field_double(shadow.get(), 3, 0, distance);
+  h->set_field_double(shadow.get(), 4, 0, softness);
+  return shadow.get();
+}
+
 // Writes a 3D .cube LUT of `size`^3 entries, red fastest, mapping each grid point through `fn`.
 bool write_cube(const QString& path, int size, const std::function<QVector3D(QVector3D)>& fn) {
   QFile f(path);
@@ -483,6 +514,13 @@ void TestEffectsGpu::steadyStateCreatesNothing() {
   QVERIFY2(orig != nullptr, "Glow after Box Blur should snapshot its input into ClipRhiResources::orig");
   QVERIFY(!h_->render_frame(seq.get(), 20).isEmpty());
   QCOMPARE(static_cast<ClipRhiResources*>(c->fbo_rhi)->orig, orig);
+
+  // Drop Shadow: both blur passes (scratch = the clip's free ping-pong texture) and the offset srcover
+  SequencePtr shadowed = h_->make_sequence(64, 64, 30);
+  add_shadow(h_.get(), add_red_pip(h_.get(), shadowed.get(), -1), 135.0, 10.0);
+  check_steady(shadowed.get(), 5, 1, "drop shadow", frame0);
+  if (QTest::currentTestFailed()) return;
+  QVERIFY2(alpha_of(frame0, 64, 50, 50) > 150, "drop shadow scene drew no shadow");
 
   // Superimpose generator redrawn on every frame (AlwaysUpdate): an image upload per frame, nothing else
   SequencePtr bar = h_->make_sequence(64, 64, 30);
@@ -925,6 +963,142 @@ void TestEffectsGpu::cornerpinMovesOneCorner() {
                           .arg(alpha_of(pixels, 64, 48, 20))));
   h_->assert_pixel(pixels, 64, 4, 60, QColor(50, 100, 150, 255), 3);
   h_->assert_pixel(pixels, 64, 16, 40, QColor(50, 100, 150, 255), 3);
+}
+
+// ---------------------------------------------------------------------------
+// Drop Shadow (drawn by compose_sequence between the clip's back-buffer render and its blend)
+// ---------------------------------------------------------------------------
+//
+// Rows (dropshadoweffect.cpp): 0 color, 1 opacity, 2 direction, 3 distance, 4 softness. PiP scene: opaque red Solid
+// scaled to 50 % and centred, so the clip covers x,y 16..47 of 64x64; a hard shadow at 135° and distance 8·√2
+// (offset (8, 8), whole pixels so its edges are crisp) covers 24..55. Direction is clockwise from straight up on
+// screen: 90° = right, 0° = up.
+
+void TestEffectsGpu::dropShadowHardPip() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_shadow(h_.get(), add_red_pip(h_.get(), seq.get(), -1), 135.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 50, 50, QColor(0, 0, 0, 255));    // shadow only
+  h_->assert_pixel(pixels, 64, 52, 30, QColor(0, 0, 0, 255));    // right of the clip
+  h_->assert_pixel(pixels, 64, 30, 52, QColor(0, 0, 0, 255));    // below the clip
+  h_->assert_pixel(pixels, 64, 60, 60, QColor(0, 0, 0, 0));      // past the shadow
+  h_->assert_pixel(pixels, 64, 20, 52, QColor(0, 0, 0, 0));      // below the clip, left of the shadow
+  h_->assert_pixel(pixels, 64, 20, 20, QColor(255, 0, 0, 255));  // clip only
+  h_->assert_pixel(pixels, 64, 40, 40, QColor(255, 0, 0, 255));  // clip over its own shadow
+}
+
+void TestEffectsGpu::dropShadowOverOpaqueTrack() {
+  // Blue on V1, the shadowed clip on V2 at shadow opacity 50 %: the shadow darkens the blue by half
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* blue = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(blue->effects[1].get(), 2, 0, QColor(0, 0, 255, 255));
+  add_shadow(h_.get(), add_red_pip(h_.get(), seq.get(), -2), 135.0, 0.0, 50.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 50, 50, QColor(0, 0, 128, 255), 2);
+  h_->assert_pixel(pixels, 64, 60, 60, QColor(0, 0, 255, 255));
+  h_->assert_pixel(pixels, 64, 40, 40, QColor(255, 0, 0, 255));
+}
+
+void TestEffectsGpu::dropShadowDirection() {
+  // 90°: shadow covers x 24..55, y 16..47 (right only). 0°: x 16..47, y 8..39 (up only).
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* shadow = add_shadow(h_.get(), add_red_pip(h_.get(), seq.get(), -1), 90.0, 0.0, 100.0, 8.0);
+  QByteArray right = h_->render_frame(seq.get(), 0);
+  QVERIFY(!right.isEmpty());
+  h_->assert_pixel(right, 64, 52, 32, QColor(0, 0, 0, 255));
+  h_->assert_pixel(right, 64, 32, 52, QColor(0, 0, 0, 0));
+  h_->assert_pixel(right, 64, 32, 12, QColor(0, 0, 0, 0));
+  h_->assert_pixel(right, 64, 10, 32, QColor(0, 0, 0, 0));
+
+  h_->set_field_double(shadow, 2, 0, 0.0);
+  QByteArray up = h_->render_frame(seq.get(), 0);
+  QVERIFY(!up.isEmpty());
+  h_->assert_pixel(up, 64, 32, 12, QColor(0, 0, 0, 255));
+  h_->assert_pixel(up, 64, 32, 52, QColor(0, 0, 0, 0));
+  h_->assert_pixel(up, 64, 52, 32, QColor(0, 0, 0, 0));
+}
+
+void TestEffectsGpu::dropShadowSoft() {
+  // Softness 10 = sigma 10/3 px: the hard shadow's last column (x = 55) is about half covered, (50,50) almost fully
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_shadow(h_.get(), add_red_pip(h_.get(), seq.get(), -1), 135.0, 10.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  const int edge = alpha_of(pixels, 64, 55, 40);
+  QVERIFY2(edge >= 90 && edge <= 170, qPrintable(QString("alpha at the blurred edge (55,40) = %1").arg(edge)));
+  const int inner = alpha_of(pixels, 64, 50, 50);
+  QVERIFY2(inner > 150, qPrintable(QString("alpha inside the soft shadow (50,50) = %1").arg(inner)));
+  QVERIFY2(alpha_of(pixels, 64, 63, 40) < edge,
+           qPrintable(QString("alpha past the edge (63,40) = %1").arg(alpha_of(pixels, 64, 63, 40))));
+  const Rgba c = pixel_at(pixels, 64, 55, 40);
+  QVERIFY2(c.r <= 2 && c.g <= 2 && c.b <= 2,
+           qPrintable(QString("black shadow got (%1,%2,%3)").arg(c.r).arg(c.g).arg(c.b)));
+  h_->assert_pixel(pixels, 64, 32, 32, QColor(255, 0, 0, 255));
+}
+
+void TestEffectsGpu::dropShadowOpacityZeroDrawsNothing() {
+  // Same pixels as without the effect, and no shadow pass recorded: the scene creates exactly the pipelines and
+  // buffers of the scene without it (a skipped pass looks up neither)
+  auto plain = h_->make_sequence(64, 64, 30.0);
+  add_red_pip(h_.get(), plain.get(), -1);
+  h_->reset_cache();
+  QByteArray expected = h_->render_frame(plain.get(), 0);
+  const RhiResourceCache::Stats plain_stats = h_->cache_stats();
+
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_shadow(h_.get(), add_red_pip(h_.get(), seq.get(), -1), 135.0, 10.0, 0.0);
+  h_->reset_cache();
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  const RhiResourceCache::Stats stats = h_->cache_stats();
+  QVERIFY(!expected.isEmpty());
+  QCOMPARE(pixels, expected);
+  QCOMPARE(stats.pipelinesCreated, plain_stats.pipelinesCreated);
+  QCOMPARE(stats.buffersCreated, plain_stats.buffersCreated);
+}
+
+void TestEffectsGpu::dropShadowTransparentClipCastsNothing() {
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = add_red_pip(h_.get(), seq.get(), -1);
+  h_->set_field_double(c->effects[1].get(), 1, 0, 0.0);  // Solid opacity 0
+  add_shadow(h_.get(), c, 135.0, 10.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  QVERIFY2(pixels == QByteArray(pixels.size(), '\0'), "a transparent clip must cast no shadow");
+}
+
+void TestEffectsGpu::dropShadowNested() {
+  // A shadow on an inner clip (drawn into the nest accumulator), then one on the nest clip itself (outer back buffer)
+  auto inner = h_->make_sequence(64, 64, 30.0);
+  Effect* inner_shadow = add_shadow(h_.get(), add_red_pip(h_.get(), inner.get(), -1), 135.0);
+  auto outer = h_->make_sequence(64, 64, 30.0);
+  Clip* nest = h_->add_nested_clip(outer.get(), inner, 0, 30);
+  QByteArray pixels = h_->render_frame(outer.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 50, 50, QColor(0, 0, 0, 255));
+  h_->assert_pixel(pixels, 64, 40, 40, QColor(255, 0, 0, 255));
+  h_->assert_pixel(pixels, 64, 60, 60, QColor(0, 0, 0, 0));
+  if (QTest::currentTestFailed()) return;
+
+  inner_shadow->SetEnabled(false);
+  add_shadow(h_.get(), nest, 135.0);
+  pixels = h_->render_frame(outer.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  h_->assert_pixel(pixels, 64, 50, 50, QColor(0, 0, 0, 255));
+  h_->assert_pixel(pixels, 64, 40, 40, QColor(255, 0, 0, 255));
+  h_->assert_pixel(pixels, 64, 60, 60, QColor(0, 0, 0, 0));
+}
+
+void TestEffectsGpu::dropShadowPreviewDivider() {
+  // Half preview resolution (32x32): clip 8..23, the 8 px shadow offset halves to 4, so the shadow covers 12..27
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_shadow(h_.get(), add_red_pip(h_.get(), seq.get(), -1), 135.0);
+  QByteArray pixels = h_->render_frame(seq.get(), 0, 2);
+  QCOMPARE(pixels.size(), 32 * 32 * 4);
+  h_->assert_pixel(pixels, 32, 25, 25, QColor(0, 0, 0, 255));
+  h_->assert_pixel(pixels, 32, 30, 30, QColor(0, 0, 0, 0));
+  h_->assert_pixel(pixels, 32, 20, 20, QColor(255, 0, 0, 255));
 }
 
 void TestEffectsGpu::subtitleActiveEntry() {

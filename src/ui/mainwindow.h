@@ -337,6 +337,7 @@ class MainWindow : public QMainWindow {
   QAction* window_footageviewer_action;
   QAction* window_sequenceviewer_action;
   QAction* window_undo_history_action;
+  QAction* window_scopes_action;
 
   QAction* maximize_panel_;
   QAction* lock_panels_;
