@@ -82,6 +82,35 @@ class TestPixelSampler : public QObject {
     g.sequence = QSize();
     QVERIFY(!amber::map_viewer_point(g, QPointF(10, 10), QSize(1920, 1080), &p));
   }
+  void frameRectFollowsZoomAndScroll() {
+    QCOMPARE(amber::viewer_frame_rect(fitted()), QRectF(0, 0, 960, 540));
+    ViewerFrameGeometry g = fitted();
+    g.zoom = 2.0;
+    QCOMPARE(amber::viewer_frame_rect(g), QRectF(0, 0, 3840, 2160));  // scroll 0: top-left corner in view
+    g.x_scroll = 1.0;
+    g.y_scroll = 0.25;
+    QCOMPARE(amber::viewer_frame_rect(g), QRectF(-2880, -405, 3840, 2160));
+    g.sequence = QSize();
+    QVERIFY(amber::viewer_frame_rect(g).isEmpty());
+  }
+  void overlayPointsStayOnThePicture() {
+    // Guides, gizmos and the title safe area are drawn at sequence_to_viewer(); their hit tests invert it
+    ViewerFrameGeometry g = fitted();
+    g.zoom = 2.0;
+    g.x_scroll = 1.0;
+    g.y_scroll = 1.0;  // scrolled to the bottom-right corner
+    QCOMPARE(amber::sequence_to_viewer(g, QPointF(1920, 1080)), QPointF(960, 540));
+    QCOMPARE(amber::sequence_to_viewer(g, QPointF(1440, 810)), QPointF(0, 0));
+    QCOMPARE(amber::viewer_to_sequence(g, QPointF(480, 270)), QPointF(1680, 945));
+    g.y_scroll = 0.0;  // top: the frame's top row on the widget's, not its bottom one
+    QCOMPARE(amber::sequence_to_viewer(g, QPointF(1440, 0)), QPointF(0, 0));
+    QCOMPARE(amber::viewer_to_sequence(g, QPointF(960, 540)), QPointF(1920, 270));
+    // Fitted: plain scale, and off-frame points stay unclamped (a guide dragged off the frame)
+    QCOMPARE(amber::sequence_to_viewer(fitted(), QPointF(1920, 1080)), QPointF(960, 540));
+    QCOMPARE(amber::viewer_to_sequence(fitted(), QPointF(-10, 600)), QPointF(-20, 1200));
+    g.widget = QSizeF();
+    QCOMPARE(amber::viewer_to_sequence(g, QPointF(10, 10)), QPointF());
+  }
 };
 
 QTEST_GUILESS_MAIN(TestPixelSampler)
