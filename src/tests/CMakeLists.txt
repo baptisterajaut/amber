@@ -22,6 +22,11 @@ target_include_directories(amber-test-scrub-resolution PRIVATE ${CMAKE_SOURCE_DI
 target_link_libraries(amber-test-scrub-resolution PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-scrub-resolution COMMAND amber-test-scrub-resolution)
 
+add_executable(amber-test-fps-meter test_fps_meter.cpp)
+target_include_directories(amber-test-fps-meter PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-fps-meter PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-fps-meter COMMAND amber-test-fps-meter)
+
 add_executable(amber-test-shadertoy test_shadertoy.cpp)
 target_include_directories(amber-test-shadertoy PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_definitions(amber-test-shadertoy PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")
