@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<effect name="Curves" category="Color">
+	<row name="Curves" keyframable="0">
+		<field type="curve" id="curves"/>
+	</row>
+	<shader vert="common.vert" frag="curves.frag"/>
+</effect>

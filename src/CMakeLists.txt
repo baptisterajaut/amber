@@ -140,6 +140,7 @@ add_library(amber-engine OBJECT
   effects/fields/buttonfield.cpp effects/fields/buttonfield.h
   effects/fields/colorfield.cpp effects/fields/colorfield.h
   effects/fields/combofield.cpp effects/fields/combofield.h
+  effects/fields/curvefield.cpp effects/fields/curvefield.h
   effects/fields/doublefield.cpp effects/fields/doublefield.h
   effects/fields/filefield.cpp effects/fields/filefield.h
   effects/fields/fontfield.cpp effects/fields/fontfield.h
@@ -336,6 +337,8 @@ set(AMBER_EFFECTS
   effects/shaders/crop.xml
   effects/shaders/crossstitch.frag
   effects/shaders/crossstitch.xml
+  effects/shaders/curves.frag
+  effects/shaders/curves.xml
   effects/shaders/denoise.frag
   effects/shaders/denoise.xml
   effects/shaders/despill.frag

@@ -407,11 +407,20 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
       }
     }
 
+    QRhiTexture* extraTexture = lutTexture;
+
+    // Curves: the 256 x 1 lookup texture at binding 3 (never with a LUT or original="1", see parseEffectXml), with
+    // an upload only when the curves changed (an empty batch otherwise)
+    if (e->needsCurveTexture()) {
+      QRhiResourceUpdateBatch* curveUpload = params.rhi->nextResourceUpdateBatch();
+      extraTexture = e->process_curve_texture(params.rhi, curveUpload, timecode);
+      params.cb->resourceUpdate(curveUpload);  // between passes: process_effect never runs inside one
+    }
+
     // original="1": the effect's input at binding 3 in every pass (never together with a LUT, see parseEffectXml).
     // A ping-pong input gets overwritten by the passes (and would be a feedback loop as their target), so it is
     // copied first; any other input (decoder/superimpose texture, ...) is left untouched by the passes.
     // CBA: one snapshot per clip, two such effects on a clip re-copy in turn (each one's passes finish first).
-    QRhiTexture* extraTexture = lutTexture;
     if (e->needsOriginal()) {
       extraTexture = composite_texture;
       for (int j = 0; j < res->count; j++) {

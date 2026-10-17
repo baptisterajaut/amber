@@ -249,8 +249,21 @@ class Effect : public QObject {
   QRhiTexture* currentLutTexture() const { return lutTex_; }
   QRhiTexture* process_lut(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& lutPath);
 
+  // A curve field (the Curves effect): its 256 x 1 lookup texture at binding 3, exclusive with the LUT and original
+  bool needsCurveTexture();
+  // The curve texture for `timecode`, created once; an upload is queued in `u` only when the curves changed
+  QRhiTexture* process_curve_texture(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode);
+  int curveUploadCount() const { return curveUploads_; }  // for tests
+
  private:
   FileField* findLutField();
+  CurveField* findCurveField();
+
+  CurveField* curveField_{nullptr};
+  bool curveFieldSearched_{false};
+  QRhiTexture* curveTex_{nullptr};
+  QString uploadedCurves_;
+  int curveUploads_{0};
 
   FileField* lutField_{nullptr};
   bool lutFieldSearched_{false};
