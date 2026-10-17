@@ -3293,17 +3293,17 @@ void TestEffectsGpu::denoiseFlatSolid() {
 
 void TestEffectsGpu::denoiseReducesNoise() {
   // Grey 128 Solid with the Noise shader at its default amount 20: grey grain uniform in +-0.2, mean |dev| ~25 per
-  // pixel. Denoise radius 2 (sigma_s 1), strength 100 (sigma_r 0.3 per channel), detail 50 (a quarter of the centre
-  // back). A CPU model of the shader on independent uniform grain gives 0.48..0.50x the deviation over 12 seeds; GL
-  // and Vulkan measured 0.49x (26398 → 12919). Thin margin, but the Noise shader is deterministic per pixel.
+  // pixel. Denoise radius 2 (sigma_s 1), strength 100 (sigma_r 0.3 per channel), detail 0. Noise amount 10, not 20:
+  // at 20 with detail 50 a CPU model gives 0.48..0.50x, too close to the 0.5 bar for drivers whose tan() differs
+  // (the Noise shader hashes with fract(tan(x))); amount 10 / detail 0 models at 0.27..0.31x.
   auto seq = h_->make_sequence(64, 64, 30.0);
   Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
   h_->set_field_color(c->effects[1].get(), 2, 0, QColor(128, 128, 128));
   EffectPtr noise = h_->attach_xml_shader(c, "Noise");
-  h_->set_field_double(noise.get(), 0, 0, 20.0);
+  h_->set_field_double(noise.get(), 0, 0, 10.0);
   const long noisy = block_abs_deviation(h_->render_frame(seq.get(), 0));
   QVERIFY2(noisy > 1024 * 5, qPrintable(QString("Noise shader barely changed the solid, deviation %1").arg(noisy)));
-  attach_denoise(h_.get(), c, 2.0, 100.0, 50.0);
+  attach_denoise(h_.get(), c, 2.0, 100.0, 0.0);
   const long denoised = block_abs_deviation(h_->render_frame(seq.get(), 0));
   QVERIFY2(
       denoised * 2 <= noisy,
