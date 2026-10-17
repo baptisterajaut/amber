@@ -268,6 +268,7 @@ struct Decoded {
   int width = 0;
   int height = 0;
   QByteArray first_rgba;
+  QVector<QByteArray> rgba;  // every video frame, when decode_file() is asked to keep them
   int audio_rate = 0;
   int audio_channels = 0;
   long audio_samples = 0;  // per channel
@@ -305,7 +306,7 @@ void read_audio_frame(const AVFrame* f, Decoded& d) {
 }
 
 // Decode every frame of the first video and first audio stream of a file
-Decoded decode_file(const QString& path) {
+Decoded decode_file(const QString& path, bool keep_frames = false) {
   Decoded d;
   AVFormatContext* fmt = nullptr;
   QByteArray p = path.toUtf8();
@@ -347,6 +348,7 @@ Decoded decode_file(const QString& path) {
           d.height = frame->height;
           d.first_rgba = to_rgba(frame);
         }
+        if (keep_frames) d.rgba.append(to_rgba(frame));
         d.video_frames++;
       } else {
         read_audio_frame(frame, d);
@@ -405,6 +407,40 @@ SequencePtr half_white_sequence() {
   solid->row(2)->Field(0)->SetValueAt(0.0, QVariant(QColor(Qt::white)));  // Color
   c->effects.append(solid);
   seq->clips.append(c);
+  return seq;
+}
+
+// kSize x kSize sequence of three Solids in a row, each kPaletteClipFrames long and scaled to 50 % (the centre half of
+// the frame) over nothing: an opaque colour off the rgb8 3-3-2 grid in the centre, fully transparent around it
+constexpr int kPaletteClipFrames = 2;
+const QColor kPaletteColours[] = {QColor(200, 120, 40), QColor(40, 200, 120), QColor(120, 40, 200)};
+
+SequencePtr palette_sequence() {
+  SequencePtr seq = std::make_shared<Sequence>();
+  seq->name = "Palette";
+  seq->width = kSize;
+  seq->height = kSize;
+  seq->frame_rate = kFps;
+  seq->audio_frequency = kAudioRate;
+  long in = 0;
+  for (const QColor& colour : kPaletteColours) {
+    ClipPtr c = std::make_shared<Clip>(seq.get());
+    c->set_media(nullptr, 0);
+    c->set_timeline_in(in);
+    c->set_timeline_out(in + kPaletteClipFrames);
+    c->set_clip_in(0);
+    c->set_track(-1);
+    c->set_name("Solid");
+    EffectPtr transform =
+        Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TRANSFORM, EFFECT_TYPE_EFFECT));
+    transform->row(1)->Field(0)->SetValueAt(0.0, QVariant(50.0));  // Scale (uniform)
+    c->effects.append(transform);
+    EffectPtr solid = Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SOLID, EFFECT_TYPE_EFFECT));
+    solid->row(2)->Field(0)->SetValueAt(0.0, QVariant(colour));  // Color
+    c->effects.append(solid);
+    seq->clips.append(c);
+    in += kPaletteClipFrames;
+  }
   return seq;
 }
 
@@ -1024,6 +1060,112 @@ class TestHeadlessRender : public QObject {
     } else {
       for (int ch : {r, g, b}) QVERIFY2(qAbs(ch - 128) <= tol, qPrintable(QString("colour over black %1").arg(ch)));
     }
+  }
+
+  // swscale can't write PAL8 (choosing it used to crash the export): it goes through palettegen/paletteuse, one
+  // palette per frame. Its colours must come out closer than the fixed 3-3-2 palette of rgb8 (the GIF default), and
+  // fully transparent pixels must stay transparent.
+  void gifPal8Export() {
+    if (avcodec_find_encoder(AV_CODEC_ID_GIF) == nullptr) QSKIP("GIF encoder not in this FFmpeg build");
+    const int frames = kPaletteClipFrames * int(std::size(kPaletteColours));
+    auto export_gif = [this, frames](AVPixelFormat pix_fmt, const QString& file, Decoded& out, int size = kSize) {
+      SequencePtr seq = palette_sequence();
+      ExportParams params;
+      params.filename = dir_.filePath(file);
+      params.video_enabled = true;
+      params.video_codec = AV_CODEC_ID_GIF;
+      params.video_width = size;
+      params.video_height = size;
+      params.video_compression_type = COMPRESSION_TYPE_CBR;
+      params.video_bitrate = 20.0;  // Mbps
+      params.audio_enabled = false;
+      params.start_frame = 0;
+      params.end_frame = frames;
+      const QString error = export_sequence(seq.get(), params, pix_fmt);
+      QVERIFY2(error.isEmpty(), qPrintable(error));
+      out = decode_file(params.filename, true);
+      QVERIFY(out.ok);
+      QVERIFY(out.has_video);
+      QCOMPARE(out.rgba.size(), frames);
+      for (const QByteArray& f : out.rgba) QCOMPARE(f.size(), size * size * 4);
+    };
+    // Inside the solid (centre half) or around it, two pixels clear of its edge
+    auto inside = [](int x, int y) {
+      return x >= kSize / 4 + 2 && x < 3 * kSize / 4 - 2 && y >= kSize / 4 + 2 && y < 3 * kSize / 4 - 2;
+    };
+    auto outside = [](int x, int y) {
+      return x < kSize / 4 - 2 || x >= 3 * kSize / 4 + 2 || y < kSize / 4 - 2 || y >= 3 * kSize / 4 + 2;
+    };
+    // Mean absolute colour error inside the solid, per channel, over every frame
+    auto colour_error = [&inside](const Decoded& d) {
+      double sum = 0;
+      long n = 0;
+      for (int f = 0; f < d.rgba.size(); f++) {
+        const QColor& c = kPaletteColours[f / kPaletteClipFrames];
+        const int want[3] = {c.red(), c.green(), c.blue()};
+        for (int y = 0; y < kSize; y++) {
+          for (int x = 0; x < kSize; x++) {
+            if (!inside(x, y)) continue;
+            const int off = (y * kSize + x) * 4;
+            for (int ch = 0; ch < 3; ch++) sum += qAbs(int(uchar(d.rgba[f][off + ch])) - want[ch]);
+            n += 3;
+          }
+        }
+      }
+      return sum / n;
+    };
+
+    Decoded pal8;
+    export_gif(AV_PIX_FMT_PAL8, "pal8.gif", pal8);
+    if (QTest::currentTestFailed()) return;
+    Decoded rgb8;
+    export_gif(AV_PIX_FMT_RGB8, "rgb8.gif", rgb8);
+    if (QTest::currentTestFailed()) return;
+
+    const double pal8_error = colour_error(pal8);
+    const double rgb8_error = colour_error(rgb8);
+    qInfo("mean colour error: pal8 %.2f, rgb8 %.2f (%d frames)", pal8_error, rgb8_error, int(pal8.rgba.size()));
+    QVERIFY2(pal8_error < 2.0, qPrintable(QString("pal8 error %1").arg(pal8_error)));
+    QVERIFY2(pal8_error < rgb8_error, qPrintable(QString("pal8 %1, rgb8 %2").arg(pal8_error).arg(rgb8_error)));
+
+    int max_alpha = 0;
+    for (const QByteArray& f : pal8.rgba) {
+      for (int y = 0; y < kSize; y++) {
+        for (int x = 0; x < kSize; x++) {
+          if (outside(x, y)) max_alpha = qMax(max_alpha, int(uchar(f[(y * kSize + x) * 4 + 3])));
+        }
+      }
+    }
+    const int centre_alpha = uchar(pal8.rgba[0][((kSize / 2) * kSize + kSize / 2) * 4 + 3]);
+    qInfo("pal8 alpha: around the solid max %d, centre %d", max_alpha, centre_alpha);
+    QCOMPARE(max_alpha, 0);
+    QCOMPARE(centre_alpha, 255);
+
+    // Another export size puts a scale in front of the palette filters
+    Decoded scaled;
+    export_gif(AV_PIX_FMT_PAL8, "pal8_scaled.gif", scaled, kSize / 2);
+  }
+
+  // A pixel format swscale can't write fails the export with an error instead of crashing it
+  void exportUnsupportedPixelFormatFails() {
+    if (sws_isSupportedOutput(AV_PIX_FMT_BAYER_RGGB8)) QSKIP("swscale writes Bayer now: pick another format");
+    if (avcodec_find_encoder(AV_CODEC_ID_RAWVIDEO) == nullptr) QSKIP("rawvideo encoder not in this FFmpeg build");
+    SequencePtr seq = half_white_sequence();
+    ExportParams params;
+    params.filename = dir_.filePath("bayer.nut");
+    params.video_enabled = true;
+    params.video_codec = AV_CODEC_ID_RAWVIDEO;
+    params.video_width = kSize;
+    params.video_height = kSize;
+    params.video_compression_type = COMPRESSION_TYPE_CBR;
+    params.video_bitrate = 20.0;  // Mbps
+    params.audio_enabled = false;
+    params.start_frame = 0;
+    params.end_frame = 2;
+    const QString error = export_sequence(seq.get(), params, AV_PIX_FMT_BAYER_RGGB8);
+    qInfo("export error: %s", qPrintable(error));
+    QVERIFY(error.contains("could not convert to pixel format"));
+    QVERIFY(!QFileInfo::exists(params.filename));
   }
 
   // Save Frame writes a PNG with straight alpha too, and a format without alpha the composite over black
