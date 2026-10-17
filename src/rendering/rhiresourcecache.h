@@ -8,7 +8,7 @@
 
 // Per-QRhi cache of graphics pipelines and a per-frame pool of dynamic buffers, so steady-state
 // compositing creates neither. One instance per QRhi, used only on that QRhi's render thread (no locks).
-// Must be destroyed before the sampler and the QRhi it was created with.
+// Must be destroyed before the QRhi it was created with: owners reset it before deleting their QRhi.
 class RhiResourceCache {
  public:
   enum class Blend { None, PremultipliedOver };
@@ -34,12 +34,14 @@ class RhiResourceCache {
 
   // Pipeline (2x Float2 vertex input, stride 16, triangle strip) for this shader pair and blend, usable with
   // any render pass compatible with `rpd` and any SRB whose bindings match `layout`. Null if creation failed;
-  // the failure is cached and warned once.
+  // the failure is cached and warned once. The pipeline is destroyed once it goes evict_after_frames frames
+  // without a lookup: look it up every frame you draw with it, never store it (e.g. in ClipRhiResources).
   QRhiGraphicsPipeline* pipeline(const QShader& vert, const QShader& frag, Blend blend, const SrbLayout& layout,
                                  QRhiRenderPassDescriptor* rpd);
 
   // Dynamic buffer of at least `size` bytes not handed out yet in the current frame. Pooled by usage and
   // 256-byte bucket, so a vertex buffer and a uniform buffer are never handed out for each other.
+  // Valid only for the current frame: after endFrame() it is handed out again or evicted, so never store it.
   QRhiBuffer* dynamicBuffer(QRhiBuffer::UsageFlags usage, quint32 size);
 
   // Call after endOffscreenFrame(): rewinds the buffer pool and evicts entries unused for evict_after_frames.

@@ -1,7 +1,9 @@
 #include <rhi/qrhi.h>
 #include <QFile>
 #include <QGuiApplication>
+#include <QMatrix4x4>
 #include <QOffscreenSurface>
+#include <QRegularExpression>
 #include <QSurfaceFormat>
 #include <QTest>
 
@@ -11,6 +13,8 @@
 #if QT_CONFIG(vulkan)
 #include <QVulkanInstance>
 #endif
+
+#include <memory>
 
 class TestRhiCache : public QObject {
   Q_OBJECT
@@ -114,9 +118,18 @@ void TestRhiCache::differentKeysDifferentPipelines() {
       cache.pipeline(vert_, passthrough_, RhiResourceCache::Blend::PremultipliedOver, layout, rpd);
   QRhiGraphicsPipeline* frag = cache.pipeline(vert_, premultiply_, RhiResourceCache::Blend::None, layout, rpd);
   QRhiGraphicsPipeline* lay = cache.pipeline(vert_, passthrough_, RhiResourceCache::Blend::None, two_tex, rpd);
-  QVERIFY(base && blend && frag && lay);
+  RhiResourceCache::SrbLayout both_stages = layout;
+  both_stages.paramStages = QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage;
+  QRhiGraphicsPipeline* stages = cache.pipeline(vert_, passthrough_, RhiResourceCache::Blend::None, both_stages, rpd);
+  // premultiply.frag has no UBO 1, so it is valid with and without one in the layout
+  RhiResourceCache::SrbLayout no_ubo = layout;
+  no_ubo.paramUbo = false;
+  QRhiGraphicsPipeline* frag_no_ubo = cache.pipeline(vert_, premultiply_, RhiResourceCache::Blend::None, no_ubo, rpd);
+  QVERIFY(base && blend && frag && lay && stages && frag_no_ubo);
   QVERIFY(base != blend && base != frag && base != lay && blend != frag);
-  QCOMPARE(cache.stats().pipelinesCreated, quint64(4));
+  QVERIFY(stages != base && stages != lay);
+  QVERIFY(frag_no_ubo != frag);
+  QCOMPARE(cache.stats().pipelinesCreated, quint64(6));
   rt.reset();
   delete rpd;
   delete tex;
@@ -239,9 +252,13 @@ void TestRhiCache::failedPipelineCachedOnce() {
   QRhiRenderPassDescriptor* rpd;
   std::unique_ptr<QRhiTextureRenderTarget> rt(makeTarget(&tex, &rpd, true));
   RhiResourceCache::SrbLayout layout;
-  // An empty fragment shader can't produce a pipeline on any backend
+  // An empty fragment shader can't produce a pipeline on any backend. The first lookup warns (QRhi, then the
+  // cache); the second must be silent.
+  QTest::ignoreMessage(QtWarningMsg, "Empty shader passed to graphics pipeline");
+  QTest::ignoreMessage(QtWarningMsg, QRegularExpression("^\\[RHI-PIPELINE\\] pipeline creation FAILED"));
   QCOMPARE(cache.pipeline(vert_, QShader(), RhiResourceCache::Blend::None, layout, rpd),
            static_cast<QRhiGraphicsPipeline*>(nullptr));
+  QTest::failOnWarning();
   QCOMPARE(cache.pipeline(vert_, QShader(), RhiResourceCache::Blend::None, layout, rpd),
            static_cast<QRhiGraphicsPipeline*>(nullptr));
   QCOMPARE(cache.stats().pipelinesCreated, quint64(1));
@@ -257,15 +274,40 @@ void TestRhiCache::evictionDestroysUnusedEntries() {
   QRhiRenderPassDescriptor* rpd;
   std::unique_ptr<QRhiTextureRenderTarget> rt(makeTarget(&tex, &rpd, true));
   RhiResourceCache::SrbLayout layout;
-  QVERIFY(cache.pipeline(vert_, passthrough_, RhiResourceCache::Blend::None, layout, rpd));
+  // The stale pipeline/buffer are used in frame 0 only; the hot ones in every frame (a vertex buffer, so it
+  // sits in its own pool and the stale uniform buffer is a pool tail).
+  QRhiGraphicsPipeline* stale = cache.pipeline(vert_, passthrough_, RhiResourceCache::Blend::None, layout, rpd);
+  QVERIFY(stale);
   QVERIFY(cache.dynamicBuffer(QRhiBuffer::UniformBuffer, 64));
-  QCOMPARE(cache.stats().livePipelines, 1);
+  auto use_hot = [&] {
+    QRhiGraphicsPipeline* p = cache.pipeline(vert_, premultiply_, RhiResourceCache::Blend::None, layout, rpd);
+    QRhiBuffer* b = cache.dynamicBuffer(QRhiBuffer::VertexBuffer, 64);
+    return p && b;
+  };
+  QVERIFY(use_hot());
+  QCOMPARE(cache.stats().livePipelines, 2);
+  QCOMPARE(cache.stats().liveBuffers, 2);
+  // Evicted when frame_ - lastUsedFrame > 3: live at frames 1..3, gone at frame 4
+  for (int i = 0; i < 3; i++) {
+    cache.endFrame();
+    QVERIFY(use_hot());
+  }
+  QCOMPARE(cache.stats().livePipelines, 2);  // 3 frames unused: still within the window
+  QCOMPARE(cache.stats().liveBuffers, 2);
+  cache.endFrame();
+  QCOMPARE(cache.stats().livePipelines, 1);  // the 4th frame unused evicts the stale entries
   QCOMPARE(cache.stats().liveBuffers, 1);
-  for (int i = 0; i < 2; i++) cache.endFrame();
-  QCOMPARE(cache.stats().livePipelines, 1);  // still within the window
-  for (int i = 0; i < 3; i++) cache.endFrame();
-  QCOMPARE(cache.stats().livePipelines, 0);
-  QCOMPARE(cache.stats().liveBuffers, 0);
+  for (int i = 0; i < 10; i++) {
+    QVERIFY(use_hot());
+    cache.endFrame();
+  }
+  QCOMPARE(cache.stats().livePipelines, 1);  // used every frame: never evicted, never recreated
+  QCOMPARE(cache.stats().liveBuffers, 1);
+  QCOMPARE(cache.stats().pipelinesCreated, quint64(2));
+  QCOMPARE(cache.stats().buffersCreated, quint64(2));
+  // An evicted key is a miss: it is created again
+  QVERIFY(cache.pipeline(vert_, passthrough_, RhiResourceCache::Blend::None, layout, rpd));
+  QCOMPARE(cache.stats().pipelinesCreated, quint64(3));
   rt.reset();
   delete rpd;
   delete tex;

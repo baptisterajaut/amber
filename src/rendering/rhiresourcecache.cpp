@@ -61,7 +61,16 @@ QRhiGraphicsPipeline* RhiResourceCache::pipeline(const QShader& vert, const QSha
   entry.lastUsedFrame = frame_;
   entry.layoutSrb = rhi_->newShaderResourceBindings();
   entry.layoutSrb->setBindings(bindings.cbegin(), bindings.cend());
-  entry.layoutSrb->create();
+  stats_.pipelinesCreated++;
+  if (!entry.layoutSrb->create()) {
+    // Cached as a failure, like a failed pipeline below
+    qWarning().nospace() << "[RHI-PIPELINE] layout SRB creation FAILED (frag hash " << Qt::hex << qHash(frag) << Qt::dec
+                         << ", paramUbo " << layout.paramUbo << ", textures " << layout.textures << ")";
+    delete entry.layoutSrb;
+    entry.layoutSrb = nullptr;
+    pipelines_.insert(key, entry);
+    return nullptr;
+  }
 
   QRhiGraphicsPipeline* p = rhi_->newGraphicsPipeline();
   p->setShaderStages({{QRhiShaderStage::Vertex, vert}, {QRhiShaderStage::Fragment, frag}});
@@ -87,12 +96,12 @@ QRhiGraphicsPipeline* RhiResourceCache::pipeline(const QShader& vert, const QSha
   p->setTargetBlends({tb});
   p->setShaderResourceBindings(entry.layoutSrb);
   p->setRenderPassDescriptor(ownedRpd(rpd, format));
-  stats_.pipelinesCreated++;
   if (p->create()) {
     entry.pipeline = p;
   } else {
     // Cached as a failure so a broken shader isn't re-created (and re-warned) every frame
-    qWarning() << "[RHI-PIPELINE] pipeline creation FAILED";
+    qWarning().nospace() << "[RHI-PIPELINE] pipeline creation FAILED (frag hash " << Qt::hex << qHash(frag) << Qt::dec
+                         << ", blend " << int(blend) << ", textures " << layout.textures << ")";
     delete p;
   }
   pipelines_.insert(key, entry);
@@ -108,7 +117,9 @@ QRhiBuffer* RhiResourceCache::dynamicBuffer(QRhiBuffer::UsageFlags usage, quint3
     return b.buffer;
   }
   QRhiBuffer* buf = rhi_->newBuffer(QRhiBuffer::Dynamic, usage, bucket);
-  buf->create();
+  // CBA: a failed create() is warned and the buffer still handed out, as before the cache: callers update it
+  // without a null check. Return null (and guard every caller) if this ever fires.
+  if (!buf->create()) qWarning() << "[RHI-BUFFER] dynamic buffer creation FAILED, size" << bucket;
   stats_.buffersCreated++;
   pool.buffers.append({buf, frame_});
   pool.cursor = pool.buffers.size();
