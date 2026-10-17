@@ -355,6 +355,8 @@ void Timeline::add_clips_from_ghosts(ComboAction* ca, Sequence* s) {
 }
 
 void Timeline::add_transition() {
+  if (amber::ActiveSequence == nullptr) return;
+
   ComboAction* ca = new ComboAction(tr("Add Transition"));
   bool adding = false;
 
@@ -876,6 +878,8 @@ void Timeline::SetTrackHeight(int track, int height) {
 }
 
 void Timeline::ChangeTrackHeightUniformly(int diff) {
+  if (amber::ActiveSequence == nullptr) return;
+
   // get range of tracks currently active
   int min_track, max_track;
   amber::ActiveSequence->getTrackLimits(&min_track, &max_track);
@@ -1231,6 +1235,8 @@ void Timeline::edit_to_in_point() { panel_timeline->edit_to_point_internal(true,
 void Timeline::edit_to_out_point() { panel_timeline->edit_to_point_internal(false, false); }
 
 void Timeline::toggle_links() {
+  if (amber::ActiveSequence == nullptr) return;
+
   LinkCommand* command = new LinkCommand();
   command->setText(tr("Toggle Links"));
   command->s = amber::ActiveSequence.get();
@@ -1257,6 +1263,8 @@ void Timeline::toggle_links() {
 }
 
 void Timeline::deselect() {
+  if (amber::ActiveSequence == nullptr) return;
+
   amber::ActiveSequence->selections.clear();
   repaint_timeline();
 }

@@ -313,7 +313,8 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
       for (int i = 0; i < selected_markers.size(); i++) {
         Marker* m = &(*viewer->marker_ref)[selected_markers.at(i)];
         if (selected_marker_original_times.at(i) != m->frame) {
-          ca->append(new MoveMarkerAction(m, selected_marker_original_times.at(i), m->frame));
+          ca->append(new MoveMarkerAction(viewer->marker_ref, selected_markers.at(i),
+                                          selected_marker_original_times.at(i), m->frame));
           moved = true;
         }
       }

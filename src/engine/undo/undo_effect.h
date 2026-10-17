@@ -176,4 +176,25 @@ private:
   bool done_{true};
 };
 
+// Sets one member of field->keyframes[index]. Addressed by index rather than by pointer because
+// the keyframe vector reallocates when keyframes are appended between redo and undo.
+class KeyframeMemberChange : public AmberAction {
+public:
+  enum Member { kType, kTime, kData, kPreHandleX, kPreHandleY, kPostHandleX, kPostHandleY };
+
+  KeyframeMemberChange(EffectField* field, int index, Member member, const QVariant& old_value,
+                       const QVariant& new_value);
+  void doUndo() override;
+  void doRedo() override;
+
+private:
+  void apply(const QVariant& value);
+
+  EffectField* field_;
+  int index_;
+  Member member_;
+  QVariant old_value_;
+  QVariant new_value_;
+};
+
 #endif // UNDO_EFFECT_H

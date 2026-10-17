@@ -56,6 +56,17 @@ KeyframeView::KeyframeView(QWidget* parent)
   connect(this, &KeyframeView::customContextMenuRequested, this, &KeyframeView::show_context_menu);
 }
 
+// An undo can remove keyframes behind the selection's back: forget entries that no longer exist.
+// Only called right before the selection is used (fields are dereferenced there anyway).
+static void drop_stale_selection(QVector<EffectField*>& fields, QVector<int>& keys) {
+  for (int i = keys.size() - 1; i >= 0; i--) {
+    if (keys.at(i) < 0 || keys.at(i) >= fields.at(i)->keyframes.size()) {
+      fields.removeAt(i);
+      keys.removeAt(i);
+    }
+  }
+}
+
 void KeyframeView::SetEffects(const QVector<EffectUI*>& open_effects) { open_effects_ = open_effects; }
 
 void KeyframeView::show_context_menu(const QPoint& pos) {
@@ -76,6 +87,8 @@ void KeyframeView::show_context_menu(const QPoint& pos) {
 
     connect(&menu, &QMenu::triggered, this, &KeyframeView::menu_set_key_type);
     connect(properties, &QAction::triggered, this, [this]() {
+      drop_stale_selection(selected_fields, selected_keyframes);
+      if (selected_fields.isEmpty()) return;
       KeyframePropertiesDialog dlg(this, selected_fields, selected_keyframes,
                                    amber::ActiveSequence ? amber::ActiveSequence->frame_rate : 30.0);
       dlg.exec();
@@ -93,10 +106,13 @@ void KeyframeView::menu_set_key_type(QAction* a) {
     return;
   } else {
     int new_type = a->data().toInt();
+    drop_stale_selection(selected_fields, selected_keyframes);
+    if (selected_fields.isEmpty()) return;
     ComboAction* ca = new ComboAction(tr("Change Keyframe Type"));
     for (int i = 0; i < selected_fields.size(); i++) {
       EffectField* f = selected_fields.at(i);
-      ca->append(new SetInt(&f->keyframes[selected_keyframes.at(i)].type, new_type));
+      int k = selected_keyframes.at(i);
+      ca->append(new KeyframeMemberChange(f, k, KeyframeMemberChange::kType, f->keyframes.at(k).type, new_type));
     }
     amber::UndoStack.push(ca);
 
@@ -204,7 +220,10 @@ void KeyframeView::update_keys() {
   update();
 }
 
-void KeyframeView::delete_selected_keyframes() { delete_keyframes(selected_fields, selected_keyframes); }
+void KeyframeView::delete_selected_keyframes() {
+  drop_stale_selection(selected_fields, selected_keyframes);
+  delete_keyframes(selected_fields, selected_keyframes);
+}
 
 void KeyframeView::set_x_scroll(int s) {
   x_scroll = s;
@@ -309,6 +328,7 @@ void KeyframeView::mousePressEvent(QMouseEvent* event) {
     }
   }
 
+  drop_stale_selection(selected_fields, selected_keyframes);
   if (!selected_fields.isEmpty()) {
     for (int i = 0; i < selected_fields.size(); i++) {
       old_key_vals.append(selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time);
@@ -428,8 +448,9 @@ void KeyframeView::mouseReleaseEvent(QMouseEvent*) {
   if (dragging) {
     ComboAction* ca = new ComboAction(tr("Move Keyframe(s)"));
     for (int i = 0; i < selected_fields.size(); i++) {
-      ca->append(new SetLong(&selected_fields.at(i)->keyframes[selected_keyframes.at(i)].time, old_key_vals.at(i),
-                             selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time));
+      ca->append(new KeyframeMemberChange(
+          selected_fields.at(i), selected_keyframes.at(i), KeyframeMemberChange::kTime, qlonglong(old_key_vals.at(i)),
+          qlonglong(selected_fields.at(i)->keyframes.at(selected_keyframes.at(i)).time)));
     }
     amber::UndoStack.push(ca);
   }

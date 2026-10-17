@@ -26,6 +26,7 @@
 class RippleAction : public AmberAction {
 public:
   RippleAction(Sequence* is, long ipoint, long ilength, const QVector<int>& iignore);
+  ~RippleAction() override;
   void doUndo() override;
   void doRedo() override;
 private:
@@ -115,11 +116,12 @@ private:
 
 class MoveMarkerAction : public AmberAction {
 public:
-  MoveMarkerAction(Marker* m, long o, long n);
+  MoveMarkerAction(QVector<Marker>* m, int i, long o, long n);
   void doUndo() override;
   void doRedo() override;
 private:
-  Marker* marker;
+  QVector<Marker>* active_array;
+  int index;
   long old_time;
   long new_time;
 };

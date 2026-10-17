@@ -57,6 +57,22 @@ QColor get_curve_color(int index, int length) {
   return c;
 }
 
+// An undo can remove keyframes behind the selection's back: forget entries that no longer exist.
+// Called right before the selection is used.
+static void drop_stale_selection(EffectRow* row, QVector<int>& keys, QVector<int>& key_fields) {
+  if (row == nullptr) return;
+  const int n = qMin(keys.size(), key_fields.size());
+  keys.resize(n);
+  key_fields.resize(n);
+  for (int i = n - 1; i >= 0; i--) {
+    const int f = key_fields.at(i);
+    if (f < 0 || f >= row->FieldCount() || keys.at(i) < 0 || keys.at(i) >= row->Field(f)->keyframes.size()) {
+      keys.removeAt(i);
+      key_fields.removeAt(i);
+    }
+  }
+}
+
 GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   x_scroll = 0;
   y_scroll = 0;
@@ -115,6 +131,7 @@ void GraphView::reset_view() {
 }
 
 void GraphView::set_view_to_selection() {
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
   if (row != nullptr && selected_keys.size() > 0) {
     long min_time = LONG_MAX;
     long max_time = LONG_MIN;
@@ -592,10 +609,10 @@ bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
       QRect test_rect(key_x - KEYFRAME_SIZE, key_y - KEYFRAME_SIZE, KEYFRAME_SIZE + KEYFRAME_SIZE,
                       KEYFRAME_SIZE + KEYFRAME_SIZE);
       QRect pre_rect(qRound(key_x + key.pre_handle_x * x_zoom - kBezierHandleSize),
-                     qRound(key_y + key.pre_handle_y * y_zoom - kBezierHandleSize),
+                     qRound(key_y - key.pre_handle_y * y_zoom - kBezierHandleSize),
                      kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
       QRect post_rect(qRound(key_x + key.post_handle_x * x_zoom - kBezierHandleSize),
-                      qRound(key_y + key.post_handle_y * y_zoom - kBezierHandleSize),
+                      qRound(key_y - key.post_handle_y * y_zoom - kBezierHandleSize),
                       kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
 
       if (test_rect.contains(pos) || pre_rect.contains(pos) || post_rect.contains(pos)) {
@@ -730,18 +747,27 @@ void GraphView::mouseReleaseEvent(QMouseEvent*) {
     switch (current_handle) {
       case kBezierHandleNone:
         for (int i = 0; i < selected_keys.size(); i++) {
-          EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)];
-          ca->append(new SetLong(&key.time, selected_keys_old_vals.at(i), key.time));
-          ca->append(new SetQVariant(&key.data, selected_keys_old_doubles.at(i), key.data));
+          EffectField* f = row->Field(selected_keys_fields.at(i));
+          int k = selected_keys.at(i);
+          const EffectKeyframe& key = f->keyframes.at(k);
+          ca->append(new KeyframeMemberChange(f, k, KeyframeMemberChange::kTime,
+                                              qlonglong(selected_keys_old_vals.at(i)), qlonglong(key.time)));
+          ca->append(
+              new KeyframeMemberChange(f, k, KeyframeMemberChange::kData, selected_keys_old_doubles.at(i), key.data));
         }
         break;
       case kBezierHandlePre:
       case kBezierHandlePost: {
-        EffectKeyframe& key = row->Field(handle_field)->keyframes[handle_index];
-        ca->append(new SetDouble(&key.pre_handle_x, old_pre_handle_x, key.pre_handle_x));
-        ca->append(new SetDouble(&key.pre_handle_y, old_pre_handle_y, key.pre_handle_y));
-        ca->append(new SetDouble(&key.post_handle_x, old_post_handle_x, key.post_handle_x));
-        ca->append(new SetDouble(&key.post_handle_y, old_post_handle_y, key.post_handle_y));
+        EffectField* f = row->Field(handle_field);
+        const EffectKeyframe& key = f->keyframes.at(handle_index);
+        ca->append(new KeyframeMemberChange(f, handle_index, KeyframeMemberChange::kPreHandleX, old_pre_handle_x,
+                                            key.pre_handle_x));
+        ca->append(new KeyframeMemberChange(f, handle_index, KeyframeMemberChange::kPreHandleY, old_pre_handle_y,
+                                            key.pre_handle_y));
+        ca->append(new KeyframeMemberChange(f, handle_index, KeyframeMemberChange::kPostHandleX, old_post_handle_x,
+                                            key.post_handle_x));
+        ca->append(new KeyframeMemberChange(f, handle_index, KeyframeMemberChange::kPostHandleY, old_post_handle_y,
+                                            key.post_handle_y));
       } break;
     }
     amber::UndoStack.push(ca);
@@ -832,11 +858,13 @@ void GraphView::set_row(EffectRow* r) {
 void GraphView::set_visible_in(long i) { visible_in = i; }
 
 void GraphView::set_selected_keyframe_type(int type) {
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
   if (selected_keys.size() > 0) {
     ComboAction* ca = new ComboAction(tr("Change Keyframe Type"));
     for (int i = 0; i < selected_keys.size(); i++) {
-      EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)];
-      ca->append(new SetInt(&key.type, type));
+      EffectField* f = row->Field(selected_keys_fields.at(i));
+      int k = selected_keys.at(i);
+      ca->append(new KeyframeMemberChange(f, k, KeyframeMemberChange::kType, f->keyframes.at(k).type, type));
     }
     amber::UndoStack.push(ca);
     update_ui(false);
@@ -850,11 +878,14 @@ void GraphView::set_field_visibility(int field, bool b) {
 
 void GraphView::delete_selected_keys() {
   if (row != nullptr) {
+    drop_stale_selection(row, selected_keys, selected_keys_fields);
     QVector<EffectField*> fields;
     for (int selected_keys_field : selected_keys_fields) {
       fields.append(row->Field(selected_keys_field));
     }
     delete_keyframes(fields, selected_keys);
+    // delete_keyframes() cleared selected_keys and our local copy, not the field indices
+    if (selected_keys.isEmpty()) selected_keys_fields.clear();
   }
 }
 
@@ -909,6 +940,7 @@ long GraphView::get_value_x(int i) {
 double GraphView::get_value_y(int i) { return double(height() + y_scroll - i) / y_zoom; }
 
 void GraphView::selection_update() {
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
   selected_keys_old_vals.clear();
   selected_keys_old_doubles.clear();
 

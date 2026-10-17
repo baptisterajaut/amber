@@ -152,13 +152,14 @@ void KeyframePropertiesDialog::UpdateBezierEnabled() {
 bool KeyframePropertiesDialog::apply_keyframe_changes_for_one(ComboAction* ca, int i, int& new_type_for_sticky) {
   EffectField* f = fields_[i];
   int ki = keyframe_indices_[i];
-  EffectKeyframe& kf = f->keyframes[ki];
+  const EffectKeyframe& kf = f->keyframes.at(ki);
   bool changed = false;
 
   if (time_modified_ && !qIsNaN(time_slider_->value())) {
     long new_time = qRound(time_slider_->value());
     if (new_time != kf.time) {
-      ca->append(new SetLong(&kf.time, originals_[i].time, new_time));
+      ca->append(new KeyframeMemberChange(f, ki, KeyframeMemberChange::kTime, qlonglong(originals_[i].time),
+                                          qlonglong(new_time)));
       changed = true;
     }
   }
@@ -166,25 +167,30 @@ bool KeyframePropertiesDialog::apply_keyframe_changes_for_one(ComboAction* ca, i
   if (type_modified_) {
     int new_type = type_combo_->currentData().toInt();
     if (new_type >= 0 && new_type != kf.type) {
-      ca->append(new SetInt(&kf.type, new_type));
+      ca->append(new KeyframeMemberChange(f, ki, KeyframeMemberChange::kType, kf.type, new_type));
       changed = true;
       if (new_type_for_sticky < 0) new_type_for_sticky = new_type;
     }
   }
 
-  auto apply_double = [&](bool modified, LabelSlider* slider, double* field_ptr, double orig) {
+  auto apply_double = [&](bool modified, LabelSlider* slider, double current, KeyframeMemberChange::Member member,
+                          double orig) {
     if (!modified || qIsNaN(slider->value())) return;
     double new_val = slider->value();
-    if (!qFuzzyCompare(new_val, *field_ptr)) {
-      ca->append(new SetDouble(field_ptr, orig, new_val));
+    if (!qFuzzyCompare(new_val, current)) {
+      ca->append(new KeyframeMemberChange(f, ki, member, orig, new_val));
       changed = true;
     }
   };
 
-  apply_double(pre_handle_x_modified_, pre_handle_x_, &kf.pre_handle_x, originals_[i].pre_handle_x);
-  apply_double(pre_handle_y_modified_, pre_handle_y_, &kf.pre_handle_y, originals_[i].pre_handle_y);
-  apply_double(post_handle_x_modified_, post_handle_x_, &kf.post_handle_x, originals_[i].post_handle_x);
-  apply_double(post_handle_y_modified_, post_handle_y_, &kf.post_handle_y, originals_[i].post_handle_y);
+  apply_double(pre_handle_x_modified_, pre_handle_x_, kf.pre_handle_x, KeyframeMemberChange::kPreHandleX,
+               originals_[i].pre_handle_x);
+  apply_double(pre_handle_y_modified_, pre_handle_y_, kf.pre_handle_y, KeyframeMemberChange::kPreHandleY,
+               originals_[i].pre_handle_y);
+  apply_double(post_handle_x_modified_, post_handle_x_, kf.post_handle_x, KeyframeMemberChange::kPostHandleX,
+               originals_[i].post_handle_x);
+  apply_double(post_handle_y_modified_, post_handle_y_, kf.post_handle_y, KeyframeMemberChange::kPostHandleY,
+               originals_[i].post_handle_y);
 
   return changed;
 }
