@@ -457,7 +457,8 @@ bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samp
   qint64 total_time = 0;
   long frame_count = 1;
 
-  while (seq_->playhead <= params_.end_frame && !interrupt_) {
+  // end_frame is exclusive (the frame after the last clip, or the out point): N sequence frames give N video frames
+  while (seq_->playhead < params_.end_frame && !interrupt_) {
     qint64 frame_start_time = QDateTime::currentMSecsSinceEpoch();
 
     int audio_cachers = 0;
@@ -473,17 +474,19 @@ bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samp
     }
 
     if (params_.audio_enabled) {
-      if (!EncodeAudioFrames(file_audio_samples, timecode_secs, audio_cachers)) return false;
+      // Audio up to the end of this frame, so the last frame's audio isn't cut and both streams end together
+      double frame_end_secs = double(seq_->playhead + 1 - params_.start_frame) / seq_->frame_rate;
+      if (!EncodeAudioFrames(file_audio_samples, frame_end_secs, audio_cachers)) return false;
     }
 
     qint64 frame_time = QDateTime::currentMSecsSinceEpoch() - frame_start_time;
     total_time += frame_time;
-    long remaining_frames = params_.end_frame - seq_->playhead;
+    long remaining_frames = params_.end_frame - seq_->playhead - 1;
     qint64 avg_time = total_time / frame_count;
     qint64 eta = remaining_frames * avg_time;
 
     emit ProgressChanged(
-        qRound((double(seq_->playhead - params_.start_frame) / double(params_.end_frame - params_.start_frame)) *
+        qRound((double(seq_->playhead + 1 - params_.start_frame) / double(params_.end_frame - params_.start_frame)) *
                100.0),
         eta);
 

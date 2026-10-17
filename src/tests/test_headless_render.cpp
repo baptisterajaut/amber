@@ -490,9 +490,8 @@ class TestHeadlessRender : public QObject {
     QVERIFY(out.has_video);
     QVERIFY(src.video_frames >= 1);
 
-    // ExportThread::EncodeAllFrames() renders while playhead <= end_frame: the editor's export includes end_frame,
-    // one frame past the last clip, so a 10-frame sequence gives 11 frames
-    const long expected_frames = params.end_frame - params.start_frame + 1;
+    // end_frame is exclusive (one frame past the last clip): a 10-frame sequence gives 10 frames, no extra empty one
+    const long expected_frames = params.end_frame - params.start_frame;
     QCOMPARE(long(out.video_frames), expected_frames);
     // The export takes the sequence's frame rate (ExportParams has no frame rate of its own)
     QVERIFY2(qAbs(out.video_fps - seq->frame_rate) < 0.001, qPrintable(QString("output fps %1").arg(out.video_fps)));
@@ -529,12 +528,13 @@ class TestHeadlessRender : public QObject {
     QVERIFY(out.has_audio);
     QCOMPARE(out.audio_rate, kAudioRate);
     QCOMPARE(out.audio_channels, 2);
-    // EncodeAudioFrames() encodes up to the start of the last exported frame, in whole encoder frames (1024 samples
-    // for AAC): at least end_frame / fps seconds
+    // EncodeAudioFrames() encodes up to the end of the last exported frame, in whole encoder frames (1024 samples
+    // for AAC): as long as the video, end_frame / fps seconds, and less than two encoder frames longer
     const long expected_samples = qRound64((params.end_frame - params.start_frame) / kFps * kAudioRate);
     qInfo("audio: %ld samples per channel (expected >= %ld), peak %.3f", out.audio_samples, expected_samples,
           out.audio_peak);
     QVERIFY(out.audio_samples >= expected_samples);
+    QVERIFY(out.audio_samples < expected_samples + 2 * 1024);
     QVERIFY2(out.audio_peak > 0.25, qPrintable(QString("audio peak %1").arg(out.audio_peak)));
 
     qInfo("load + export + decode: %lld ms", timer.elapsed());
