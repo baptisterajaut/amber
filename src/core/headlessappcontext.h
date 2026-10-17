@@ -7,8 +7,8 @@
 // `amber::app_ctx = &ctx;` before touching engine code; the editor uses AppContextImpl instead.
 //
 // Policy: messages are logged on stderr (qInfo/qWarning); questions are logged and answered Yes (e.g. a project from
-// another version keeps loading); file dialogs return an empty path (= cancelled); UI refreshes are no-ops; the
-// recent projects list is never touched.
+// another version keeps loading), but isInteractive() is false so a VST plugin path nobody trusted is never loaded;
+// file dialogs return an empty path (= cancelled); UI refreshes are no-ops; the recent projects list is never touched.
 class HeadlessAppContext : public AppContext {
  public:
   void refreshViewer() override {}
@@ -31,6 +31,7 @@ class HeadlessAppContext : public AppContext {
   void updateUi(bool) override {}
   int showMessage(const QString& title, const QString& text, int type) override;
   bool showQuestion(const QString& title, const QString& text, bool warning) override;
+  bool isInteractive() override { return false; }
   QString showSaveFileDialog(const QString&, const QString&) override { return {}; }
   QString showOpenFileDialog(const QString&, const QString&) override { return {}; }
   void clearViewerMedia() override {}

@@ -7,6 +7,9 @@
 #include <QPointer>
 #include <QTemporaryDir>
 
+#include "effects/effect.h"
+#include "effects/effectfield.h"
+#include "effects/effectrow.h"
 #include "engine/sequence.h"
 #include "global/config.h"
 #include "global/projectio.h"
@@ -16,16 +19,22 @@
 #include "project/projectmodel.h"
 #include "tests/test_appcontext_stub.h"
 
+// External entry point from effectloaders.cpp (no header export), as in test_render_harness.cpp
+extern void load_internal_effects();
+
 namespace {
 
-// Counts questions and errors; answers every question "No" (like the base stub).
+// Counts questions and errors; answers every question "No" (like the base stub) unless told otherwise.
 class CountingAppContext : public TestAppContext {
  public:
   int questions = 0;
   int messages = 0;
+  bool interactive = false;  // pretend a user answers (VST trust question)
+  bool answer = false;
+  bool isInteractive() override { return interactive; }
   bool showQuestion(const QString&, const QString&, bool) override {
     questions++;
-    return false;
+    return answer;
   }
   int showMessage(const QString&, const QString&, int) override {
     messages++;
@@ -115,6 +124,8 @@ class TestLoadThread : public QObject {
     pio_->setModified(true);
     ctx_.questions = 0;
     ctx_.messages = 0;
+    ctx_.interactive = false;
+    ctx_.answer = false;
   }
 
   void loadsFolderAndSequence() {
@@ -290,6 +301,46 @@ class TestLoadThread : public QObject {
     QVERIFY(!succeeded);
     QCOMPARE(failed, 1);
     QCOMPARE(ctx_.messages, 1);
+  }
+
+  // A VST plugin path set by a project load or a paste (a field change, as LoadFieldElement does) only loads when
+  // trusted. The paths don't exist: a load attempt shows up as one "failed to load" message, no attempt as none.
+  void vstPluginLoadsOnlyTrustedPaths() {
+    if (effects.isEmpty()) load_internal_effects();
+    const EffectMeta* meta = get_meta_from_name("VST Plugin 2.x");
+    QVERIFY(meta != nullptr);
+    const QString dir = dir_.filePath("no-such-dir");
+    auto set_path = [meta](const QString& path) {
+      EffectPtr e(Effect::Create(nullptr, meta));
+      e->row(0)->Field(0)->SetValueAt(0, path);
+      QCoreApplication::processEvents();  // the queued change_plugin()
+      return e;
+    };
+
+    // Headless: never loaded, never asked, the path is kept for saving
+    EffectPtr headless = set_path(dir + "/headless.so");
+    QCOMPARE(ctx_.questions, 0);
+    QCOMPARE(ctx_.messages, 0);
+    QCOMPARE(headless->row(0)->Field(0)->GetValueAt(0).toString(), dir + "/headless.so");
+
+    // Interactive, answered No: asked once per path, not loaded
+    ctx_.interactive = true;
+    EffectPtr no1 = set_path(dir + "/no.so");
+    EffectPtr no2 = set_path(dir + "/no.so");
+    QCOMPARE(ctx_.questions, 1);
+    QCOMPARE(ctx_.messages, 0);
+
+    // Answered Yes: loaded (and failed), trusted from now on, even headless
+    ctx_.answer = true;
+    EffectPtr yes = set_path(dir + "/yes.so");
+    QCOMPARE(ctx_.questions, 2);
+    QCOMPARE(ctx_.messages, 1);
+    QVERIFY(amber::CurrentConfig.trusted_vst_plugins.contains(dir + "/yes.so"));
+    ctx_.interactive = false;
+    EffectPtr again = set_path(dir + "/yes.so");
+    QCOMPARE(ctx_.questions, 2);
+    QCOMPARE(ctx_.messages, 2);
+    amber::CurrentConfig.trusted_vst_plugins.clear();
   }
 };
 

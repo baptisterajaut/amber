@@ -22,6 +22,7 @@
 #define CONFIG_H
 
 #include <QString>
+#include <QStringList>
 
 #include "core/style.h"
 
@@ -691,6 +692,14 @@ struct Config {
    * Versioned autorecovery files are not yet implemented.
    */
   int autorecovery_max{5};
+
+  /**
+   * @brief VST plugin libraries the user trusts to load
+   *
+   * Absolute paths. Loading a plugin runs its native code, and a project file or a paste can name any library: a path
+   * gets here when the user picks it in the effect's file chooser or says Yes when a project asks to load it.
+   */
+  QStringList trusted_vst_plugins;
 
   /**
    * @brief Load config from file

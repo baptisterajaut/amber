@@ -44,6 +44,9 @@ class AppContext {
   virtual int showMessage(const QString& title, const QString& text, int type) = 0;
   // warning: warning icon over the main window, Yes by default (project load prompts)
   virtual bool showQuestion(const QString& title, const QString& text, bool warning = false) = 0;
+  // True if showQuestion() reaches a user. Headless contexts answer questions themselves: a caller that needs real
+  // consent (loading a native plugin) must take that as No
+  virtual bool isInteractive() = 0;
   virtual QString showSaveFileDialog(const QString& title, const QString& filter) = 0;
   virtual QString showOpenFileDialog(const QString& title, const QString& filter) = 0;
   virtual void clearViewerMedia() = 0;

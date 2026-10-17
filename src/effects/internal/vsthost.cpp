@@ -24,6 +24,9 @@
 
 #include <QCloseEvent>
 #include <QFile>
+#include <QFileInfo>
+#include <QPointer>
+#include <QSet>
 #include <QWindow>
 #include <QXmlStreamWriter>
 
@@ -32,6 +35,7 @@
 #include <functional>
 
 #include "core/appcontext.h"
+#include "global/config.h"
 #include "global/debug.h"
 #include "rendering/audio.h"
 
@@ -158,9 +162,7 @@ using processEventsFuncPtr = int32_t (*)(VstEvents* events);
 // Plugin's process() method
 using processFuncPtr = void (*)(AEffect* effect, float** inputs, float** outputs, int32_t sampleFrames);
 
-void VSTHost::loadPlugin() {
-  QString dll_fn = file_field->GetFileAt(0);
-
+void VSTHost::loadPlugin(const QString& dll_fn) {
   if (dll_fn.isEmpty()) {
     return;
   }
@@ -341,8 +343,10 @@ EffectPtr VSTHost::copy(Clip* c) {
   }
 
   // Load plugin on the copy — file path was copied to persistent_data_
-  // by copy_field_keyframes() but change_plugin() was never triggered
-  vst_copy->change_plugin();
+  // by copy_field_keyframes() but change_plugin() was never triggered.
+  // Queued like a field change: change_plugin() may ask whether to trust the path, which must not open a dialog in
+  // the middle of a paste or a clip duplication
+  QMetaObject::invokeMethod(vst_copy, &VSTHost::change_plugin, Qt::QueuedConnection);
 
   return cp;
 }
@@ -580,9 +584,60 @@ void VSTHost::show_interface(bool show) {
 
 void VSTHost::uncheck_show_button() { show_interface_btn->SetChecked(false); }
 
+// Loading a plugin runs native code (the library's constructors run in QLibrary::load()), and the path comes from a
+// project file or a paste. Only a trusted path loads: picked in the file chooser (FileFieldWidget trusts it) or
+// confirmed here once. An untrusted one leaves the effect inert (audio passes through) and keeps the path, so saving
+// doesn't lose it. Trust persists in the config; a No holds until Amber restarts. Runs on the GUI thread:
+// change_plugin() is a queued slot, so the question never opens from the loader thread or in the middle of a paste.
+bool VSTHost::PluginPathTrusted(const QString& path) {
+  static QSet<QString> declined;
+  static QSet<QString> asking;
+  static QVector<QPointer<VSTHost>> waiting;  // same path came up while its question was open
+
+  if (path.isEmpty() || amber::CurrentConfig.trusted_vst_plugins.contains(path)) return true;
+  if (declined.contains(path)) return false;
+  if (!QFileInfo(path).isAbsolute() || !amber::app_ctx->isInteractive()) {
+    qWarning() << "Not loading untrusted VST plugin" << path;
+    return false;
+  }
+  if (asking.contains(path)) {
+    waiting.append(this);
+    return false;
+  }
+
+  // showQuestion() runs an event loop: this effect may be deleted meanwhile, touch only locals and statics after it
+  asking.insert(path);
+  bool yes = amber::app_ctx->showQuestion(
+      tr("Load VST Plugin?"),
+      tr("This project or pasted clip uses the VST plugin:\n\n%1\n\nLoading it runs the native code in that library "
+         "with your permissions. Only load plugins you trust.\n\nLoad it?")
+          .arg(path),
+      true);
+  asking.remove(path);
+  // CBA: the config is written when Amber closes, a crash before that asks again next time
+  if (yes) {
+    amber::CurrentConfig.trusted_vst_plugins.append(path);
+  } else {
+    declined.insert(path);
+  }
+
+  // Retry the effects that were waiting on this answer (still waiting ones re-register)
+  const QVector<QPointer<VSTHost>> retry = waiting;
+  waiting.clear();
+  for (const QPointer<VSTHost>& host : retry) {
+    if (!host.isNull()) QMetaObject::invokeMethod(host.data(), &VSTHost::change_plugin, Qt::QueuedConnection);
+  }
+  return yes;
+}
+
 void VSTHost::change_plugin() {
   freePlugin();
-  loadPlugin();
+  QPointer<VSTHost> self(this);
+  // Load exactly the path that was approved: the field may change while the trust question is open
+  const QString path = file_field->GetFileAt(0);
+  bool trusted = PluginPathTrusted(path);
+  if (self.isNull()) return;  // deleted while the trust question was open
+  if (trusted) loadPlugin(path);
   if (plugin != nullptr) {
     if (configurePluginCallbacks()) {
       startPlugin();

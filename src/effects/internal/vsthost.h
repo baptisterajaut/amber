@@ -53,8 +53,9 @@ class VSTHost : public Effect {
   FileField* file_field;
   ButtonField* show_interface_btn;
 
-  void loadPlugin();
+  void loadPlugin(const QString& dll_fn);
   void freePlugin();
+  bool PluginPathTrusted(const QString& path);
   dispatcherFuncPtr dispatcher;
   AEffect* plugin{nullptr};
   bool configurePluginCallbacks();

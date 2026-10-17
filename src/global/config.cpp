@@ -189,6 +189,9 @@ void Config::load(QString path) {
 
     if (!apply_config_element(this, name, text) && name == QLatin1String("Style")) {
       style = static_cast<amber::styling::Style>(text.toInt());
+    } else if (name == QLatin1String("TrustedVstPlugin") && !text.isEmpty()) {
+      // one element per path
+      if (!trusted_vst_plugins.contains(text.toString())) trusted_vst_plugins.append(text.toString());
     }
   }
 
@@ -286,6 +289,7 @@ void Config::save(QString path) {
   stream.writeTextElement("AutorecoveryMax", QString::number(autorecovery_max));
   stream.writeTextElement("StickyKeyframeType", QString::number(sticky_keyframe_type));
   stream.writeTextElement("DefaultKeyframeType", QString::number(default_keyframe_type));
+  for (const QString& path : trusted_vst_plugins) stream.writeTextElement("TrustedVstPlugin", path);
 
   stream.writeEndElement();   // configuration
   stream.writeEndDocument();  // doc
