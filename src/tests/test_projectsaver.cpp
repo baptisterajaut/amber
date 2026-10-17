@@ -258,6 +258,26 @@ class TestProjectSaver : public QObject {
     QCOMPARE(find_media("clip")->to_footage()->markers.size(), 1);
   }
 
+  // A new effect shows its defaults: otherwise its reset arrows are lit before any edit and Reset changes the
+  // picture (Text's Shadow Opacity was set to 100, then given a default of 80)
+  void freshEffectsStartAtDefaults() {
+    ClipPtr title = title_clip();
+    QVERIFY(title != nullptr);
+    for (const EffectMeta& em : effects) {
+      if (em.type != EFFECT_TYPE_EFFECT) continue;
+      EffectPtr e = Effect::Create(title.get(), &em);
+      QVERIFY2(e != nullptr, qPrintable(em.name));
+      for (int i = 0; i < e->row_count(); i++) {
+        EffectRow* row = e->row(i);
+        for (int j = 0; j < row->FieldCount(); j++) {
+          EffectField* f = row->Field(j);
+          if (!f->HasDefault()) continue;
+          QVERIFY2(f->GetValueAt(0) == f->GetDefaultData(), qPrintable(em.name + " / " + f->id()));
+        }
+      }
+    }
+  }
+
   // A failed save must report false and leave the previous file untouched (disk full, read-only share). Before
   // QSaveFile the old file was truncated on open and a write error still returned true
   void failedSaveKeepsPreviousFile() {
