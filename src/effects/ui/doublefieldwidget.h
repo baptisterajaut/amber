@@ -5,6 +5,7 @@
 
 class DoubleField;
 class KeyframeDataChange;
+class LabelSlider;
 
 class DoubleFieldWidget : public EffectFieldWidget {
   Q_OBJECT
@@ -18,6 +19,8 @@ private slots:
   void UpdateFromWidget(double d);
 
 private:
+  QUndoCommand* ApplyValue(double d, LabelSlider* ls);
+
   KeyframeDataChange* kdc_{nullptr};
 };
 

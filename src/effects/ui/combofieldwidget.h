@@ -15,6 +15,9 @@ public:
 
 private slots:
   void UpdateFromWidget(int index);
+
+private:
+  QUndoCommand* ApplyValue(int index);
 };
 
 #endif  // COMBOFIELDWIDGET_H
