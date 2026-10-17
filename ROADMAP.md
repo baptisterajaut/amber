@@ -90,7 +90,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 - Linked clip vertical drag — done in 2.0: dragging a clip up or down a track moves the selected clips on the other side (video or audio) the mirrored way, away from or toward the V/A seam, so a linked V1+A1 pair dragged to V2 lands on V2+A2. A ghost that would cross the seam blocks the vertical move of all of them (the drag still moves in time), so their layout is kept. Track arithmetic in `panels/timeline_layout` (`ghost_track`, `clamp_track_diff`), tested in `amber-test-timeline-layout` (#12)
 - Layout presets (Default, 3-Point Editing, Color)
 - ~~Color labels on media in project panel~~ (shipped in v1.7.0)
-- Proxy toggle (switch proxy/full-res during playback without rebuild)
+- Proxy toggle — done in 2.0: Use Proxies (on by default), in the viewer's preview resolution menu and in View (keymap id `useproxies`, no default shortcut). Off, every clip whose footage has a proxy switches to the original file, live, during playback too, without regenerating anything; on, back to the proxy. Export always decodes the original; Save Frame follows the viewer. `Clip::Open()` latches the setting next to the export mode, and `NeedsCacherReconfigure()` reopens a proxied clip whose latch no longer matches (`amber-engine-tests`, `viewerFollowsUseProxies` in `amber-test-headless-render`)
 - Markers with duration — range markers with in/out points, Premiere-style section marking (#15)
 - Effect presets save/load — serialize effect parameters, apply saved presets to clips (#15)
 
