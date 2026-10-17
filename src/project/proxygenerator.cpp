@@ -78,7 +78,7 @@ static bool setup_proxy_video_stream(int i, AVFormatContext* input_fmt_ctx, AVFo
   enc_ctx->width = qFloor(dec_ctx->width * info.size_multiplier);
   enc_ctx->height = qFloor(dec_ctx->height * info.size_multiplier);
   enc_ctx->sample_aspect_ratio = dec_ctx->sample_aspect_ratio;
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
   const enum AVPixelFormat* pix_fmts = nullptr;
   int num_pix_fmts = 0;
   avcodec_get_supported_config(nullptr, enc_codec, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void**)&pix_fmts,
