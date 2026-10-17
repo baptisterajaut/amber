@@ -35,6 +35,11 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 - **Preferences** describe what each option does in its tooltip.
 - **Translations**: the 2.0 strings are translated in all 15 languages, and about 600 existing entries were corrected (wrong meanings such as Import shown as Export, swapped Move Up / Move Down, blank labels, typos).
 
+## Fixes (coming to 1.x too)
+
+- **Export reads the original media**: footage with a finished proxy was exported from the proxy, at its reduced resolution and quality. Proxies are now used for preview only; export (video and audio) always decodes the original file, and the viewer goes back to the proxy after the export.
+- **Frei0r effects on proxied footage**: a Frei0r effect silently did nothing on a clip whose footage had a proxy. It now processes the frame it is given, whatever its size, and no longer shears the picture of footage of some widths, such as 1366 pixels or a 270-pixel-wide proxy of portrait video.
+
 ## Under the hood
 
 - The engine is separated from the interface and builds as a library of its own, so rendering can be tested without a window.
