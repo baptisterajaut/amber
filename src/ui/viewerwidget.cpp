@@ -123,6 +123,10 @@ ViewerWidget::ViewerWidget(QWidget* parent)
 
   window = new ViewerWindow(this);
 
+  settle_timer_.setSingleShot(true);
+  settle_timer_.setInterval(amber::kScrubSettleMs);
+  connect(&settle_timer_, &QTimer::timeout, this, &ViewerWidget::scrub_settled);
+
   // Overlay created by ViewerContainer as sibling — child QWidget over
   // QRhiWidget breaks Vulkan compositing in Amber's widget hierarchy.
 }
@@ -369,7 +373,13 @@ void ViewerWidget::resizeEvent(QResizeEvent* event) {
   if (overlay_) overlay_->setGeometry(geometry());  // overlay is sibling in ViewerContainer
 }
 
-void ViewerWidget::frame_update() {
+void ViewerWidget::frame_update() { request_render(true); }
+
+void ViewerWidget::request_render(bool with_audio) {
+  // Consume the seek mark before any early return, so a seek whose render is skipped can't leave it set for a
+  // later non-seek render
+  bool scrub_flag = viewer->scrub_next_render_;
+  viewer->scrub_next_render_ = false;
   if (audio_rendering) return;  // export in progress — viewer frozen
   if (viewer->seq != nullptr) {
     if (waveform) {
@@ -378,12 +388,36 @@ void ViewerWidget::frame_update() {
       // Single-step actions (prev/next frame) request precise retrieval so the
       // cacher uses the long-wait path and we don't show a stale closest-frame.
       bool scrubbing = !viewer->playing && !viewer->precise_next_render_;
+      bool scrub_render = scrubbing && scrub_flag;
       viewer->precise_next_render_ = false;
-      renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0,
-                             amber::CurrentConfig.preview_resolution_divider, scrubbing);
+      int base = qMax(1, amber::CurrentConfig.preview_resolution_divider);
+      auto mode = static_cast<amber::ScrubHalfRes>(amber::CurrentConfig.scrub_half_resolution);
+      RenderThread::FrameTiming t = renderer->last_frame_timing();
+      if (settle_timer_.isActive()) {
+        // frames of the current gesture feed Auto
+        scrub_res_.record_frame(t.serial, t.gpu_ms, t.divider, base, viewer->seq->frame_rate);
+      } else if (scrub_render) {
+        // gesture starts: the last record predates it (settle render, Save Frame...), never count it
+        scrub_res_.skip_serial(t.serial);
+      }
+      int divider = scrub_res_.divider(base, mode, scrub_render, qMin(viewer->seq->width, viewer->seq->height));
+      if (scrub_render && mode != amber::ScrubHalfRes::Never) settle_timer_.start();  // restarts per scrub render
+      last_requested_divider_ = divider;
+      renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0, divider, scrubbing);
     }
 
-    amber::rendering::compose_audio(viewer->seq.get(), !viewer->playing, viewer->get_playback_speed(), false);
+    if (with_audio) {
+      amber::rendering::compose_audio(viewer->seq.get(), !viewer->playing, viewer->get_playback_speed(), false);
+    }
+  }
+}
+
+void ViewerWidget::scrub_settled() {
+  scrub_res_.end_gesture();
+  if (viewer->seq == nullptr || viewer->playing) return;
+  if (last_requested_divider_ != qMax(1, amber::CurrentConfig.preview_resolution_divider)) {
+    viewer->precise_next_render_ = true;  // exact frame, not the closest cached one
+    request_render(false);                // same frame, no extra audio grain
   }
 }
 
@@ -1089,7 +1123,23 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
   gizmos = renderer->gizmos;
   if (viewer->seq != nullptr && gizmos != viewer->seq->GetSelectedGizmo()) {
     gizmos = nullptr;
-    QTimer::singleShot(0, this, &ViewerWidget::frame_update);
+    // Fires on any paint (paused or playing) while the clip's gizmo isn't drawn (clip closed, lock busy, near a cut),
+    // so it can repeat every frame. Mid-gesture it re-requests at the gesture's divider without audio and without
+    // touching the Auto state or the settle timer; the pending settle restores base. Otherwise a plain frame_update().
+    if (settle_timer_.isActive() && !viewer->playing) {
+      QTimer::singleShot(0, this, [this]() {
+        if (audio_rendering || viewer->seq == nullptr) return;
+        if (viewer->playing || waveform) {
+          frame_update();  // playback started (or waveform view) meanwhile: same as outside a gesture
+          return;
+        }
+        // same scrubbing value frame_update() would compute while paused (true unless a precise step is pending)
+        renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0,
+                               last_requested_divider_, !viewer->precise_next_render_);
+      });
+    } else {
+      QTimer::singleShot(0, this, &ViewerWidget::frame_update);
+    }
   }
 
   if (has_frame && window->isVisible()) window->set_frame(frame_data, fw, fh);
@@ -1138,8 +1188,9 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
   cb->endPass();
 
   if (renderer->did_texture_fail() && !viewer->playing) {
+    // same divider as the failed request; not a new scrub frame (no Auto feed, no settle restart)
     renderer->start_render(viewer->seq.get(), viewer->get_playback_speed(), nullptr, nullptr, 0,
-                           amber::CurrentConfig.preview_resolution_divider);
+                           last_requested_divider_);
   }
   if (overlay_) overlay_->update();
 }

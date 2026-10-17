@@ -30,6 +30,7 @@
 #include <QWaitCondition>
 
 #include "core/guide.h"
+#include "core/scrubresolution.h"
 #include "effects/effect.h"
 #include "engine/clip.h"
 #include "project/footage.h"
@@ -106,6 +107,8 @@ class ViewerWidget : public QRhiWidget {
   void draw_gizmos(QPainter& p);
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
   void move_gizmos(QMouseEvent* event, bool done);
+  // Body of frame_update(); with_audio = false skips the audio scrub grain
+  void request_render(bool with_audio);
   int find_guide_at(int video_x, int video_y, bool* hit_mirror = nullptr) const;
   void show_guide_context_menu(int guide_index, const QPoint& global_pos, bool on_mirror = false);
   bool dragging{false};
@@ -160,11 +163,17 @@ class ViewerWidget : public QRhiWidget {
   double x_scroll{0};
   double y_scroll{0};
   QString save_frame_last_dir_;
+  // Half resolution while scrubbing: Auto decision state and the settle timer (restarted by each scrub render)
+  amber::ScrubResolution scrub_res_;
+  QTimer settle_timer_;
+  int last_requested_divider_{1};  // divider of the last viewer render requested, reused by the retries and checked by the settle
  public slots:
   void queue_repaint();
 
  private slots:
   void context_destroy();
+  // Scrub gesture over: re-renders the same frame at the base divider if the last request was reduced
+  void scrub_settled();
   void retry();
   void show_context_menu();
   void save_frame();

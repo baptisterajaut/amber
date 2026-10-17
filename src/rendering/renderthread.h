@@ -70,6 +70,16 @@ class RenderThread : public QThread {
   void cancel();
   void wait_until_paused();
 
+  // GPU + readback time of the last successfully rendered viewer frame, the divider it was rendered at, and a
+  // serial that increments per published frame (0 = none yet). Written on the render thread, read on the GUI
+  // thread; the three fields always belong to the same frame.
+  struct FrameTiming {
+    quint64 serial{0};
+    double gpu_ms{0};
+    int divider{1};
+  };
+  FrameTiming last_frame_timing() const;
+
   // Queue a QRhi resource for deferred deletion on the render thread.
   // Safe to call from any thread.
   static void DeferRhiResourceDeletion(QRhiResource* res);
@@ -91,7 +101,7 @@ class RenderThread : public QThread {
   // RHI initialization helpers
   bool try_create_rhi();
   void init_rhi_resources();
-  void ensure_render_buffers();
+  void ensure_render_buffers(int divider);
 
   // RHI resources
   QRhi* rhi_{nullptr};
@@ -134,7 +144,8 @@ class RenderThread : public QThread {
   int playback_speed_;
   int tex_width{-1};
   int tex_height{-1};
-  int divider_{1};
+  std::atomic<int> divider_{1};  // written by start_render() on the GUI thread, latched once per render in run()
+  int render_divider_{1};        // render thread only: divider the current frame is rendered at
   QAtomicInt queued;
   bool texture_failed{false};
   bool scrubbing_{false};
@@ -148,6 +159,9 @@ class RenderThread : public QThread {
   QByteArray cpu_frame_[2];
   int cpu_frame_w_[2]{0, 0};  // size of cpu_frame_[i], written with it under its buffer mutex
   int cpu_frame_h_[2]{0, 0};
+
+  mutable QMutex timing_mutex_;
+  FrameTiming last_timing_;
 };
 
 #endif  // RENDERTHREAD_H

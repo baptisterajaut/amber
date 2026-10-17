@@ -22,6 +22,7 @@
 
 #include <QDateTime>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
 // Qt may set QT_CONFIG(vulkan) even without a real Vulkan SDK (e.g. macOS
@@ -185,9 +186,9 @@ bool RenderThread::try_create_rhi() {
 }
 
 // Create or recreate front/back render buffers if the target dimensions changed.
-void RenderThread::ensure_render_buffers() {
-  int target_w = qMax(1, seq->width / divider_);
-  int target_h = qMax(1, seq->height / divider_);
+void RenderThread::ensure_render_buffers(int divider) {
+  int target_w = qMax(1, seq->width / divider);
+  int target_h = qMax(1, seq->height / divider);
   if (target_w != tex_width || target_h != tex_height) {
     delete_buffers();
     tex_width = target_w;
@@ -249,7 +250,9 @@ void RenderThread::run() {
       rhi_failed_ = false;
     }
 
-    ensure_render_buffers();
+    // Latch once: start_render() may change divider_ from the GUI thread while this frame renders
+    render_divider_ = qMax(1, divider_.load());
+    ensure_render_buffers(render_divider_);
     paint();
 
     front_buffer_switcher = !front_buffer_switcher;
@@ -327,7 +330,10 @@ void RenderThread::paint() {
   amber::rendering::compose_sequence(params);
   gizmos = params.gizmos;  // nulled by compose_sequence if clip wasn't rendered
 
-  // CPU readback
+  // CPU readback. gpu_ns spans endOffscreenFrame() (waits for the GPU to finish the frame, readback included) to the
+  // end of the CPU copy; it excludes compose_sequence(), so decoder waits don't count.
+  qint64 gpu_ns = 0;
+  bool frame_ok = false;
   {
     QRhiReadbackResult readback;
     QRhiResourceUpdateBatch* u = rhi_->nextResourceUpdateBatch();
@@ -336,7 +342,9 @@ void RenderThread::paint() {
     cb->beginPass(front_rt_[active_idx], clearColor, {1.0f, 0});
     cb->endPass(u);
 
-    rhi_->endOffscreenFrame();
+    QElapsedTimer gpu_timer;
+    gpu_timer.start();
+    frame_ok = rhi_->endOffscreenFrame() == QRhi::FrameOpSuccess;
 
     qDeleteAll(params.transientResources);
     params.transientResources.clear();
@@ -349,11 +357,21 @@ void RenderThread::paint() {
     dst = readback.data;
     cpu_frame_w_[active_idx] = readback.pixelSize.width();
     cpu_frame_h_[active_idx] = readback.pixelSize.height();
+    gpu_ns = gpu_timer.nsecsElapsed();
   }
 
   active_mutex.unlock();
 
   texture_failed = params.texture_failed;
+
+  // Publish viewer frames only: failed frames (texture not ready, device lost) and export renders (pixel_buffer,
+  // cleared further down) are skipped. Reads the local params: the GUI thread may write texture_failed concurrently.
+  if (frame_ok && !params.texture_failed && pixel_buffer == nullptr) {
+    QMutexLocker tl(&timing_mutex_);
+    last_timing_.serial++;
+    last_timing_.gpu_ms = gpu_ns / 1e6;
+    last_timing_.divider = render_divider_;
+  }
 
   // readBackTexture() returns top-to-bottom data on all backends (both OpenGL
   // and Vulkan/Metal/D3D). No row reversal needed for export or save-frame.
@@ -458,6 +476,11 @@ void RenderThread::start_render(Sequence* s, int playback_speed, const QString& 
 }
 
 bool RenderThread::did_texture_fail() { return texture_failed; }
+
+RenderThread::FrameTiming RenderThread::last_frame_timing() const {
+  QMutexLocker tl(&timing_mutex_);
+  return last_timing_;
+}
 
 bool RenderThread::rhi_failed() const { return rhi_failed_.load(); }
 

@@ -184,6 +184,7 @@ void Viewer::seek(long p, bool enable_scrub_audio) {
     }
   }
   last_playhead = seq->playhead;
+  scrub_next_render_ = true;
   update_parents(update_fx, fast_scrub);
 }
 

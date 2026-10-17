@@ -195,6 +195,7 @@ void PreferencesDialog::save_config_from_ui() {
   amber::CurrentConfig.sticky_keyframe_type = sticky_keyframe_type_check->isChecked();
   amber::CurrentConfig.default_keyframe_type = default_keyframe_type_combo->currentData().toInt();
   amber::CurrentConfig.language_file = language_combobox->currentData().toString();
+  amber::CurrentConfig.scrub_half_resolution = scrub_half_res_combo->currentData().toInt();
   amber::CurrentConfig.default_sequence_width = default_sequence.width;
   amber::CurrentConfig.default_sequence_height = default_sequence.height;
   amber::CurrentConfig.default_sequence_framerate = default_sequence.frame_rate;
@@ -863,6 +864,22 @@ void PreferencesDialog::setup_ui() {
   previous_queue_type->setToolTip(tr("Unit of the previous frame queue size."));
   memory_usage_layout->addWidget(previous_queue_type, 1, 2);
   playback_tab_layout->addWidget(memory_usage_group);
+
+  // Playback -> Scrubbing
+  QGroupBox* scrubbing_group = new QGroupBox(tr("Scrubbing"), playback_tab);
+  QGridLayout* scrubbing_layout = new QGridLayout(scrubbing_group);
+  scrubbing_layout->addWidget(new QLabel(tr("Half Resolution While Scrubbing:"), playback_tab), 0, 0);
+  scrub_half_res_combo = new QComboBox(playback_tab);
+  scrub_half_res_combo->addItem(tr("Auto (when the viewer can't keep up)"), 0);
+  scrub_half_res_combo->addItem(tr("Always"), 1);
+  scrub_half_res_combo->addItem(tr("Never"), 2);
+  scrub_half_res_combo->setCurrentIndex(qBound(0, amber::CurrentConfig.scrub_half_resolution, 2));
+  scrub_half_res_combo->setToolTip(
+      tr("Render scrub frames at half the preview resolution so the viewer keeps up; the frame is re-rendered at "
+         "full preview resolution when you stop."));
+  scrubbing_layout->addWidget(scrub_half_res_combo, 0, 1);
+  scrubbing_layout->setColumnStretch(1, 1);
+  playback_tab_layout->addWidget(scrubbing_group);
   playback_tab_layout->addStretch();
 
   tabWidget->addTab(playback_tab, tr("Playback"));

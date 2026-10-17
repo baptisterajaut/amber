@@ -16,6 +16,8 @@ target_sources(amber-engine PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/headlessappcontext.h
   ${CMAKE_CURRENT_SOURCE_DIR}/math.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/math.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/scrubresolution.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/scrubresolution.h
   ${CMAKE_CURRENT_SOURCE_DIR}/path.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/path.h
   ${CMAKE_CURRENT_SOURCE_DIR}/displaytype.h

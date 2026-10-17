@@ -310,6 +310,11 @@ class PreferencesDialog : public QDialog {
   QComboBox* default_keyframe_type_combo;
 
   /**
+   * @brief UI widget for the half-resolution-while-scrubbing mode
+   */
+  QComboBox* scrub_half_res_combo;
+
+  /**
    * @brief Stored default Sequence object
    *
    * Default Sequence settings are loaded into an actual Sequence object that can be loaded into NewSequenceDialog

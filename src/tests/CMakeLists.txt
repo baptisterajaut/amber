@@ -14,6 +14,11 @@ target_include_directories(amber-test-path PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-path PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-path COMMAND amber-test-path)
 
+add_executable(amber-test-scrub-resolution test_scrub_resolution.cpp)
+target_include_directories(amber-test-scrub-resolution PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-scrub-resolution PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-scrub-resolution COMMAND amber-test-scrub-resolution)
+
 add_executable(amber-test-audio test_audio.cpp)
 target_include_directories(amber-test-audio PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-audio PRIVATE amber-engine Qt6::Test)
