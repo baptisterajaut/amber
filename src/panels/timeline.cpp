@@ -643,6 +643,8 @@ int Timeline::PanelHeight() {
 }
 
 void Timeline::select_from_playhead() {
+  if (amber::ActiveSequence == nullptr) return;
+
   amber::ActiveSequence->selections.clear();
   for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     ClipPtr c = amber::ActiveSequence->clips.at(i);
@@ -1116,6 +1118,8 @@ void Timeline::ripple_delete() {
 }
 
 void Timeline::deselect_area(long in, long out, int track) {
+  if (amber::ActiveSequence == nullptr) return;
+
   int len = amber::ActiveSequence->selections.size();
   for (int i = 0; i < len; i++) {
     Selection& s = amber::ActiveSequence->selections[i];
