@@ -77,7 +77,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 ### Scopes & monitoring
 
 Backported from Oak, adapted to QRhi (originally GL-based):
-- Waveform + histogram scopes
+- Waveform + histogram scopes — done in 2.0: Scopes panel (Window > Scopes, hidden by default) with luma waveform, RGB parade, histogram and vectorscope of the sequence viewer's frame, computed on the CPU from the viewer's readback (`core/scopes`, `panels/scopespanel`, `ui/scopewidget`)
 - Pixel sampler
 - Enhanced audio monitor
 - FPS counter overlay

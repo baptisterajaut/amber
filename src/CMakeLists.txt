@@ -253,6 +253,7 @@ set(UI_SOURCES
   panels/grapheditor.cpp panels/grapheditor.h
   panels/panels.cpp panels/panels.h
   panels/project.cpp panels/project.h
+  panels/scopespanel.cpp panels/scopespanel.h
   panels/undohistorypanel.cpp panels/undohistorypanel.h
   panels/timeline.cpp panels/timeline_clipboard.cpp panels/timeline_layout.cpp panels/timeline_layout.h panels/timeline_splitting.cpp panels/timeline_ui.cpp panels/timeline.h
   panels/viewer.cpp panels/viewer.h
@@ -292,6 +293,7 @@ set(UI_SOURCES
   ui/rectangleselect.cpp ui/rectangleselect.h
   ui/rulerwidget.cpp ui/rulerwidget.h
   ui/resizablescrollbar.cpp ui/resizablescrollbar.h
+  ui/scopewidget.cpp ui/scopewidget.h
   ui/scrollarea.cpp ui/scrollarea.h
   ui/sourceiconview.cpp ui/sourceiconview.h
   ui/sourcetable.cpp ui/sourcetable.h
