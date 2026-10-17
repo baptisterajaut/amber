@@ -451,14 +451,19 @@ void TextEffect::redraw(double timecode) {
     col.setAlpha(0);
     img.fill(col);
 
-    double shadow_alpha = shadow_opacity->GetDoubleAt(timecode) * 0.01;
+    // Characters are drawn at their reveal alpha only, so overlapping joins
+    // (Arabic, script fonts) don't stack into darker seams; the opacity is
+    // applied once to the whole shadow layer afterwards.
     p.save();
     p.translate(shadow_x_offset, shadow_y_offset);
     for (const ClusterPath& cp : cluster_paths) {
-      col.setAlphaF(shadow_alpha * cp.progress);
+      col.setAlphaF(cp.progress);
       p.setBrush(col);
       p.drawPath(cp.path);
     }
+    p.resetTransform();
+    p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+    p.fillRect(img.rect(), QColor(0, 0, 0, qRound(shadow_opacity->GetDoubleAt(timecode) * 2.55)));
     p.restore();
 
     int blurSoftness = qFloor(shadow_softness->GetDoubleAt(timecode));
