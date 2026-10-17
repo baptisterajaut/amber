@@ -278,6 +278,7 @@ void Config::save(QString path) {
   stream.writeTextElement("ShowWelcomeDialog", QString::number(show_welcome_dialog));
   stream.writeTextElement("FrameSkipStep", QString::number(frame_skip_step));
   stream.writeTextElement("ShowGuides", QString::number(show_guides));
+  stream.writeTextElement("LockGuides", QString::number(lock_guides));
   stream.writeTextElement("SnapToOutgoingClip", QString::number(snap_to_outgoing_clip));
   stream.writeTextElement("SnapOutgoingModifier", QString::number(snap_outgoing_modifier));
   stream.writeTextElement("EffectPanelShrinkable", QString::number(effect_panel_shrinkable));
