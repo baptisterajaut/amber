@@ -28,7 +28,6 @@
 #include <cstring>
 
 #include "core/appcontext.h"
-#include "engine/clip.h"
 
 using f0rConstructFunc = f0r_instance_t (*)(unsigned int width, unsigned int height);
 using f0rInitFunc = int (*)();
@@ -77,7 +76,7 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta* em)
   set_param_func_ = reinterpret_cast<f0rSetParamValue>(handle.resolve("f0r_set_param_value"));
   destruct_func_ = reinterpret_cast<f0rDestructFunc>(handle.resolve("f0r_destruct"));
 
-  construct_module();
+  // The instance is built by process_image() at the size of the frames it receives
 
   f0r_plugin_info_t info;
   f0rGetPluginInfo info_func = reinterpret_cast<f0rGetPluginInfo>(handle.resolve("f0r_get_plugin_info"));
@@ -184,20 +183,22 @@ void ApplyFrei0rParam(f0r_instance_t instance, f0rSetParamValue set_param, Effec
 
 }  // namespace
 
-void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* output, int size) {
-  // Reconstruct Frei0r instance if clip dimensions changed since construction
-  // (e.g., effect was created during project load before media was analyzed)
-  int w = parent_clip->media_width();
-  int h = parent_clip->media_height();
-  if (w <= 0 || h <= 0) return;
-  if (w != instance_width || h != instance_height) {
+void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* output, int width, int height, int stride) {
+  const int row_bytes = width * 4;
+  if (width <= 0 || height <= 0 || stride < row_bytes) return;
+
+  // Build the instance at the size of the frame actually decoded, not the footage stream's: a proxied clip decodes
+  // smaller frames, and a mid-stream resolution change alters them
+  if (width != instance_width || height != instance_height) {
     destruct_module();
-    construct_module();
+    construct_module(width, height);
   }
 
-  // construct_module() leaves open=false when f0r_construct is missing or returns null
-  if (!open || instance == nullptr) return;
-  if (update_func_ == nullptr || set_param_func_ == nullptr) return;
+  // construct_module() leaves open=false when f0r_construct is missing or returns null: pass the frame through
+  if (!open || instance == nullptr || update_func_ == nullptr || set_param_func_ == nullptr) {
+    memcpy(output, input, size_t(stride) * height);
+    return;
+  }
 
   for (int i = 0, row_idx = 0; i < param_count; i++) {
     f0r_param_info_t param_info;
@@ -206,19 +207,27 @@ void Frei0rEffect::process_image(double timecode, uint8_t* input, uint8_t* outpu
     ApplyFrei0rParam(instance, set_param_func_, row(row_idx++), param_info.type, i, timecode);
   }
 
-  // The instance reads and writes w * h RGBA pixels, w/h from the stream parameters: a decoded frame smaller than
-  // declared (corrupt or mid-stream resolution change) would be overrun. Pass it through untouched instead.
-  if (size < qint64(w) * h * 4) {
-    memcpy(output, input, size);
+  if (stride == row_bytes) {
+    update_func_(instance, timecode, reinterpret_cast<uint32_t*>(input), reinterpret_cast<uint32_t*>(output));
     return;
   }
 
-  update_func_(instance, timecode, reinterpret_cast<uint32_t*>(input), reinterpret_cast<uint32_t*>(output));
+  // Frei0r frames are tightly packed (pitch = width * 4), decoded rows are padded for alignment when the width isn't
+  // a multiple of it. CBA: two extra frame copies on such widths; the plugin API has no stride.
+  packed_in_.resize(size_t(width) * height);
+  packed_out_.resize(size_t(width) * height);
+  uint8_t* packed_in = reinterpret_cast<uint8_t*>(packed_in_.data());
+  const uint8_t* packed_out = reinterpret_cast<const uint8_t*>(packed_out_.data());
+  for (int y = 0; y < height; y++) memcpy(packed_in + size_t(y) * row_bytes, input + size_t(y) * stride, row_bytes);
+  update_func_(instance, timecode, packed_in_.data(), packed_out_.data());
+  for (int y = 0; y < height; y++) memcpy(output + size_t(y) * stride, packed_out + size_t(y) * row_bytes, row_bytes);
 }
 
 void Frei0rEffect::refresh() {
+  // Rebuilt (from a fresh state) on the next frame
   destruct_module();
-  construct_module();
+  instance_width = 0;
+  instance_height = 0;
 }
 
 void Frei0rEffect::destruct_module() {
@@ -228,9 +237,9 @@ void Frei0rEffect::destruct_module() {
   }
 }
 
-void Frei0rEffect::construct_module() {
-  instance_width = parent_clip->media_width();
-  instance_height = parent_clip->media_height();
+void Frei0rEffect::construct_module(int width, int height) {
+  instance_width = width;
+  instance_height = height;
 
   f0rConstructFunc construct = reinterpret_cast<f0rConstructFunc>(handle.resolve("f0r_construct"));
   if (construct == nullptr) return;

@@ -737,7 +737,7 @@ bool Clip::retrieveCpuRgbaPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequence
         memcpy(data_buffer_1, frame->data[0], frame_size);
       }
       e->process_image(get_timecode(this, cacher_frame), using_db_1 ? data_buffer_1 : data_buffer_2,
-                       using_db_1 ? data_buffer_2 : data_buffer_1, frame_size);
+                       using_db_1 ? data_buffer_2 : data_buffer_1, frame->width, frame->height, frame->linesize[0]);
       using_db_1 = !using_db_1;
     }
   }
