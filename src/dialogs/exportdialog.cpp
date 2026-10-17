@@ -375,7 +375,6 @@ ExportParams ExportDialog::build_export_params(const QString& filename) const {
     params.video_codec = vcodecCombobox->currentData().toInt();
     params.video_width = widthSpinbox->value();
     params.video_height = heightSpinbox->value();
-    params.video_frame_rate = framerateSpinbox->value();
     params.video_compression_type = compressionTypeCombobox->currentData().toInt();
     params.video_bitrate = videobitrateSpinbox->value();
   }
@@ -617,8 +616,13 @@ void ExportDialog::setup_ui() {
 
   videoGridLayout->addWidget(new QLabel(tr("Frame Rate:"), this), 3, 0, 1, 1);
   framerateSpinbox = new QDoubleSpinBox(videoGroupbox);
+  // Display only: the export always uses the sequence frame rate (ExportThread::SetupVideo)
+  framerateSpinbox->setEnabled(false);
+  framerateSpinbox->setToolTip(tr("Exports always use the sequence frame rate. Change it in Sequence Settings."));
+  framerateSpinbox->setDecimals(3);  // 23.976 and 59.94 shown as they are
   framerateSpinbox->setMinimum(1);
-  framerateSpinbox->setMaximum(60);
+  // CBA: display ceiling only, no sequence (even from high-speed footage) comes near it
+  framerateSpinbox->setMaximum(1000);
   framerateSpinbox->setValue(0);
   videoGridLayout->addWidget(framerateSpinbox, 3, 1, 1, 1);
 
@@ -804,7 +808,6 @@ void ExportDialog::SavePreset(const QString& name) {
   stream.writeTextElement("video_codec_index", QString::number(vcodecCombobox->currentIndex()));
   stream.writeTextElement("width", QString::number(widthSpinbox->value()));
   stream.writeTextElement("height", QString::number(heightSpinbox->value()));
-  stream.writeTextElement("frame_rate", QString::number(framerateSpinbox->value(), 'f', 6));
   stream.writeTextElement("compression_type_index", QString::number(compressionTypeCombobox->currentIndex()));
   stream.writeTextElement("video_bitrate", QString::number(videobitrateSpinbox->value(), 'f', 6));
 
@@ -846,7 +849,6 @@ void ExportDialog::LoadPreset(const QString& name) {
   int video_codec_index = -1;
   int width = -1;
   int height = -1;
-  double frame_rate = -1;
   int compression_type_index = -1;
   double video_bitrate = -1;
   int audio_enabled = -1;
@@ -868,8 +870,6 @@ void ExportDialog::LoadPreset(const QString& name) {
         width = stream.readElementText().toInt();
       } else if (tag == "height") {
         height = stream.readElementText().toInt();
-      } else if (tag == "frame_rate") {
-        frame_rate = stream.readElementText().toDouble();
       } else if (tag == "compression_type_index") {
         compression_type_index = stream.readElementText().toInt();
       } else if (tag == "video_bitrate") {
@@ -907,7 +907,7 @@ void ExportDialog::LoadPreset(const QString& name) {
   // 3. Video settings (after codec is set so compression type combo is populated)
   if (width >= 0) widthSpinbox->setValue(width);
   if (height >= 0) heightSpinbox->setValue(height);
-  if (frame_rate >= 0) framerateSpinbox->setValue(frame_rate);
+  // An older preset's frame_rate is skipped: the export always uses the sequence frame rate
   if (compression_type_index >= 0 && compression_type_index < compressionTypeCombobox->count()) {
     compressionTypeCombobox->setCurrentIndex(compression_type_index);
   }

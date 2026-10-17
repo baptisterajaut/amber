@@ -56,7 +56,6 @@ struct ExportParams {
   int video_codec;
   int video_width;
   int video_height;
-  double video_frame_rate;
   int video_compression_type;
   double video_bitrate;
   bool audio_enabled;

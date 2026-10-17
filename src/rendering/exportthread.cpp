@@ -126,7 +126,9 @@ bool ExportThread::SetupVideo() {
   vcodec_ctx->height = params_.video_height;
   vcodec_ctx->sample_aspect_ratio = {1, 1};
   vcodec_ctx->pix_fmt = static_cast<AVPixelFormat>(vcodec_params_.pix_fmt);
-  vcodec_ctx->framerate = av_d2q(params_.video_frame_rate, INT_MAX);
+  // Always the sequence rate: EncodeAllFrames() stamps one frame per sequence frame, so any other rate gives
+  // duplicate pts (export fails) or uneven frame timing. A codec that can't encode it fails in avcodec_open2() below.
+  vcodec_ctx->framerate = av_d2q(seq_->frame_rate, INT_MAX);
   if (params_.video_compression_type == COMPRESSION_TYPE_CBR) {
     vcodec_ctx->bit_rate = qRound(params_.video_bitrate * 1000000);
   }

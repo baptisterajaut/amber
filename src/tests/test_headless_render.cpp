@@ -238,6 +238,7 @@ struct Decoded {
   bool has_video = false;
   bool has_audio = false;
   int video_frames = 0;
+  double video_fps = 0;  // stream avg_frame_rate
   int width = 0;
   int height = 0;
   QByteArray first_rgba;
@@ -303,6 +304,7 @@ Decoded decode_file(const QString& path) {
   if (vi >= 0) vctx = open_dec(vi);
   if (ai >= 0) actx = open_dec(ai);
   d.has_video = vctx != nullptr;
+  if (vctx != nullptr) d.video_fps = av_q2d(fmt->streams[vi]->avg_frame_rate);
   d.has_audio = actx != nullptr;
   if (actx != nullptr) {
     d.audio_rate = actx->sample_rate;
@@ -468,7 +470,6 @@ class TestHeadlessRender : public QObject {
     params.video_codec = AV_CODEC_ID_MPEG4;  // native libavcodec encoder, in every FFmpeg build
     params.video_width = kSize;
     params.video_height = kSize;
-    params.video_frame_rate = kFps;
     params.video_compression_type = COMPRESSION_TYPE_CBR;
     params.video_bitrate = 2.0;  // Mbps
     params.audio_enabled = true;
@@ -493,6 +494,8 @@ class TestHeadlessRender : public QObject {
     // one frame past the last clip, so a 10-frame sequence gives 11 frames
     const long expected_frames = params.end_frame - params.start_frame + 1;
     QCOMPARE(long(out.video_frames), expected_frames);
+    // The export takes the sequence's frame rate (ExportParams has no frame rate of its own)
+    QVERIFY2(qAbs(out.video_fps - seq->frame_rate) < 0.001, qPrintable(QString("output fps %1").arg(out.video_fps)));
     QCOMPARE(out.width, kSize);
     QCOMPARE(out.height, kSize);
 
