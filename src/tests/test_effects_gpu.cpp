@@ -293,25 +293,40 @@ void TestEffectsGpu::multiEffectChain() {
 }
 
 void TestEffectsGpu::multiFrameConsistency() {
-  // Same frame rendered three times must be byte-identical: guards pooled/cached RHI resources (a stale vertex
-  // buffer or UBO from a previous frame or pass only shows across frames).
+  // Same frame rendered three times must be byte-identical AND match pixels pinned from the pre-cache build: guards
+  // pooled/cached RHI resources (a stale or shared vertex buffer/UBO, a wrong cached pipeline). Bottom clip is a
+  // checkerboard so both Box Blur passes (iteration 0 = horizontal, 1 = vertical) and the HSB hue shift change pixels;
+  // the semi-transparent top clip exercises the srcover blend onto it.
   SequencePtr seq = h_->make_sequence(64, 64, 30);
   Clip* bottom = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
-  h_->set_field_color(bottom->effects[1].get(), 2, 0, QColor(200, 40, 20));
-  h_->attach_xml_shader(bottom, "Box Blur");  // default radius 10
-  h_->attach_xml_shader(bottom, "Hue/Saturation/Brightness");
-  // Second clip, shifted right, so its edge (blurred against transparency) and the srcover onto the bottom clip
-  // carry real per-pixel content: a stale vertex buffer or UBO would move or recolour it
+  Effect* checker = bottom->effects[1].get();
+  h_->set_field_combo(checker, 0, 0, 2);                     // Type = SOLID_TYPE_CHECKERBOARD
+  h_->set_field_color(checker, 2, 0, QColor(240, 120, 30));  // odd cells; (0,0) cell is black
+  h_->set_field_double(checker, 3, 0, 16.0);                 // cell size 16 px
+  EffectPtr blur = h_->attach_xml_shader(bottom, "Box Blur");
+  h_->set_field_double(blur.get(), 0, 0, 8.0);  // radius
+  EffectPtr hsb = h_->attach_xml_shader(bottom, "Hue/Saturation/Brightness");
+  h_->set_field_double(hsb.get(), 0, 0, 60.0);  // hue
+  // Second clip, semi-transparent, shifted right by 24 px (covers x >= 24), with its own Box Blur passes in the pool
   Clip* top = h_->add_generator_clip(seq.get(), -2, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_double(top->effects[1].get(), 1, 0, 50.0);  // Solid opacity 50%
   h_->set_field_color(top->effects[1].get(), 2, 0, QColor(20, 60, 220));
-  h_->set_field_double(top->effects[0].get(), 0, 0, 64.0 / 2 + 16);  // posx
+  h_->set_field_double(top->effects[0].get(), 0, 0, 64.0 / 2 + 24);  // posx
   h_->attach_xml_shader(top, "Box Blur");
   QByteArray f1 = h_->render_frame(seq.get(), 5);
   QByteArray f2 = h_->render_frame(seq.get(), 5);
   QByteArray f3 = h_->render_frame(seq.get(), 5);
   QVERIFY(!f1.isEmpty());
-  // Non-uniform content: bottom-only area (8,32) vs top-clip area (56,32)
-  QVERIFY(f1.mid((32 * 64 + 8) * 4, 4) != f1.mid((32 * 64 + 56) * 4, 4));
+  // Values captured from the pre-cache build (per-pass pipeline/buffer create+destroy), tolerance +/-2
+  // (15,8) horizontal pass only, (8,15) vertical pass only, (15,15) both, (8,24) cell interior: HSB only
+  h_->assert_pixel(f1, 64, 15, 8, QColor(65, 105, 13, 255), 2);
+  h_->assert_pixel(f1, 64, 8, 15, QColor(65, 105, 13, 255), 2);
+  h_->assert_pixel(f1, 64, 15, 15, QColor(73, 118, 15, 255), 2);
+  h_->assert_pixel(f1, 64, 8, 24, QColor(150, 240, 30, 255), 2);
+  // (22,8) bottom only near the top clip's edge (x=24), (26,8) and (40,24) srcover of the 50% top clip
+  h_->assert_pixel(f1, 64, 22, 8, QColor(131, 210, 26, 255), 2);
+  h_->assert_pixel(f1, 64, 26, 8, QColor(76, 135, 123, 255), 2);
+  h_->assert_pixel(f1, 64, 40, 24, QColor(85, 150, 125, 255), 2);
   QCOMPARE(f2, f1);
   QCOMPARE(f3, f1);
 }
@@ -319,19 +334,34 @@ void TestEffectsGpu::multiFrameConsistency() {
 void TestEffectsGpu::sceneSwitchConsistency() {
   // make_sequence() points amber::ActiveSequence at the newest sequence (B); harmless here because Solid,
   // Box Blur and Hue/Saturation/Brightness don't read it. Don't add Timecode-like effects to this test.
+  // A and B use different shaders and UBOs: a cache key that ignored the shader or a buffer reused across scenes
+  // would give B A's pipeline (or the reverse), which the pinned pixels catch even when a2 == a1.
   SequencePtr a = h_->make_sequence(64, 64, 30);
   Clip* ca = h_->add_generator_clip(a.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
-  h_->set_field_color(ca->effects[1].get(), 2, 0, QColor(250, 200, 10));
-  h_->set_field_double(ca->effects[0].get(), 0, 0, 64.0 / 2 + 16);  // posx
-  h_->attach_xml_shader(ca, "Box Blur");
+  Effect* checker = ca->effects[1].get();
+  h_->set_field_combo(checker, 0, 0, 2);  // Type = SOLID_TYPE_CHECKERBOARD
+  h_->set_field_color(checker, 2, 0, QColor(250, 200, 10));
+  h_->set_field_double(checker, 3, 0, 16.0);
+  h_->set_field_double(ca->effects[0].get(), 0, 0, 64.0 / 2 + 16);  // posx: covers x >= 16
+  EffectPtr blur = h_->attach_xml_shader(ca, "Box Blur");
+  h_->set_field_double(blur.get(), 0, 0, 8.0);  // radius
   SequencePtr b = h_->make_sequence(64, 64, 30);
   Clip* cb = h_->add_generator_clip(b.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
   h_->set_field_color(cb->effects[1].get(), 2, 0, QColor(10, 120, 90));
-  h_->attach_xml_shader(cb, "Hue/Saturation/Brightness");
+  EffectPtr hsb = h_->attach_xml_shader(cb, "Hue/Saturation/Brightness");
+  h_->set_field_double(hsb.get(), 0, 0, 90.0);  // hue
   QByteArray a1 = h_->render_frame(a.get(), 5);
   QByteArray b1 = h_->render_frame(b.get(), 5);
   QByteArray a2 = h_->render_frame(a.get(), 5);
   QVERIFY(!a1.isEmpty() && !b1.isEmpty());
+  // Values captured from the pre-cache build (per-pass pipeline/buffer create+destroy), tolerance +/-2
+  // A: (8,32) left of the shifted clip (cleared), (31,8) horizontal blur edge, (24,40) black cell, (56,24) colour
+  h_->assert_pixel(a1, 64, 8, 32, QColor(0, 0, 0, 0), 2);
+  h_->assert_pixel(a1, 64, 31, 8, QColor(109, 88, 4, 255), 2);
+  h_->assert_pixel(a1, 64, 24, 40, QColor(0, 0, 0, 255), 2);
+  h_->assert_pixel(a1, 64, 56, 24, QColor(250, 200, 10, 255), 2);
+  // B: hue-shifted solid, so B drawn with A's pipeline (or no HSB) shows
+  h_->assert_pixel(b1, 64, 32, 32, QColor(35, 10, 120, 255), 2);
   QVERIFY(a1 != b1);  // the switch really changes what the pooled buffers hold
   QCOMPARE(a2, a1);
 }

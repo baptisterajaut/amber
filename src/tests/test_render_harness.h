@@ -121,11 +121,11 @@ class TestRenderHarness {
   // production minus the threading.
   QByteArray render_audio(Clip* clip, double timecode_start, int duration_ms);
 
-  // Pixel assertions. `pixels` is the QByteArray from render_frame.
-  // `w` is the sequence width (needed to compute the row offset for (x, y)).
   // Pipeline/buffer counters of the harness's RHI resource cache (zeroes when there is no QRhi).
   RhiResourceCache::Stats cache_stats() const { return cache_ ? cache_->stats() : RhiResourceCache::Stats{}; }
 
+  // Pixel assertions. `pixels` is the QByteArray from render_frame.
+  // `w` is the sequence width (needed to compute the row offset for (x, y)).
   void assert_pixel(const QByteArray& pixels, int w, int x, int y, QColor expected, int tolerance = 2);
   void assert_solid_color(const QByteArray& pixels, int w, int h, QColor expected, int tolerance = 2);
 
