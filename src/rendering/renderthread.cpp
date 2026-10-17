@@ -144,6 +144,7 @@ void RenderThread::init_rhi_resources() {
   blendingFrag_ = loadQsb(QStringLiteral(":/shaders/blending.frag.qsb"));
   premultiplyFrag_ = loadQsb(QStringLiteral(":/shaders/premultiply.frag.qsb"));
   yuvFrag_ = loadQsb(QStringLiteral(":/shaders/yuv2rgb.frag.qsb"));
+  shadowFrag_ = loadQsb(QStringLiteral(":/shaders/dropshadow.frag.qsb"));
 
   sampler_ = rhi_->newSampler(QRhiSampler::Linear, QRhiSampler::Linear, QRhiSampler::None, QRhiSampler::ClampToEdge,
                               QRhiSampler::ClampToEdge);
@@ -315,6 +316,7 @@ void RenderThread::paint() {
   params.blendingFrag = blendingFrag_;
   params.premultiplyFrag = premultiplyFrag_;
   params.yuvFrag = yuvFrag_;
+  params.shadowFrag = shadowFrag_;
 
   params.main_tex = front_tex_[active_idx];
   params.main_target = front_rt_[active_idx];

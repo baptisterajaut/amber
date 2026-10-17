@@ -114,6 +114,7 @@ class RenderThread : public QThread {
   QShader blendingFrag_;
   QShader premultiplyFrag_;
   QShader yuvFrag_;
+  QShader shadowFrag_;
 
   QRhiSampler* sampler_{nullptr};
   std::unique_ptr<RhiResourceCache> cache_;  // reset before sampler_ and rhi_ in delete_ctx()

@@ -506,6 +506,7 @@ qt_add_shaders(amber-engine "amber_shaders"
     rendering/shaders/yuv2rgb.frag
     rendering/shaders/blending.frag
     rendering/shaders/premultiply.frag
+    rendering/shaders/dropshadow.frag
 )
 
 # Copy shader effects next to the binary so dev builds find them
