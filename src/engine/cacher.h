@@ -173,8 +173,12 @@ class Cacher : public QThread {
    * playhead hasn't reached the clip yet (issue #47): blocking the render thread to wait
    * for an upcoming-clip queue refill produced periodic stutters at every cut on slow
    * iGPU machines (~30-frame cycle = queue drain → blocking refill → drain again).
+   *
+   * @return
+   *
+   * **TRUE** if a CacheWorker() run was queued (the export counts these to wait for the audio fills).
    */
-  void Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
+  bool Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
              bool nonblocking = false);
 
   /**

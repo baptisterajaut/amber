@@ -62,6 +62,9 @@ struct ComposeSequenceParams {
   int playback_speed;
   bool scrubbing{false};
 
+  // Audio cachers queued by this compose, nested sequences included (shared by the recursive compose_sequence calls)
+  int audio_cachers_triggered{0};
+
   // Shared sampler (created by RenderThread, reused across all blit passes)
   QRhiSampler* sampler;
 
@@ -92,7 +95,8 @@ namespace rendering {
 
 QRhiTexture* compose_sequence(ComposeSequenceParams &params);
 
-void compose_audio(Viewer* viewer, Sequence *seq, int playback_speed, bool wait_for_mutexes);
+// Returns how many audio cachers it queued (each signals SignalAudioFill() once its fill pass ends)
+int compose_audio(Viewer* viewer, Sequence *seq, int playback_speed, bool wait_for_mutexes);
 }
 }
 

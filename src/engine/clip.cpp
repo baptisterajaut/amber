@@ -528,10 +528,11 @@ void Clip::Close(bool wait) {
 
 bool Clip::IsOpen() { return open_; }
 
-void Clip::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
+bool Clip::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
                  bool nonblocking) {
-  cacher.Cache(playhead, scrubbing, nests, playback_speed, nonblocking);
+  bool queued = cacher.Cache(playhead, scrubbing, nests, playback_speed, nonblocking);
   cacher_frame = playhead;
+  return queued;
 }
 
 bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* params) {

@@ -87,8 +87,6 @@ signals:
   void ProgressChanged(int value, qint64 remaining_ms);
 public slots:
   void Interrupt();
-
-  void play_wake();
 private:
   bool Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, AVFrame* frame, AVPacket* packet, AVStream* stream);
   bool SetupVideo();
@@ -130,7 +128,6 @@ private:
 
   QString export_error;
 
-  std::atomic<bool> waiting_for_audio_;
   QOffscreenSurface* gl_fallback_surface_{nullptr};
 private slots:
   void wake();

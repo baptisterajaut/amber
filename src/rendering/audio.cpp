@@ -34,6 +34,7 @@
 #include <QAudioDevice>
 #include <QAudioSink>
 #include <QAudioSource>
+#include <QDeadlineTimer>
 #include <QDir>
 #include <QFile>
 #include <QMediaDevices>
@@ -512,4 +513,28 @@ void WakeAudioWakeObject() {
   if (audio_wake_object != nullptr) {
     QMetaObject::invokeMethod(audio_wake_object, "play_wake", Qt::QueuedConnection);
   }
+}
+
+static qint64 audio_fill_count = 0;  // playback passes keep counting between exports
+static QMutex audio_fill_mutex;
+static QWaitCondition audio_fill_cond;
+
+void ResetAudioFillCount() {
+  QMutexLocker locker(&audio_fill_mutex);
+  audio_fill_count = 0;
+}
+
+void SignalAudioFill() {
+  QMutexLocker locker(&audio_fill_mutex);
+  audio_fill_count++;
+  audio_fill_cond.wakeAll();
+}
+
+bool WaitForAudioFills(int expected, int timeout_ms) {
+  QDeadlineTimer deadline(timeout_ms);
+  QMutexLocker locker(&audio_fill_mutex);
+  while (audio_fill_count < expected) {
+    if (!audio_fill_cond.wait(&audio_fill_mutex, deadline)) return audio_fill_count >= expected;
+  }
+  return true;
 }

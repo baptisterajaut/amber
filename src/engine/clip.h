@@ -147,7 +147,7 @@ public:
 
   // playback functions
   void Open();
-  void Cache(long playhead, bool scrubbing, QVector<Clip*> &nests, int playback_speed,
+  bool Cache(long playhead, bool scrubbing, QVector<Clip*> &nests, int playback_speed,
              bool nonblocking = false);
   bool Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* params);
   void Close(bool wait);

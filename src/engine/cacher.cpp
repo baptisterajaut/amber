@@ -470,6 +470,7 @@ void Cacher::CacheWorker() {
   } else {
     // clip is audio
     CacheAudioWorker();
+    SignalAudioFill();  // here, not in CacheAudioWorker(): its early returns must signal too or the export stalls
   }
 }
 
@@ -562,12 +563,12 @@ void Cacher::Open()
   start((clip->track() < 0) ? QThread::HighPriority : QThread::TimeCriticalPriority);
 }
 
-void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
+bool Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int playback_speed,
                    bool nonblocking)
 {
 
   if (!is_valid_state_) {
-    return;
+    return false;
   }
 
   if (clip->media_stream() != nullptr
@@ -578,7 +579,7 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
     }
     queue_.unlock();
     if (retrieved_frame != nullptr) {
-      return;
+      return false;
     }
   }
 
@@ -649,6 +650,8 @@ void Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
   if (blocking) {
     main_thread_lock_.unlock();
   }
+
+  return true;
 }
 
 AVFrame *Cacher::Retrieve()

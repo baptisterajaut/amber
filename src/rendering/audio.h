@@ -64,6 +64,12 @@ QObject* GetAudioWakeObject();
 void SetAudioWakeObject(QObject* o);
 void WakeAudioWakeObject();
 
+// Export audio sync. Every audio cacher signals the end of each fill pass; the export resets the count, triggers the
+// cachers through compose_audio() and waits until all of them have mixed before it reads the ring buffer.
+void ResetAudioFillCount();
+void SignalAudioFill();
+bool WaitForAudioFills(int expected, int timeout_ms);  // false on timeout
+
 int current_audio_freq();
 
 bool is_audio_device_set();

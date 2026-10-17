@@ -458,10 +458,10 @@ bool ExportThread::Export()
     frame_start_time = QDateTime::currentMSecsSinceEpoch();
 
     // If we're exporting audio, run compose_audio() which will write mixed audio to the internal audio buffer
+    int audio_cachers = 0;
     if (params_.audio_enabled) {
-      waiting_for_audio_ = true;
-      SetAudioWakeObject(this);
-      amber::rendering::compose_audio(nullptr, amber::ActiveSequence.get(), 1, true);
+      ResetAudioFillCount();
+      audio_cachers = amber::rendering::compose_audio(nullptr, amber::ActiveSequence.get(), 1, true);
     }
 
     // If we're exporting video, trigger a render on the RenderThread
@@ -541,8 +541,17 @@ bool ExportThread::Export()
     // If we're exporting audio, copy audio from the buffer into an AVFrame for encoding
     if (params_.audio_enabled) {
 
-      while (waiting_for_audio_ && !interrupt_) {
-        waitCond.wait(&mutex);
+      // Reading before every triggered cacher has mixed loses that clip's first samples (or replays them a ring lap
+      // later). Release the export mutex meanwhile so Interrupt() doesn't block the GUI thread.
+      // CBA: a cacher that never signals costs the full timeout on every frame and delays a cancel by as much; poll
+      // interrupt_ in slices if that ever shows up. After a timeout the stalled pass's late signal lands after the
+      // next frame's reset and releases that frame early (the original bug, for a frame or two); a cumulative target
+      // would fix it.
+      mutex.unlock();
+      bool mixed = WaitForAudioFills(audio_cachers, 5000);
+      mutex.lock();
+      if (!mixed) {
+        qWarning() << "Export: timed out waiting for" << audio_cachers << "audio clip(s) to mix, audio may have gaps";
       }
 
       // Make sure nothing is writing while we're retrieving
@@ -756,14 +765,6 @@ void ExportThread::Interrupt()
 {
   mutex.lock();
   interrupt_ = true;
-  waitCond.wakeAll();
-  mutex.unlock();
-}
-
-void ExportThread::play_wake()
-{
-  mutex.lock();
-  waiting_for_audio_ = false;
   waitCond.wakeAll();
   mutex.unlock();
 }
