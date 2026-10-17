@@ -106,6 +106,8 @@ class ViewerWidget : public QRhiWidget {
   void draw_gizmos(QPainter& p);
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
   void move_gizmos(QMouseEvent* event, bool done);
+  // Body of frame_update(); with_audio = false skips the audio scrub grain
+  void request_render(bool with_audio);
   int find_guide_at(int video_x, int video_y, bool* hit_mirror = nullptr) const;
   void show_guide_context_menu(int guide_index, const QPoint& global_pos, bool on_mirror = false);
   bool dragging{false};

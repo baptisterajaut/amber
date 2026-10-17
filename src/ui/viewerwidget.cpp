@@ -369,7 +369,14 @@ void ViewerWidget::resizeEvent(QResizeEvent* event) {
   if (overlay_) overlay_->setGeometry(geometry());  // overlay is sibling in ViewerContainer
 }
 
-void ViewerWidget::frame_update() {
+void ViewerWidget::frame_update() { request_render(true); }
+
+void ViewerWidget::request_render(bool with_audio) {
+  // Consume the seek mark before any early return, so a seek whose render is skipped can't leave it set for a
+  // later non-seek render
+  bool scrub_flag = viewer->scrub_next_render_;
+  viewer->scrub_next_render_ = false;
+  Q_UNUSED(scrub_flag);
   if (audio_rendering) return;  // export in progress — viewer frozen
   if (viewer->seq != nullptr) {
     if (waveform) {
@@ -383,7 +390,9 @@ void ViewerWidget::frame_update() {
                              amber::CurrentConfig.preview_resolution_divider, scrubbing);
     }
 
-    amber::rendering::compose_audio(viewer->seq.get(), !viewer->playing, viewer->get_playback_speed(), false);
+    if (with_audio) {
+      amber::rendering::compose_audio(viewer->seq.get(), !viewer->playing, viewer->get_playback_speed(), false);
+    }
   }
 }
 

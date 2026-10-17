@@ -76,6 +76,7 @@ class Viewer : public Panel {
   // so the next render fetches the exact frame instead of falling back to the
   // scrubbing fast-bail path. Consumed (cleared) by ViewerWidget::frame_update().
   bool precise_next_render_{false};
+  bool scrub_next_render_{false};  // set by seek(), consumed by the next ViewerWidget::request_render()
   long playhead_start;
   qint64 start_msecs;
   QTimer playback_updater;
