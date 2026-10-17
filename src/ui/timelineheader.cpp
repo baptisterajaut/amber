@@ -302,6 +302,8 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
   }
 
   if (viewer->seq != nullptr) {
+    // a playhead drag ends the scrub gesture; update_parents() below requests its refresh
+    if (dragging && !resizing_workarea && !dragging_markers) viewer->viewer_widget->scrub_released();
     dragging = false;
     if (resizing_workarea) {
       auto* cmd = new SetTimelineInOutCommand(viewer->seq.get(), true, temp_workarea_in, temp_workarea_out);

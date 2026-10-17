@@ -64,6 +64,8 @@ class ViewerWidget : public QRhiWidget {
   int waveform_scroll{0};
 
   void frame_update();
+  // A ruler scrub ended on a mouse release, whose refresh is the next request: makes it the settle render
+  void scrub_released();
   RenderThread* get_renderer();
   void set_scroll(double x, double y);
 

@@ -38,6 +38,11 @@ target_include_directories(amber-test-timer-format PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-timer-format PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-timer-format COMMAND amber-test-timer-format)
 
+add_executable(amber-test-config test_config.cpp)
+target_include_directories(amber-test-config PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-config PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-config COMMAND amber-test-config)
+
 add_executable(amber-test-audio test_audio.cpp)
 target_include_directories(amber-test-audio PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-audio PRIVATE amber-engine Qt6::Test)

@@ -421,6 +421,15 @@ void ViewerWidget::scrub_settled() {
   }
 }
 
+void ViewerWidget::scrub_released() {
+  // The release's refresh renders at base, so the pending settle would take it for its own render and skip, though it
+  // is a scrub render (closest cached frame). Make it precise instead: one render, the exact frame, at base.
+  if (settle_timer_.isActive() && !viewer->playing &&
+      last_requested_divider_ != qMax(1, amber::CurrentConfig.preview_resolution_divider)) {
+    viewer->precise_next_render_ = true;
+  }
+}
+
 RenderThread* ViewerWidget::get_renderer() { return renderer; }
 
 void ViewerWidget::set_scroll(double x, double y) {
@@ -1121,11 +1130,15 @@ void ViewerWidget::render(QRhiCommandBuffer* cb) {
 
   // Update gizmo tracking — detect stale gizmo (user selected a different clip while paused)
   gizmos = renderer->gizmos;
-  if (viewer->seq != nullptr && gizmos != viewer->seq->GetSelectedGizmo()) {
-    gizmos = nullptr;
-    // Fires on any paint (paused or playing) while the clip's gizmo isn't drawn (clip closed, lock busy, near a cut),
-    // so it can repeat every frame. Mid-gesture it re-requests at the gesture's divider without audio and without
-    // touching the Auto state or the settle timer; the pending settle restores base. Otherwise a plain frame_update().
+  Effect* selected_gizmo = viewer->seq != nullptr ? viewer->seq->GetSelectedGizmo() : nullptr;
+  if (gizmos != selected_gizmo) gizmos = nullptr;
+  // Re-render when the selection changed since the frame was rendered, not merely because its gizmo wasn't drawn: a
+  // selected clip near the playhead but not under it (IsActiveAt's window) is never drawn, and re-requesting then
+  // re-rendered the same frame on every paint. A clip not open yet fails the texture, which the retry below covers.
+  if (viewer->seq != nullptr && selected_gizmo != renderer->rendered_gizmo_selection()) {
+    // Fires on any paint (paused or playing) until the new selection's frame lands. Mid-gesture it re-requests at the
+    // gesture's divider without audio and without touching the Auto state or the settle timer; the pending settle
+    // restores base. Otherwise a plain frame_update().
     if (settle_timer_.isActive() && !viewer->playing) {
       QTimer::singleShot(0, this, [this]() {
         if (audio_rendering || viewer->seq == nullptr) return;

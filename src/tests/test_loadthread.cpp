@@ -417,6 +417,83 @@ class TestLoadThread : public QObject {
     QCOMPARE(ctx_.recents, 0);
   }
 
+  // A load cancelled after it has parsed footage never started the probes that release each footage's ready lock:
+  // clearing the project afterwards (what AmberGlobal does) must not destroy a locked QMutex
+  void cancelledLoadLeavesNoLockedMutex() {
+    QTest::failOnWarning(QRegularExpression("destroying locked mutex"));
+    QString media;
+    for (int i = 1; i <= 2000; i++) {
+      media += QString(R"(<footage id="%1" folder="1" name="clip %1" url="%2"/>)")
+                   .arg(QString::number(i), dir_.filePath("missing-%1.mp4").arg(i).toHtmlEscaped());
+    }
+    QString path = dir_.filePath("cancel-footage.ove");
+    {
+      QFile f(path);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(amber::kSaveVersion, path).replace("<media/>", "<media>" + media + "</media>").toUtf8());
+    }
+
+    auto* lt = new LoadThread(path, false);
+    QPointer<LoadThread> guard(lt);
+    bool succeeded = false;
+    int failed = 0;
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    connect(lt, &LoadThread::error, this, [&failed]() { ++failed; });
+    // Hold the worker a tenth of the way through, then cancel: it still has ~1800 footage elements to go
+    QSemaphore reached, go;
+    std::atomic<bool> held{false};
+    connect(
+        lt, &LoadThread::report_progress, lt,
+        [&](int p) {
+          if (p >= 10 && !held.exchange(true)) {
+            reached.release();
+            go.acquire();
+          }
+        },
+        Qt::DirectConnection);
+    lt->start();
+    QVERIFY(reached.tryAcquire(1, 10000));
+    go.release();
+    lt->cancel();
+    QTRY_VERIFY_WITH_TIMEOUT(guard.isNull(), 10000);
+    QVERIFY(!succeeded);
+    QCOMPARE(failed, 0);
+
+    Media* folder = amber::project_model.child(0);
+    QVERIFY(folder != nullptr);
+    QVERIFY(amber::project_model.childCount(folder) > 0);  // footage was parsed before the cancel
+    amber::project_model.clear();
+  }
+
+  // Load progress counts each folder/footage/sequence/clip/effect once: it only rises, and reaches 100% with the last
+  // one. Older projects have no <previewresolution>: looking for it scans the whole file, which must count nothing.
+  void progressRisesToHundredAtTheEnd() {
+    const QString effects = QStringLiteral(R"(<effect name="Distort/Transform" enabled="1"></effect>
+                <effect name="Distort/Transform" enabled="1"></effect>)");
+    for (bool old_style : {true, false}) {
+      amber::project_model.clear();
+      QString path = dir_.filePath(old_style ? "progress-old.ove" : "progress.ove");
+      {
+        QFile f(path);
+        QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+        QString xml = fixture(amber::kSaveVersion, path, QString(), effects);
+        if (old_style) xml.remove("<previewresolution>1</previewresolution>");
+        f.write(xml.toUtf8());
+      }
+      auto* lt = new LoadThread(path, false);
+      QPointer<LoadThread> guard(lt);
+      bool succeeded = false;
+      QVector<int> values;
+      connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+      connect(lt, &LoadThread::report_progress, this, [&values](int p) { values.append(p); });
+      lt->start();
+      QTRY_VERIFY_WITH_TIMEOUT(guard.isNull(), 10000);
+      QVERIFY(succeeded);
+      // folder, sequence, clip, two effects
+      QCOMPARE(values, QVector<int>({20, 40, 60, 80, 100}));
+    }
+  }
+
   // A file that can't be opened is a load error like any other: error() once, one message
   void unreadableFileEmitsErrorOnce() {
     bool succeeded = false;
