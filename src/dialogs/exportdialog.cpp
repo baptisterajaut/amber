@@ -426,6 +426,14 @@ void ExportDialog::StartExport() {
     return;
   }
 
+  // end_frame is exclusive: an empty range would write a file with no frames
+  const ExportParams range = build_export_params(QString());
+  if (range.end_frame <= range.start_frame) {
+    QMessageBox::critical(this, tr("Nothing to export"), tr("Nothing to export: the sequence or work area is empty."),
+                          QMessageBox::Ok);
+    return;
+  }
+
   QString ext = GetFormatExtension(formatCombobox->currentIndex(), vcodecCombobox->currentData().toInt(),
                                    videoGroupbox->isChecked(), audioGroupbox->isChecked());
   if (ext.isEmpty()) {
