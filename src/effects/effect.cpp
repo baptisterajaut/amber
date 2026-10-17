@@ -1551,6 +1551,11 @@ QString Effect::currentMaskPath(double timecode) {
 
 namespace {
 
+// A header claiming more than this is rejected before decoding (hostile or broken file). Formats whose header gives
+// no size are bounded by QImageReader's own allocation limit (static, process-wide, 256 MB by default), left as is.
+constexpr int kMaskMaxSide = 16384;
+constexpr qint64 kMaskMaxPixels = 256ll * 1000 * 1000;
+
 // Decodes a mask file to straight-alpha RGBA8888, its long side capped at `maxSide`. A null image on failure.
 QImage loadMaskImage(const QString& path, int maxSide) {
   QImage img;
@@ -1560,20 +1565,36 @@ QImage loadMaskImage(const QString& path, int maxSide) {
     QSize size = svg.defaultSize();
     if (!svg.isValid() || size.isEmpty()) return QImage();
     // CBA: fixed 2048 raster, re-rasterise at clip resolution if large clips show softness
-    size.scale(2048, 2048, Qt::KeepAspectRatio);
+    // (at least 1 px a side: an extreme aspect would round the short side to 0)
+    size = size.scaled(2048, 2048, Qt::KeepAspectRatio).expandedTo(QSize(1, 1));
     img = QImage(size, QImage::Format_ARGB32_Premultiplied);
+    if (img.isNull()) return QImage();
     img.fill(Qt::transparent);
     QPainter p(&img);
     svg.render(&p);
   } else {
     QImageReader reader(path);
     reader.setAutoTransform(true);  // EXIF orientation: upright like in a file viewer
+    // From the header, invalid when the format can't tell without decoding
+    const QSize size = reader.size();
+    if (size.isValid()) {
+      if (size.width() > kMaskMaxSide || size.height() > kMaskMaxSide ||
+          qint64(size.width()) * size.height() > kMaskMaxPixels) {
+        qWarning() << "Alpha mask:" << path << "claims" << size << "pixels, too large for a mask";
+        return QImage();
+      }
+      // Formats that support it (JPEG) downscale while decoding, the others decode at full size and get scaled
+      if (qMax(size.width(), size.height()) > maxSide) {
+        reader.setScaledSize(size.scaled(maxSide, maxSide, Qt::KeepAspectRatio).expandedTo(QSize(1, 1)));
+      }
+    }
     img = reader.read();
   }
   if (img.isNull()) return QImage();
   // Bounds the upload and its memory on modest hardware, a mask doesn't need more
   if (qMax(img.width(), img.height()) > maxSide) {
-    img = img.scaled(maxSide, maxSide, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    img = img.scaled(img.size().scaled(maxSide, maxSide, Qt::KeepAspectRatio).expandedTo(QSize(1, 1)),
+                     Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
   }
   return img.convertToFormat(QImage::Format_RGBA8888);
 }
