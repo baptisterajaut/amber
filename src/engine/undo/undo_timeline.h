@@ -26,6 +26,7 @@
 class RippleAction : public OliveAction {
 public:
   RippleAction(Sequence* is, long ipoint, long ilength, const QVector<int>& iignore);
+  ~RippleAction() override;
   void doUndo() override;
   void doRedo() override;
 private:

@@ -34,6 +34,9 @@ RippleAction::RippleAction(Sequence *is, long ipoint, long ilength, const QVecto
 {
 }
 
+// ca is only alive while the ripple is redone; delete it if the stack drops us in that state
+RippleAction::~RippleAction() { delete ca; }
+
 void RippleAction::doUndo() {
   if (ca != nullptr) {
     ca->undo();
