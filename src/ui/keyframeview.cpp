@@ -58,6 +58,8 @@ KeyframeView::KeyframeView(QWidget* parent)
 
 // An undo can remove keyframes behind the selection's back: forget entries that no longer exist.
 // Only called right before the selection is used (fields are dereferenced there anyway).
+// CBA: only drops out-of-range indices; an undo removing an earlier keyframe shifts later ones, so the selection then
+// points at a different keyframe. Upgrade path: select by keyframe identity instead of index.
 static void drop_stale_selection(QVector<EffectField*>& fields, QVector<int>& keys) {
   for (int i = keys.size() - 1; i >= 0; i--) {
     if (keys.at(i) < 0 || keys.at(i) >= fields.at(i)->keyframes.size()) {
