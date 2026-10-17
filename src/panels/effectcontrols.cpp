@@ -642,11 +642,7 @@ void EffectControls::SyncLabelColumnWidth() {
       max_w = qMax(max_w, lbl->sizeHint().width());
     }
   }
-  for (EffectUI* ui : open_effects_) {
-    for (QLabel* lbl : ui->labels()) {
-      lbl->setMinimumWidth(max_w);
-    }
-  }
+  for (EffectUI* ui : open_effects_) ui->SetLabelColumnWidth(max_w);
 }
 
 void EffectControls::SetClips() {
