@@ -137,6 +137,68 @@ class TestShaderToy : public QObject {
     QVERIFY2(err.contains(needle), qPrintable(QStringLiteral("message \"%1\" lacks \"%2\"").arg(err, needle)));
   }
 
+  void rejectsEveryUnflippableBuiltin() {
+    for (const char* fn :
+         {"textureGrad", "textureGradOffset", "textureOffset", "textureLodOffset", "textureProj", "textureProjOffset",
+          "textureProjLod", "textureProjLodOffset", "textureProjGrad", "textureProjGradOffset", "textureGather",
+          "textureGatherOffset", "textureGatherOffsets", "texelFetchOffset", "textureQueryLod"}) {
+      const QString src =
+          QStringLiteral("void mainImage(out vec4 c, in vec2 p) { c = vec4(%1 (iChannel0, p)); }").arg(fn);
+      QVERIFY2(reject_message(src).contains(QLatin1String(fn) + QLatin1String("()")), fn);
+    }
+  }
+
+  void userFunctionsNamedLikeBuiltinsPass() {
+    // Only the exact GLSL builtin names are rejected: a user's textureGradient() / textureProjector() is fine
+    const QString src = QStringLiteral(
+        "vec4 textureGradient(vec2 p) { return vec4(p, 0.0, 1.0); }\n"
+        "vec4 textureProjector(vec2 p) { return vec4(p.yx, 0.0, 1.0); }\n"
+        "void mainImage(out vec4 c, in vec2 p) { c = textureGradient(p) + textureProjector(p); }\n");
+    QString err;
+    const QString out = to_amber_glsl(src, {}, &err);
+    QVERIFY2(!out.isEmpty(), qPrintable(err));
+    QVERIFY(Effect::bakeSource(out.toUtf8(), QShader::FragmentStage, &err).isValid());
+  }
+
+  void unterminatedBlockComment() {
+    const QString err = reject_message(kMinimal + QStringLiteral("\n/* never closed\nvoid main() {}\n"));
+    QCOMPARE(err, QStringLiteral("Unterminated /* comment starting at line 5."));
+  }
+
+  void effectNames_data() {
+    QTest::addColumn<QString>("name");
+    QTest::addColumn<bool>("valid");
+    QTest::newRow("plain") << QStringLiteral("Plasma 2") << true;
+    QTest::newRow("dotted") << QStringLiteral("v1.2 glow") << true;
+    QTest::newRow("CONSOLE is not CON") << QStringLiteral("CONSOLE") << true;
+    QTest::newRow("COM10 is not reserved") << QStringLiteral("COM10") << true;
+    QTest::newRow("empty") << QString() << false;
+    QTest::newRow("slash") << QStringLiteral("a/b") << false;
+    QTest::newRow("backslash") << QStringLiteral("a\\b") << false;
+    QTest::newRow("colon") << QStringLiteral("a:b") << false;
+    QTest::newRow("star") << QStringLiteral("a*") << false;
+    QTest::newRow("question") << QStringLiteral("a?") << false;
+    QTest::newRow("quote") << QStringLiteral("a\"b") << false;
+    QTest::newRow("angle") << QStringLiteral("<a>") << false;
+    QTest::newRow("pipe") << QStringLiteral("a|b") << false;
+    QTest::newRow("tab") << QStringLiteral("a\tb") << false;
+    QTest::newRow("newline") << QStringLiteral("a\nb") << false;
+    QTest::newRow("leading dot") << QStringLiteral(".hidden") << false;
+    QTest::newRow("trailing dot") << QStringLiteral("name.") << false;
+    QTest::newRow("trailing space") << QStringLiteral("name ") << false;
+    QTest::newRow("CON") << QStringLiteral("CON") << false;
+    QTest::newRow("nul lowercase") << QStringLiteral("nul") << false;
+    QTest::newRow("Aux.txt") << QStringLiteral("Aux.txt") << false;
+    QTest::newRow("PRN") << QStringLiteral("PRN") << false;
+    QTest::newRow("COM1") << QStringLiteral("COM1") << false;
+    QTest::newRow("lpt9.x") << QStringLiteral("lpt9.x") << false;
+  }
+  void effectNames() {
+    QFETCH(QString, name);
+    QFETCH(bool, valid);
+    QCOMPARE(amber::shadertoy::effect_name_error(name).isEmpty(), valid);
+  }
+
   void rejectsBadParams() {
     QVERIFY(reject_message(kMinimal, {{QStringLiteral("iTime"), QStringLiteral("float")}}).contains("reserved"));
     QVERIFY(reject_message(kMinimal, {{QStringLiteral("amber_x"), QStringLiteral("float")}}).contains("reserved"));

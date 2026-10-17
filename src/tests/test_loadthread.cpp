@@ -257,7 +257,6 @@ class TestLoadThread : public QObject {
 #endif
   }
 
-  // Importing a project with Frei0r effects into the open one shows them too; a project without any leaves them hidden
   // A project referencing a ShaderToy effect whose .shadertoy isn't installed loads it as a Missing Effect, which
   // saves back what it read (name, enabled, field values), so the project survives a round trip on that machine
   void missingShaderToyEffectSavesBack() {
@@ -287,6 +286,7 @@ class TestLoadThread : public QObject {
     QVERIFY2(saved.contains(R"(<field id="speed" value="2.5")"), saved.constData());
   }
 
+  // Importing a project with Frei0r effects into the open one shows them too; a project without any leaves them hidden
   void frei0rImportShowsFrei0rEffects() {
     QString plain = write_fixture("plain.ove", amber::kSaveVersion, QString(),
                                   R"(<effect name="Distort/Transform" enabled="1"></effect>)");

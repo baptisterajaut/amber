@@ -53,18 +53,22 @@ void main() {
 const char* const kReserved[] = {"iResolution",        "iTime",     "iTimeDelta", "iFrame", "iDate",    "iMouse",
                                  "iChannelResolution", "iChannel0", "vTexCoord",  "main",   "mainImage"};
 
-// Replaces `//` and `/* */` comments with spaces, newlines kept (GLSL has no string literals)
-QString blank_comments(const QString& in) {
+// Replaces `//` and `/* */` comments with spaces, newlines kept (GLSL has no string literals). A `/*` left open sets
+// *unterminated_line to its 1-based line (0 otherwise).
+QString blank_comments(const QString& in, int* unterminated_line) {
   QString out = in;
   enum { Code, Line, Block } state = Code;
+  int line = 1, block_line = 0;
   for (int i = 0; i < out.size(); i++) {
     const QChar c = out.at(i);
     const QChar next = i + 1 < out.size() ? out.at(i + 1) : QChar();
+    if (c == '\n') line++;
     if (state == Code) {
       if (c == '/' && next == '/') {
         state = Line;
       } else if (c == '/' && next == '*') {
         state = Block;
+        block_line = line;
         out[i] = ' ';
         out[++i] = ' ';
         continue;
@@ -86,6 +90,7 @@ QString blank_comments(const QString& in) {
       }
     }
   }
+  *unterminated_line = state == Block ? block_line : 0;
   return out;
 }
 
@@ -121,7 +126,11 @@ QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString*
   QString text = src;
   text.replace(QLatin1String("\r\n"), QLatin1String("\n"));
   text.replace('\r', '\n');
-  text = blank_comments(text);
+  int unterminated_line = 0;
+  text = blank_comments(text, &unterminated_line);
+  if (unterminated_line > 0) {
+    return reject(error, tr("Unterminated /* comment starting at line %1.").arg(unterminated_line));
+  }
 
   // Ports and copy-pastes carry these; the header already declares all of them
   blank_matches(text, QRegularExpression(QStringLiteral("^[ \\t]*#[ \\t]*(version|extension)\\b[^\\n]*"),
@@ -144,8 +153,10 @@ QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString*
   }
   // These sample with coordinates the helpers can't flip (gradients, offsets, gathers, projective coordinates)
   const QRegularExpressionMatch unflippable =
-      QRegularExpression(QStringLiteral("\\b(textureGrad\\w*|textureGather\\w*|textureProj\\w*|textureQueryLod|"
-                                        "texture\\w*Offset|texelFetchOffset)\\s*\\("))
+      QRegularExpression(QStringLiteral("\\b(textureGrad|textureGradOffset|textureOffset|textureLodOffset|textureProj|"
+                                        "textureProjOffset|textureProjLod|textureProjLodOffset|textureProjGrad|"
+                                        "textureProjGradOffset|textureGather|textureGatherOffset|textureGatherOffsets|"
+                                        "texelFetchOffset|textureQueryLod)\\s*\\("))
           .match(text);
   if (unflippable.hasMatch()) {
     return reject(error, tr("%1() on iChannel0 isn't supported in this version.").arg(unflippable.captured(1)));
@@ -175,6 +186,23 @@ QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString*
 
   if (!text.endsWith('\n')) text += '\n';
   return QString::fromLatin1(kHeader).arg(members) + text + QString::fromLatin1(kMain);
+}
+
+QString effect_name_error(const QString& name) {
+  if (name.isEmpty()) return tr("Enter a name for the effect.");
+  for (const QChar c : name) {
+    if (c.unicode() < 0x20 || QStringLiteral("/\\:*?\"<>|").contains(c)) {
+      return tr("The name can't contain / \\ : * ? \" < > | or control characters.");
+    }
+  }
+  if (name.startsWith('.') || name.endsWith('.') || name.endsWith(' ')) {
+    return tr("The name can't start with a dot or end with a dot or a space.");
+  }
+  // Windows refuses these as a file's base name, whatever the extension ("NUL.shadertoy", "con.v2")
+  static const QRegularExpression kReserved(QStringLiteral("^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\..*)?$"),
+                                            QRegularExpression::CaseInsensitiveOption);
+  if (kReserved.match(name).hasMatch()) return tr("\"%1\" is a reserved device name on Windows.").arg(name);
+  return {};
 }
 
 }  // namespace amber::shadertoy

@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QPoint>
+#include <QPointer>
 #include <QtMath>
 
 #include "effects/ui/effectfieldwidget.h"
@@ -80,8 +81,15 @@ EffectUI::EffectUI(Effect* e) : effect_(e), effect_reset_button_(nullptr), shade
     shader_error_icon_ = new QLabel(title_bar);
     shader_error_icon_->setPixmap(amber::icon::MediaError.pixmap(QSize(16, 16)));
     tbl->insertWidget(3, shader_error_icon_);
+    // Connected before the first read so a change in between isn't lost. Qt drops the posted call if this EffectUI
+    // dies first, but not if the Effect does: the guard covers that.
+    connect(
+        e, &Effect::ShaderErrorChanged, this,
+        [this, guard = QPointer<Effect>(e)]() {
+          if (guard) UpdateShaderError();
+        },
+        Qt::QueuedConnection);
     UpdateShaderError();
-    connect(e, &Effect::ShaderErrorChanged, this, &EffectUI::UpdateShaderError, Qt::QueuedConnection);
   }
 
   int maximum_column = 0;

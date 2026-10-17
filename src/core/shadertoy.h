@@ -23,6 +23,11 @@ struct Param {
 // unflippable texture functions, a reserved or duplicate param name). GLSL errors are left to the baker.
 QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString* error);
 
+// Why `name` (already trimmed) can't be an imported effect's name, i.e. the base of <name>.shadertoy on every
+// platform: empty, a / \ : * ? " < > | or control character, a leading dot, a trailing dot or space, a Windows
+// reserved device name (CON, PRN, AUX, NUL, COM1-9, LPT1-9, any case, also with an extension). Empty when valid.
+QString effect_name_error(const QString& name);
+
 }  // namespace amber::shadertoy
 
 #endif  // SHADERTOY_H

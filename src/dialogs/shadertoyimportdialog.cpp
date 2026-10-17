@@ -12,7 +12,7 @@
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QPushButton>
-#include <QRegularExpression>
+#include <QSaveFile>
 #include <QVBoxLayout>
 
 #include "core/path.h"
@@ -88,13 +88,9 @@ void ShaderToyImportDialog::open_file() {
 void ShaderToyImportDialog::accept() {
   // 1. A name that is a valid file name on every platform
   const QString name = name_edit_->text().trimmed();
-  if (name.isEmpty()) {
-    show_error(tr("Enter a name for the effect."));
-    return;
-  }
-  static const QRegularExpression kForbidden(QStringLiteral("[/\\\\:*?\"<>|]"));
-  if (name.contains(kForbidden) || name.startsWith('.')) {
-    show_error(tr("The name can't contain / \\ : * ? \" < > | or start with a dot."));
+  const QString name_error = amber::shadertoy::effect_name_error(name);
+  if (!name_error.isEmpty()) {
+    show_error(name_error);
     return;
   }
   const QDir dir(get_data_dir().filePath(QStringLiteral("effects")));
@@ -124,12 +120,13 @@ void ShaderToyImportDialog::accept() {
     show_error(tr("Couldn't create the folder %1.").arg(dir.absolutePath()));
     return;
   }
-  QFile f(file);
-  if (!f.open(QIODevice::WriteOnly) || f.write(source.toUtf8()) < 0) {
-    show_error(tr("Couldn't write %1.").arg(file));
+  // QSaveFile writes a temporary file and renames it on commit(): a failed write leaves nothing behind
+  const QByteArray bytes = source.toUtf8();
+  QSaveFile f(file);
+  if (!f.open(QIODevice::WriteOnly) || f.write(bytes) != bytes.size() || !f.commit()) {
+    show_error(tr("Couldn't write %1: %2").arg(file, f.errorString()));
     return;
   }
-  f.close();
 
   // 4. Register it for this session (the menus re-read `effects` on every open)
   effects_loaded_mutex.lock();
