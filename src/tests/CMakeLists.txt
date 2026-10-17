@@ -1,6 +1,8 @@
 find_package(Qt6 REQUIRED COMPONENTS Test Core)
 
 set(AMBER_CORE_SOURCES
+  ${CMAKE_SOURCE_DIR}/core/alpha.cpp
+  ${CMAKE_SOURCE_DIR}/core/alpha.h
   ${CMAKE_SOURCE_DIR}/core/audio.cpp
   ${CMAKE_SOURCE_DIR}/core/audio.h
   ${CMAKE_SOURCE_DIR}/core/math.cpp

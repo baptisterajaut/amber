@@ -24,6 +24,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/pixdesc.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 }
@@ -36,6 +37,7 @@ extern "C" {
 
 #include "global/global.h"
 #include "engine/sequence.h"
+#include "core/alpha.h"
 #include "core/appcontext.h"
 #include "rendering/renderthread.h"
 #include "rendering/renderfunctions.h"
@@ -233,6 +235,13 @@ bool ExportThread::SetupVideo() {
         nullptr,
         nullptr
         );
+
+  // The composite is premultiplied alpha (renderfunctions.cpp), but swscale and the encoders take RGBA as straight.
+  // A format without alpha drops it, leaving the composite over black, which is what an opaque file should show.
+  // CBA: scaling to another size filters straight colour, so semi-transparent edges can darken slightly; scale the
+  // premultiplied frame first if that ever shows
+  const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(vcodec_ctx->pix_fmt);
+  unpremultiply_ = desc != nullptr && (desc->flags & AV_PIX_FMT_FLAG_ALPHA);
 
   return true;
 }
@@ -520,6 +529,11 @@ bool ExportThread::Export()
       // - Perhaps this is the intended way to use swscale, but it seems inefficient.
       // - Anyway, here we are.
       //
+
+      if (unpremultiply_) {
+        amber::unpremultiply_rgba8(video_frame->data[0], video_frame->width, video_frame->height,
+                                   video_frame->linesize[0]);
+      }
 
       // Construct destination pixel format frame
       sws_frame = av_frame_alloc();
