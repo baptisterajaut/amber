@@ -35,6 +35,7 @@ extern "C" {
 #include "project/previewgenerator.h"
 #include "project/projectmodel.h"
 #include "rendering/exportthread.h"
+#include "rendering/renderthread.h"
 
 namespace {
 
@@ -740,6 +741,43 @@ class TestHeadlessRender : public QObject {
           rev.audio_peak, fwd.audio_peak);
     QVERIFY2(fwd.audio_peak > 0.25, "forward export is silent or too quiet");
     QVERIFY2(best_delta <= 2.0f / 32768, qPrintable(QString("max delta %1 at lag %2").arg(best_delta).arg(best_lag)));
+  }
+
+  // A viewer request (start_render() without pixels or file name, published without the thread's lock) must be rendered
+  // even when it lands between the thread's "anything queued?" check and its wait. Each request goes out the moment
+  // the previous frame is announced, right when the thread runs that check: without the bounded wait in run() the
+  // second or third request already sleeps forever.
+  void viewerRequestIsNeverLost() {
+    SequencePtr seq = std::make_shared<Sequence>();
+    seq->width = 16;
+    seq->height = 16;
+    seq->frame_rate = kFps;
+    QOffscreenSurface* surface = QRhiGles2InitParams::newFallbackSurface();
+    auto* rt = new RenderThread();
+    rt->setGlFallbackSurface(surface);
+    std::atomic<int> frames{0};
+    connect(rt, &RenderThread::ready, rt, [&frames]() { frames++; }, Qt::DirectConnection);
+    rt->start();
+    int requests = 0;
+    bool lost = false;
+    QElapsedTimer total;
+    total.start();
+    while (!lost && total.elapsed() < 2000) {
+      const int before = frames.load();
+      rt->start_render(seq.get(), 1, nullptr, nullptr, 0, 1);
+      // Spin rather than sleep: answering at once is what hits the window. The first frame creates the QRhi.
+      const int deadline_ms = requests == 0 ? 10000 : 1000;
+      QElapsedTimer t;
+      t.start();
+      while (frames.load() == before && t.elapsed() < deadline_ms) {
+      }
+      lost = frames.load() == before;
+      requests++;
+    }
+    rt->cancel();
+    delete rt;
+    delete surface;
+    QVERIFY2(!lost, qPrintable(QString("request %1 never rendered").arg(requests)));
   }
 };
 
