@@ -1477,16 +1477,25 @@ QRhiTexture* Effect::process_curve_texture(QRhi* rhi, QRhiResourceUpdateBatch* u
   CurveField* f = findCurveField();
   if (f == nullptr) return nullptr;
   const QString curves = f->GetValueAt(timecode).toString();
+  // RGBA16F where supported: an RGBA8 texture may be filtered at 8-bit precision (llvmpipe does), and the luma
+  // curve's ratio y_out / y turns that rounding into a visible error on dark saturated colours
+  const bool use_fp16 = rhi->isTextureFormatSupported(QRhiTexture::RGBA16F);
   if (curveTex_ == nullptr) {
-    // 256 x 1 RGBA8 (R/G/B = channel curves after the master, A = luma), sampled at texel centres with the
-    // shared linear sampler
-    curveTex_ = rhi->newTexture(QRhiTexture::RGBA8, QSize(256, 1));
+    // 256 x 1 (R/G/B = channel curves after the master, A = luma), sampled at texel centres with the shared
+    // linear sampler
+    curveTex_ = rhi->newTexture(use_fp16 ? QRhiTexture::RGBA16F : QRhiTexture::RGBA8, QSize(256, 1));
     curveTex_->create();
     uploadedCurves_.clear();
   } else if (curves == uploadedCurves_) {
     return curveTex_;
   }
-  const QByteArray lut = amber::curves::build_lut(amber::curves::parse(curves));
+  QByteArray lut = amber::curves::build_lut(amber::curves::parse(curves));
+  if (use_fp16) {
+    QByteArray half(lut.size() * int(sizeof(qfloat16)), Qt::Uninitialized);
+    auto* out = reinterpret_cast<qfloat16*>(half.data());
+    for (int i = 0; i < lut.size(); i++) out[i] = qfloat16(uchar(lut[i]) / 255.0f);
+    lut = half;
+  }
   QRhiTextureSubresourceUploadDescription desc(lut.constData(), lut.size());
   desc.setSourceSize(QSize(256, 1));
   u->uploadTexture(curveTex_, QRhiTextureUploadDescription({QRhiTextureUploadEntry(0, 0, desc)}));
