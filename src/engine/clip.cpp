@@ -241,9 +241,15 @@ int Clip::IndexOfEffect(Effect* e) {
 }
 
 Clip::~Clip() {
+  // compose_sequence() closes clips with Close(false): the cacher thread may still be in OpenWorker()/CloseWorker(),
+  // holding state_change_lock and using this clip. Wait that transition out, then wait for the thread itself —
+  // destroying a running QThread aborts the process.
+  state_change_lock.lock();
+  state_change_lock.unlock();
   if (IsOpen()) {
     Close(true);
   }
+  cacher.wait();
 
   // Safety net: queue any remaining QRhi resources for deferred deletion.
   // If Close() succeeded, these are already nullptr (no-op).
