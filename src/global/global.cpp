@@ -376,11 +376,11 @@ void OliveGlobal::finished_initialize() {
 
 void OliveGlobal::save_autorecovery_file() {
   if (changed_since_last_autorecovery) {
-    panel_project->save_project(true);
-
-    changed_since_last_autorecovery = false;
-
-    qInfo() << "Auto-recovery project saved";
+    // A failed backup stays pending so the next timer tick retries it
+    if (panel_project->save_project(true)) {
+      changed_since_last_autorecovery = false;
+      qInfo() << "Auto-recovery project saved";
+    }
   }
 }
 
