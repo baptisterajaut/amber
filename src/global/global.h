@@ -426,6 +426,16 @@ private:
     bool enable_load_project_on_init;
 
     /**
+     * @brief True once the user chose to open the auto-recovery file in the startup prompt
+     */
+    bool autorecovery_loaded_{false};
+
+    /**
+     * @brief True from LoadProject() until its LoadThread has finished: a second load is refused meanwhile.
+     */
+    bool load_running_{false};
+
+    /**
      * @brief Internal translator object that interfaces with the currently loaded language file
      */
     std::unique_ptr<QTranslator> translator;

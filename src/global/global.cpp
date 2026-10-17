@@ -102,6 +102,7 @@ void OliveGlobal::check_for_autorecovery_file() {
                                 QMessageBox::Yes,
                                 QMessageBox::No) == QMessageBox::Yes) {
         enable_load_project_on_init = false;
+        autorecovery_loaded_ = true;
         OpenProjectWorker(autorecovery_filename, true);
       }
     }
@@ -193,21 +194,34 @@ void OliveGlobal::LoadProject(const QString &fn, bool autorecovery, bool import)
   // can cause glitches in its presentation. Therefore for the duration of the loading process, we disconnect it,
   // and reconnect it later once the loading is complete.
 
+  // One load at a time: two LoadThreads would fill the same project model
+  if (load_running_) {
+    qWarning() << "A project is still loading, not loading" << fn;
+    return;
+  }
+  load_running_ = true;
+
   panel_project->DisconnectFilterToModel();
 
-  LoadDialog ld(amber::MainWindow);
-
-  ld.open();
+  // The dialog is application-modal for the whole load: the main window takes no input (a Ctrl+S during the load
+  // would save a half-loaded project over the file). It doesn't block the caller though: LoadProject() returns at
+  // once as it always did, and the dialog goes away when the thread has finished. exec() would run a nested event
+  // loop inside every caller (and upstream Olive replaced its exec() with open() for a load bug, 8befb9074).
+  // The dialog used to be a stack object destroyed as soon as this function returned.
+  LoadDialog* ld = new LoadDialog(amber::MainWindow, fn);
+  ld->setWindowModality(Qt::ApplicationModal);
 
   LoadThread* lt = new LoadThread(fn, autorecovery, import);
-  connect(&ld, &LoadDialog::cancel, lt, &LoadThread::cancel);
-  connect(lt, &LoadThread::success, &ld, &QDialog::accept);
-  connect(lt, &LoadThread::error, &ld, &QDialog::reject);
+  // The thread emitted success() or error(); a cancelled load emits neither
+  auto ended = std::make_shared<bool>(false);
+  connect(ld, &LoadDialog::cancel, lt, &LoadThread::cancel);
+  connect(lt, &LoadThread::success, ld, [ended]() { *ended = true; });
+  connect(lt, &LoadThread::error, ld, [ended]() { *ended = true; });
   // An import failing must not clear the project it was being imported into
   if (!import) {
     connect(lt, &LoadThread::error, this, &OliveGlobal::new_project);
   }
-  connect(lt, &LoadThread::report_progress, &ld, &LoadDialog::setValue);
+  connect(lt, &LoadThread::report_progress, ld, &LoadDialog::setValue);
   connect(lt, &LoadThread::found_invalid_footage, this,
           [](QVector<QPair<Media*, Footage*>> invalid) {
             FootageRelinkDialog dlg(amber::MainWindow, invalid);
@@ -216,9 +230,20 @@ void OliveGlobal::LoadProject(const QString &fn, bool autorecovery, bool import)
               amber::Global->set_modified(true);
             }
           });
+  // Queued after success()/error() and their handlers (all emitted from the thread): the project is in its final state
+  connect(lt, &QThread::finished, ld, [this, ld, ended, import]() {
+    ld->hide();
+    ld->deleteLater();
+    load_running_ = false;
+    panel_project->ConnectFilterToModel();
+    // Cancelled: what was parsed so far is already in the project model. An open ends on an empty project
+    // (ClearProject() already ran, so there is no previous state to go back to, and keeping the partial project
+    // under its file name would let a save overwrite the file with it). An import keeps what it merged.
+    // CBA: a cancelled import isn't rolled back, the open project just stays modified
+    if (!*ended && !import) ClearProject();
+  });
   lt->start();
-
-  panel_project->ConnectFilterToModel();
+  ld->show();
 }
 
 void OliveGlobal::ClearProject()
@@ -254,6 +279,11 @@ void OliveGlobal::ClearProject()
 
 void OliveGlobal::ImportProject(const QString &fn)
 {
+  // CBA: several .ove dropped at once only import the first one, the others are logged and skipped
+  if (load_running_) {
+    qWarning() << "A project is still loading, not importing" << fn;
+    return;
+  }
   LoadProject(fn, false, true);
   set_modified(true);
 }
@@ -349,6 +379,13 @@ void OliveGlobal::open_export_dialog() {
 }
 
 void OliveGlobal::finished_initialize() {
+  // The user chose the auto-recovery file in the startup prompt: it wins over a project given on the command line
+  // (main() sets that one up after the prompt, while the recovered project may still be loading)
+  if (enable_load_project_on_init && autorecovery_loaded_) {
+    qInfo() << "Auto-recovery file chosen at startup, not opening the project given on the command line";
+    enable_load_project_on_init = false;
+  }
+
   if (enable_load_project_on_init) {
 
     // if a project was set as a command line argument, we load it here
@@ -466,6 +503,11 @@ void OliveGlobal::clear_sequence_history()
 }
 
 void OliveGlobal::OpenProjectWorker(QString fn, bool autorecovery) {
+  // Clearing the project would pull the model from under the running LoadThread
+  if (load_running_) {
+    qWarning() << "A project is still loading, not opening" << fn;
+    return;
+  }
   ClearProject();
   update_project_filename(fn);
   LoadProject(fn, autorecovery);

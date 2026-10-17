@@ -790,7 +790,11 @@ void LoadThread::run() {
     }
   }
 
-  if (cont) {
+  // A cancelled load emits neither success() nor error(): LoadProject() ends it on finished(), so a cancel no longer
+  // shows an error box nor clears the project twice (error() -> new_project(), then the finished handler)
+  const bool cancelled = cancelled_;
+
+  if (cont && !cancelled) {
     // Collect invalid footage (files that couldn't be resolved) before analysis
     QVector<QPair<Media*, Footage*>> invalid_footage;
     for (auto loaded_media_item : loaded_media_items) {
@@ -810,7 +814,7 @@ void LoadThread::run() {
     for (auto loaded_media_item : loaded_media_items) {
       PreviewGenerator::AnalyzeMedia(loaded_media_item);
     }
-  } else {
+  } else if (!cancelled) {
     if (error_str.isEmpty()) {
       error_str = tr("User aborted loading");
     }
