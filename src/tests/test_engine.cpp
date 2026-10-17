@@ -142,6 +142,24 @@ class TestEngine : public QObject {
     QCOMPARE(f.get_length_in_frames(30.0), LONG_MAX);
     f.ready_lock.unlock();
   }
+
+  // -- Sequence::copy ----------------------------------------------------------
+
+  void sequenceCopyKeepsWorkarea() {
+    Sequence s;
+    s.width = 1280;  // no default initializers on these, and copy() reads them
+    s.height = 720;
+    s.frame_rate = 25.0;
+    s.audio_frequency = 48000;
+    s.audio_layout = 3;
+    s.using_workarea = true;
+    s.workarea_in = 12;
+    s.workarea_out = 48;
+    SequencePtr copy = s.copy();
+    QCOMPARE(copy->using_workarea, true);
+    QCOMPARE(copy->workarea_in, 12L);
+    QCOMPARE(copy->workarea_out, 48L);
+  }
 };
 
 QTEST_GUILESS_MAIN(TestEngine)
