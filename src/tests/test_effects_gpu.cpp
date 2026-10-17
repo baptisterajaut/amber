@@ -224,6 +224,9 @@ class TestEffectsGpu : public QObject {
   void alphaMaskPositionScale();
   void alphaMaskSvg();
   void alphaMaskUnreadableFile();
+  void alphaMaskSemiTransparentClip();
+  void alphaMaskFillCropsSides();
+  void alphaMaskHugeHeaderRejected();
 
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
@@ -4061,6 +4064,12 @@ void TestEffectsGpu::alphaMaskPositionScale() {
   pixels = h_->render_frame(seq.get(), 1);
   QVERIFY(mask_value(pixels, 8, 32) >= 254);
   QVERIFY(mask_value(pixels, 40, 32) <= 1);
+  // Position y = 25% then moves it up to the top-left quadrant: y = 0 is the clip's top
+  h_->set_field_double(fx, 3, 1, 25.0);
+  pixels = h_->render_frame(seq.get(), 2);
+  QVERIFY2(mask_value(pixels, 8, 8) >= 254, "top-left quadrant not kept");
+  QVERIFY2(mask_value(pixels, 8, 40) <= 1, "bottom-left quadrant not hidden");
+  QVERIFY2(mask_value(pixels, 40, 8) <= 1, "top-right quadrant not hidden");
 }
 
 void TestEffectsGpu::alphaMaskSvg() {
@@ -4104,6 +4113,73 @@ void TestEffectsGpu::alphaMaskUnreadableFile() {
   QByteArray pixels = h_->render_frame(seq.get(), 2);
   QVERIFY(mask_value(pixels, 32, 8) >= 254);
   QVERIFY(mask_value(pixels, 32, 56) <= 1);
+}
+
+void TestEffectsGpu::alphaMaskSemiTransparentClip() {
+  // Premultiplied input: the mask scales rgb and alpha together. A white clip at alpha 128 reads back as rgb 128 where
+  // kept and 0 where masked (the readback forces alpha to 255, its rgb is the premultiplied value)
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", split_mask(32, 32, QColor(255, 255, 255, 255), QColor(0, 0, 0, 0)));
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_double(c->effects[1].get(), 1, 0, 50.0);  // Solid opacity 50% → alpha 128
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(Qt::white));
+  EffectPtr fx = h_->attach_xml_shader(c, "Alpha Mask");
+  h_->set_field_string(fx.get(), 0, 0, path);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QString where;
+  QVERIFY2(rows_are(pixels, 0, 28, 128, 2, &where), qPrintable("kept half: " + where));
+  QVERIFY2(rows_are(pixels, 35, 63, 0, 1, &where), qPrintable("masked half: " + where));
+}
+
+void TestEffectsGpu::alphaMaskFillCropsSides() {
+  // A 2:1 mask whose left and right quarters are transparent: Fill on the square clip crops exactly those quarters
+  // away and keeps the whole clip, Stretch hides the clip's left and right quarters
+  QImage img(64, 32, QImage::Format_RGBA8888);
+  for (int y = 0; y < 32; y++) {
+    for (int x = 0; x < 64; x++) img.setPixelColor(x, y, x < 16 || x >= 48 ? QColor(0, 0, 0, 0) : QColor(Qt::white));
+  }
+  QTemporaryDir dir;
+  const QString path = save_mask(dir, "m.png", img);
+  QVERIFY(!path.isEmpty());
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  QByteArray pixels = h_->render_frame(seq.get(), 0);  // Stretch
+  for (int y : {4, 32, 60}) {
+    QVERIFY2(mask_value(pixels, 6, y) <= 1, qPrintable(QString("Stretch: left quarter not hidden at y=%1").arg(y)));
+    QVERIFY2(mask_value(pixels, 32, y) >= 254, qPrintable(QString("Stretch: middle not kept at y=%1").arg(y)));
+    QVERIFY2(mask_value(pixels, 57, y) <= 1, qPrintable(QString("Stretch: right quarter not hidden at y=%1").arg(y)));
+  }
+  h_->set_field_combo(fx, 2, 0, 2);  // Fill
+  // The mask's opaque/transparent boundaries land on the clip's left and right edges: allow one filtered column
+  pixels = h_->render_frame(seq.get(), 1);
+  for (int y = 0; y < 64; y++) {
+    for (int x = 1; x < 63; x++) {
+      if (mask_value(pixels, x, y) < 254) {
+        QFAIL(qPrintable(QString("Fill: (%1,%2)=%3, expected kept").arg(x).arg(y).arg(mask_value(pixels, x, y))));
+      }
+    }
+  }
+}
+
+void TestEffectsGpu::alphaMaskHugeHeaderRejected() {
+  // A PNG whose header claims 100000 x 100000 (signature, IHDR, an empty IDAT, IEND) is rejected from its header
+  // before any decode or allocation: a passthrough
+  QTemporaryDir dir;
+  const QString path = dir.filePath("huge.png");
+  {
+    QFile f(path);
+    QVERIFY(f.open(QFile::WriteOnly));
+    f.write(
+        QByteArray::fromHex("89504e470d0a1a0a0000000d49484452000186a0000186a00806000000a8520bc8"
+                            "000000004944415435af061e0000000049454e44ae426082"));
+  }
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  add_masked_white(h_.get(), seq.get(), path);
+  QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Alpha mask: .* too large for a mask"));
+  QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Alpha mask: could not read"));
+  h_->assert_solid_color(h_->render_frame(seq.get(), 0), 64, 64, QColor(Qt::white), 1);
 }
 
 // Phase 4 — only test that exercises the YUV decode path (yuv2rgb.frag.qsb).
