@@ -87,7 +87,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 ### Editing features
 - Track mute/solo/lock with track headers (per-track header controls showing V1/A1 labels, show/hide for video, mute/solo for audio + skip logic in compose_sequence) (#12)
 - **Per-track volume and pan** — simple mixer controls in the track headers, next to mute/solo. Applied in the audio mix, not as a clip effect.
-- Linked clip vertical drag — V+A clips move together across tracks when dragging a linked pair, standard NLE behavior (#12)
+- Linked clip vertical drag — done in 2.0: dragging a clip up or down a track moves the selected clips on the other side (video or audio) the mirrored way, away from or toward the V/A seam, so a linked V1+A1 pair dragged to V2 lands on V2+A2. A ghost that would cross the seam blocks the vertical move of all of them (the drag still moves in time), so their layout is kept. Track arithmetic in `panels/timeline_layout` (`ghost_track`, `clamp_track_diff`), tested in `amber-test-timeline-layout` (#12)
 - Layout presets (Default, 3-Point Editing, Color)
 - ~~Color labels on media in project panel~~ (shipped in v1.7.0)
 - Proxy toggle (switch proxy/full-res during playback without rebuild)
