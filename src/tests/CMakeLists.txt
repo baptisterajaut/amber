@@ -19,6 +19,11 @@ target_include_directories(amber-test-scrub-resolution PRIVATE ${CMAKE_SOURCE_DI
 target_link_libraries(amber-test-scrub-resolution PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-scrub-resolution COMMAND amber-test-scrub-resolution)
 
+add_executable(amber-test-scopes test_scopes.cpp)
+target_include_directories(amber-test-scopes PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-scopes PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-scopes COMMAND amber-test-scopes)
+
 add_executable(amber-test-timer-format test_timer_format.cpp)
 target_include_directories(amber-test-timer-format PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-timer-format PRIVATE amber-engine Qt6::Test)
