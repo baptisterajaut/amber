@@ -63,6 +63,37 @@ bool SnapKeyDrag(long& diff, const QVector<long>& old_times, const QVector<QVect
   return found;
 }
 
+double ValueGridStep(double px_per_unit) {
+  if (!(px_per_unit > 0) || std::isinf(px_per_unit)) return 1.0;
+  const double min_step = kValueGridMinPx / px_per_unit;
+  const double magnitude = std::pow(10.0, std::floor(std::log10(min_step)));
+  for (double m : {1.0, 2.0, 5.0}) {
+    if (m * magnitude >= min_step * (1 - 1e-9)) return m * magnitude;
+  }
+  return 10.0 * magnitude;
+}
+
+int StepDecimals(double step) {
+  if (!(step > 0) || step >= 1) return 0;
+  return int(std::ceil(-std::log10(step) - 1e-9));
+}
+
+long TimeGridStep(double px_per_frame, double frame_rate) {
+  const long second = qMax(1L, long(qRound(frame_rate)));
+  QVector<long> steps;
+  for (long f : {1, 2, 5, 10, 20, 50, 100, 200, 500}) {
+    if (f < second) steps.append(f);
+  }
+  for (long s : {1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600}) steps.append(s * second);
+  if (!(px_per_frame > 0)) return steps.last();
+  for (long step : steps) {
+    if (double(step) * px_per_frame >= kTimeGridMinPx) return step;
+  }
+  long step = steps.last();
+  while (double(step) * px_per_frame < kTimeGridMinPx && step < (1L << 40)) step *= 2;
+  return step;
+}
+
 FitRect FitRange(double min_time, double max_time, double min_value, double max_value) {
   FitRect r{min_time, max_time, min_value, max_value};
   pad_span(r.min_time, r.max_time, kFitMinTimeSpan, false);

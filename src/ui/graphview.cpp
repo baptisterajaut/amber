@@ -26,6 +26,7 @@
 #include <QPainterPath>
 #include <QtMath>
 #include <cfloat>
+#include <cmath>
 #include <limits>
 
 #include "core/graphmath.h"
@@ -46,7 +47,6 @@
 
 const double kGraphZoomSpeed = 0.05;
 const double kGraphMinZoom = 1e-4;  // set_zoom floor: mouse deltas are divided by the zoom
-const int kGraphSize = 100;
 const int kBezierHandleSize = 3;
 const int kBezierLineSize = 2;
 
@@ -272,39 +272,49 @@ void GraphView::set_view_to_rect(double x1, double y1, double x2, double y2) {
   update();
 }
 
-void GraphView::draw_line_text(QPainter& p, bool vert, int line_no, int line_pos, int next_line_pos) {
-  // draws last line's text
-  QString str = QString::number(line_no * kGraphSize);
-  int text_sz = vert ? fontMetrics().height() : fontMetrics().horizontalAdvance(str);
-  if (text_sz < (next_line_pos - line_pos)) {
-    QRect text_rect = vert ? QRect(0, line_pos - 50, 50, 50) : QRect(line_pos, height() - 50, 50, 50);
-    p.drawText(text_rect, Qt::AlignBottom | Qt::AlignLeft, str);
-  }
-}
+// Adaptive grid: value lines at 1/2/5 x 10^n, time lines on whole frames of the sequence, both from the zoom
+void GraphView::draw_grid(QPainter& p) {
+  const QColor bg = palette().color(QPalette::Window);
+  const QColor fg = palette().color(QPalette::WindowText);
+  auto mix = [&bg, &fg](double t) {
+    return QColor::fromRgbF(bg.redF() + (fg.redF() - bg.redF()) * t, bg.greenF() + (fg.greenF() - bg.greenF()) * t,
+                            bg.blueF() + (fg.blueF() - bg.blueF()) * t);
+  };
+  const QColor line_color = mix(0.12);
+  const QColor zero_color = mix(0.3);
+  const QColor label_color = mix(0.55);
 
-void GraphView::draw_lines(QPainter& p, bool vert) {
-  int last_line = INT_MIN;
-  int last_line_x = INT_MIN;
-  int lim = vert ? height() : width();
-  int scroll = vert ? y_scroll : x_scroll;
-  for (int i = 0; i < lim; i++) {
-    int scroll_offs = vert ? height() - i + scroll : i + scroll;
-    int this_line = qFloor(scroll_offs / (kGraphSize * (vert ? y_zoom : x_zoom)));
-    if (vert) this_line++;
-    if (this_line != last_line) {
-      if (vert) {
-        p.drawLine(0, i, width(), i);
-      } else {
-        p.drawLine(i, 0, i, height());
-      }
-
-      draw_line_text(p, vert, last_line, last_line_x, i);
-
-      last_line_x = i;
-      last_line = this_line;
+  // Value lines, labelled along the left
+  const double v_step = amber::graph::ValueGridStep(y_zoom);
+  const int decimals = amber::graph::StepDecimals(v_step);
+  const long v_first = long(std::floor(get_value_y(height()) / v_step));
+  const long v_last = long(std::ceil(get_value_y(0) / v_step));
+  for (long k = v_first; k <= v_last && v_last - v_first < 1000; k++) {
+    const double v = double(k) * v_step;
+    const int y = get_screen_y(v);
+    p.setPen(k == 0 ? zero_color : line_color);
+    p.drawLine(0, y, width(), y);
+    if (y < height() - fontMetrics().height() - 2) {  // clear of the time labels along the bottom
+      p.setPen(label_color);
+      p.drawText(4, y - 3, QString::number(v, 'f', decimals));
     }
   }
-  draw_line_text(p, vert, last_line, last_line_x, width());
+
+  // Time lines on sequence frames, labelled along the bottom in the user's timecode format
+  const Sequence* seq = panel_sequence_viewer->seq.get();
+  const long t_step = amber::graph::TimeGridStep(x_zoom, seq->frame_rate);
+  const long t_first = long(std::floor((double(x_scroll) / x_zoom + visible_in) / t_step));
+  const long t_last = long(std::ceil((double(x_scroll + width()) / x_zoom + visible_in) / t_step));
+  for (long k = t_first; k <= t_last && t_last - t_first < 1000; k++) {
+    const long frame = k * t_step;
+    const int x = qRound(double(frame - visible_in) * x_zoom - x_scroll);
+    p.setPen(frame == 0 ? zero_color : line_color);
+    p.drawLine(x, 0, x, height());
+    if (frame >= 0) {
+      p.setPen(label_color);
+      p.drawText(x + 3, height() - 4, frame_to_timecode(frame, amber::CurrentConfig.timecode_view, seq->frame_rate));
+    }
+  }
 }
 
 // Build a path for the curve segment between two keyframes (used for hit-testing).
@@ -432,9 +442,7 @@ void GraphView::paintEvent(QPaintEvent*) {
   QPainter p(this);
 
   if (panel_sequence_viewer->seq != nullptr) {
-    p.setPen(Qt::gray);
-    draw_lines(p, true);
-    draw_lines(p, false);
+    draw_grid(p);
 
     if (row != nullptr) {
       for (int i = row->FieldCount() - 1; i >= 0; i--) {

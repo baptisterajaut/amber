@@ -42,6 +42,17 @@ constexpr int kSnapRangePx = 10;  // as Timeline::get_snap_range(), in the Graph
 bool SnapKeyDrag(long& diff, const QVector<long>& old_times, const QVector<QVector<long>>& targets, double range,
                  long* target);
 
+// Adaptive grid. Value lines every 1, 2 or 5 x 10^n units: the smallest such step at least kValueGridMinPx apart.
+constexpr double kValueGridMinPx = 40;
+double ValueGridStep(double px_per_unit);
+// Decimals needed to label multiples of a value step (0 for steps of 1 and more)
+int StepDecimals(double step);
+// Time lines on whole frames: 1, 2, 5, 10, 20, 50... frames under a second, then 1, 2, 5, 10, 15, 30 s, 1, 2, 5, 10,
+// 15, 30 min, 1 h and doublings, a second being qRound(frame_rate) frames. The smallest step at least kTimeGridMinPx
+// apart.
+constexpr double kTimeGridMinPx = 80;
+long TimeGridStep(double px_per_frame, double frame_rate);
+
 // Bezier handles of a key, relative to it (as in core/keyframe.h)
 struct Handles {
   double pre_x;

@@ -117,6 +117,56 @@ class TestGraphViewMath : public QObject {
     QCOMPARE(diff, 10L);
   }
 
+  void valueGridSteps() {
+    // 1, 2 or 5 x 10^n, the smallest at least 40 px apart
+    QCOMPARE(ValueGridStep(1.0), 50.0);   // 1 px per unit: 40 -> 50
+    QCOMPARE(ValueGridStep(0.4), 100.0);  // exactly 40 px
+    QCOMPARE(ValueGridStep(3.0), 20.0);   // 13.3 -> 20
+    QCOMPARE(ValueGridStep(300.0), 0.2);  // a 0-1 field over 300 px
+    QCOMPARE(ValueGridStep(1000.0), 0.05);
+    QCOMPARE(ValueGridStep(0.001), 50000.0);
+    for (double px : {0.0013, 0.37, 1.0, 7.7, 123.0, 4567.0}) {
+      const double step = ValueGridStep(px);
+      QVERIFY(step * px >= 40.0 * (1 - 1e-9));
+      QVERIFY(step * px < 100.0);
+      const double mantissa = step / std::pow(10.0, std::floor(std::log10(step) + 1e-9));
+      QVERIFY(qFuzzyCompare(mantissa, 1.0) || qFuzzyCompare(mantissa, 2.0) || qFuzzyCompare(mantissa, 5.0));
+    }
+  }
+
+  void valueLabelDecimals() {
+    QCOMPARE(StepDecimals(50.0), 0);
+    QCOMPARE(StepDecimals(1.0), 0);
+    QCOMPARE(StepDecimals(0.5), 1);
+    QCOMPARE(StepDecimals(0.2), 1);
+    QCOMPARE(StepDecimals(0.1), 1);
+    QCOMPARE(StepDecimals(0.05), 2);
+    QCOMPARE(StepDecimals(0.001), 3);
+  }
+
+  void timeGridSteps_data() {
+    QTest::addColumn<double>("fps");
+    QTest::addColumn<double>("px_per_frame");
+    QTest::addColumn<long>("step");
+    QTest::newRow("24 fps, 100 px/frame") << 24.0 << 100.0 << 1L;
+    QTest::newRow("24 fps, 30 px/frame") << 24.0 << 30.0 << 5L;
+    QTest::newRow("24 fps, 5 px/frame") << 24.0 << 5.0 << 20L;
+    QTest::newRow("24 fps, 3 px/frame") << 24.0 << 3.0 << 48L;     // 20 frames is 60 px: 1 s too (72 px): 2 s
+    QTest::newRow("24 fps, 0.5 px/frame") << 24.0 << 0.5 << 240L;  // 10 s
+    QTest::newRow("25 fps, 4 px/frame") << 25.0 << 4.0 << 20L;
+    QTest::newRow("25 fps, 3.5 px/frame") << 25.0 << 3.5 << 25L;    // 1 s = 25 frames, 87.5 px
+    QTest::newRow("29.97 fps, 3 px/frame") << 29.97 << 3.0 << 30L;  // 1 s = 30 whole frames
+    QTest::newRow("29.97 fps, 1 px/frame") << 29.97 << 1.0 << 150L;
+    QTest::newRow("29.97 fps, tiny zoom") << 29.97 << 1e-4 << 108000L * 8;  // past an hour: doublings
+  }
+
+  void timeGridSteps() {
+    QFETCH(double, fps);
+    QFETCH(double, px_per_frame);
+    QFETCH(long, step);
+    QCOMPARE(TimeGridStep(px_per_frame, fps), step);
+  }
+
   void easyEaseThirdOfTheWay() {
     // Key at 30 between keys at 0 and 90: handles flat, a third of the way to each neighbour
     const Handles h = EasyEase({-40, 12, 40, -7}, 30, 0L, 90L, EaseSide::kBoth);
