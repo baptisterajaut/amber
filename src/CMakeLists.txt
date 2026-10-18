@@ -192,6 +192,7 @@ add_library(amber-engine OBJECT
   # rendering/ (not audio_ui)
   rendering/audio.cpp rendering/audio.h
   rendering/batchexport.cpp rendering/batchexport.h
+  rendering/renderqueue.cpp rendering/renderqueue.h
   rendering/clipqueue.cpp rendering/clipqueue.h
   rendering/encoderoptions.cpp rendering/encoderoptions.h
   rendering/exportthread.cpp rendering/exportthread.h
@@ -254,6 +255,7 @@ set(UI_SOURCES
   dialogs/newsequencedialog.cpp dialogs/newsequencedialog.h
   dialogs/preferencesdialog.cpp dialogs/preferencesdialog.h
   dialogs/proxydialog.cpp dialogs/proxydialog.h
+  dialogs/renderqueuedialog.cpp dialogs/renderqueuedialog.h
   dialogs/replaceclipmediadialog.cpp dialogs/replaceclipmediadialog.h
   dialogs/shadertoyimportdialog.cpp dialogs/shadertoyimportdialog.h
   dialogs/speeddialog.cpp dialogs/speeddialog.h

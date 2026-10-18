@@ -298,6 +298,13 @@ target_include_directories(amber-test-headless-render PRIVATE ${CMAKE_SOURCE_DIR
 target_link_libraries(amber-test-headless-render PRIVATE amber-engine Qt6::Gui Qt6::Test)
 add_test(NAME amber-test-headless-render COMMAND amber-test-headless-render)
 
+# Render queue model — rows, refusals, the range taken at render time, sequences that left the project (rendering is
+# in amber-test-headless-render)
+add_executable(amber-test-render-queue test_render_queue.cpp)
+target_include_directories(amber-test-render-queue PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-render-queue PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-render-queue COMMAND amber-test-render-queue)
+
 # Render benchmark — run by hand (amber-bench-render --help), deliberately not an add_test()
 add_executable(amber-bench-render bench_render.cpp test_render_harness.cpp test_render_harness.h)
 target_include_directories(amber-bench-render PRIVATE ${CMAKE_SOURCE_DIR})

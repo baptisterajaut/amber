@@ -33,6 +33,8 @@ extern "C" {
 #include <QtEndian>
 #include <QtMath>
 #include <algorithm>
+#include <cerrno>
+#include <cstring>
 #include <functional>
 
 #include "core/audio.h"
@@ -52,6 +54,7 @@ extern "C" {
 #include "rendering/encoderoptions.h"
 #include "rendering/exportthread.h"
 #include "rendering/renderfunctions.h"
+#include "rendering/renderqueue.h"
 #include "rendering/renderthread.h"
 
 // External entry point from effectloaders.cpp (no header export), as in test_render_harness.cpp
@@ -358,6 +361,7 @@ struct Decoded {
   int width = 0;
   int height = 0;
   int pix_fmt = -1;  // of the first decoded frame
+  int video_codec = AV_CODEC_ID_NONE;
   QByteArray first_rgba;
   QVector<QByteArray> rgba;  // every video frame, when decode_file() is asked to keep them
   int audio_rate = 0;
@@ -434,7 +438,10 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
   if (vi >= 0) vctx = open_dec(vi);
   if (ai >= 0) actx = open_dec(ai);
   d.has_video = vctx != nullptr;
-  if (vctx != nullptr) d.video_fps = av_q2d(fmt->streams[vi]->avg_frame_rate);
+  if (vctx != nullptr) {
+    d.video_fps = av_q2d(fmt->streams[vi]->avg_frame_rate);
+    d.video_codec = fmt->streams[vi]->codecpar->codec_id;
+  }
   d.has_audio = actx != nullptr;
   if (actx != nullptr) {
     d.audio_rate = actx->sample_rate;
@@ -849,9 +856,10 @@ class TestHeadlessRender : public QObject {
   }
 
   // Jobs for seqs into folder, named and derived as ExportDialog::start_batch_export() does; a PNG image sequence
-  // with image_sequence
+  // with image_sequence. Every job gets vparams, as the dialog's Advanced settings.
   static QVector<BatchExport::Job> batch_jobs(const QVector<SequencePtr>& seqs, const QString& folder, bool use_inout,
-                                              bool image_sequence = false) {
+                                              bool image_sequence = false,
+                                              const VideoCodecParams& vparams = yuv420p_params()) {
     const QString ext = image_sequence ? "png" : "mp4";
     ExportParams base = batch_base();
     if (image_sequence) base.video_codec = AV_CODEC_ID_PNG;
@@ -861,7 +869,7 @@ class TestHeadlessRender : public QObject {
       const QString name = amber::batch_export_filename(s->name, ext, taken);
       taken.append(name);
       const QString filename = amber::batch_export_path(folder, name, ext, image_sequence);
-      jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename)});
+      jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename), vparams});
     }
     return jobs;
   }
@@ -876,6 +884,30 @@ class TestHeadlessRender : public QObject {
     }
     batch.Start();
     return QTest::qWaitFor([&finished]() { return finished; }, 120000);
+  }
+
+  // A render queue row of seq into path, as ExportDialog::QueueExport() queues it: the batch base settings at seq's
+  // size, the whole sequence
+  static amber::QueuedJob queue_job(const SequencePtr& seq, const QString& path) {
+    amber::QueuedJob job;
+    job.seq = seq;
+    job.params = amber::batch_export_params(batch_base(), seq.get(), false, path);
+    job.vparams = yuv420p_params();
+    job.summary = "MPEG-4";
+    return job;
+  }
+
+  // Runs queue's Render() to its end; the rows started, in order. False on time-out.
+  bool run_queue(RenderQueue& queue, QVector<int>* started) {
+    bool finished = false;
+    QMetaObject::Connection f = connect(&queue, &RenderQueue::Finished, this, [&finished]() { finished = true; });
+    QMetaObject::Connection s =
+        connect(&queue, &RenderQueue::JobStarted, this, [started](int row, int, int) { started->append(row); });
+    queue.Render();
+    const bool ok = QTest::qWaitFor([&finished]() { return finished; }, 120000);
+    disconnect(f);
+    disconnect(s);
+    return ok;
   }
 
   static VideoCodecParams yuv420p_params() {
@@ -2552,7 +2584,7 @@ class TestHeadlessRender : public QObject {
     QCOMPARE(whole.start_frame, 0L);
     QCOMPARE(whole.end_frame, 6L);
 
-    BatchExport batch(jobs, yuv420p_params());
+    BatchExport batch(jobs);
     QVector<SequencePtr> active;
     QVector<long> playheads;
     QVERIFY(run_batch(batch, [&](int index) {
@@ -2609,7 +2641,7 @@ class TestHeadlessRender : public QObject {
 
     QVector<BatchExport::Job> jobs = batch_jobs({b.wide, empty, b.tall}, folder, false);
     jobs[0].params.video_encoder = "amber_no_such_encoder";
-    BatchExport batch(jobs, yuv420p_params());
+    BatchExport batch(jobs);
     QVector<int> started;
     QVERIFY(run_batch(batch, [&](int index) { started.append(index); }));
     QCOMPARE(started, (QVector<int>{0, 2}));
@@ -2647,7 +2679,7 @@ class TestHeadlessRender : public QObject {
     vparams.pix_fmt = AV_PIX_FMT_RGB24;
 
     {
-      BatchExport batch(batch_jobs({seq}, folder, false, true), vparams);
+      BatchExport batch(batch_jobs({seq}, folder, false, true, vparams));
       QVERIFY(run_batch(batch));
       QCOMPARE(batch.ExportedCount(), 1);
     }
@@ -2667,10 +2699,10 @@ class TestHeadlessRender : public QObject {
     }
 
     seq->clips.first()->effects.at(1)->row(2)->Field(0)->SetValueAt(0.0, QVariant(QColor(Qt::blue)));  // Solid colour
-    QVector<BatchExport::Job> again = batch_jobs({seq}, folder, false, true);
+    QVector<BatchExport::Job> again = batch_jobs({seq}, folder, false, true, vparams);
     QCOMPARE(QFileInfo(again.at(0).params.filename).fileName(), QString("Sequence 01 (2)%05d.png"));
     {
-      BatchExport batch(again, vparams);
+      BatchExport batch(again);
       QVERIFY(run_batch(batch));
       QCOMPARE(batch.ExportedCount(), 1);
     }
@@ -2692,7 +2724,7 @@ class TestHeadlessRender : public QObject {
     const QString folder = dir_.filePath("batch_cancel");
     QVERIFY(QDir().mkpath(folder));
 
-    BatchExport batch(batch_jobs({b.wide, b.tall}, folder, false), yuv420p_params());
+    BatchExport batch(batch_jobs({b.wide, b.tall}, folder, false));
     connect(&batch, &BatchExport::ProgressChanged, &batch, &BatchExport::Cancel);
     QVector<int> started;
     QVERIFY(run_batch(batch, [&](int index) { started.append(index); }));
@@ -2705,6 +2737,135 @@ class TestHeadlessRender : public QObject {
     QCOMPARE(amber::ActiveSequence, b.user);
     QCOMPARE(b.wide->playhead, 7L);
     QVERIFY(!audio_rendering);
+    pio_->setSequence(nullptr);
+  }
+
+  // Each job its own codec and Advanced settings: an MPEG-4 file in YUV 4:2:0 and a PNG image sequence in RGB, each
+  // pixel format refused by the other's encoder (exportUnsupportedPixelFormatFails()): shared settings would fail one
+  void batchExportPerJobCodecs() {
+    if (avcodec_find_encoder(AV_CODEC_ID_PNG) == nullptr) QSKIP("PNG encoder not in this FFmpeg build");
+    BatchSequences b = batch_sequences();
+    const QString folder = dir_.filePath("batch_per_job_codecs");
+    QVERIFY(QDir().mkpath(folder));
+    VideoCodecParams rgb = yuv420p_params();
+    rgb.pix_fmt = AV_PIX_FMT_RGB24;
+    QVector<BatchExport::Job> jobs = batch_jobs({b.wide}, folder, false);
+    jobs += batch_jobs({b.tall}, folder, false, true, rgb);
+
+    BatchExport batch(jobs);
+    QVERIFY(run_batch(batch));
+    for (const BatchExport::Outcome& o : batch.Outcomes()) {
+      QVERIFY2(o.status == BatchExport::Outcome::Exported, qPrintable(o.name + ": " + o.reason));
+    }
+
+    const Decoded wide = decode_file(QDir(folder).filePath("Wide.mp4"));
+    QVERIFY(wide.ok && wide.has_video);
+    QCOMPARE(wide.video_codec, int(AV_CODEC_ID_MPEG4));
+    QCOMPARE(wide.pix_fmt, int(AV_PIX_FMT_YUV420P));
+    QCOMPARE(wide.video_frames, 10);
+    const Decoded tall = decode_file(jobs.at(1).params.filename);  // the image2 pattern
+    QVERIFY(tall.ok && tall.has_video);
+    QCOMPARE(tall.video_codec, int(AV_CODEC_ID_PNG));
+    QCOMPARE(tall.pix_fmt, int(AV_PIX_FMT_RGB24));
+    QCOMPARE(tall.video_frames, 6);
+    pio_->setSequence(nullptr);
+  }
+
+  // Render queue: a row that fails (its folder doesn't exist) is rendered again by the next Render() once the folder is
+  // there; the Done row isn't. The user's sequence and the playheads come back after each run, as for a batch export.
+  void renderQueueRetriesOnlyWhatIsNotDone() {
+    BatchSequences b = batch_sequences();
+    pio_->setSequence(b.user);
+    MediaPtr wide_item = amber::create_sequence_item(nullptr, b.wide, false, nullptr);
+    MediaPtr tall_item = amber::create_sequence_item(nullptr, b.tall, false, nullptr);
+    const QString folder = dir_.filePath("queue_retry");
+    const QString missing = QDir(folder).filePath("missing");
+    QVERIFY(QDir().mkpath(folder));
+    RenderQueue& queue = amber::render_queue();
+    queue.Clear();
+    QVERIFY(queue.Add(queue_job(b.wide, QDir(folder).filePath("Wide.mp4"))).isEmpty());
+    QVERIFY(queue.Add(queue_job(b.tall, QDir(missing).filePath("Tall.mp4"))).isEmpty());
+
+    QVector<int> started;
+    QVERIFY(run_queue(queue, &started));
+    QCOMPARE(started, (QVector<int>{0, 1}));
+    QCOMPARE(queue.Jobs().at(0).outcome.status, BatchExport::Outcome::Exported);
+    QCOMPARE(queue.Jobs().at(1).outcome.status, BatchExport::Outcome::Failed);
+    // The path and the system's words for the error, not a bare "(-2)"
+    const QString reason = queue.Jobs().at(1).outcome.reason;
+    qInfo("failed: %s", qPrintable(reason));
+    QCOMPARE(reason, QString("could not open output file \"%1\": %2")
+                         .arg(QDir::toNativeSeparators(QDir(missing).filePath("Tall.mp4")),
+                              QString::fromLocal8Bit(std::strerror(ENOENT))));
+    QCOMPARE(queue.PendingCount(), 1);
+    QCOMPARE(amber::ActiveSequence, b.user);
+    QCOMPARE(b.wide->playhead, 7L);
+    QCOMPARE(b.tall->playhead, 2L);
+    QVERIFY(!audio_rendering);
+
+    // Fixed: the folder exists. Wide.mp4 gone: it would come back if its Done row were rendered again.
+    QVERIFY(QDir().mkpath(missing));
+    QVERIFY(QFile::remove(QDir(folder).filePath("Wide.mp4")));
+    started.clear();
+    QVERIFY(run_queue(queue, &started));
+    QCOMPARE(started, QVector<int>{1});
+    QCOMPARE(queue.Jobs().at(0).outcome.status, BatchExport::Outcome::Exported);
+    QCOMPARE(queue.Jobs().at(1).outcome.status, BatchExport::Outcome::Exported);
+    QCOMPARE(queue.PendingCount(), 0);
+    QCOMPARE(dir_entries(folder), QStringList{"missing"});
+    const Decoded tall = decode_file(QDir(missing).filePath("Tall.mp4"));
+    QVERIFY(tall.ok);
+    QCOMPARE(tall.width, 32);
+    QCOMPARE(tall.video_frames, 6);
+    QCOMPARE(amber::ActiveSequence, b.user);
+
+    queue.ClearFinished();
+    QCOMPARE(queue.Count(), 0);
+    amber::project_model.removeChild(nullptr, wide_item.get());
+    amber::project_model.removeChild(nullptr, tall_item.get());
+    pio_->setSequence(nullptr);
+  }
+
+  // Cancel stops the running row (Cancelled, its partial file removed) and leaves the rows after it to render next
+  // time, unlike a batch export's Cancel; the next Render() renders all three
+  void renderQueueCancelKeepsTheRest() {
+    BatchSequences b = batch_sequences();
+    pio_->setSequence(b.user);
+    QVector<MediaPtr> items;
+    for (const SequencePtr& s : {b.wide, b.tall, b.user}) {
+      items.append(amber::create_sequence_item(nullptr, s, false, nullptr));
+    }
+    const QString folder = dir_.filePath("queue_cancel");
+    QVERIFY(QDir().mkpath(folder));
+    RenderQueue& queue = amber::render_queue();
+    queue.Clear();
+    for (const SequencePtr& s : {b.wide, b.tall, b.user}) {
+      QVERIFY(queue.Add(queue_job(s, QDir(folder).filePath(s->name + ".mp4"))).isEmpty());
+    }
+
+    QMetaObject::Connection c = connect(&queue, &RenderQueue::ProgressChanged, &queue, &RenderQueue::Cancel);
+    QVector<int> started;
+    QVERIFY(run_queue(queue, &started));
+    disconnect(c);
+    QCOMPARE(started, QVector<int>{0});
+    QCOMPARE(queue.Jobs().at(0).outcome.status, BatchExport::Outcome::Cancelled);
+    QCOMPARE(queue.Jobs().at(1).outcome.status, BatchExport::Outcome::Pending);
+    QCOMPARE(queue.Jobs().at(2).outcome.status, BatchExport::Outcome::Pending);
+    QCOMPARE(queue.PendingCount(), 3);
+    QCOMPARE(dir_entries(folder), QStringList{});
+    QCOMPARE(amber::ActiveSequence, b.user);
+    QVERIFY(!audio_rendering);
+
+    started.clear();
+    QVERIFY(run_queue(queue, &started));
+    QCOMPARE(started, (QVector<int>{0, 1, 2}));
+    QCOMPARE(queue.PendingCount(), 0);
+    QCOMPARE(dir_entries(folder), (QStringList{"Tall.mp4", "User.mp4", "Wide.mp4"}));
+    QCOMPARE(amber::ActiveSequence, b.user);
+    QCOMPARE(b.user->playhead, 3L);
+
+    queue.Clear();
+    for (const MediaPtr& m : items) amber::project_model.removeChild(nullptr, m.get());
     pio_->setSequence(nullptr);
   }
 

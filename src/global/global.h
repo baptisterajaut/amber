@@ -285,6 +285,11 @@ class AmberGlobal : public QObject {
   void open_export_dialog();
 
   /**
+   * @brief Open the Render Queue dialog (File > Render Queue), which renders the exports queued from the Export dialog.
+   */
+  void open_render_queue_dialog();
+
+  /**
    * @brief Open the About Amber dialog.
    */
   void open_about_dialog();

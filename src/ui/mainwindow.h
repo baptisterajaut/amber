@@ -287,6 +287,11 @@ class MainWindow : public QMainWindow {
 
   void Retranslate();
 
+  /**
+   * @brief "Render Queue (3)..." with the rows still to render, disabled while the queue is empty
+   */
+  void update_render_queue_action();
+
   // file menu actions
   QMenu* file_menu;
   QMenu* new_menu;
@@ -300,6 +305,7 @@ class MainWindow : public QMainWindow {
   QAction* import_subtitle_action;
   QAction* relink_media_action;
   QAction* export_action;
+  QAction* render_queue_action;
   QAction* export_frame_action;
   QAction* exit_action;
 

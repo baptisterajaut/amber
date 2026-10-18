@@ -48,6 +48,7 @@ extern "C" {
 #include "global/global.h"
 #include "panels/panels.h"
 #include "rendering/exportthread.h"
+#include "rendering/renderqueue.h"
 #include "ui/mainwindow.h"
 #include "ui/viewerwidget.h"
 
@@ -377,6 +378,7 @@ void ExportDialog::reject() {
 
 void ExportDialog::prep_ui_for_render(bool r) {
   export_button->setEnabled(!r);
+  queue_button->setEnabled(!r);
   cancel_button->setEnabled(!r);
   faststartCheckbox->setEnabled(!r);
   videoGroupbox->setEnabled(!r);  // the two-pass checkbox with it
@@ -507,28 +509,32 @@ void ExportDialog::launch_export_thread(const ExportParams& params) {
   export_thread_->start();
 }
 
-void ExportDialog::start_batch_export(const QString& ext) {
-  const QString folder = QFileDialog::getExistingDirectory(this, tr("Export Sequences To"));
-  if (folder.isEmpty()) return;
+QVector<BatchExport::Job> ExportDialog::batch_jobs(const QString& folder, const QString& ext,
+                                                   const QStringList& taken) const {
   const bool image_sequence = formatCombobox->currentIndex() == FORMAT_IMG;
 
-  // Names in use: the folder's (an image sequence's frames as the name they were exported under), then those given to
-  // the sequences before
-  QStringList taken = amber::batch_export_taken_names(
+  // Names in use: the folder's (an image sequence's frames as the name they were exported under), the caller's, then
+  // those given to the sequences before
+  QStringList names = amber::batch_export_taken_names(
       QDir(folder).entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden), image_sequence);
+  names += taken;
 
   const ExportParams base = build_export_params(QString());
   const bool use_inout = rangeCombobox->isEnabled() && rangeCombobox->currentIndex() == 1;
   QVector<BatchExport::Job> jobs;
   for (const SequencePtr& s : batch_) {
-    const QString name = amber::batch_export_filename(s->name, ext, taken);
-    taken.append(name);
+    const QString name = amber::batch_export_filename(s->name, ext, names);
+    names.append(name);
     const QString filename = amber::batch_export_path(folder, name, ext, image_sequence);
-    jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename)});
+    jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename), vcodec_params});
   }
+  return jobs;
+}
 
+void ExportDialog::start_batch_export(const QString& folder, const QString& ext) {
+  QVector<BatchExport::Job> jobs = batch_jobs(folder, ext, {});
   batch_folder_ = QDir::toNativeSeparators(folder);
-  batch_export_ = new BatchExport(jobs, vcodec_params, this);
+  batch_export_ = new BatchExport(jobs, this);
   connect(batch_export_, &BatchExport::SequenceStarted, this, [this](int index, int count, const QString& name) {
     batch_label_ = tr("Sequence %1 of %2 — %3").arg(QString::number(index + 1), QString::number(count), name);
     export_pass_.clear();
@@ -581,12 +587,12 @@ void ExportDialog::batch_export_finished() {
   if (exported > 0 && !cancelled) accept();
 }
 
-void ExportDialog::StartExport() {
+bool ExportDialog::choose_output(QString* ext_out, QString* output) {
   // Batch mode checks size and range per sequence (BatchExport skips a sequence that fails them)
   if (batch_.isEmpty() && (widthSpinbox->value() % 2 == 1 || heightSpinbox->value() % 2 == 1)) {
     QMessageBox::critical(this, tr("Invalid dimensions"),
                           tr("Export width and height must both be even numbers/divisible by 2."), QMessageBox::Ok);
-    return;
+    return false;
   }
 
   // end_frame is exclusive: an empty range would write a file with no frames
@@ -594,7 +600,7 @@ void ExportDialog::StartExport() {
   if (batch_.isEmpty() && range.end_frame <= range.start_frame) {
     QMessageBox::critical(this, tr("Nothing to export"), tr("Nothing to export: the sequence or work area is empty."),
                           QMessageBox::Ok);
-    return;
+    return false;
   }
 
   QString ext = GetFormatExtension(formatCombobox->currentIndex(), vcodecCombobox->currentData().toInt(),
@@ -604,15 +610,16 @@ void ExportDialog::StartExport() {
     QMessageBox::critical(this, tr("Invalid format"),
                           tr("Couldn't determine output format. This is a bug, please contact the developers."),
                           QMessageBox::Ok);
-    return;
+    return false;
   }
+  *ext_out = ext;
   if (!batch_.isEmpty()) {
-    start_batch_export(ext);
-    return;
+    *output = QFileDialog::getExistingDirectory(this, tr("Export Sequences To"));
+    return !output->isEmpty();
   }
   QString filename = QFileDialog::getSaveFileName(this, tr("Export Media"), "",
                                                   format_strings[formatCombobox->currentIndex()] + " (*." + ext + ")");
-  if (filename.isEmpty()) return;
+  if (filename.isEmpty()) return false;
 
   if (!filename.endsWith("." + ext, Qt::CaseInsensitive)) {
     filename += "." + ext;
@@ -628,9 +635,70 @@ void ExportDialog::StartExport() {
       filename.insert(ext_location, '%');
     }
   }
+  *output = filename;
+  return true;
+}
 
-  ExportParams params = build_export_params(filename);
+void ExportDialog::StartExport() {
+  QString ext;
+  QString output;
+  if (!choose_output(&ext, &output)) return;
+  if (!batch_.isEmpty()) {
+    start_batch_export(output, ext);
+    return;
+  }
+  ExportParams params = build_export_params(output);
   launch_export_thread(params);
+}
+
+// The start of a codec's name in its combo box, up to the first " / " or " (": "H.264" of "H.264 / AVC / MPEG-4 AVC /
+// MPEG-4 part 10", "AAC" of "AAC (Advanced Audio Coding)"
+static QString short_codec_name(const QString& text) {
+  static const QRegularExpression rest(QStringLiteral(" [/(].*$"));
+  QString name = text;
+  name.remove(rest);
+  return name;
+}
+
+QString ExportDialog::queue_summary(const ExportParams& params) const {
+  QStringList parts;
+  parts.append(formatCombobox->currentText());
+  if (params.video_enabled) {
+    parts.append(short_codec_name(vcodecCombobox->currentText()));
+    parts.append(QStringLiteral("%1×%2").arg(params.video_width).arg(params.video_height));
+  }
+  if (params.audio_enabled) parts.append(short_codec_name(acodecCombobox->currentText()));
+  return parts.join(QStringLiteral(", "));
+}
+
+void ExportDialog::QueueExport() {
+  QString ext;
+  QString output;
+  if (!choose_output(&ext, &output)) return;
+
+  RenderQueue& queue = amber::render_queue();
+  const bool use_inout = rangeCombobox->isEnabled() && rangeCombobox->currentIndex() == 1;
+  QVector<amber::QueuedJob> jobs;
+  if (batch_.isEmpty()) {
+    const ExportParams params = build_export_params(output);
+    jobs.append({amber::ActiveSequence, params, vcodec_params, use_inout, queue_summary(params)});
+  } else {
+    // Named as the batch export names them, apart from the rows already queued into that folder too
+    for (const BatchExport::Job& j : batch_jobs(output, ext, queue.TakenNames(output))) {
+      jobs.append({j.seq, j.params, j.vparams, use_inout, queue_summary(j.params)});
+    }
+  }
+  for (const amber::QueuedJob& job : jobs) {
+    // CBA: a batch refused halfway would keep the rows added before; not expected, its names avoid every name queued
+    // in the folder (TakenNames()), compared as Add() compares them
+    const QString error = queue.Add(job);
+    if (!error.isEmpty()) {
+      QMessageBox::warning(this, tr("Not Queued"), error);
+      return;
+    }
+  }
+  // As Premiere's Queue: nothing to confirm, the Render Queue (File menu) shows it
+  accept();
 }
 
 void ExportDialog::update_progress_bar(int value, qint64 remaining_ms) {
@@ -1078,6 +1146,11 @@ void ExportDialog::setup_ui() {
 
   QHBoxLayout* buttonLayout = new QHBoxLayout();
   buttonLayout->addStretch();
+
+  queue_button = new QPushButton(tr("Queue"), this);
+  queue_button->setToolTip(tr("Add this export to the render queue (File > Render Queue)"));
+  connect(queue_button, &QPushButton::clicked, this, &ExportDialog::QueueExport);
+  buttonLayout->addWidget(queue_button);
 
   export_button = new QPushButton(this);
   export_button->setText("Export");

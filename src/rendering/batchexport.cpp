@@ -67,8 +67,8 @@ ExportParams amber::batch_export_params(const ExportParams& base, Sequence* seq,
   return params;
 }
 
-BatchExport::BatchExport(const QVector<Job>& jobs, const VideoCodecParams& vparams, QObject* parent)
-    : QObject(parent), jobs_(jobs), outcomes_(jobs.size()), vparams_(vparams) {
+BatchExport::BatchExport(const QVector<Job>& jobs, QObject* parent)
+    : QObject(parent), jobs_(jobs), outcomes_(jobs.size()) {
   for (int i = 0; i < jobs_.size(); i++) outcomes_[i].name = jobs_.at(i).seq->name;
 }
 
@@ -150,7 +150,7 @@ void BatchExport::StartNext() {
     amber::project_io->setRenderingState(true);
     if (amber::ActiveSequence != job.seq) amber::project_io->setSequence(job.seq);
 
-    thread_ = new ExportThread(job.seq.get(), job.params, vparams_, this);
+    thread_ = new ExportThread(job.seq.get(), job.params, job.vparams, this);
     connect(thread_, &QThread::finished, this, &BatchExport::ThreadFinished);
     connect(thread_, &ExportThread::ProgressChanged, this, &BatchExport::ProgressChanged);
     connect(thread_, &ExportThread::PassChanged, this, &BatchExport::PassChanged);

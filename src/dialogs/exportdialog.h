@@ -89,6 +89,14 @@ private slots:
   void StartExport();
 
   /**
+   * @brief Slot for the Queue button: the checks and the file (or folder) choice of Export, then one render queue row
+   * (one per sequence in batch mode) instead of the export, and the dialog closes
+   *
+   * A refused row (its output already queued) is a warning; the dialog stays open.
+   */
+  void QueueExport();
+
+  /**
    * @brief Slot for the export thread to update the progress bar's value
    *
    * @param value
@@ -194,13 +202,39 @@ private:
   void launch_export_thread(const ExportParams& params);
 
   /**
-   * @brief Batch mode's Export: asks for a folder, then runs a BatchExport of every batch sequence into it
+   * @brief Export's and Queue's checks (even size, a range, a format), then the output: the file, or in batch mode the
+   * folder, the user picks
+   *
+   * @param ext
+   *
+   * Set to the format's file extension.
+   *
+   * @param output
+   *
+   * Set to the file (an image sequence's "%05d" pattern), or the folder in batch mode.
+   *
+   * @return False when a check failed (the user was told) or the user cancelled the file dialog.
+   */
+  bool choose_output(QString* ext, QString* output);
+
+  /**
+   * @brief One job per batch sequence into folder, named after the sequence, apart from the folder's names and taken
+   */
+  QVector<BatchExport::Job> batch_jobs(const QString& folder, const QString& ext, const QStringList& taken) const;
+
+  /**
+   * @brief The render queue's Settings text for params: "MPEG-4 Video, H.264, 1920×1080, AAC"
+   */
+  QString queue_summary(const ExportParams& params) const;
+
+  /**
+   * @brief Batch mode's Export: runs a BatchExport of every batch sequence into folder
    *
    * @param ext
    *
    * The format's file extension.
    */
-  void start_batch_export(const QString& ext);
+  void start_batch_export(const QString& folder, const QString& ext);
 
   /**
    * @brief Slot for the BatchExport finishing: restores the UI, shows the outcome, closes unless nothing was exported
@@ -437,6 +471,11 @@ private:
    * @brief Export button to trigger the start of an export
    */
   QPushButton* export_button;
+
+  /**
+   * @brief Queue button, left of Export: adds the export to the render queue (QueueExport())
+   */
+  QPushButton* queue_button;
 
   /**
    * @brief Dialog cancel button to close this dialog
