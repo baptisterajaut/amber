@@ -25,6 +25,7 @@
 #include <QPainterPath>
 #include <QtMath>
 #include <cfloat>
+#include <limits>
 
 #include "core/graphmath.h"
 #include "effects/effect.h"
@@ -146,7 +147,7 @@ void GraphView::set_view_to_selection() {
     long min_time = LONG_MAX;
     long max_time = LONG_MIN;
     double min_dbl = DBL_MAX;
-    double max_dbl = DBL_MIN;
+    double max_dbl = std::numeric_limits<double>::lowest();  // not DBL_MIN, the smallest positive double
     for (int i = 0; i < selected_keys.size(); i++) {
       const EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes.at(selected_keys.at(i));
       min_time = qMin(key.time, min_time);
@@ -169,7 +170,7 @@ void GraphView::set_view_to_all() {
     long min_time = LONG_MAX;
     long max_time = LONG_MIN;
     double min_dbl = DBL_MAX;
-    double max_dbl = DBL_MIN;
+    double max_dbl = std::numeric_limits<double>::lowest();  // not DBL_MIN, the smallest positive double
     for (int i = 0; i < row->FieldCount(); i++) {
       for (const auto& key : row->Field(i)->keyframes) {
         min_time = qMin(key.time, min_time);
@@ -188,16 +189,13 @@ void GraphView::set_view_to_all() {
   }
 }
 
-void GraphView::set_view_to_rect(int x1, double y1, int x2, double y2) {
-  double padding = 1.5;
-  double x_diff = double(x2 - x1);
-  double y_diff = (y2 - y1);
-  double x_diff_padded = (x_diff + 10) * padding;
-  double y_diff_padded = (y_diff + 10) * padding;
-  set_zoom(double(width()) / x_diff_padded, double(height()) / y_diff_padded);
+void GraphView::set_view_to_rect(double x1, double y1, double x2, double y2) {
+  const amber::graph::FitRect r = amber::graph::FitRange(x1, x2, y1, y2);
+  set_zoom(double(width()) / (r.max_time - r.min_time), double(height()) / (r.max_value - r.min_value));
 
-  set_scroll_x(qRound((double(x1) - ((x_diff_padded - x_diff) / 2)) * x_zoom));
-  set_scroll_y(qRound((double(y1) - ((y_diff_padded - y_diff) / 2)) * y_zoom));
+  set_scroll_x(qRound(r.min_time * x_zoom));
+  set_scroll_y(qRound(r.min_value * y_zoom));
+  update();
 }
 
 void GraphView::draw_line_text(QPainter& p, bool vert, int line_no, int line_pos, int next_line_pos) {

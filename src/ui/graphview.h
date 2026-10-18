@@ -130,7 +130,7 @@ class GraphView : public QWidget {
   void reset_view();
   void set_view_to_selection();
   void set_view_to_all();
-  void set_view_to_rect(int x1, double y1, int x2, double y2);
+  void set_view_to_rect(double x1, double y1, double x2, double y2);
 };
 
 #endif  // GRAPHVIEW_H
