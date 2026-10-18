@@ -325,10 +325,22 @@ struct Decoded {
   double audio_peak = 0;   // max |sample|, 0..1
   // Channel 0 samples, -1..1
   QVector<float> audio_left;
+  // Every channel, interleaved S16, for S16 and S16P streams (FLAC's 16-bit output): compared byte for byte
+  QByteArray audio_s16;
 };
 
 void read_audio_frame(const AVFrame* f, Decoded& d) {
   const int ch = f->ch_layout.nb_channels;
+  if (f->format == AV_SAMPLE_FMT_S16 || f->format == AV_SAMPLE_FMT_S16P) {
+    for (int i = 0; i < f->nb_samples; i++) {
+      for (int c = 0; c < ch; c++) {
+        const qint16 v = f->format == AV_SAMPLE_FMT_S16P
+                             ? reinterpret_cast<const qint16*>(f->extended_data[c])[i]
+                             : reinterpret_cast<const qint16*>(f->extended_data[0])[i * ch + c];
+        d.audio_s16.append(reinterpret_cast<const char*>(&v), 2);
+      }
+    }
+  }
   for (int c = 0; c < ch; c++) {
     for (int i = 0; i < f->nb_samples; i++) {
       double v = 0;
@@ -432,6 +444,62 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
   avformat_close_input(&fmt);
   d.ok = true;
   return d;
+}
+
+// Offset of the first top-level box of this type in an MP4/MOV file, -1 if there is none
+qint64 mp4_box_offset(const QByteArray& file, const char* type) {
+  qint64 pos = 0;
+  while (pos + 8 <= file.size()) {
+    qint64 size = qFromBigEndian<quint32>(file.constData() + pos);
+    if (size == 1 && pos + 16 <= file.size()) size = qint64(qFromBigEndian<quint64>(file.constData() + pos + 8));
+    if (size == 0) size = file.size() - pos;  // extends to the end of the file
+    if (file.mid(pos + 4, 4) == type) return pos;
+    if (size < 8) return -1;
+    pos += size;
+  }
+  return -1;
+}
+
+// x264's settings string (its SEI: "x264 - core ... options: ..."), empty if the file has none
+QByteArray x264_settings(const QByteArray& file) {
+  const qsizetype start = file.indexOf("x264 - core");
+  if (start < 0) return QByteArray();
+  const qsizetype end = file.indexOf('\0', start);
+  return file.mid(start, end < 0 ? -1 : end - start);
+}
+
+// kSize x kSize sequence of one red Solid over frames [0, frames), its Transform opacity ramping from 100 % down to
+// 20 % over black, so every frame differs
+SequencePtr solid_sequence(long frames) {
+  SequencePtr seq = std::make_shared<Sequence>();
+  seq->name = "Solid";
+  seq->width = kSize;
+  seq->height = kSize;
+  seq->frame_rate = kFps;
+  seq->audio_frequency = kAudioRate;
+  ClipPtr c = std::make_shared<Clip>(seq.get());
+  c->set_media(nullptr, 0);
+  c->set_timeline_in(0);
+  c->set_timeline_out(frames);
+  c->set_clip_in(0);
+  c->set_track(-1);
+  c->set_name("Solid");
+  EffectPtr transform = Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_TRANSFORM, EFFECT_TYPE_EFFECT));
+  EffectRow* opacity = transform->row(5);
+  opacity->SetKeyframingInternal(true);
+  for (const auto& [time, value] : {std::pair<long, double>{0, 100.0}, {frames, 20.0}}) {
+    EffectKeyframe k;
+    k.time = time;
+    k.data = value;
+    k.type = EFFECT_KEYFRAME_LINEAR;
+    opacity->Field(0)->keyframes.append(k);
+  }
+  c->effects.append(transform);
+  EffectPtr solid = Effect::Create(c.get(), Effect::GetInternalMeta(EFFECT_INTERNAL_SOLID, EFFECT_TYPE_EFFECT));
+  solid->row(2)->Field(0)->SetValueAt(0.0, QVariant(QColor(220, 40, 40)));  // Color
+  c->effects.append(solid);
+  seq->clips.append(c);
+  return seq;
 }
 
 // kSize x kSize sequence holding one white Solid (default Transform, centred, full frame) at 50 % Transform opacity
@@ -1383,6 +1451,232 @@ class TestHeadlessRender : public QObject {
     delete rt;
     delete surface;
     QVERIFY2(!lost, qPrintable(QString("request %1 never rendered").arg(requests)));
+  }
+
+  // Video-only export parameters over the whole of seq
+  static ExportParams video_params(const QString& file, Sequence* seq, int codec, const QString& encoder,
+                                   int compression_type, double value) {
+    ExportParams params;
+    params.filename = file;
+    params.video_enabled = true;
+    params.video_codec = codec;
+    params.video_encoder = encoder;
+    params.video_width = kSize;
+    params.video_height = kSize;
+    params.video_compression_type = compression_type;
+    params.video_bitrate = value;
+    params.audio_enabled = false;
+    params.start_frame = 0;
+    params.end_frame = seq->getEndFrame();
+    return params;
+  }
+
+  // x264's preset reaches the encoder: ultrafast and veryslow write different settings into x264's SEI and both
+  // decode to every frame; the quality-based CRF and the average bitrate show there too; the default preset passed
+  // explicitly changes nothing; an option the encoder doesn't know is reported, not fatal
+  void x264OptionsReachEncoder() {
+    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    if (avcodec_find_decoder(AV_CODEC_ID_H264) == nullptr) QSKIP("no H.264 decoder");
+    const long frames = long(kFps);  // 1 s
+    SequencePtr seq = solid_sequence(frames);
+    auto run = [&](const QString& name, const QString& encoder, int compression_type, double value,
+                   const QVector<QPair<QString, QString>>& options, QByteArray* bytes) {
+      ExportParams params =
+          video_params(dir_.filePath(name), seq.get(), AV_CODEC_ID_H264, encoder, compression_type, value);
+      params.video_options = options;
+      const QString error = export_sequence(seq.get(), params);
+      QVERIFY2(error.isEmpty(), qPrintable(error));
+      const Decoded d = decode_file(params.filename);
+      QVERIFY(d.ok);
+      QCOMPARE(long(d.video_frames), frames);
+      QFile f(params.filename);
+      QVERIFY(f.open(QFile::ReadOnly));
+      *bytes = f.readAll();
+    };
+    QByteArray fast, slow, plain, medium, abr, bogus;
+    run("x264_ultrafast.mp4", "libx264", COMPRESSION_TYPE_CFR, 30, {{"preset", "ultrafast"}}, &fast);
+    if (QTest::currentTestFailed()) return;
+    run("x264_veryslow.mp4", "libx264", COMPRESSION_TYPE_CFR, 30, {{"preset", "veryslow"}}, &slow);
+    if (QTest::currentTestFailed()) return;
+    run("x264_plain.mp4", QString(), COMPRESSION_TYPE_CFR, 30, {}, &plain);
+    if (QTest::currentTestFailed()) return;
+    run("x264_medium.mp4", "libx264", COMPRESSION_TYPE_CFR, 30, {{"preset", "medium"}}, &medium);
+    if (QTest::currentTestFailed()) return;
+    run("x264_abr.mp4", "libx264", COMPRESSION_TYPE_TARGETBR, 0.5, {}, &abr);
+    if (QTest::currentTestFailed()) return;
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("video encoder ignored option amber_no_such_option"));
+    run("x264_bogus.mp4", "libx264", COMPRESSION_TYPE_CFR, 30, {{"amber_no_such_option", "1"}}, &bogus);
+    if (QTest::currentTestFailed()) return;
+
+    const QByteArray fast_settings = x264_settings(fast);
+    const QByteArray slow_settings = x264_settings(slow);
+    qInfo("ultrafast: %lld bytes, veryslow: %lld bytes, default: %lld bytes", qint64(fast.size()), qint64(slow.size()),
+          qint64(plain.size()));
+    qInfo("ultrafast settings: %s", fast_settings.constData());
+    qInfo("veryslow settings: %s", slow_settings.constData());
+    QVERIFY(!fast_settings.isEmpty());
+    QVERIFY(!slow_settings.isEmpty());
+    QVERIFY(fast_settings != slow_settings);
+    QVERIFY(fast_settings.contains("subme=0"));  // ultrafast turns subpixel refinement off
+    QVERIFY(slow_settings.contains("subme=10"));
+    // x264 prints its settings with the process locale's decimal separator
+    const QRegularExpression crf30("crf=30[.,]0 ");
+    QVERIFY(QString::fromLatin1(fast_settings).contains(crf30));
+    QVERIFY(QString::fromLatin1(slow_settings).contains(crf30));
+    // No encoder name and libx264 with its default preset spelled out: the same file
+    QVERIFY(plain == medium);
+    const QByteArray abr_settings = x264_settings(abr);
+    qInfo("average bitrate settings: %s", abr_settings.constData());
+    QVERIFY(abr_settings.contains("rc=abr"));
+    QVERIFY(abr_settings.contains("bitrate=500"));
+    QVERIFY(bogus == plain);
+  }
+
+  void av1Export_data() {
+    QTest::addColumn<QString>("encoder");
+    QTest::addColumn<int>("quality");
+    QTest::addColumn<QString>("speed_key");
+    QTest::addColumn<QString>("speed");
+    QTest::newRow("libsvtav1") << "libsvtav1" << 35 << "preset" << "12";
+    QTest::newRow("librav1e") << "librav1e" << 100 << "speed" << "10";
+    QTest::newRow("libaom-av1") << "libaom-av1" << 32 << "cpu-used" << "8";
+  }
+
+  // AV1 through each installed software encoder, quality-based at its own quality key, at a fast speed: every frame
+  // comes back at the export size, red where the solid is opaque
+  void av1Export() {
+    QFETCH(QString, encoder);
+    QFETCH(int, quality);
+    QFETCH(QString, speed_key);
+    QFETCH(QString, speed);
+    if (avcodec_find_encoder_by_name(encoder.toUtf8().constData()) == nullptr) QSKIP("encoder not in this build");
+    if (avcodec_find_decoder(AV_CODEC_ID_AV1) == nullptr) QSKIP("no AV1 decoder");
+    const long frames = long(kFps);
+    SequencePtr seq = solid_sequence(frames);
+    ExportParams params = video_params(dir_.filePath(encoder + ".mkv"), seq.get(), AV_CODEC_ID_AV1, encoder,
+                                       COMPRESSION_TYPE_CFR, quality);
+    params.video_options = {{speed_key, speed}};
+    QElapsedTimer timer;
+    timer.start();
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded d = decode_file(params.filename);
+    qInfo("%s: %lld bytes, %d frames, %dx%d, %lld ms", qPrintable(encoder), QFileInfo(params.filename).size(),
+          d.video_frames, d.width, d.height, timer.elapsed());
+    QVERIFY(d.ok);
+    QVERIFY(d.has_video);
+    QCOMPARE(long(d.video_frames), frames);
+    QCOMPARE(d.width, kSize);
+    QCOMPARE(d.height, kSize);
+    const int off = ((kSize / 2) * kSize + kSize / 2) * 4;
+    const int r = uchar(d.first_rgba[off]), g = uchar(d.first_rgba[off + 1]), b = uchar(d.first_rgba[off + 2]);
+    qInfo("first frame centre (%d, %d, %d)", r, g, b);
+    QVERIFY(r > 180 && g < 80 && b < 80);
+  }
+
+  // FLAC at compression level 0 and 12: the same samples, bit for bit, and the higher level no larger
+  void flacCompressionLevel() {
+    if (avcodec_find_encoder_by_name("flac") == nullptr) QSKIP("flac encoder not in this FFmpeg build");
+    const QString video = dir_.filePath("flac_checkerboard.y4m");
+    {
+      QFile f(video);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(checkerboard_y4m());
+    }
+    const QString audio = dir_.filePath("flac_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("flac.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      QPointer<PreviewGenerator> gen(c->media()->to_footage()->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+    }
+
+    auto run = [&](const QString& level, Decoded* d, qint64* size) {
+      ExportParams params{};
+      params.filename = dir_.filePath("flac_" + level + ".mkv");
+      params.video_enabled = false;
+      params.audio_enabled = true;
+      params.audio_codec = AV_CODEC_ID_FLAC;
+      params.audio_encoder = "flac";
+      params.audio_options = {{"compression_level", level}};
+      params.audio_sampling_rate = kAudioRate;
+      params.audio_bitrate = 1536;  // ignored by FLAC
+      params.start_frame = 0;
+      params.end_frame = seq->getEndFrame();
+      const QString error = export_sequence(seq.get(), params);
+      QVERIFY2(error.isEmpty(), qPrintable(error));
+      *d = decode_file(params.filename);
+      *size = QFileInfo(params.filename).size();
+    };
+    Decoded l0, l12;
+    qint64 size0 = 0, size12 = 0;
+    run("0", &l0, &size0);
+    if (QTest::currentTestFailed()) return;
+    run("12", &l12, &size12);
+    if (QTest::currentTestFailed()) return;
+    qInfo("FLAC level 0: %lld bytes, %ld samples per channel; level 12: %lld bytes, %ld samples per channel", size0,
+          l0.audio_samples, size12, l12.audio_samples);
+    QVERIFY(l0.ok && l12.ok);
+    QVERIFY(l0.has_audio && l12.has_audio);
+    // The export runs to the end of the encoder frame holding the last sample, and FLAC's frame size grows with the
+    // level (1152 samples at 0, 4096 at 12): compare the export's span, which both files cover
+    const qsizetype span_bytes = qRound64((seq->getEndFrame() / kFps) * kAudioRate) * 2 * 2;
+    QVERIFY(l0.audio_s16.size() >= span_bytes);
+    QVERIFY(l12.audio_s16.size() >= span_bytes);
+    QVERIFY(l0.audio_s16.left(span_bytes) == l12.audio_s16.left(span_bytes));
+    const qsizetype common = qMin(l0.audio_s16.size(), l12.audio_s16.size());
+    QVERIFY(l0.audio_s16.left(common) == l12.audio_s16.left(common));
+    QVERIFY2(size12 <= size0, qPrintable(QString("level 12 %1 > level 0 %2").arg(size12).arg(size0)));
+  }
+
+  // Fast start puts the MP4 index (moov) before the media data (mdat); without it the index comes last
+  void mp4FastStart() {
+    const long frames = 10;
+    SequencePtr seq = solid_sequence(frames);
+    auto run = [&](bool faststart, qint64* moov, qint64* mdat) {
+      ExportParams params = video_params(dir_.filePath(faststart ? "faststart.mp4" : "plain.mp4"), seq.get(),
+                                         AV_CODEC_ID_MPEG4, QString(), COMPRESSION_TYPE_CBR, 2.0);
+      params.faststart = faststart;
+      const QString error = export_sequence(seq.get(), params);
+      QVERIFY2(error.isEmpty(), qPrintable(error));
+      QFile f(params.filename);
+      QVERIFY(f.open(QFile::ReadOnly));
+      const QByteArray bytes = f.readAll();
+      *moov = mp4_box_offset(bytes, "moov");
+      *mdat = mp4_box_offset(bytes, "mdat");
+      const Decoded d = decode_file(params.filename);
+      QVERIFY(d.ok);
+      QCOMPARE(long(d.video_frames), frames);
+    };
+    qint64 fast_moov = -1, fast_mdat = -1, plain_moov = -1, plain_mdat = -1;
+    run(true, &fast_moov, &fast_mdat);
+    if (QTest::currentTestFailed()) return;
+    run(false, &plain_moov, &plain_mdat);
+    if (QTest::currentTestFailed()) return;
+    qInfo("fast start: moov at %lld, mdat at %lld; without: moov at %lld, mdat at %lld", fast_moov, fast_mdat,
+          plain_moov, plain_mdat);
+    QVERIFY(fast_moov >= 0 && fast_mdat >= 0 && plain_moov >= 0 && plain_mdat >= 0);
+    QVERIFY(fast_moov < fast_mdat);
+    QVERIFY(plain_mdat < plain_moov);
   }
 
   // The composite is premultiplied; a pixel format with alpha must receive straight alpha, an opaque one the
