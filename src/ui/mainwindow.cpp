@@ -290,6 +290,8 @@ void MainWindow::save_layout_as() {
       QInputDialog::getText(this, tr("Save Layout"), tr("Layout name:"), QLineEdit::Normal, QString(), &ok).trimmed();
   if (!ok || name.isEmpty()) return;
 
+  // Save the real arrangement, not the one-panel view of a maximized panel
+  leave_maximized_panel();
   QDir dir = user_layouts_dir();
   dir.mkpath(".");
   const QString path = dir.filePath(amber::sanitize_layout_name(name) + ".xml");
