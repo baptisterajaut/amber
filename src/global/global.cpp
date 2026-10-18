@@ -25,6 +25,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QFileDialog>
+#include <QLibraryInfo>
 #include <QMessageBox>
 #include <QStyleFactory>
 
@@ -79,6 +80,7 @@ AmberGlobal::AmberGlobal()
 
   // alloc QTranslator
   translator = std::unique_ptr<QTranslator>(new QTranslator());
+  qt_translator = std::unique_ptr<QTranslator>(new QTranslator());
 
   project_io_ = new ProjectIO(this);
   amber::project_io = project_io_;
@@ -192,8 +194,9 @@ void AmberGlobal::load_translation_from_config() {
   // clear runtime language file so if the user sets a different language, we won't load it next time
   amber::CurrentRuntimeConfig.external_translation_file.clear();
 
-  // remove current translation if there is one
+  // remove current translations if there are any
   QApplication::removeTranslator(translator.get());
+  QApplication::removeTranslator(qt_translator.get());
 
   if (!language_file.isEmpty()) {
     // translation files are stored relative to app path (see GitHub issue #454)
@@ -201,6 +204,21 @@ void AmberGlobal::load_translation_from_config() {
 
     // load translation file
     if (QFileInfo::exists(full_language_path) && translator->load(full_language_path)) {
+      // Qt's own strings (standard dialog buttons, key names in shortcuts) in the same language, else they stay in
+      // English (under KDE Plasma the platform theme supplies the button texts itself, in the system language). Same
+      // locale parsing as the language list in PreferencesDialog ("amber_pt-BR" -> pt-BR). Not looked up in Amber's
+      // language folders: the language list shows every .qm found there.
+      const QString base_name = QFileInfo(language_file).baseName();
+      const QLocale locale(base_name.mid(base_name.lastIndexOf('_') + 1));
+      for (const QString& dir :
+           {QDir(get_app_path()).filePath("translations"), QLibraryInfo::path(QLibraryInfo::TranslationsPath)}) {
+        if (qt_translator->load(locale, "qtbase", "_", dir)) {
+          QApplication::installTranslator(qt_translator.get());
+          break;
+        }
+      }
+
+      // installed last so it is searched first: Amber's file wins over Qt's on shared contexts
       QApplication::installTranslator(translator.get());
     } else {
       qWarning() << "Failed to load translation file" << full_language_path << ". No language will be loaded.";
