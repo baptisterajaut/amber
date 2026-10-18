@@ -1146,6 +1146,10 @@ void MainWindow::setup_menus() {
 }
 
 void MainWindow::Retranslate() {
+  // The translator is installed before the menus and panels exist (see the constructor); a LanguageChange delivered
+  // in between has nothing to retranslate yet, and the constructor calls Retranslate() once they are built.
+  if (file_menu == nullptr) return;
+
   file_menu->setTitle(tr("&File"));
   new_menu->setTitle(tr("&New"));
   open_project->setText(tr("&Open Project"));
