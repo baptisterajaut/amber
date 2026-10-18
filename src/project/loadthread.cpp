@@ -35,6 +35,7 @@
 
 #include <QCoreApplication>
 #include <QFile>
+#include <cmath>
 
 #define LOAD_TYPE_VERSION 69
 #define LOAD_TYPE_URL 70
@@ -242,6 +243,17 @@ void LoadThread::parse_track_state(QXmlStreamReader& stream, Sequence* s) {
       t.solo = on;
     } else if (attr.name() == QLatin1String("locked")) {
       t.locked = on;
+    } else if (attr.name() == QLatin1String("volume")) {
+      // clamped to the header's range and rounded to its 0.1 dB step; a bad number keeps the default
+      bool ok = false;
+      const double v = attr.value().toDouble(&ok);
+      if (ok && std::isfinite(v)) {
+        t.volume_db = qRound(qBound(amber::kTrackVolumeMinDb, v, amber::kTrackVolumeMaxDb) * 10.0) / 10.0;
+      }
+    } else if (attr.name() == QLatin1String("pan")) {
+      bool ok = false;
+      const int v = attr.value().toInt(&ok);
+      if (ok) t.pan = qBound(-amber::kTrackPanLimit, v, amber::kTrackPanLimit);
     }
   }
   // a missing, malformed or out-of-range index is ignored rather than landing on V1/A1

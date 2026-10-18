@@ -22,6 +22,7 @@
 
 #include <QtMath>
 
+#include "core/audio.h"
 #include "global/debug.h"
 #include "project/projectelements.h"
 #include "rendering/audio.h"
@@ -104,6 +105,14 @@ void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int 
 
   applyOpeningTransition(clip, timecode_start, timecode_end, frame, nb_bytes);
   applyClosingTransition(clip, timecode_start, timecode_end, frame, nb_bytes);
+
+  // Track volume and pan of the clip's own sequence; the recursion below then applies the outer nest clip's track, so
+  // a nested sequence mixes like a submix. Default tracks skip the loop.
+  if (clip->track() >= 0) {
+    double gain_l, gain_r;
+    clip->sequence->track_gain_pan(clip->track(), &gain_l, &gain_r);
+    amber::apply_stereo_gain(frame->data[0], nb_bytes, gain_l, gain_r);
+  }
 
   if (!nests.isEmpty()) {
     Clip* next_nest = nests.last();

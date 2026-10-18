@@ -21,9 +21,11 @@
 #include "sequence.h"
 
 #include <QCoreApplication>
+#include <QtMath>
 
 #include "global/debug.h"
 #include "core/appcontext.h"
+#include "core/audio.h"
 
 Sequence::Sequence()
 
@@ -90,6 +92,25 @@ bool Sequence::track_audible(int track) const {
 bool Sequence::track_visible_in_render(int track) const { return track < 0 && !track_state(track).hidden; }
 
 bool Sequence::track_locked(int track) const { return track_state(track).locked; }
+
+void Sequence::track_gain_pan(int track, double* gain_l, double* gain_r) const {
+  *gain_l = 1.0;
+  *gain_r = 1.0;
+  if (track < 0) return;
+  const TrackState state = track_state(track);
+  if (state.volume_db == 0.0 && state.pan == 0) return;
+
+  const double gain = (state.volume_db <= amber::kTrackVolumeMinDb) ? 0.0 : qPow(10.0, state.volume_db / 20.0);
+  *gain_l = gain;
+  *gain_r = gain;
+  // PanEffect's law: panning right attenuates the left channel, and the other way round
+  const double attenuation = 1.0 - log_volume(qAbs(state.pan) * 0.01);
+  if (state.pan > 0) {
+    *gain_l *= attenuation;
+  } else if (state.pan < 0) {
+    *gain_r *= attenuation;
+  }
+}
 
 std::optional<int> Sequence::first_locked_track(const QVector<int>& tracks) const {
   for (int track : tracks) {

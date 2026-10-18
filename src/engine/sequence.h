@@ -86,6 +86,8 @@ class Sequence {
   // A video track that is not hidden
   bool track_visible_in_render(int track) const;
   bool track_locked(int track) const;
+  // The linear left and right gains of an audio track's volume and pan; 1 and 1 for a default or a video track
+  void track_gain_pan(int track, double* gain_l, double* gain_r) const;
   // The first of these tracks that is locked, if any
   std::optional<int> first_locked_track(const QVector<int>& tracks) const;
   // Indexes of the clips on locked tracks (the ripple ignore list)
