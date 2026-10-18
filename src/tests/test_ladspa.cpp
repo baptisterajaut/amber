@@ -1,5 +1,6 @@
-// LADSPA hosting: port hints to field ranges, discovery from $LADSPA_PATH, and processing through the plugins of the
-// LADSPA SDK (amp.so, delay.so). A machine without them skips the tests that need them.
+// LADSPA hosting: port hints to field ranges, discovery from $LADSPA_PATH, and processing through the test-only
+// plugins of tests/fixtures/ladspa (built with the test, so these run everywhere) and through the same plugins of the
+// LADSPA SDK (amp.so, delay.so) they mirror. A machine without the SDK skips the SDK rows.
 
 #include <QtTest>
 
@@ -95,15 +96,31 @@ EffectField* field(Effect* e, const QString& id) {
 class TestLadspa : public QObject {
   Q_OBJECT
 
-  std::vector<EffectMeta> system_;  // the scan of the default folders (or the user's $LADSPA_PATH)
-  QString amp_dir_;                 // folder holding the SDK's amp.so, empty if none
+  std::vector<EffectMeta> system_;   // the scan of the default folders (or the user's $LADSPA_PATH)
+  std::vector<EffectMeta> fixture_;  // the test plugins, found through $LADSPA_PATH
+  QString amp_dir_;                  // folder holding the SDK's amp.so, empty if none
   QString delay_dir_;
 
+  // tests/fixtures/ladspa: gain mono, gain stereo, delay line (amp_mono, amp_stereo, delay_5s lookalikes)
+  static constexpr int kTestGainMono = 4243001;
+  static constexpr int kTestGainStereo = 4243002;
+  static constexpr int kTestDelay = 4243003;
+  static bool is_fixture(int id) { return id >= kTestGainMono && id <= kTestDelay; }
+
   const EffectMeta* plugin(unsigned long id) {
-    for (const EffectMeta& em : system_) {
-      if (em.plugin_id == id) return &em;
+    for (const std::vector<EffectMeta>* list : {&fixture_, &system_}) {
+      for (const EffectMeta& em : *list) {
+        if (em.plugin_id == id) return &em;
+      }
     }
     return nullptr;
+  }
+
+  // Rows of the delay line tests: the test plugin always, the SDK's delay_5s when installed
+  static void delay_rows() {
+    QTest::addColumn<int>("id");
+    QTest::newRow("test delay") << kTestDelay;
+    QTest::newRow("delay_5s") << 1043;
   }
 
  private slots:
@@ -115,6 +132,26 @@ class TestLadspa : public QObject {
     }
     qInfo("%d LADSPA plugins in the default folders; amp.so in '%s', delay.so in '%s'", int(system_.size()),
           qPrintable(amp_dir_), qPrintable(delay_dir_));
+
+    const QByteArray saved = qgetenv("LADSPA_PATH");
+    qputenv("LADSPA_PATH", QByteArray(AMBER_TEST_LADSPA_DIR));
+    fixture_ = amber::ladspa::scan(amber::ladspa::search_paths());
+    if (saved.isNull()) {
+      qunsetenv("LADSPA_PATH");
+    } else {
+      qputenv("LADSPA_PATH", saved);
+    }
+  }
+
+  // The test plugins are found through $LADSPA_PATH, sorted by name, hostable
+  void testPluginsDiscovered() {
+    QStringList names;
+    for (const EffectMeta& em : fixture_) names.append(em.name);
+    QCOMPARE(names, QStringList({"Amber Test Delay Line", "Amber Test Mono Gain", "Amber Test Stereo Gain"}));
+    for (const EffectMeta& em : fixture_) {
+      QCOMPARE(em.internal, int(EFFECT_INTERNAL_LADSPA));
+      QCOMPARE(em.subtype, int(EFFECT_TYPE_AUDIO));
+    }
   }
 
   void portRanges_data() {
@@ -364,6 +401,8 @@ class TestLadspa : public QObject {
 
   void ampHalvesRms_data() {
     QTest::addColumn<int>("id");
+    QTest::newRow("test gain mono") << kTestGainMono;
+    QTest::newRow("test gain stereo") << kTestGainStereo;
     QTest::newRow("amp_mono") << 1048;
     QTest::newRow("amp_stereo") << 1049;
   }
@@ -372,6 +411,7 @@ class TestLadspa : public QObject {
   void ampHalvesRms() {
     QFETCH(int, id);
     const EffectMeta* meta = plugin(id);
+    if (meta == nullptr && is_fixture(id)) QFAIL("the test plugin amber_test_ladspa was not built");
     if (meta == nullptr) QSKIP("the LADSPA SDK's amp.so is not installed");
     ScopedAppContext app;
     Sequence seq;
@@ -395,8 +435,11 @@ class TestLadspa : public QObject {
   }
 
   // delay_5s at 0.1 s fully wet: the tone starts 4410 samples later on both channels
+  void delayShiftsOnset_data() { delay_rows(); }
   void delayShiftsOnset() {
-    const EffectMeta* meta = plugin(1043);
+    QFETCH(int, id);
+    const EffectMeta* meta = plugin(id);
+    if (meta == nullptr && is_fixture(id)) QFAIL("the test plugin amber_test_ladspa was not built");
     if (meta == nullptr) QSKIP("delay_5s (1043) not installed");
     ScopedAppContext app;
     Sequence seq;
@@ -412,16 +455,19 @@ class TestLadspa : public QObject {
     const int in_onset = first_above(in, 0, 100);
     const int out_left = first_above(out, 0, 100);
     const int out_right = first_above(out, 1, 100);
-    qInfo("delay_5s 0.1 s: onset in %d, out left %d, right %d (shift %d)", in_onset, out_left, out_right,
-          out_left - in_onset);
+    qInfo("%s 0.1 s: onset in %d, out left %d, right %d (shift %d)", qPrintable(meta->name), in_onset, out_left,
+          out_right, out_left - in_onset);
     QCOMPARE(out_left - in_onset, 4410);
     QCOMPARE(out_right - in_onset, 4410);
   }
 
   // A jump in the timecode (seek) restarts the plugin: the delay line doesn't echo the previous position. Played on
   // without a jump, it does.
+  void resetClearsDelayLine_data() { delay_rows(); }
   void resetClearsDelayLine() {
-    const EffectMeta* meta = plugin(1043);
+    QFETCH(int, id);
+    const EffectMeta* meta = plugin(id);
+    if (meta == nullptr && is_fixture(id)) QFAIL("the test plugin amber_test_ladspa was not built");
     if (meta == nullptr) QSKIP("delay_5s (1043) not installed");
     ScopedAppContext app;
     Sequence seq;
@@ -446,8 +492,11 @@ class TestLadspa : public QObject {
   }
 
   // Two streams processed alternately (two inner clips of a nest) keep their own delay lines
+  void streamsKeepTheirOwnState_data() { delay_rows(); }
   void streamsKeepTheirOwnState() {
-    const EffectMeta* meta = plugin(1043);
+    QFETCH(int, id);
+    const EffectMeta* meta = plugin(id);
+    if (meta == nullptr && is_fixture(id)) QFAIL("the test plugin amber_test_ladspa was not built");
     if (meta == nullptr) QSKIP("delay_5s (1043) not installed");
     ScopedAppContext app;
     Sequence seq;
