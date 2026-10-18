@@ -178,6 +178,12 @@ void AmberGlobal::load_project_on_launch(const QString& s) {
 
 QString AmberGlobal::get_recent_project_list_file() { return project_io_->recentProjectListFile(); }
 
+// Never read by Amber: lupdate extracts it, and QGuiApplication looks it up whenever a translator is installed or
+// removed, switching the whole UI to right-to-left when the loaded language translates it as "RTL".
+//: Translate this string to "RTL" for right-to-left languages (Arabic, Hebrew...), "LTR" for all others.
+[[maybe_unused]] static const char* const kLayoutDirectionMarker =
+    QT_TRANSLATE_NOOP("QGuiApplication", "QT_LAYOUT_DIRECTION");
+
 void AmberGlobal::load_translation_from_config() {
   QString language_file = amber::CurrentRuntimeConfig.external_translation_file.isEmpty()
                               ? amber::CurrentConfig.language_file
