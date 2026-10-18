@@ -24,6 +24,7 @@
 #include "engine/undo/undo.h"
 #include "global/debug.h"
 #include "global/projectio.h"
+#include "project/footage.h"
 #include "project/media.h"
 
 ProjectModel amber::project_model;
@@ -33,6 +34,24 @@ MediaPtr amber::create_folder_item(const QString& name) {
   item->set_folder();
   item->set_name(name);
   return item;
+}
+
+static void collect_proxy_paths(Media *parent, const QVector<Media *> &skip, QStringList &paths) {
+  for (int i = 0; i < amber::project_model.childCount(parent); i++) {
+    Media *item = amber::project_model.child(i, parent);
+    if (item->get_type() == MEDIA_TYPE_FOLDER) {
+      collect_proxy_paths(item, skip, paths);
+    } else if (item->get_type() == MEDIA_TYPE_FOOTAGE && !skip.contains(item)) {
+      const Footage *f = item->to_footage();
+      if (f != nullptr && !f->proxy_path.isEmpty()) paths.append(f->proxy_path);
+    }
+  }
+}
+
+QStringList amber::project_proxy_paths(const QVector<Media *> &skip) {
+  QStringList paths;
+  collect_proxy_paths(nullptr, skip, paths);
+  return paths;
 }
 
 MediaPtr amber::create_sequence_item(ComboAction* ca, SequencePtr s, bool open, Media* parent) {

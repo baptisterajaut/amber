@@ -31,6 +31,7 @@
 #include "core/path.h"
 #include "project/proxygenerator.h"
 #include "project/footage.h"
+#include "project/projectmodel.h"
 #include "ui/mainwindow.h"
 #include "global/global.h"
 
@@ -97,6 +98,10 @@ void ProxyDialog::accept() {
 
   QStringList sources;
   for (auto i : selected_media) sources.append(i->to_footage()->url);
+  // nor another footage's proxy, made by an earlier batch or still queued: a same-named source proxied into the same
+  // folder would overwrite it. The selected footage may reuse its own.
+  sources += amber::project_proxy_paths(selected_media);
+  sources += amber::proxy_generator.queued_paths(selected_media);
 
   for (auto i : selected_media) {
     // loop through selected footage and send info to the proxy queue

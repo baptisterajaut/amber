@@ -79,6 +79,11 @@ MediaPtr create_folder_item(const QString& name);
  * item is appended to project_model immediately and, if open is true, the sequence becomes the active sequence.
  */
 MediaPtr create_sequence_item(ComboAction* ca, SequencePtr s, bool open, Media* parent);
+
+/**
+ * @brief The proxy file of every footage in project_model, in any folder, but the footage in skip
+ */
+QStringList project_proxy_paths(const QVector<Media*>& skip);
 }
 
 #endif // PROJECTMODEL_H

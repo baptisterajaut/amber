@@ -1,6 +1,9 @@
 #include <QtTest>
 
 #include "core/path.h"
+#include "project/footage.h"
+#include "project/media.h"
+#include "project/projectmodel.h"
 
 class TestPath : public QObject {
   Q_OBJECT
@@ -110,6 +113,31 @@ class TestPath : public QObject {
     // same name, different container: the second one is told apart
     QCOMPARE(proxy_file_path("/media/clip.mov", "/media/Proxy", {"/media/clip.mp4", "/media/Proxy/clip.mov"}),
              QString("/media/Proxy/clip.proxy.mov"));
+  }
+
+  // A proxy an earlier batch made for another footage of the same name (here b/Proxy/clip.mov, a's proxy made into
+  // b's Proxy folder) is avoided: the Proxy dialog passes every other footage's proxy, in any project folder
+  void testProxyPathAvoidsEarlierBatches() {
+    amber::project_model.clear();
+    auto add_footage = [](Media* parent, const QString& url, const QString& proxy) {
+      auto f = std::make_shared<Footage>();
+      f->url = url;
+      f->proxy_path = proxy;
+      MediaPtr m = std::make_shared<Media>();
+      m->set_footage(f);
+      amber::project_model.appendChild(parent, m);
+      return m.get();
+    };
+    MediaPtr bin = amber::create_folder_item("Bin");
+    amber::project_model.appendChild(nullptr, bin);
+    Media* a = add_footage(bin.get(), "/media/a/clip.mp4", "/media/b/Proxy/clip.mov");
+    Media* b = add_footage(nullptr, "/media/b/clip.mp4", QString());
+    QCOMPARE(amber::project_proxy_paths({b}), QStringList{"/media/b/Proxy/clip.mov"});
+    QCOMPARE(amber::project_proxy_paths({a, b}), QStringList());  // re-proxied, a may replace its own file
+    QStringList avoid = {"/media/b/clip.mp4"};
+    avoid += amber::project_proxy_paths({b});
+    QCOMPARE(proxy_file_path("/media/b/clip.mp4", "/media/b/Proxy", avoid), QString("/media/b/Proxy/clip.proxy.mov"));
+    amber::project_model.clear();
   }
 };
 
