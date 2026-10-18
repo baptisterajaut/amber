@@ -320,8 +320,9 @@ void GraphEditor::refresh_key_entry() {
   time_slider_->setEnabled(count == 1);
   value_slider_->setEnabled(count > 0);
 
-  if (count == 1) {
-    time_slider_->SetFrameRate(row->GetParentEffect()->parent_clip->sequence->frame_rate);
+  const Sequence* seq = (count > 0) ? row->GetParentEffect()->parent_clip->sequence : nullptr;
+  if (count == 1 && seq != nullptr) {
+    time_slider_->SetFrameRate(seq->frame_rate);
     time_slider_->SetValue(time);
   } else {
     time_slider_->SetValue(qSNaN());
