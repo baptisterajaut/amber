@@ -162,6 +162,8 @@ add_executable(amber-test-fieldwidgets
   ${CMAKE_SOURCE_DIR}/effects/fields/boolfield.cpp
   ${CMAKE_SOURCE_DIR}/effects/fields/combofield.cpp
   ${CMAKE_SOURCE_DIR}/effects/fields/doublefield.cpp
+  ${CMAKE_SOURCE_DIR}/effects/fields/labelfield.cpp
+  ${CMAKE_SOURCE_DIR}/effects/internal/voideffect.cpp
   ${CMAKE_SOURCE_DIR}/engine/undo/comboaction.cpp
   ${CMAKE_SOURCE_DIR}/engine/undo/undo_effect.cpp
   ${CMAKE_SOURCE_DIR}/engine/undo/undo_generic.cpp

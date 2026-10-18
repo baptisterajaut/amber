@@ -7,6 +7,7 @@
 #include "effects/fields/boolfield.h"
 #include "effects/fields/combofield.h"
 #include "effects/fields/doublefield.h"
+#include "effects/internal/voideffect.h"
 #include "engine/clip.h"
 #include "engine/undo/comboaction.h"
 #include "engine/undo/undo_effect.h"
@@ -33,6 +34,7 @@ class TestFieldWidgets : public QObject {
   void comboPickIsOneEntry();
   void singleClipEntryIsUnchanged();
   void followerStaysWithItsWidget();
+  void voidEffectCopyKeepsStoredXml();
 
  private:
   struct Fields {
@@ -242,6 +244,27 @@ void TestFieldWidgets::followerStaysWithItsWidget() {
   QVERIFY(dynamic_cast<const KeyframeDataChange*>(amber::UndoStack.command(0)) != nullptr);
   QVERIFY(a_.b->GetBoolAt(0));
   QVERIFY(!b_.b->GetBoolAt(0));
+}
+
+// Not a field widget, but VoidEffect only needs these stubs. A Missing Effect is the XML it was loaded from: a split
+// or duplicated clip copies its effects, and the copy must save that XML too, not an empty effect.
+void TestFieldWidgets::voidEffectCopyKeepsStoredXml() {
+  auto save = [](Effect* e) {
+    QByteArray out;
+    QXmlStreamWriter w(&out);
+    w.writeStartElement("effect");
+    e->save(w);
+    w.writeEndElement();
+    return out;
+  };
+  QXmlStreamReader r(
+      QByteArrayLiteral(R"(<effect name="Gone" enabled="1"><row><field id="0" value="0.5"/></row></effect>)"));
+  r.readNextStartElement();
+  VoidEffect missing(clip_a_, "Gone");
+  missing.load(r);
+  const QByteArray saved = save(&missing);
+  QVERIFY2(saved.contains(R"(<field id="0" value="0.5"/>)"), saved.constData());
+  QCOMPARE(save(missing.copy(clip_b_).get()), saved);
 }
 
 QTEST_MAIN(TestFieldWidgets)
