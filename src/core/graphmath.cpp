@@ -45,4 +45,18 @@ FitRect FitRange(double min_time, double max_time, double min_value, double max_
   return r;
 }
 
+Handles EasyEase(const Handles& h, long time, std::optional<long> prev_time, std::optional<long> next_time,
+                 EaseSide side) {
+  Handles r = h;
+  if (side != EaseSide::kOut) {
+    if (prev_time) r.pre_x = -double(time - *prev_time) / 3.0;
+    r.pre_y = 0;
+  }
+  if (side != EaseSide::kIn) {
+    if (next_time) r.post_x = double(*next_time - time) / 3.0;
+    r.post_y = 0;
+  }
+  return r;
+}
+
 }  // namespace amber::graph

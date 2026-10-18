@@ -2,6 +2,7 @@
 #define CORE_GRAPHMATH_H
 
 #include <QVector>
+#include <optional>
 
 namespace amber::graph {
 
@@ -33,6 +34,21 @@ FitRect FitRange(double min_time, double max_time, double min_value, double max_
 // the keys of its field that are not moving.
 long AvoidKeyCollisions(long diff, long previous_diff, const QVector<long>& old_times,
                         const QVector<QVector<long>>& fixed_times);
+
+// Bezier handles of a key, relative to it (as in core/keyframe.h)
+struct Handles {
+  double pre_x;
+  double pre_y;
+  double post_x;
+  double post_y;
+};
+enum class EaseSide { kBoth, kIn, kOut };
+
+// After Effects' Easy Ease: the eased handle(s) flat (y 0), x a third of the way to the neighbouring key on that side
+// (AE's 33 % influence). In is the pre handle (arriving at the key), Out the post handle. A side with no neighbour
+// keeps its x (still flattened).
+Handles EasyEase(const Handles& h, long time, std::optional<long> prev_time, std::optional<long> next_time,
+                 EaseSide side);
 
 }  // namespace amber::graph
 

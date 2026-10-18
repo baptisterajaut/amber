@@ -89,6 +89,9 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   center_tool_layout->addWidget(linear_button);
   center_tool_layout->addWidget(bezier_button);
   center_tool_layout->addWidget(hold_button);
+  ease_button_ = new QPushButton();
+  center_tool_layout->addSpacing(8);
+  center_tool_layout->addWidget(ease_button_);
 
   // Value and time of the selected key(s), typed or dragged
   time_label_ = new QLabel();
@@ -151,8 +154,10 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   connect(linear_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
   connect(bezier_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
   connect(hold_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
+  connect(ease_button_, &QPushButton::clicked, this, [this]() { view->easy_ease(amber::graph::EaseSide::kBoth); });
 
   Retranslate();
+  set_key_button_enabled(false, -1);
   refresh_key_entry();
 }
 
@@ -163,6 +168,8 @@ void GraphEditor::Retranslate() {
   linear_button->setText(tr("Linear"));
   bezier_button->setText(tr("Bezier"));
   hold_button->setText(tr("Hold"));
+  ease_button_->setText(tr("Easy Ease"));
+  ease_button_->setToolTip(tr("Easy Ease (F9)\nEasy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9"));
   time_label_->setText(tr("Time:"));
   value_label_->setText(tr("Value:"));
 }
@@ -289,6 +296,7 @@ void GraphEditor::set_key_button_enabled(bool e, int type) {
   bezier_button->setEnabled(e);
   bezier_button->setChecked(type == EFFECT_KEYFRAME_BEZIER);
   hold_button->setEnabled(e);
+  ease_button_->setEnabled(e);
   hold_button->setChecked(type == EFFECT_KEYFRAME_HOLD);
 }
 

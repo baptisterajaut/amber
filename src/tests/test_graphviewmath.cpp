@@ -88,6 +88,40 @@ class TestGraphViewMath : public QObject {
     QCOMPARE(AvoidKeyCollisions(30, 29, {0, 10}, {{}, {50}}), 30L);
   }
 
+  void easyEaseThirdOfTheWay() {
+    // Key at 30 between keys at 0 and 90: handles flat, a third of the way to each neighbour
+    const Handles h = EasyEase({-40, 12, 40, -7}, 30, 0L, 90L, EaseSide::kBoth);
+    QCOMPARE(h.pre_x, -10.0);
+    QCOMPARE(h.pre_y, 0.0);
+    QCOMPARE(h.post_x, 20.0);
+    QCOMPARE(h.post_y, 0.0);
+  }
+
+  void easyEaseFirstAndLastKeys() {
+    // No neighbour on a side: that x is kept, the handle still flattened
+    const Handles first = EasyEase({-40, 5, 40, 5}, 0, std::nullopt, 60L, EaseSide::kBoth);
+    QCOMPARE(first.pre_x, -40.0);
+    QCOMPARE(first.pre_y, 0.0);
+    QCOMPARE(first.post_x, 20.0);
+    const Handles last = EasyEase({-40, 5, 40, 5}, 60, 0L, std::nullopt, EaseSide::kBoth);
+    QCOMPARE(last.pre_x, -20.0);
+    QCOMPARE(last.post_x, 40.0);
+    QCOMPARE(last.post_y, 0.0);
+  }
+
+  void easyEaseInAndOutOnly() {
+    const Handles in = EasyEase({-40, 5, 40, 6}, 30, 0L, 90L, EaseSide::kIn);
+    QCOMPARE(in.pre_x, -10.0);
+    QCOMPARE(in.pre_y, 0.0);
+    QCOMPARE(in.post_x, 40.0);  // the Out side is untouched
+    QCOMPARE(in.post_y, 6.0);
+    const Handles out = EasyEase({-40, 5, 40, 6}, 30, 0L, 90L, EaseSide::kOut);
+    QCOMPARE(out.pre_x, -40.0);
+    QCOMPARE(out.pre_y, 5.0);
+    QCOMPARE(out.post_x, 20.0);
+    QCOMPARE(out.post_y, 0.0);
+  }
+
   void onlyBezierKeysShowHandles() {
     // Painting and hit-testing share this test: a Linear or Hold key keeps default +-40 handles it never draws
     QVERIFY(keyframe_shows_handles(EFFECT_KEYFRAME_BEZIER));

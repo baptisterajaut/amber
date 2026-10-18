@@ -31,6 +31,7 @@ class TestKeyframes : public QObject {
   void memberChangeIgnoresStaleIndex();
   void keyDraggedPastNeighbourInterpolatesByTime();
   void valueEntryOnThreeKeysIsOneUndoStep();
+  void easyEaseUndoRestoresTypesAndHandles();
 
  private:
   static EffectKeyframe key(long time, double value, int type);
@@ -253,6 +254,55 @@ void TestKeyframes::valueEntryOnThreeKeysIsOneUndoStep() {
   delete clamped;
   field_->SetMaximum(qSNaN());
   QVERIFY(keyframe_value_entry({field_}, {1}, {QVariant(5.0)}, 5.0) == nullptr);
+}
+
+// Easy Ease on two of three keys, then undo: types and handles come back exactly
+void TestKeyframes::easyEaseUndoRestoresTypesAndHandles() {
+  EffectKeyframe k1 = key(30, 100.0, EFFECT_KEYFRAME_HOLD);
+  k1.pre_handle_x = -7.5;
+  k1.pre_handle_y = 3.25;
+  k1.post_handle_x = 11.0;
+  k1.post_handle_y = -2.0;
+  field_->keyframes.append(key(0, 0.0, EFFECT_KEYFRAME_LINEAR));
+  field_->keyframes.append(k1);
+  field_->keyframes.append(key(90, 0.0, EFFECT_KEYFRAME_LINEAR));
+  const QVector<EffectKeyframe> before = field_->keyframes;
+
+  amber::UndoStack.clear();
+  ComboAction* ca = keyframe_easy_ease({field_, field_}, {1, 2}, amber::graph::EaseSide::kBoth);
+  QVERIFY(ca != nullptr);
+  amber::UndoStack.push(ca);
+  QCOMPARE(amber::UndoStack.count(), 1);
+  QCOMPARE(field_->keyframes.at(1).type, int(EFFECT_KEYFRAME_BEZIER));
+  QCOMPARE(field_->keyframes.at(1).pre_handle_x, -10.0);
+  QCOMPARE(field_->keyframes.at(1).pre_handle_y, 0.0);
+  QCOMPARE(field_->keyframes.at(1).post_handle_x, 20.0);
+  QCOMPARE(field_->keyframes.at(1).post_handle_y, 0.0);
+  QCOMPARE(field_->keyframes.at(2).type, int(EFFECT_KEYFRAME_BEZIER));
+  QCOMPARE(field_->keyframes.at(2).pre_handle_x, -20.0);
+  QCOMPARE(field_->keyframes.at(2).post_handle_x, 40.0);                // last key: no neighbour after it
+  QCOMPARE(field_->keyframes.at(0).type, int(EFFECT_KEYFRAME_LINEAR));  // not selected
+
+  amber::UndoStack.undo();
+  for (int i = 0; i < before.size(); i++) {
+    const EffectKeyframe& a = field_->keyframes.at(i);
+    const EffectKeyframe& b = before.at(i);
+    QCOMPARE(a.type, b.type);
+    QCOMPARE(a.pre_handle_x, b.pre_handle_x);
+    QCOMPARE(a.pre_handle_y, b.pre_handle_y);
+    QCOMPARE(a.post_handle_x, b.post_handle_x);
+    QCOMPARE(a.post_handle_y, b.post_handle_y);
+  }
+  amber::UndoStack.clear();
+
+  // Already eased: nothing to do, no undo step
+  ComboAction* linear_to_bezier = keyframe_easy_ease({field_}, {0}, amber::graph::EaseSide::kOut);
+  QVERIFY(linear_to_bezier != nullptr);
+  delete linear_to_bezier;
+  field_->keyframes[0].type = EFFECT_KEYFRAME_BEZIER;
+  field_->keyframes[0].post_handle_x = 10.0;
+  field_->keyframes[0].post_handle_y = 0.0;
+  QVERIFY(keyframe_easy_ease({field_}, {0}, amber::graph::EaseSide::kOut) == nullptr);
 }
 
 QTEST_GUILESS_MAIN(TestKeyframes)

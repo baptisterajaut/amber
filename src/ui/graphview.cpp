@@ -20,6 +20,7 @@
 
 #include "graphview.h"
 
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -107,8 +108,51 @@ GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   connect(this, &GraphView::customContextMenuRequested, this, &GraphView::show_context_menu);
 }
 
+// The Graph Editor's own keys, taken before the main window's shortcuts while the view has focus
+static bool is_view_key(const QKeyEvent* e) {
+  const Qt::KeyboardModifiers mods = e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier);
+  if (e->key() == Qt::Key_F9) {
+    return mods == Qt::NoModifier || mods == Qt::ShiftModifier || mods == (Qt::ControlModifier | Qt::ShiftModifier);
+  }
+  return false;
+}
+
+bool GraphView::event(QEvent* e) {
+  if (e->type() == QEvent::ShortcutOverride && row != nullptr && is_view_key(static_cast<QKeyEvent*>(e))) {
+    e->accept();
+    return true;
+  }
+  return QWidget::event(e);
+}
+
+void GraphView::keyPressEvent(QKeyEvent* e) {
+  if (row == nullptr || !is_view_key(e)) {
+    QWidget::keyPressEvent(e);
+    return;
+  }
+  const bool shift = e->modifiers() & Qt::ShiftModifier;
+  const bool ctrl = e->modifiers() & Qt::ControlModifier;
+  if (e->key() == Qt::Key_F9) {
+    easy_ease(ctrl ? amber::graph::EaseSide::kOut
+                   : (shift ? amber::graph::EaseSide::kIn : amber::graph::EaseSide::kBoth));
+  }
+}
+
 void GraphView::show_context_menu(const QPoint& pos) {
   Menu menu(this);
+
+  const bool has_selection = (row != nullptr && selected_keys.size() > 0);
+  QAction* ease = menu.addAction(tr("Easy Ease"), this, [this]() { easy_ease(amber::graph::EaseSide::kBoth); });
+  ease->setShortcut(QKeySequence(Qt::Key_F9));
+  QAction* ease_in = menu.addAction(tr("Easy Ease In"), this, [this]() { easy_ease(amber::graph::EaseSide::kIn); });
+  ease_in->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F9));
+  QAction* ease_out = menu.addAction(tr("Easy Ease Out"), this, [this]() { easy_ease(amber::graph::EaseSide::kOut); });
+  ease_out->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F9));
+  ease->setEnabled(has_selection);
+  ease_in->setEnabled(has_selection);
+  ease_out->setEnabled(has_selection);
+
+  menu.addSeparator();
 
   QAction* zoom_to_selection = menu.addAction(tr("Zoom to Selection"));
   if (selected_keys.size() == 0 || row == nullptr) {
@@ -1021,6 +1065,18 @@ void GraphView::set_selected_time(long sequence_time, bool final) {
     entry_active = false;
     selection_update();
   }
+  update_ui(false);
+}
+
+void GraphView::easy_ease(amber::graph::EaseSide side) {
+  if (row == nullptr) return;
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
+  QVector<EffectField*> fields;
+  for (int f : selected_keys_fields) fields.append(row->Field(f));
+  ComboAction* ca = keyframe_easy_ease(fields, selected_keys, side);
+  if (ca == nullptr) return;
+  amber::UndoStack.push(ca);
+  selection_update();  // the keys are Bezier now: the type buttons follow
   update_ui(false);
 }
 

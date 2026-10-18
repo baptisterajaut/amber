@@ -24,6 +24,7 @@
 #include <QVector>
 #include <QWidget>
 
+#include "core/graphmath.h"
 #include "effects/effectfields.h"
 #include "effects/effectrow.h"
 
@@ -39,6 +40,8 @@ class GraphView : public QWidget {
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
+  bool event(QEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
 
   void set_row(EffectRow* r);
   void set_visible_in(long i);
@@ -55,6 +58,9 @@ class GraphView : public QWidget {
   // Value goes to every selected key, Time only with a single key selected.
   void set_selected_value(double value, bool final);
   void set_selected_time(long sequence_time, bool final);
+
+  // Easy Ease (F9), Easy Ease In (Shift+F9), Easy Ease Out (Ctrl+Shift+F9) on the selected keys, one undo step
+  void easy_ease(amber::graph::EaseSide side);
  signals:
   void x_scroll_changed(int);
   void y_scroll_changed(int);

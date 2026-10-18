@@ -21,6 +21,7 @@
 #ifndef KEYFRAME_H
 #define KEYFRAME_H
 
+#include "core/graphmath.h"
 #include "core/keyframe.h"
 
 #include <QVariant>
@@ -40,5 +41,10 @@ bool keyframe_shows_handles(int type);
 // nullptr when no key changes.
 ComboAction *keyframe_value_entry(const QVector<EffectField *> &fields, const QVector<int> &keys,
                                   const QVector<QVariant> &old_values, double value);
+
+// Graph Editor Easy Ease on the given keys: Bezier type, handles from amber::graph::EasyEase() against each key's
+// neighbours in time within its field. One undo step; nullptr when no key changes.
+ComboAction *keyframe_easy_ease(const QVector<EffectField *> &fields, const QVector<int> &keys,
+                                amber::graph::EaseSide side);
 
 #endif // KEYFRAME_H
