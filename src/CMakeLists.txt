@@ -290,6 +290,7 @@ set(UI_SOURCES
   ui/keyframenavigator.cpp ui/keyframenavigator.h
   ui/keyframeview.cpp ui/keyframeview.h
   ui/labelslider.cpp ui/labelslider.h
+  ui/layoutpresets.cpp ui/layoutpresets.h
   ui/mainwindow.cpp ui/mainwindow.h
   ui/mediaiconservice.cpp ui/mediaiconservice.h
   ui/menu.cpp ui/menu.h

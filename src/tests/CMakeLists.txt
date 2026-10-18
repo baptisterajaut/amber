@@ -185,6 +185,15 @@ target_include_directories(amber-test-marker-range PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-marker-range PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-marker-range COMMAND amber-test-marker-range)
 
+add_executable(amber-test-layoutpresets
+  test_layoutpresets.cpp
+  ${CMAKE_SOURCE_DIR}/ui/layoutpresets.cpp
+  ${CMAKE_SOURCE_DIR}/ui/layoutpresets.h
+)
+target_include_directories(amber-test-layoutpresets PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-layoutpresets PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-layoutpresets COMMAND amber-test-layoutpresets)
+
 add_executable(amber-test-recordingtap
   test_recordingtap.cpp
   ${CMAKE_SOURCE_DIR}/rendering/recordingtap.cpp
