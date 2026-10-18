@@ -866,7 +866,8 @@ bool ExportThread::AnalysisPass() {
   pass_ = 1;
   emit PassChanged(1, 2);
   long no_audio = 0;
-  bool ok = SetupContainer() && SetupVideo() && RenderPass(no_audio) && FlushEncoders();
+  // A cancel during the drain stops here, before pass 2 creates the output file
+  bool ok = SetupContainer() && SetupVideo() && RenderPass(no_audio) && FlushEncoders() && !interrupt_;
   // Frees the pass-1 encoder, which is when libx264 and libx265 finish their stats file
   Cleanup();
   if (ok && stats_key_.isEmpty() && pass1_stats_.isEmpty()) {
@@ -923,6 +924,9 @@ bool ExportThread::Export() {
   if (interrupt_) return false;
 
   if (!FlushEncoders()) return false;
+  // Interrupt() no longer waits for the drain: a cancel during it lands here, and run() removes the file (an image
+  // sequence keeps the frames it wrote, as on any failure)
+  if (interrupt_) return false;
 
   // Write container trailer
   ret = av_write_trailer(fmt_ctx);
