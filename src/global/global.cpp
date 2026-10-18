@@ -153,6 +153,12 @@ QString OliveGlobal::get_recent_project_list_file() {
   return get_data_dir().filePath("recents");
 }
 
+// Never read by Amber: lupdate extracts it, and QGuiApplication looks it up whenever a translator is installed or
+// removed, switching the whole UI to right-to-left when the loaded language translates it as "RTL".
+//: Translate this string to "RTL" for right-to-left languages (Arabic, Hebrew...), "LTR" for all others.
+[[maybe_unused]] static const char* const kLayoutDirectionMarker =
+    QT_TRANSLATE_NOOP("QGuiApplication", "QT_LAYOUT_DIRECTION");
+
 void OliveGlobal::load_translation_from_config() {
   QString language_file = amber::CurrentRuntimeConfig.external_translation_file.isEmpty() ?
         amber::CurrentConfig.language_file :
