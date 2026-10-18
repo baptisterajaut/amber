@@ -674,9 +674,13 @@ void Cacher::Reset() {
       reached_end = false;
       audio_buffer_write = 0;
 
-      // seek (target_frame represents timeline timecode in frames, not clip timecode)
+      // seek (target_frame represents timeline timecode in frames, not clip timecode). A stream starting after 0
+      // (MPEG-TS, an MP4 muxed video first) is offset by its start_time, as the sample offset (cacheAudioPostDecode())
+      // and the video target are: the seek used to land start_time early, and the reverse cutoff (raw pts) to come
+      // start_time late, leaving a reversed clip's first start_time seconds silent
 
-      int64_t timestamp = qRound64(playhead_to_clip_seconds(clip, playhead_) / av_q2d(stream->time_base));
+      const int64_t start = qMax(static_cast<int64_t>(0), stream->start_time);
+      int64_t timestamp = qRound64(playhead_to_clip_seconds(clip, playhead_) / av_q2d(stream->time_base)) + start;
 
       bool temp_reverse = (playback_speed_ < 0);
       if (clip->reversed() != temp_reverse) {
