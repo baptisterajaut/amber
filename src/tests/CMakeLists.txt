@@ -110,6 +110,11 @@ target_include_directories(amber-test-timer-format PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-timer-format PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-timer-format COMMAND amber-test-timer-format)
 
+add_executable(amber-test-decimal-input test_decimal_input.cpp)
+target_include_directories(amber-test-decimal-input PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-decimal-input PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-decimal-input COMMAND amber-test-decimal-input)
+
 add_executable(amber-test-config test_config.cpp)
 target_include_directories(amber-test-config PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-config PRIVATE amber-engine Qt6::Test)

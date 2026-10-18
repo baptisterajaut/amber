@@ -298,6 +298,7 @@ set(UI_SOURCES
   ui/colorbutton.cpp ui/colorbutton.h
   ui/comboboxex.cpp ui/comboboxex.h
   ui/curveeditor.cpp ui/curveeditor.h
+  ui/decimalinput.h
   ui/cursors.cpp ui/cursors.h
   ui/effectui.cpp ui/effectui.h
   ui/embeddedfilechooser.cpp ui/embeddedfilechooser.h
