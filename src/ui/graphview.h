@@ -102,6 +102,7 @@ class GraphView : public QWidget {
   int handle_index;
 
   bool moved_keys;
+  long last_frame_diff;  // frame offset of the previous key drag move, to step away from collisions
 
   int current_handle;
 

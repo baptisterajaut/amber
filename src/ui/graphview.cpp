@@ -90,6 +90,7 @@ GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   y_zoom = 1.0;
   row = nullptr;
   moved_keys = false;
+  last_frame_diff = 0;
   current_handle = kBezierHandleNone;
   rect_select = false;
   visible_in = 0;
@@ -386,6 +387,7 @@ void GraphView::paintEvent(QPaintEvent*) {
 void GraphView::mousePressEvent(QMouseEvent* event) {
   if (row != nullptr) {
     mousedown = true;
+    last_frame_diff = 0;
     start_x = event->position().toPoint().x();
     start_y = event->position().toPoint().y();
 
@@ -555,10 +557,25 @@ void GraphView::handle_mouse_keyframe_drag(QMouseEvent* event) {
     qWarning() << "handle_mouse_keyframe_drag: event is null";
     return;
   }
+  // Times of the keys that are not moving, per moving key's field
+  QVector<QVector<long>> fixed_times(selected_keys.size());
+  for (int i = 0; i < selected_keys.size(); i++) {
+    const EffectField* field = row->Field(selected_keys_fields.at(i));
+    for (int j = 0; j < field->keyframes.size(); j++) {
+      bool moving = false;
+      for (int k = 0; k < selected_keys.size() && !moving; k++) {
+        moving = (selected_keys.at(k) == j && selected_keys_fields.at(k) == selected_keys_fields.at(i));
+      }
+      if (!moving) fixed_times[i].append(field->keyframes.at(j).time);
+    }
+  }
+  long frame_diff = qRound(double(event->position().toPoint().x() - start_x) / x_zoom);
+  frame_diff = amber::graph::AvoidKeyCollisions(frame_diff, last_frame_diff, selected_keys_old_vals, fixed_times);
+  last_frame_diff = frame_diff;
+
   for (int i = 0; i < selected_keys.size(); i++) {
     EffectField* field = row->Field(selected_keys_fields.at(i));
-    field->keyframes[selected_keys.at(i)].time =
-        qRound(selected_keys_old_vals.at(i) + (double(event->position().toPoint().x() - start_x) / x_zoom));
+    field->keyframes[selected_keys.at(i)].time = selected_keys_old_vals.at(i) + frame_diff;
     if (event->modifiers() & Qt::ShiftModifier) {
       field->keyframes[selected_keys.at(i)].data = selected_keys_old_doubles.at(i);
     } else {
