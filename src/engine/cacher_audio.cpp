@@ -43,9 +43,10 @@ void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int 
     qWarning() << "apply_audio_effects: frame is null";
     return;
   }
-  // perform all audio effects
+  // The chunk spans its playback duration in clip-local timeline time: stereo s16 (the filter graph forces it) at the
+  // rate the samples play at, not frame->sample_rate (the source rate before a speed change, 0 on the reverse buffer)
   double timecode_end;
-  timecode_end = timecode_start + bytes_to_seconds(nb_bytes, frame->ch_layout.nb_channels, frame->sample_rate);
+  timecode_end = timecode_start + bytes_to_seconds(nb_bytes, 2, current_audio_freq());
 
   if (!clip->sequence) {
     qWarning() << "apply_audio_effects: clip sequence is null";
