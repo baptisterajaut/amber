@@ -21,13 +21,16 @@
 #ifndef EXPORTTHREAD_H
 #define EXPORTTHREAD_H
 
+#include <QByteArray>
 #include <QMutex>
 #include <QOffscreenSurface>
 #include <QPair>
+#include <QTemporaryDir>
 #include <QThread>
 #include <QVector>
 #include <QWaitCondition>
 #include <atomic>
+#include <memory>
 
 struct AVFormatContext;
 struct AVCodecContext;
@@ -49,7 +52,7 @@ extern "C" {
 #define COMPRESSION_TYPE_CBR 0
 #define COMPRESSION_TYPE_CFR 1  // quality-based: the encoder's quality option (crf, qp...) gets video_bitrate
 #define COMPRESSION_TYPE_TARGETSIZE 2
-#define COMPRESSION_TYPE_TARGETBR 3  // average bitrate, one pass: bit_rate alone (ABR/VBR)
+#define COMPRESSION_TYPE_TARGETBR 3  // average bitrate: bit_rate alone (ABR/VBR), one pass unless two_pass
 
 // structs that store parameters passed from the export dialogs to this thread
 
@@ -76,6 +79,10 @@ struct ExportParams {
   QVector<QPair<QString, QString>> audio_options;
   // movflags=+faststart when the muxer has it (MOV family): the index goes before the media data
   bool faststart = false;
+  // Analyse the whole range first, then encode (AV_CODEC_FLAG_PASS1/PASS2). Only for COMPRESSION_TYPE_TARGETBR video
+  // with an encoder whose descriptor has supports_two_pass (rendering/encoderoptions.h); ignored otherwise.
+  // CBA: two-pass only in Average bitrate mode; libvpx/libaom also gain from it in quality mode
+  bool two_pass = false;
 };
 
 struct VideoCodecParams {
@@ -98,6 +105,8 @@ class ExportThread : public QThread {
   bool WasInterrupted();
  signals:
   void ProgressChanged(int value, qint64 remaining_ms);
+  // Two-pass exports only, as each pass starts: pass 1 (analysis) covers 0-50 % of ProgressChanged, pass 2 the rest
+  void PassChanged(int pass, int passes);
  public slots:
   void Interrupt();
 
@@ -114,10 +123,22 @@ class ExportThread : public QThread {
   bool FlushPaletteGraph();
   bool EncodeAudioFrames(long& file_audio_samples, double timecode_secs, int audio_cachers);
   bool EncodeAllFrames(RenderThread* renderer, long& file_audio_samples);
+  bool RenderPass(long& file_audio_samples);
+  bool TwoPassApplies();
+  bool AnalysisPass();
   bool FlushSwrAudio(long& file_audio_samples);
   bool FlushEncoders();
 
   std::atomic<bool> interrupt_;
+
+  // 0: one-pass export; two-pass: 1 while analysing (nothing written, no audio), then 2 for the real export
+  int pass_{0};
+  QByteArray pass1_stats_;  // stats_out of pass 1, concatenated: pass 2's stats_in (FFmpeg doesn't copy it)
+  // Encoders with a stats file (libx264, libx265): its AVOption, and the folder holding it until the pass-2 encoder
+  // is freed
+  QString stats_key_;
+  std::unique_ptr<QTemporaryDir> stats_dir_;
+  QString stats_file_;
 
   Sequence* seq_;
 

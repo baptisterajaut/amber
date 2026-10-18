@@ -64,6 +64,10 @@ QVector<EncoderInfo> build_table() {
   x264.quality_max = 51;
   x264.quality_default = 36;
   x264.supports_average_bitrate = true;
+  // Two-pass, FFmpeg n9.0 libx264.c:1119-1121: PASS1 sets x264's b_stat_write, PASS2 b_stat_read, through the stats
+  // file of the "stats" option (libx264.c:1545; x264's default name is in the working directory)
+  x264.supports_two_pass = true;
+  x264.two_pass_stats_key = "stats";
   x264.options = {x26x_preset()};
   t.append(x264);
 
@@ -73,6 +77,8 @@ QVector<EncoderInfo> build_table() {
   x265.name = "libx265";
   x265.codec_id = AV_CODEC_ID_HEVC;
   x265.label = "x265";
+  // libx265.c:552-568: PASS1/PASS2 become x265's pass=1/2, the stats file comes from -x265-stats (libx265.c:1050)
+  x265.two_pass_stats_key = "x265-stats";
   t.append(x265);
 
   // AV1, in preference order (available_encoders keeps it): SVT-AV1 is the fast one, libaom the slow reference.
@@ -90,6 +96,9 @@ QVector<EncoderInfo> build_table() {
   svt.quality_max = 63;
   svt.quality_default = 35;
   svt.supports_average_bitrate = true;
+  // libsvtav1.c:366-401: PASS2 decodes stats_in into rc_stats_buffer, PASS1 sets pass=1; 677-710: stats_out once, on
+  // the end-of-stream packet (SVT-AV1 2.0+)
+  svt.supports_two_pass = true;
   svt.options = {int_option("preset", tr("Speed preset:"),
                             tr("0 = slowest, smallest file\n13 = fastest\nDefault lets SVT-AV1 choose"), 0, 13,
                             QString(), tr("Default"))};
@@ -108,6 +117,9 @@ QVector<EncoderInfo> build_table() {
   rav1e.quality_max = 255;
   rav1e.quality_default = 100;
   rav1e.supports_average_bitrate = true;
+  // No two-pass: librav1e.c handles PASS1/PASS2 (225-249, 517-535), but never asks rav1e to emit pass data
+  // (rav1e_config_set_emit_data, rav1e.h), so stats_out stays empty: ffmpeg -pass 1 writes a 0-byte log with
+  // FFmpeg 9.0.2 and rav1e 0.8.1
   rav1e.options = {int_option("speed", tr("Speed:"),
                               tr("0 = slowest, smallest file\n10 = fastest\nDefault lets rav1e choose (6)"), 0, 10,
                               QString(), tr("Default"))};
@@ -127,8 +139,32 @@ QVector<EncoderInfo> build_table() {
   aom.quality_max = 63;
   aom.quality_default = 32;
   aom.supports_average_bitrate = true;
+  // libaomenc.c:840-845 and 921-945: PASS1/PASS2 select the first/last pass, PASS2 decodes stats_in; 1387-1397:
+  // stats_out at the drain
+  aom.supports_two_pass = true;
   aom.options = {int_option("cpu-used", tr("Speed:"), tr("0 = slowest, smallest file\n8 = fastest"), 0, 8, "1")};
   t.append(aom);
+
+  // ffmpeg -h encoder=libvpx-vp9: -crf <int> (from -1 to 63) (default -1); -cpu-used <int> (from -8 to 8) (default 1).
+  // Constant quality needs bit_rate 0 (the -b:v 0 of FFmpeg's VP9 guide, which recommends CRF 31 for 1080p):
+  // libvpxenc.c:1104-1111 picks VPX_Q for crf >= 0 without a bitrate, VPX_CQ (crf as a floor under a bitrate)
+  // with one. The encoder's codec defaults set b=0 (libvpxenc.c:2097). Two-pass: libvpxenc.c:1097-1100 and
+  // 1189-1213 (PASS2 decodes stats_in), 1964-1974 (stats_out at the drain).
+  EncoderInfo vp9;
+  vp9.name = "libvpx-vp9";
+  vp9.codec_id = AV_CODEC_ID_VP9;
+  vp9.label = "libvpx";
+  vp9.quality_key = "crf";
+  vp9.quality_mode_label = tr("Quality-based (Constant Quality)");
+  vp9.quality_label = tr("Quality (CRF):");
+  vp9.quality_min = 0;
+  vp9.quality_max = 63;
+  vp9.quality_default = 31;
+  vp9.supports_average_bitrate = true;
+  vp9.supports_two_pass = true;
+  vp9.options = {int_option("cpu-used", tr("Speed:"),
+                            tr("Higher is faster, lower makes smaller files at the same quality"), 0, 8, "1")};
+  t.append(vp9);
 
   // compression_level is a generic AVCodecContext option (-1 = encoder default); flacenc.c uses 5 for -1 and
   // rejects levels above 12
@@ -228,6 +264,12 @@ EncoderInfo validate_encoder_info(const EncoderInfo& raw, const AVCodec* codec) 
       if (!opt.choices.contains(opt.default_value)) opt.default_value = opt.choices.first();
     }
     v.options.append(opt);
+  }
+
+  // A stats file option this FFmpeg doesn't know: no two-pass
+  if (v.supports_two_pass && !v.two_pass_stats_key.isEmpty()) {
+    const AVOption* o = find_codec_option(codec, v.two_pass_stats_key);
+    if (o == nullptr || o->type != AV_OPT_TYPE_STRING) v.supports_two_pass = false;
   }
   return v;
 }

@@ -12,13 +12,17 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavfilter/avfilter.h>
 #include <libavformat/avformat.h>
+#include <libavutil/log.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 }
 
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QGuiApplication>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QPointer>
 #include <QRegularExpression>
 #include <QScopeGuard>
@@ -27,6 +31,8 @@ extern "C" {
 #include <QTest>
 #include <QtEndian>
 #include <QtMath>
+#include <algorithm>
+#include <functional>
 
 #include "core/headlessappcontext.h"
 #include "effects/effect.h"
@@ -68,6 +74,33 @@ QByteArray checkerboard_y4m() {
   QByteArray y4m = QByteArray("YUV4MPEG2 W") + QByteArray::number(kSize) + " H" + QByteArray::number(kSize) + " F" +
                    QByteArray::number(int(kFps)) + ":1 Ip A1:1 C420jpeg\n";
   for (int i = 0; i < kSourceFrames; i++) {
+    y4m += "FRAME\n";
+    y4m += luma;
+    y4m += chroma;
+  }
+  return y4m;
+}
+
+// frames of a diagonal gradient scrolling right with noise on top, weak over the first half and strong over the second,
+// YUV 4:2:0, as a Y4M stream: rate control has detail to spend bits on, more of it towards the end
+QByteArray noise_y4m(int frames) {
+  quint32 seed = 12345;
+  auto noise = [&seed](int amplitude) {
+    seed = seed * 1664525u + 1013904223u;  // fixed LCG: the same stream on every run
+    return int((seed >> 16) % quint32(2 * amplitude + 1)) - amplitude;
+  };
+  QByteArray y4m = QByteArray("YUV4MPEG2 W") + QByteArray::number(kSize) + " H" + QByteArray::number(kSize) + " F" +
+                   QByteArray::number(int(kFps)) + ":1 Ip A1:1 C420jpeg\n";
+  for (int i = 0; i < frames; i++) {
+    const int amplitude = i < frames / 2 ? 6 : 48;
+    QByteArray luma(kSize * kSize, Qt::Uninitialized);
+    for (int y = 0; y < kSize; y++) {
+      for (int x = 0; x < kSize; x++) {
+        luma[y * kSize + x] = char(qBound(16, 40 + ((x + y + 3 * i) * 3) % 160 + noise(amplitude), 235));
+      }
+    }
+    QByteArray chroma(kSize * kSize / 2, Qt::Uninitialized);
+    for (int c = 0; c < chroma.size(); c++) chroma[c] = char(qBound(16, 128 + noise(amplitude / 2), 240));
     y4m += "FRAME\n";
     y4m += luma;
     y4m += chroma;
@@ -119,10 +152,10 @@ QByteArray wav_from_pcm(const QByteArray& pcm) {
   return wav;
 }
 
-// 1 s of a stereo sine (by default 440 Hz at half scale), S16 PCM. With ramp, the amplitude rises linearly from 0 so
-// the signal isn't symmetric in time.
-QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5, bool ramp = false) {
-  const int frames = kAudioRate;
+// Seconds (by default 1) of a stereo sine (by default 440 Hz at half scale), S16 PCM. With ramp, the amplitude rises
+// linearly from 0 so the signal isn't symmetric in time.
+QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5, bool ramp = false, double seconds = 1.0) {
+  const int frames = int(qRound64(seconds * kAudioRate));
   QByteArray pcm(frames * 4, Qt::Uninitialized);
   for (int i = 0; i < frames; i++) {
     const double a = ramp ? amplitude * i / frames : amplitude;
@@ -144,8 +177,9 @@ QByteArray dc_wav(double seconds, double level) {
 
 // Same layout Project::save_project() writes: footage 1 (video) and 2 (audio) in folder 1, the open sequence at the
 // root. Loop mode 2 (clamp) holds the fixture's single frame for the clip's whole length. A non-empty proxy marks the
-// video footage as having that finished proxy file.
-QString fixture(const QString& url, const QString& video, const QString& audio, const QString& proxy = QString()) {
+// video footage as having that finished proxy file. Both clips span [0, out).
+QString fixture(const QString& url, const QString& video, const QString& audio, const QString& proxy = QString(),
+                long out = kClipOut) {
   const QString proxy_attrs =
       proxy.isEmpty() ? QString() : QString(R"( proxy="1" proxypath="%1")").arg(proxy.toHtmlEscaped());
   return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
@@ -175,8 +209,8 @@ QString fixture(const QString& url, const QString& video, const QString& audio, 
 </project>
 )")
       .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), video.toHtmlEscaped(), audio.toHtmlEscaped(),
-           QString::number(kSize), QString::number(kFps, 'f', 10), QString::number(kAudioRate),
-           QString::number(kClipOut), proxy_attrs);
+           QString::number(kSize), QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(out),
+           proxy_attrs);
 }
 
 // Three sequences over two WAVs (footage 1 and 2): Inner holds both on audio tracks 0 and 1, Nested holds one clip of
@@ -314,7 +348,8 @@ struct Decoded {
   bool has_video = false;
   bool has_audio = false;
   int video_frames = 0;
-  double video_fps = 0;  // stream avg_frame_rate
+  qint64 video_bytes = 0;  // all video packets: the stream's bitrate without the container's overhead
+  double video_fps = 0;    // stream avg_frame_rate
   int width = 0;
   int height = 0;
   QByteArray first_rgba;
@@ -420,6 +455,7 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
   };
   while (av_read_frame(fmt, pkt) >= 0) {
     if (vctx != nullptr && pkt->stream_index == vi) {
+      d.video_bytes += pkt->size;
       avcodec_send_packet(vctx, pkt);
       drain(vctx, true);
     } else if (actx != nullptr && pkt->stream_index == ai) {
@@ -466,6 +502,36 @@ QByteArray x264_settings(const QByteArray& file) {
   if (start < 0) return QByteArray();
   const qsizetype end = file.indexOf('\0', start);
   return file.mid(start, end < 0 ? -1 : end - start);
+}
+
+// FFmpeg's log while an AvLogCapture lives, every level (the encoders' debug dumps included), not printed
+QMutex g_av_log_mutex;
+QString g_av_log;
+
+void capture_av_log(void* avcl, int level, const char* fmt, va_list vl) {
+  char line[2048];
+  int print_prefix = 1;
+  av_log_format_line2(avcl, level, fmt, vl, line, sizeof(line), &print_prefix);
+  QMutexLocker locker(&g_av_log_mutex);
+  g_av_log += QString::fromUtf8(line);
+}
+
+struct AvLogCapture {
+  AvLogCapture() {
+    QMutexLocker locker(&g_av_log_mutex);
+    g_av_log.clear();
+    av_log_set_callback(capture_av_log);
+  }
+  ~AvLogCapture() { av_log_set_callback(av_log_default_callback); }
+  QString text() const {
+    QMutexLocker locker(&g_av_log_mutex);
+    return g_av_log;
+  }
+};
+
+// The entries of a directory, for "nothing was left behind" checks
+QStringList dir_entries(const QString& path) {
+  return QDir(path).entryList(QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot, QDir::Name);
 }
 
 // kSize x kSize sequence of one red Solid over frames [0, frames), its Transform opacity ramping from 100 % down to
@@ -573,13 +639,15 @@ class TestHeadlessRender : public QObject {
   QTemporaryDir dir_;
 
   // Export the way ExportDialog::launch_export_thread() / export_thread_finished() do it. Returns the error, empty on
-  // success.
-  QString export_sequence(Sequence* seq, const ExportParams& params, AVPixelFormat pix_fmt = AV_PIX_FMT_YUV420P) {
+  // success. hook gets the thread before it starts (to connect its signals).
+  QString export_sequence(Sequence* seq, const ExportParams& params, AVPixelFormat pix_fmt = AV_PIX_FMT_YUV420P,
+                          const std::function<void(ExportThread*)>& hook = nullptr) {
     VideoCodecParams vparams;
     vparams.pix_fmt = pix_fmt;
     vparams.threads = 0;
 
     auto* et = new ExportThread(seq, params, vparams);
+    if (hook) hook(et);
     bool finished = false;
     connect(et, &QThread::finished, this, [&finished]() { finished = true; });
     QOffscreenSurface* surface = prepare_export(et, seq, params);
@@ -674,6 +742,63 @@ class TestHeadlessRender : public QObject {
       QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
       QVERIFY(clip->media()->to_footage()->ready);
     }
+  }
+
+  // Load, as the active sequence, fixture() over a noise_y4m() video and a tone, both clips spanning [0, frames), and
+  // wait for the probes. Callers return on QTest::currentTestFailed().
+  void load_noise_project(const QString& name, long frames, SequencePtr* seq) {
+    const QString video = dir_.filePath(name + "_noise.y4m");
+    {
+      QFile f(video);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(noise_y4m(int(frames) + 2));  // two spare frames, as kSourceFrames
+    }
+    const QString audio = dir_.filePath(name + "_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav(440.0, 0.5, false, frames / kFps + 1));
+    }
+    const QString project = dir_.filePath(name + ".ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio, QString(), frames).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    *seq = amber::ActiveSequence;
+    QVERIFY(*seq != nullptr);
+    for (const auto& c : (*seq)->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      QVERIFY2(c->media_length() >= frames, qPrintable(QString("media length %1").arg(c->media_length())));
+    }
+    QCOMPARE((*seq)->getEndFrame(), frames);
+  }
+
+  // Points TMPDIR (QDir::tempPath(), where QTemporaryDir goes) at an empty folder of the test's own until the guard
+  // goes, so a two-pass test can check that nothing was left there
+  auto private_tmpdir(const QString& name, QString* path) {
+    *path = dir_.filePath("tmp_" + name);
+    QDir().mkpath(*path);
+    const QByteArray saved = qgetenv("TMPDIR");
+    qputenv("TMPDIR", path->toUtf8());
+    return qScopeGuard([saved] {
+      if (saved.isEmpty()) {
+        qunsetenv("TMPDIR");
+      } else {
+        qputenv("TMPDIR", saved);
+      }
+    });
   }
 
   // Audio-only export of a whole sequence from start_frame to its end
@@ -1572,6 +1697,220 @@ class TestHeadlessRender : public QObject {
     const int r = uchar(d.first_rgba[off]), g = uchar(d.first_rgba[off + 1]), b = uchar(d.first_rgba[off + 2]);
     qInfo("first frame centre (%d, %d, %d)", r, g, b);
     QVERIFY(r > 180 && g < 80 && b < 80);
+  }
+
+  // VP9 quality-based: libvpx encodes at constant quality (VPX_Q, which needs bit_rate 0; with a bitrate it would be
+  // constrained quality), and CRF 50 makes a much smaller file than CRF 10
+  void vp9QualityMode() {
+    if (avcodec_find_encoder_by_name("libvpx-vp9") == nullptr) QSKIP("libvpx-vp9 not in this FFmpeg build");
+    if (avcodec_find_decoder(AV_CODEC_ID_VP9) == nullptr) QSKIP("no VP9 decoder");
+    constexpr long kFrames = 30;
+    SequencePtr seq;
+    load_noise_project("vp9_crf", kFrames, &seq);
+    if (QTest::currentTestFailed()) return;
+    auto run = [&](int crf, qint64* size, QString* rc_end_usage) {
+      ExportParams params = video_params(dir_.filePath(QString("vp9_crf%1.webm").arg(crf)), seq.get(), AV_CODEC_ID_VP9,
+                                         "libvpx-vp9", COMPRESSION_TYPE_CFR, crf);
+      params.video_options = {{"cpu-used", "8"}};
+      QString log;
+      {
+        AvLogCapture capture;
+        const QString error = export_sequence(seq.get(), params);
+        log = capture.text();
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+      }
+      // libvpxenc.c dumps its config at debug level before and after setting it up: the last dump is what it encodes
+      // with. vpx_encoder.h: VPX_VBR 0, VPX_CBR 1, VPX_CQ 2, VPX_Q 3.
+      QRegularExpressionMatchIterator it = QRegularExpression("rc_end_usage:\\s+(\\d+)").globalMatch(log);
+      while (it.hasNext()) *rc_end_usage = it.next().captured(1);
+      const Decoded d = decode_file(params.filename);
+      QVERIFY(d.ok);
+      QVERIFY(d.has_video);
+      QCOMPARE(long(d.video_frames), kFrames);
+      *size = QFileInfo(params.filename).size();
+    };
+    qint64 size10 = 0, size50 = 0;
+    QString usage10, usage50;
+    run(10, &size10, &usage10);
+    if (QTest::currentTestFailed()) return;
+    run(50, &size50, &usage50);
+    if (QTest::currentTestFailed()) return;
+    qInfo("VP9 CRF 10: %lld bytes, rc_end_usage %s; CRF 50: %lld bytes, rc_end_usage %s", size10, qPrintable(usage10),
+          size50, qPrintable(usage50));
+    QCOMPARE(usage10, QString("3"));
+    QCOMPARE(usage50, QString("3"));
+    QVERIFY2(size50 * 2 < size10, qPrintable(QString("CRF 50 %1 bytes, CRF 10 %2 bytes").arg(size50).arg(size10)));
+  }
+
+  void twoPassExport_data() {
+    QTest::addColumn<QString>("encoder");
+    QTest::addColumn<int>("codec");
+    QTest::addColumn<QString>("ext");
+    QTest::addColumn<QString>("speed_key");
+    QTest::addColumn<QString>("speed");
+    QTest::addColumn<bool>("audio");
+    QTest::addColumn<double>("mbps");
+    // Targets the encoder can reach on 64x64 noise. ffmpeg -pass 1/2 on the same Y4M: libaom (cpu-used 8) can't go
+    // much below 0.5 Mbps there, SVT-AV1 (preset 8) undershoots 0.6 Mbps by 28 % and lands within 10 % of 0.3.
+    // Not librav1e: no two-pass (encoderoptions.cpp).
+    QTest::newRow("libx264") << "libx264" << int(AV_CODEC_ID_H264) << "mp4" << QString() << QString() << true << 0.6;
+    QTest::newRow("libx265") << "libx265" << int(AV_CODEC_ID_HEVC) << "mp4" << "preset" << "ultrafast" << false << 0.6;
+    QTest::newRow("libvpx-vp9") << "libvpx-vp9" << int(AV_CODEC_ID_VP9) << "webm" << "cpu-used" << "8" << false << 0.6;
+    QTest::newRow("libaom-av1") << "libaom-av1" << int(AV_CODEC_ID_AV1) << "mkv" << "cpu-used" << "8" << false << 0.6;
+    QTest::newRow("libsvtav1") << "libsvtav1" << int(AV_CODEC_ID_AV1) << "mkv" << "preset" << "8" << false << 0.3;
+  }
+
+  // Two-pass through every encoder flagged supports_two_pass: an analysis pass, then the export, reported as passes 1
+  // and 2 with the bar's halves; every frame comes back, the average bitrate lands near the target, the audio (x264
+  // row) is whole, and no stats file or temporary folder is left behind
+  void twoPassExport() {
+    QFETCH(QString, encoder);
+    QFETCH(int, codec);
+    QFETCH(QString, ext);
+    QFETCH(QString, speed_key);
+    QFETCH(QString, speed);
+    QFETCH(bool, audio);
+    QFETCH(double, mbps);
+    if (avcodec_find_encoder_by_name(encoder.toUtf8().constData()) == nullptr) QSKIP("encoder not in this build");
+    if (avcodec_find_decoder(AVCodecID(codec)) == nullptr) QSKIP("no decoder for this codec");
+    constexpr long kFrames = 60;
+    SequencePtr seq;
+    load_noise_project("twopass_" + encoder, kFrames, &seq);
+    if (QTest::currentTestFailed()) return;
+
+    ExportParams params = video_params(dir_.filePath("twopass_" + encoder + "." + ext), seq.get(), codec, encoder,
+                                       COMPRESSION_TYPE_TARGETBR, mbps);
+    params.two_pass = true;
+    if (!speed_key.isEmpty()) params.video_options = {{speed_key, speed}};
+    if (audio) {
+      params.audio_enabled = true;
+      params.audio_codec = AV_CODEC_ID_AAC;
+      params.audio_sampling_rate = kAudioRate;
+      params.audio_bitrate = 128;
+    }
+    QString tmp;
+    const auto restore_tmp = private_tmpdir(encoder, &tmp);
+    // libx264's and libx265's default stats file names are relative to the working directory
+    const QStringList cwd_before = dir_entries(QDir::currentPath());
+
+    QVector<QPair<int, int>> passes;
+    QVector<int> progress;
+    QElapsedTimer timer;
+    timer.start();
+    const QString error = export_sequence(seq.get(), params, AV_PIX_FMT_YUV420P, [&](ExportThread* et) {
+      connect(et, &ExportThread::PassChanged, this, [&passes](int pass, int count) { passes.append({pass, count}); });
+      connect(et, &ExportThread::ProgressChanged, this, [&progress](int value, qint64) { progress.append(value); });
+    });
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const qint64 elapsed = timer.elapsed();
+
+    QCOMPARE(passes, (QVector<QPair<int, int>>{{1, 2}, {2, 2}}));
+    // One value per frame and pass, then the final 100: pass 1 ends on the bar's half
+    QCOMPARE(progress.size(), int(2 * kFrames + 1));
+    QCOMPARE(progress.at(kFrames - 1), 50);
+    QVERIFY(std::is_sorted(progress.begin(), progress.end()));
+    QCOMPARE(progress.last(), 100);
+    QVERIFY2(dir_entries(tmp).isEmpty(), qPrintable(dir_entries(tmp).join(", ")));
+    QCOMPARE(dir_entries(QDir::currentPath()), cwd_before);
+
+    const Decoded d = decode_file(params.filename);
+    QVERIFY(d.ok);
+    QVERIFY(d.has_video);
+    QCOMPARE(long(d.video_frames), kFrames);
+    const double target_kbps = mbps * 1000;
+    const double kbps = d.video_bytes * 8.0 / (kFrames / kFps) / 1000.0;
+    qInfo("%s two-pass: %.1f kbps for a %.0f kbps target (%+.1f %%), %lld ms", qPrintable(encoder), kbps, target_kbps,
+          (kbps / target_kbps - 1) * 100, elapsed);
+    QVERIFY2(qAbs(kbps - target_kbps) <= 0.3 * target_kbps, qPrintable(QString("%1 kbps").arg(kbps)));
+
+    if (audio) {
+      // Pass 2 starts with the audio buffer where a one-pass export starts it
+      QVERIFY(d.has_audio);
+      const long expected_samples = qRound64(kFrames / kFps * kAudioRate);
+      QVERIFY(d.audio_samples >= expected_samples);
+      QVERIFY(d.audio_samples < expected_samples + 2 * 1024);
+      QVERIFY2(d.audio_peak > 0.25, qPrintable(QString("audio peak %1").arg(d.audio_peak)));
+    }
+    if (encoder == "libx264") {
+      QFile f(params.filename);
+      QVERIFY(f.open(QFile::ReadOnly));
+      const QByteArray settings = x264_settings(f.readAll());
+      QVERIFY2(settings.contains("rc=2pass"), settings.constData());
+    }
+    for (const auto& c : seq->clips) QVERIFY(!c->IsOpen());
+  }
+
+  // Cancelling during the analysis pass: no file, no stats left, no pass 2, the clips closed
+  void twoPassInterruptedDuringAnalysis() {
+    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    constexpr long kFrames = 60;
+    SequencePtr seq;
+    load_noise_project("twopass_cancel", kFrames, &seq);
+    if (QTest::currentTestFailed()) return;
+    ExportParams params = video_params(dir_.filePath("twopass_cancel.mp4"), seq.get(), AV_CODEC_ID_H264, "libx264",
+                                       COMPRESSION_TYPE_TARGETBR, 0.3);
+    params.two_pass = true;
+    params.audio_enabled = true;
+    params.audio_codec = AV_CODEC_ID_AAC;
+    params.audio_sampling_rate = kAudioRate;
+    params.audio_bitrate = 128;
+    QString tmp;
+    const auto restore_tmp = private_tmpdir("cancel", &tmp);
+
+    int pass = 0;
+    int interrupted_at = -1;
+    const QString error = export_sequence(seq.get(), params, AV_PIX_FMT_YUV420P, [&](ExportThread* et) {
+      connect(et, &ExportThread::PassChanged, this, [&pass](int p, int) { pass = p; });
+      // Each frame waits for this thread's event loop (the render wake-up is queued here): the interrupt lands
+      // within a frame or two of this one
+      connect(et, &ExportThread::ProgressChanged, this, [&, et](int value, qint64) {
+        if (pass == 1 && value >= 10 && interrupted_at < 0) {
+          interrupted_at = value;
+          et->Interrupt();
+        }
+      });
+    });
+    qInfo("interrupted at %d %%", interrupted_at);
+    QCOMPARE(error, QString("export interrupted"));
+    QVERIFY(interrupted_at >= 10 && interrupted_at < 50);
+    QCOMPARE(pass, 1);
+    QVERIFY(!QFileInfo::exists(params.filename));
+    QVERIFY2(dir_entries(tmp).isEmpty(), qPrintable(dir_entries(tmp).join(", ")));
+    for (const auto& c : seq->clips) QVERIFY(!c->IsOpen());
+  }
+
+  // two_pass is ignored outside Average bitrate and for an encoder without two-pass in its descriptor: the same file
+  // as without it, and no pass reported
+  void twoPassIgnoredWhereItDoesNotApply() {
+    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    SequencePtr seq = solid_sequence(long(kFps));
+    auto run = [&](const QString& name, int codec, const QString& encoder, int compression_type, double value,
+                   bool two_pass, QByteArray* bytes) {
+      ExportParams params = video_params(dir_.filePath(name), seq.get(), codec, encoder, compression_type, value);
+      params.two_pass = two_pass;
+      int passes = 0;
+      const QString error = export_sequence(seq.get(), params, AV_PIX_FMT_YUV420P, [&](ExportThread* et) {
+        connect(et, &ExportThread::PassChanged, this, [&passes](int, int) { passes++; });
+      });
+      QVERIFY2(error.isEmpty(), qPrintable(error));
+      QCOMPARE(passes, 0);
+      QFile f(params.filename);
+      QVERIFY(f.open(QFile::ReadOnly));
+      *bytes = f.readAll();
+    };
+    QByteArray crf, crf_two_pass, mpeg4, mpeg4_two_pass;
+    run("ignored_crf.mp4", AV_CODEC_ID_H264, "libx264", COMPRESSION_TYPE_CFR, 30, false, &crf);
+    if (QTest::currentTestFailed()) return;
+    run("ignored_crf_2pass.mp4", AV_CODEC_ID_H264, "libx264", COMPRESSION_TYPE_CFR, 30, true, &crf_two_pass);
+    if (QTest::currentTestFailed()) return;
+    run("ignored_mpeg4.mp4", AV_CODEC_ID_MPEG4, QString(), COMPRESSION_TYPE_TARGETBR, 1.0, false, &mpeg4);
+    if (QTest::currentTestFailed()) return;
+    run("ignored_mpeg4_2pass.mp4", AV_CODEC_ID_MPEG4, QString(), COMPRESSION_TYPE_TARGETBR, 1.0, true, &mpeg4_two_pass);
+    if (QTest::currentTestFailed()) return;
+    QVERIFY(!crf.isEmpty());
+    QVERIFY(crf == crf_two_pass);
+    QVERIFY(!mpeg4.isEmpty());
+    QVERIFY(mpeg4 == mpeg4_two_pass);
   }
 
   // FLAC at compression level 0 and 12: the same samples, bit for bit, and the higher level no larger
