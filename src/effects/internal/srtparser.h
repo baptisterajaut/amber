@@ -23,4 +23,9 @@ SrtParseResult parse_srt(const QString& filepath);
 // (Latin-1 if this Qt has no Windows-1252 decoder)
 QString decode_srt_bytes(const QByteArray& bytes);
 
+// Cue text as the HTML the SubtitleEffect renders: the style tags (<i>, <b>, <u>, <s>, their closers, any case) and
+// <br> are kept, every other '<' and '>' is escaped so "a < b and c > d" shows as written instead of being read as a
+// tag
+QString cue_text_to_html(const QString& text);
+
 #endif  // SRTPARSER_H

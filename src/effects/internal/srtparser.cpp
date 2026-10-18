@@ -22,11 +22,13 @@ qint64 parse_timestamp(const QStringView& s) {
   return h * 3600000 + min * 60000 + sec * 1000 + ms;
 }
 
-// Strip unsupported HTML tags, keep <i>, <b>, <u> and their closing tags.
+// Strip the SRT markup the renderer doesn't draw: <font ...> and </font> (the effect's Font and Color fields own
+// those) and ASS override blocks ({\an8}, {\i1}...). The style tags stay (<i>, <b>, <u>, <s>), and so does any other
+// '<' or '>': it is text ("a < b"), cue_text_to_html() escapes it for the renderer.
 QString strip_unsupported_tags(const QString& text) {
-  static const QRegularExpression tag_re(QStringLiteral("</?(?!/?(?:i|b|u)>)[^>]*>"),
-                                         QRegularExpression::CaseInsensitiveOption);
-  return QString(text).remove(tag_re);
+  static const QRegularExpression markup_re(QStringLiteral("</?font\\b[^>]*>|\\{\\\\[^}]*\\}"),
+                                            QRegularExpression::CaseInsensitiveOption);
+  return QString(text).remove(markup_re);
 }
 
 // Parse timecode line: "00:00:05,000 --> 00:00:08,500"
@@ -176,4 +178,24 @@ SrtParseResult parse_srt(const QString& filepath) {
             [](const SubtitleCue& a, const SubtitleCue& b) { return a.start_ms < b.start_ms; });
 
   return result;
+}
+
+QString cue_text_to_html(const QString& text) {
+  static const QRegularExpression tag_re(QStringLiteral("</?(?:i|b|u|s)>|<br\\s*/?>"),
+                                         QRegularExpression::CaseInsensitiveOption);
+  auto escaped = [](QStringView s) {
+    return s.toString()
+        .replace(QLatin1Char('<'), QLatin1String("&lt;"))
+        .replace(QLatin1Char('>'), QLatin1String("&gt;"));
+  };
+  QString html;
+  qsizetype pos = 0;
+  for (QRegularExpressionMatchIterator it = tag_re.globalMatch(text); it.hasNext();) {
+    QRegularExpressionMatch m = it.next();
+    html += escaped(QStringView(text).mid(pos, m.capturedStart() - pos));
+    html += m.captured();
+    pos = m.capturedEnd();
+  }
+  html += escaped(QStringView(text).mid(pos));
+  return html;
 }
