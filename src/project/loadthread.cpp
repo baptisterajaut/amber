@@ -357,6 +357,14 @@ void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& chil
     read_next_start_element(stream);
     if (stream.name() == QLatin1String("marker") && stream.isStartElement()) {
       f->markers.append(parse_marker(stream));
+    } else if (stream.name() == QLatin1String("video") && stream.isStartElement()) {
+      // Only the Media Properties interlacing choice is read back: the rest of the stream is analysed again
+      const QXmlStreamAttributes attrs = stream.attributes();
+      bool ok = false;
+      const int interlacing = attrs.value("interlacing").toInt(&ok);
+      if (ok && interlacing >= VIDEO_PROGRESSIVE && interlacing <= VIDEO_BOTTOM_FIELD_FIRST) {
+        f->saved_interlacing.insert(attrs.value("id").toInt(), interlacing);
+      }
     }
   }
 
