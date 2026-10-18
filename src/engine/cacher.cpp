@@ -118,6 +118,42 @@ void Cacher::openWorkerTryHwAccel() {
   qInfo() << "Hardware decoding unavailable, falling back to software";
 }
 
+// Open filename into ctx and read its stream info. False (logged, ctx closed) on failure.
+static bool open_media_file(AVFormatContext*& ctx, const char* filename, int start_number) {
+  // For image sequences that don't start at 0, set the index where it does start
+  AVDictionary* format_opts = nullptr;
+  if (start_number > 0) {
+    av_dict_set(&format_opts, "start_number", QString::number(start_number).toUtf8(), 0);
+  }
+
+  ctx = nullptr;
+  int errCode = avformat_open_input(&ctx, filename, nullptr, &format_opts);
+  av_dict_free(&format_opts);
+  if (errCode != 0) {
+    char err[1024];
+    av_strerror(errCode, err, 1024);
+    qCritical() << "Could not open" << filename << "-" << err;
+    return false;
+  }
+
+  errCode = avformat_find_stream_info(ctx, nullptr);
+  if (errCode < 0) {
+    char err[1024];
+    av_strerror(errCode, err, 1024);
+    qCritical() << "Could not open" << filename << "-" << err;
+    avformat_close_input(&ctx);
+    return false;
+  }
+
+  av_dump_format(ctx, 0, filename, 0);
+  return true;
+}
+
+// Whether ctx has a stream of that type at index
+static bool has_stream(const AVFormatContext* ctx, int index, AVMediaType type) {
+  return index >= 0 && index < int(ctx->nb_streams) && ctx->streams[index]->codecpar->codec_type == type;
+}
+
 // ---------------------------------------------------------------------------
 // openWorkerOpenCodec
 // ---------------------------------------------------------------------------
@@ -132,35 +168,26 @@ bool Cacher::openWorkerOpenCodec(Footage* m, const FootageStream* ms) {
   }
 
   // Proxy or original, by the mode Clip::Open() recorded
-  QByteArray ba = m->decode_url(clip->OpenedForExport(), clip->OpenedWithProxies()).toUtf8();
+  const QString url = m->decode_url(clip->OpenedForExport(), clip->OpenedWithProxies());
+  QByteArray ba = url.toUtf8();
   const char* filename = ba.constData();
+  if (!open_media_file(formatCtx, filename, m->start_number)) return false;
 
-  // For image sequences that don't start at 0, set the index where it does start
-  AVDictionary* format_opts = nullptr;
-  if (m->start_number > 0) {
-    av_dict_set(&format_opts, "start_number", QString::number(m->start_number).toUtf8(), 0);
+  // A proxy made elsewhere can lack the clip's stream (a video-only proxy under the clip of the source's audio): decode
+  // that clip from the original rather than index past the proxy's streams
+  const AVMediaType type = (clip->track() < 0) ? AVMEDIA_TYPE_VIDEO : AVMEDIA_TYPE_AUDIO;
+  if (!has_stream(formatCtx, ms->file_index, type) && url != m->url) {
+    qWarning() << "Proxy" << filename << "has no stream" << ms->file_index << "of this clip's type, using the original";
+    avformat_close_input(&formatCtx);
+    ba = m->url.toUtf8();
+    filename = ba.constData();
+    if (!open_media_file(formatCtx, filename, m->start_number)) return false;
   }
-
-  formatCtx = nullptr;
-  int errCode = avformat_open_input(&formatCtx, filename, nullptr, &format_opts);
-  av_dict_free(&format_opts);
-  if (errCode != 0) {
-    char err[1024];
-    av_strerror(errCode, err, 1024);
-    qCritical() << "Could not open" << filename << "-" << err;
-    return false;
-  }
-
-  errCode = avformat_find_stream_info(formatCtx, nullptr);
-  if (errCode < 0) {
-    char err[1024];
-    av_strerror(errCode, err, 1024);
-    qCritical() << "Could not open" << filename << "-" << err;
+  if (!has_stream(formatCtx, ms->file_index, type)) {
+    qCritical() << "No stream" << ms->file_index << "of this clip's type in" << filename;
     avformat_close_input(&formatCtx);
     return false;
   }
-
-  av_dump_format(formatCtx, 0, filename, 0);
 
   stream = formatCtx->streams[ms->file_index];
   codec = avcodec_find_decoder(stream->codecpar->codec_id);
