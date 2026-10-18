@@ -34,6 +34,7 @@ extern "C" {
 #include <QtEndian>
 #include <QtMath>
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <cstring>
 #include <functional>
@@ -904,6 +905,26 @@ SequencePtr palette_sequence() {
   }
   return seq;
 }
+
+// Counts the "QRhi ... going down with N unreleased resources" warnings (QT_RHI_LEAK_CHECK, set in main()) of any
+// thread while it exists
+class RhiLeakWatch {
+ public:
+  RhiLeakWatch() {
+    count_ = 0;
+    previous_ = qInstallMessageHandler(&RhiLeakWatch::handle);
+  }
+  ~RhiLeakWatch() { qInstallMessageHandler(previous_); }
+  int count() const { return count_.load(); }
+
+ private:
+  static void handle(QtMsgType type, const QMessageLogContext& context, const QString& message) {
+    if (message.contains("unreleased resources")) count_++;
+    if (previous_) previous_(type, context, message);
+  }
+  static inline std::atomic<int> count_{0};
+  static inline QtMessageHandler previous_ = nullptr;
+};
 
 }  // namespace
 
@@ -3435,7 +3456,7 @@ class TestHeadlessRender : public QObject {
     // A frame whose clip texture isn't ready keeps the save queued; paint() saves before announcing the frame
     rt->start_render(seq.get(), 1, fn);
     QTRY_VERIFY_WITH_TIMEOUT(QFileInfo::exists(fn), 10000);
-    rt->cancel();
+    rt->cancel(seq.get());  // the clip's textures go back to the renderer's QRhi before it's destroyed
     delete rt;
     delete surface;
     QImage saved(fn);
@@ -3763,6 +3784,28 @@ class TestHeadlessRender : public QObject {
 
   // Save Frame renders at full resolution even when a viewer request at a preview divider (the viewer's retry after a
   // failed render, a scrub) arrives before the save has been rendered
+  // The export's clips close while its renderer's QRhi exists: their textures go back to that QRhi instead of
+  // outliving it (closed after `delete renderer`, ~QRhi listed them as unreleased and they were never freed)
+  void exportReleasesClipResourcesWithItsRenderer() {
+    SequencePtr seq = half_white_sequence();
+    ExportParams params;
+    params.filename = dir_.filePath("released.mp4");
+    params.video_enabled = true;
+    params.video_codec = AV_CODEC_ID_MPEG4;
+    params.video_width = kSize;
+    params.video_height = kSize;
+    params.video_compression_type = COMPRESSION_TYPE_CBR;
+    params.video_bitrate = 2.0;  // Mbps
+    params.audio_enabled = false;
+    params.start_frame = 0;
+    params.end_frame = 2;
+    RhiLeakWatch leaks;
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(leaks.count(), 0);
+    QVERIFY(!seq->clips.first()->IsOpen());
+  }
+
   void saveFrameKeepsFullResolution() {
     SequencePtr seq = std::make_shared<Sequence>();
     seq->width = 16;
@@ -3793,6 +3836,8 @@ class TestHeadlessRender : public QObject {
 
 int main(int argc, char* argv[]) {
   qputenv("QT_QPA_PLATFORM", "offscreen");
+  // ~QRhi lists the resources it still owns, in a release build too (exportReleasesClipResourcesWithItsRenderer)
+  qputenv("QT_RHI_LEAK_CHECK", "1");
 
   // OpenGL 3.2 core so the OpenGL QRhi gets GLSL 150 (the .qsb shaders' GL target); see test_effects_gpu.cpp
   QSurfaceFormat fmt;

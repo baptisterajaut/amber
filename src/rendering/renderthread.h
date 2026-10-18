@@ -23,6 +23,7 @@
 
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
+#include <QHash>
 #include <QMutex>
 #include <QOffscreenSurface>
 #include <QThread>
@@ -73,7 +74,9 @@ class RenderThread : public QThread {
   // True when the last paint() produced no pixels: the GPU frame could not begin or end (device lost, out of memory)
   // or its readback came back empty. Set before ready() is emitted.
   bool frame_failed() const;
-  void cancel();
+  // Stops the thread, which destroys its QRhi. close_clips: a sequence whose clips this renderer rendered (export);
+  // they're closed first, so their textures are released by the QRhi that created them.
+  void cancel(Sequence* close_clips = nullptr);
   void wait_until_paused();
 
   // GPU + readback time of the last successfully rendered viewer frame, the divider it was rendered at, the
@@ -87,7 +90,7 @@ class RenderThread : public QThread {
   };
   FrameTiming last_frame_timing() const;
 
-  // Queue a QRhi resource for deferred deletion on the render thread.
+  // Queue a QRhi resource for deferred deletion on the thread of the RenderThread whose QRhi created it.
   // Safe to call from any thread.
   static void DeferRhiResourceDeletion(QRhiResource* res);
   static void DeferRhiResourceDeletion(const QVector<QRhiResource*>& resources);
@@ -100,7 +103,7 @@ class RenderThread : public QThread {
 
  private:
   static QMutex deferred_delete_mutex_;
-  static QVector<QRhiResource*> deferred_delete_queue_;
+  static QHash<QRhi*, QVector<QRhiResource*>> deferred_delete_queue_;  // by the resources' QRhi
   void drainDeferredDeletes();
 
   void delete_buffers();

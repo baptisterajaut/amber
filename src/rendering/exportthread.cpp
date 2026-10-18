@@ -826,10 +826,8 @@ bool ExportThread::RenderPass(long& file_audio_samples) {
 
   bool frames_ok = EncodeAllFrames(renderer, file_audio_samples);
 
-  renderer->cancel();
+  renderer->cancel(seq_);  // closes the clips first: their textures belong to the renderer's QRhi
   delete renderer;
-
-  close_active_clips(seq_);
   return frames_ok && !interrupt_;
 }
 
