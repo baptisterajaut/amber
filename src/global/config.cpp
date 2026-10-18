@@ -82,6 +82,7 @@ constexpr BoolEntry kBoolEntries[] = {
     {"NativeMenuStyling", &Config::use_native_menu_styling},
     {"LockedPanels", &Config::locked_panels},
     {"ShowWelcomeDialog", &Config::show_welcome_dialog},
+    {"ShowWelcomeScreen", &Config::show_welcome_screen},
     {"ReopenRecentProject", &Config::reopen_recent_project},
     {"MiddleClickEdgeScroll", &Config::middle_click_edge_scroll},
     {"ShowGuides", &Config::show_guides},
@@ -289,6 +290,7 @@ void Config::save(QString path) {
   stream.writeTextElement("DefaultSequenceAudioLayout", QString::number(default_sequence_audio_channel_layout));
   stream.writeTextElement("LockedPanels", QString::number(locked_panels));
   stream.writeTextElement("ShowWelcomeDialog", QString::number(show_welcome_dialog));
+  stream.writeTextElement("ShowWelcomeScreen", QString::number(show_welcome_screen));
   stream.writeTextElement("ReopenRecentProject", QString::number(reopen_recent_project));
   stream.writeTextElement("MiddleClickEdgeScroll", QString::number(middle_click_edge_scroll));
   stream.writeTextElement("FrameSkipStep", QString::number(frame_skip_step));

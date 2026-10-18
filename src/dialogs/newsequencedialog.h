@@ -85,6 +85,13 @@ public:
    */
   void SetNameEditable(bool enabled);
 
+  /**
+   * @brief Add a new stereo Sequence to the project and open it in the Timeline, as one undoable step
+   *
+   * What OK does when creating a Sequence; also used by the Welcome Screen's templates.
+   */
+  static void create_sequence(const QString& name, int width, int height, double frame_rate, int audio_frequency);
+
 private slots:
   /**
    * @brief Override accept function to create/edit a Sequence

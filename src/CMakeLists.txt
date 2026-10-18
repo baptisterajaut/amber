@@ -248,6 +248,7 @@ set(UI_SOURCES
   dialogs/shadertoyimportdialog.cpp dialogs/shadertoyimportdialog.h
   dialogs/speeddialog.cpp dialogs/speeddialog.h
   dialogs/texteditdialog.cpp dialogs/texteditdialog.h
+  dialogs/welcomedialog.cpp dialogs/welcomedialog.h
   effects/ui/boolfieldwidget.cpp effects/ui/boolfieldwidget.h
   effects/ui/buttonfieldwidget.cpp effects/ui/buttonfieldwidget.h
   effects/ui/colorfieldwidget.cpp effects/ui/colorfieldwidget.h

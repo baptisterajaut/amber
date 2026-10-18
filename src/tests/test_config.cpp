@@ -48,6 +48,8 @@ class TestConfig : public QObject {
     saved.lock_guides = true;  // was loaded but never saved
     QVERIFY(saved.use_proxies);  // on by default
     saved.use_proxies = false;
+    QVERIFY(saved.show_welcome_screen);  // on by default
+    saved.show_welcome_screen = false;
     HeadlessAppContext ctx;
     amber::app_ctx = &ctx;  // save() asks it for the project toolbar state
     saved.save(path);
@@ -58,6 +60,7 @@ class TestConfig : public QObject {
     QVERIFY(loaded.show_pixel_sampler);
     QVERIFY(loaded.lock_guides);
     QVERIFY(!loaded.use_proxies);
+    QVERIFY(!loaded.show_welcome_screen);
   }
 };
 

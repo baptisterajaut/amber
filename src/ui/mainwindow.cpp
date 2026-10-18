@@ -1127,6 +1127,9 @@ void MainWindow::setup_menus() {
 
   help_menu->addSeparator();
 
+  welcome_screen_ =
+      MenuHelper::create_menu_action(help_menu, "welcomescreen", amber::Global.get(), SLOT(open_welcome_dialog()));
+
   about_action_ = MenuHelper::create_menu_action(help_menu, "about", amber::Global.get(), SLOT(open_about_dialog()));
 
   load_shortcuts(get_config_path() + "/shortcuts");
@@ -1294,6 +1297,8 @@ void MainWindow::Retranslate() {
   action_search_->setStatusTip(tr("Search for any menu command by name"));
   debug_log_->setText(tr("Debug Log"));
   debug_log_->setStatusTip(tr("Open the debug log window"));
+  welcome_screen_->setText(tr("Welcome Screen..."));
+  welcome_screen_->setStatusTip(tr("Start a project from a template or open a recent one"));
   about_action_->setText(tr("&About..."));
   about_action_->setStatusTip(tr("Show information about the application"));
 
