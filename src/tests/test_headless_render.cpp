@@ -184,6 +184,65 @@ QByteArray dc_wav(double seconds, double level) {
   return wav_from_pcm(pcm);
 }
 
+// A NUT file of frames checkerboard frames (stream 0, raw YUV 4:2:0) and as long a stereo half-scale 440 Hz
+// sine (stream 1, S16 PCM at kAudioRate): one footage with both a video and an audio stream
+bool write_av_nut(const QString& path, int frames) {
+  const QByteArray p = path.toUtf8();
+  AVFormatContext* fmt = nullptr;
+  if (avformat_alloc_output_context2(&fmt, nullptr, "nut", p.constData()) < 0) return false;
+  AVStream* vs = avformat_new_stream(fmt, nullptr);
+  vs->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
+  vs->codecpar->codec_id = AV_CODEC_ID_RAWVIDEO;
+  vs->codecpar->format = AV_PIX_FMT_YUV420P;
+  vs->codecpar->codec_tag = avcodec_pix_fmt_to_codec_tag(AV_PIX_FMT_YUV420P);  // NUT reads the pixel format from it
+  vs->codecpar->width = kSize;
+  vs->codecpar->height = kSize;
+  vs->time_base = AVRational{1, 15360};
+  vs->avg_frame_rate = AVRational{int(kFps), 1};
+  AVStream* as = avformat_new_stream(fmt, nullptr);
+  as->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
+  as->codecpar->codec_id = AV_CODEC_ID_PCM_S16LE;
+  as->codecpar->sample_rate = kAudioRate;
+  av_channel_layout_default(&as->codecpar->ch_layout, 2);
+  as->codecpar->bits_per_coded_sample = 16;
+  as->codecpar->block_align = 4;
+  as->time_base = AVRational{1, kAudioRate};
+  bool ok = avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0 && avformat_write_header(fmt, nullptr) >= 0;
+
+  // checkerboard_y4m()'s frame, after its "FRAME\n" header
+  const QByteArray y4m = checkerboard_y4m(1);
+  const QByteArray picture = y4m.mid(y4m.indexOf("FRAME\n") + 6);
+  const int samples = int(kAudioRate / kFps);
+  QByteArray pcm(samples * 4, Qt::Uninitialized);
+  AVPacket* pkt = av_packet_alloc();
+  for (int i = 0; ok && i < frames; i++) {
+    av_new_packet(pkt, int(picture.size()));
+    memcpy(pkt->data, picture.constData(), picture.size());
+    pkt->stream_index = vs->index;
+    pkt->pts = pkt->dts = av_rescale_q(i, AVRational{1, int(kFps)}, vs->time_base);
+    pkt->duration = av_rescale_q(1, AVRational{1, int(kFps)}, vs->time_base);
+    pkt->flags |= AV_PKT_FLAG_KEY;
+    ok = av_interleaved_write_frame(fmt, pkt) >= 0;
+    for (int s = 0; s < samples; s++) {
+      const qint16 v = qint16(qRound(16384.0 * qSin(2.0 * M_PI * 440.0 * (i * samples + s) / kAudioRate)));
+      qToLittleEndian(v, pcm.data() + s * 4);
+      qToLittleEndian(v, pcm.data() + s * 4 + 2);
+    }
+    av_new_packet(pkt, int(pcm.size()));
+    memcpy(pkt->data, pcm.constData(), pcm.size());
+    pkt->stream_index = as->index;
+    pkt->pts = pkt->dts = qint64(i) * samples;
+    pkt->duration = samples;
+    pkt->flags |= AV_PKT_FLAG_KEY;
+    ok = ok && av_interleaved_write_frame(fmt, pkt) >= 0;
+  }
+  av_packet_free(&pkt);
+  if (ok) ok = av_write_trailer(fmt) >= 0;
+  avio_closep(&fmt->pb);
+  avformat_free_context(fmt);
+  return ok;
+}
+
 // Same layout Project::save_project() writes: footage 1 (video) and 2 (audio) in folder 1, the open sequence at the
 // root. Loop mode 2 (clamp) holds the fixture's single frame for the clip's whole length. A non-empty proxy marks the
 // video footage as having that finished proxy file. Both clips span [0, out).
@@ -681,11 +740,14 @@ class TestHeadlessRender : public QObject {
 
   // Load, as the active sequence, a checkerboard original whose footage has a finished uniform grey proxy, plus a tone
   // clip, and wait for the probes. The original holds source_frames frames, the proxy proxy_frames, both clips span
-  // [0, out). Callers return on QTest::currentTestFailed().
+  // [0, out). With av_original, the original is write_av_nut()'s and the audio clip is its stream 1, under the same
+  // video-only proxy. Callers return on QTest::currentTestFailed().
   void load_proxied_project(const QString& name, int proxy_frames = kSourceFrames, int source_frames = kSourceFrames,
-                            long out = kClipOut) {
-    const QString video = dir_.filePath(name + "_checkerboard.y4m");
-    {
+                            long out = kClipOut, bool av_original = false) {
+    const QString video = dir_.filePath(name + (av_original ? "_checkerboard.nut" : "_checkerboard.y4m"));
+    if (av_original) {
+      QVERIFY(write_av_nut(video, source_frames));
+    } else {
       QFile f(video);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
       f.write(checkerboard_y4m(source_frames));
@@ -706,7 +768,9 @@ class TestHeadlessRender : public QObject {
     {
       QFile f(project);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(fixture(project, video, audio, proxy, out).toUtf8());
+      QString xml = fixture(project, video, audio, proxy, out);
+      if (av_original) xml.replace(R"(media="2" stream="0")", R"(media="1" stream="1")");
+      f.write(xml.toUtf8());
     }
 
     bool succeeded = false;
@@ -1319,6 +1383,47 @@ class TestHeadlessRender : public QObject {
     delete surface;
     QVERIFY2(first_ok, "seconds past the proxy's end did not hold its last frame");
     QVERIFY2(second_ok, "a second frame past the proxy's end did not hold its last frame");
+  }
+
+  // A proxy without the original's audio stream (made elsewhere, video only): the clip of that audio opens on the
+  // original, the video clip on the proxy. Indexing the proxy's streams with the audio's index crashed on project open.
+  // Which file each cacher opened shows in its stream's time base: 1/48000 the original's audio, 1/30 the Y4M proxy
+  // (the original's video is not).
+  void proxyMissingStreamUsesOriginal() {
+    const bool saved = amber::CurrentConfig.use_proxies;
+    const auto restore = qScopeGuard([saved] { amber::CurrentConfig.use_proxies = saved; });
+    amber::CurrentConfig.use_proxies = true;
+    load_proxied_project("missing_stream", kSourceFrames, kSourceFrames, kClipOut, true);
+    if (QTest::currentTestFailed()) return;
+    SequencePtr seq = amber::ActiveSequence;
+
+    Clip* video = nullptr;
+    Clip* audio = nullptr;
+    for (const auto& c : seq->clips) {
+      (c->track() < 0 ? video : audio) = c.get();
+      c->Open();
+    }
+    QVERIFY(video != nullptr && audio != nullptr);
+    QCOMPARE(audio->media_stream_index(), 1);
+    // Open() holds state_change_lock until the cacher thread has opened the file
+    const bool opened = QTest::qWaitFor(
+        [&] {
+          for (Clip* c : {video, audio}) {
+            if (!c->state_change_lock.tryLock()) return false;
+            c->state_change_lock.unlock();
+          }
+          return true;
+        },
+        10000);
+    const AVRational video_tb = video->time_base();
+    const AVRational audio_tb = audio->time_base();
+    qInfo("video time base %d/%d, audio time base %d/%d", video_tb.num, video_tb.den, audio_tb.num, audio_tb.den);
+    close_active_clips(seq.get());
+    QVERIFY(opened);
+    QCOMPARE(audio_tb.num, 1);
+    QCOMPARE(audio_tb.den, kAudioRate);
+    QCOMPARE(video_tb.num, 1);
+    QCOMPARE(video_tb.den, int(kFps));
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
