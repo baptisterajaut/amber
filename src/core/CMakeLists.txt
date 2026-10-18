@@ -8,6 +8,8 @@ target_sources(amber-engine PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/blur.h
   ${CMAKE_CURRENT_SOURCE_DIR}/audio.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/audio.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/audiometer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/audiometer.h
   ${CMAKE_CURRENT_SOURCE_DIR}/audiodsp.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/audiodsp.h
   ${CMAKE_CURRENT_SOURCE_DIR}/colorlabel.cpp
