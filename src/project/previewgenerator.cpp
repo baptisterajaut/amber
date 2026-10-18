@@ -169,6 +169,17 @@ void PreviewGenerator::parse_media() {
       ms.stream_duration = qRound64(fmt_ctx_->streams[i]->duration * tb * AV_TIME_BASE);
     }
 
+    if (is_video) {
+      // The user's choice (Media Properties) over the detected value: from the project file, and kept through a
+      // re-analysis of the same footage
+      if (footage_->saved_interlacing.contains(i)) ms.video_interlacing = footage_->saved_interlacing.value(i);
+      for (const auto& j : footage_->video_tracks) {
+        if (j.file_index == i && j.video_interlacing != j.video_auto_interlacing) {
+          ms.video_interlacing = j.video_interlacing;
+        }
+      }
+    }
+
     QVector<FootageStream>& stream_list = is_audio ? footage_->audio_tracks : footage_->video_tracks;
     bool need_append = true;
     for (auto& j : stream_list) {
@@ -415,6 +426,9 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
 
   // is video interlaced? Only when the stream's field order didn't say (parse_video_stream())
   if (interlacing_from_field_order(fmt_ctx_->streams[stream_index]->codecpar->field_order) < 0) {
+    // Not over the user's choice (parse_media())
+    const bool chosen =
+        footage_->saved_interlacing.contains(stream_index) || s->video_interlacing != s->video_auto_interlacing;
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
     s->video_auto_interlacing =
         (temp_frame->flags & AV_FRAME_FLAG_INTERLACED)
@@ -425,7 +439,7 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
                                     ? (temp_frame->top_field_first ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST)
                                     : VIDEO_PROGRESSIVE;
 #endif
-    s->video_interlacing = s->video_auto_interlacing;
+    if (!chosen) s->video_interlacing = s->video_auto_interlacing;
   }
 
   s->preview_done = true;

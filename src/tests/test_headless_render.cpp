@@ -45,6 +45,9 @@ extern "C" {
 #include "effects/internal/ladspaeffect.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
+#include "engine/undo/comboaction.h"
+#include "engine/undo/undo_generic.h"
+#include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/projectio.h"
 #include "project/footage.h"
@@ -52,6 +55,7 @@ extern "C" {
 #include "project/media.h"
 #include "project/previewgenerator.h"
 #include "project/projectmodel.h"
+#include "project/projectsaver.h"
 #include "project/proxygenerator.h"
 #include "rendering/batchexport.h"
 #include "rendering/encoderoptions.h"
@@ -1060,6 +1064,29 @@ class TestHeadlessRender : public QObject {
     QCOMPARE((*seq)->getEndFrame(), frames);
   }
 
+  // Load project as the active sequence and wait for its footage probes; *video is the V1 clip's footage. Callers
+  // return on QTest::currentTestFailed().
+  void load_and_probe(const QString& project, Footage** video) {
+    *video = nullptr;
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      if (c->track() < 0) *video = f;
+    }
+    QVERIFY(*video != nullptr);
+  }
+
   // Points TMPDIR (QDir::tempPath(), where QTemporaryDir goes) at an empty folder of the test's own until the guard
   // goes, so a two-pass test can check that nothing was left there
   auto private_tmpdir(const QString& name, QString* path) {
@@ -1818,6 +1845,96 @@ class TestHeadlessRender : public QObject {
       QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
       QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
     }
+  }
+
+  // The interlacing chosen in Media Properties is saved (only when it differs from the detected value) and wins over
+  // the detection on reopen and on a re-analysis; undo still restores the detected value. It used to be lost on reopen.
+  void interlacingChoiceSaved() {
+    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    const QString video = dir_.filePath("choice_interlaced.mp4");
+    write_interlaced_h264(video, kSourceFrames);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("choice_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("choice.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    auto read = [](const QString& path) {
+      QFile f(path);
+      return f.open(QFile::ReadOnly) ? f.readAll() : QByteArray();
+    };
+    Footage* vf = nullptr;
+    load_and_probe(project, &vf);
+    if (QTest::currentTestFailed()) return;
+    QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    // Untouched: no attribute
+    const QString untouched = dir_.filePath("choice_untouched.ove");
+    QVERIFY(amber::save_project_file(untouched, untouched));
+    QVERIFY(!read(untouched).contains("interlacing="));
+
+    // The dialog's change: through the undo stack
+    amber::UndoStack.clear();
+    auto* ca = new ComboAction("Edit Media Properties");
+    ca->append(new SetInt(&vf->video_tracks[0].video_interlacing, VIDEO_BOTTOM_FIELD_FIRST));
+    amber::UndoStack.push(ca);
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_BOTTOM_FIELD_FIRST));
+    amber::UndoStack.undo();
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    amber::UndoStack.redo();
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_BOTTOM_FIELD_FIRST));
+    amber::UndoStack.clear();
+
+    // A re-analysis of the same footage (relink) keeps it
+    Media* media = nullptr;
+    for (const auto& c : amber::ActiveSequence->clips) {
+      if (c->track() < 0) media = c->media();
+    }
+    QVERIFY(media != nullptr);
+    PreviewGenerator::AnalyzeMedia(media);
+    {
+      QPointer<PreviewGenerator> gen(vf->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+    }
+    QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_BOTTOM_FIELD_FIRST));
+
+    const QString chosen = dir_.filePath("choice_bff.ove");
+    QVERIFY(amber::save_project_file(chosen, chosen));
+    QVERIFY(read(chosen).contains(
+        R"(<video id="0" width="64" height="64" framerate="30.0000000000" infinite="0" interlacing="2"/>)"));
+
+    // Reopen (thumbnail cached): the choice, over the detected value
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    load_and_probe(chosen, &vf);
+    if (QTest::currentTestFailed()) return;
+    QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_BOTTOM_FIELD_FIRST));
+
+    // Footage whose file is missing is never analysed: saving keeps the choice it was loaded with
+    const QString missing = dir_.filePath("choice_missing.ove");
+    {
+      QFile f(missing);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(read(chosen).replace("choice_interlaced.mp4", "choice_gone.mp4"));
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    load_and_probe(missing, &vf);
+    if (QTest::currentTestFailed()) return;
+    QVERIFY(vf->invalid);
+    const QString resaved = dir_.filePath("choice_missing_resaved.ove");
+    QVERIFY(amber::save_project_file(resaved, resaved));
+    QVERIFY(read(resaved).contains(R"(<video id="0" interlacing="2"/>)"));
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
