@@ -35,9 +35,11 @@ int64_t Cacher::cacheVideoLastDecodable(int64_t seek_ts) {
   const int64_t landing = seek_landing_timestamp(formatCtx, clip->media_stream_index(), seek_ts);
   if (landing != AV_NOPTS_VALUE && landing > 0) return landing - 1;
   if (latest_decoded_pts_ != AV_NOPTS_VALUE) return latest_decoded_pts_;
-  if (stream->duration != AV_NOPTS_VALUE && stream->avg_frame_rate.num > 0 && stream->avg_frame_rate.den > 0) {
+  // The probe's rate (av_guess_frame_rate()): avg_frame_rate can be the time base, not a frame rate (raw DV: 60000/1)
+  const AVRational rate = av_guess_frame_rate(formatCtx, stream, nullptr);
+  if (stream->duration != AV_NOPTS_VALUE && rate.num > 0 && rate.den > 0) {
     const int64_t start = (stream->start_time != AV_NOPTS_VALUE) ? stream->start_time : 0;
-    return start + stream->duration - av_rescale_q(1, av_inv_q(stream->avg_frame_rate), stream->time_base);
+    return start + stream->duration - av_rescale_q(1, av_inv_q(rate), stream->time_base);
   }
   return AV_NOPTS_VALUE;
 }
@@ -567,8 +569,11 @@ int Cacher::RetrieveFrameAndProcess(AVFrame** f) {
       // has only the decoder's guess, and the last one out of the decoder not even that: the frame before's plus a
       // frame. Without a timestamp the frame has no place in the queue and is dropped.
       if (frame_->pts == AV_NOPTS_VALUE) frame_->pts = frame_->best_effort_timestamp;
-      if (frame_->pts == AV_NOPTS_VALUE && last_raw_video_pts_ != AV_NOPTS_VALUE && stream->avg_frame_rate.num > 0) {
-        frame_->pts = last_raw_video_pts_ + av_rescale_q(1, av_inv_q(stream->avg_frame_rate), stream->time_base);
+      if (frame_->pts == AV_NOPTS_VALUE && last_raw_video_pts_ != AV_NOPTS_VALUE) {
+        const AVRational rate = av_guess_frame_rate(formatCtx, stream, nullptr);
+        if (rate.num > 0 && rate.den > 0) {
+          frame_->pts = last_raw_video_pts_ + av_rescale_q(1, av_inv_q(rate), stream->time_base);
+        }
       }
       last_raw_video_pts_ = frame_->pts;
 

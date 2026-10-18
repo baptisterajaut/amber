@@ -185,6 +185,9 @@ bool PreviewGenerator::parse_video_stream(int stream_index, FootageStream& ms) {
     if (fmt_name.contains(QLatin1String("image2")) || fmt_name.endsWith(QLatin1String("_pipe"))) {
       is_still_image = true;
     }
+    // A GIF of one frame is a still (it was a video as long as its frame delay), an animated one a video. The demuxer
+    // counts the frames when it opens a seekable file (FFmpeg 4.2+; 0 when unknown: a video, as before)
+    if (fmt_name == QLatin1String("gif") && stream->nb_frames == 1) is_still_image = true;
   }
 
   if (is_still_image) {
@@ -288,6 +291,11 @@ void PreviewGenerator::parse_media() {
   }
 
   footage_->length = media_length(fmt_ctx_, footage_->url);
+  // Only stills: no length of its own, as a PNG's (unknown duration). A one-frame GIF had its frame delay, an image2
+  // file (TGA) 40 ms: the media viewer opened it as a clip that long instead of the default still length
+  bool only_stills = !footage_->video_tracks.isEmpty() && footage_->audio_tracks.isEmpty();
+  for (const auto& ms : footage_->video_tracks) only_stills = only_stills && ms.infinite_length;
+  if (only_stills) footage_->length = 0;
   if (fmt_ctx_->duration == INT64_MIN) {
     retrieve_duration_ = true;
   } else {

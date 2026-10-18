@@ -686,6 +686,57 @@ void write_offset_mp4(const QString& path, int frames, int64_t start, int frames
   avformat_free_context(fmt);
 }
 
+// frames frames of a flat colour each, a tenth of a second apart, as a GIF (one frame: a static GIF)
+void write_gif(const QString& path, int frames) {
+  const QByteArray p = path.toUtf8();
+  const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_GIF);
+  QVERIFY(codec != nullptr);
+  AVFormatContext* fmt = nullptr;
+  QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, "gif", p.constData()) >= 0);
+  AVStream* st = avformat_new_stream(fmt, nullptr);
+  AVCodecContext* enc = avcodec_alloc_context3(codec);
+  enc->width = kSize;
+  enc->height = kSize;
+  enc->pix_fmt = AV_PIX_FMT_RGB8;
+  enc->time_base = AVRational{1, 100};
+  QVERIFY(avcodec_open2(enc, codec, nullptr) >= 0);
+  avcodec_parameters_from_context(st->codecpar, enc);
+  st->time_base = enc->time_base;
+  QVERIFY(avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0);
+  QVERIFY(avformat_write_header(fmt, nullptr) >= 0);
+
+  AVPacket* pkt = av_packet_alloc();
+  auto write_packets = [&]() {
+    while (avcodec_receive_packet(enc, pkt) >= 0) {
+      pkt->duration = 10;
+      av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+      pkt->stream_index = st->index;
+      av_interleaved_write_frame(fmt, pkt);
+      av_packet_unref(pkt);
+    }
+  };
+  AVFrame* frame = av_frame_alloc();
+  frame->width = kSize;
+  frame->height = kSize;
+  frame->format = AV_PIX_FMT_RGB8;
+  QVERIFY(av_frame_get_buffer(frame, 0) >= 0);
+  for (int i = 0; i < frames; i++) {
+    av_frame_make_writable(frame);
+    memset(frame->data[0], 0x25 + 0x49 * i, frame->linesize[0] * kSize);
+    frame->pts = 10 * i;
+    avcodec_send_frame(enc, frame);
+    write_packets();
+  }
+  avcodec_send_frame(enc, nullptr);
+  write_packets();
+  QVERIFY(av_write_trailer(fmt) >= 0);
+  av_frame_free(&frame);
+  av_packet_free(&pkt);
+  avcodec_free_context(&enc);
+  avio_closep(&fmt->pb);
+  avformat_free_context(fmt);
+}
+
 // frames frames of a flat colour, luma 24 + 16 * i under a non-neutral chroma (a dropped or swapped chroma plane
 // shows), as interlaced (top field first) video in the container path's extension names: MBAFF H.264 from libx264 by
 // default (mpeg2video in .mpg: MPEG-PS, whose video starts at 0.5 s)
@@ -1983,6 +2034,51 @@ class TestHeadlessRender : public QObject {
     QVERIFY(vf != nullptr);
     QCOMPARE(vf->video_tracks.size(), 1);
     QVERIFY(vf->video_tracks.at(0).infinite_length);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+  }
+
+  // A GIF of one frame is a still like a PNG (it was imported as a video as long as its frame delay, 0.1 s here); an
+  // animated GIF stays a video
+  void singleFrameGifIsStill_data() {
+    QTest::addColumn<int>("frames");
+    QTest::newRow("static") << 1;
+    QTest::newRow("animated") << 3;
+  }
+
+  void singleFrameGifIsStill() {
+    QFETCH(int, frames);
+    const QString image = dir_.filePath(QString("gif_%1.gif").arg(frames));
+    write_gif(image, frames);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath(QString("gif_%1_tone.wav").arg(frames));
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath(QString("gif_%1.ove").arg(frames));
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, image, audio).toUtf8());
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    Footage* vf = nullptr;
+    load_and_probe(project, &vf);
+    if (QTest::currentTestFailed()) return;
+    QVERIFY(vf->ready);
+    QCOMPARE(vf->video_tracks.size(), 1);
+    const FootageStream& ms = vf->video_tracks.at(0);
+    if (frames == 1) {
+      QVERIFY(ms.infinite_length);
+      QCOMPARE(ms.video_frame_rate, 0.0);
+      QCOMPARE(vf->length, int64_t(0));  // a PNG's: the media viewer gives it the default still length
+    } else {
+      QVERIFY(!ms.infinite_length);
+      QCOMPARE(ms.video_frame_rate, 10.0);
+    }
     amber::ActiveSequence = nullptr;
     amber::project_model.clear();
   }
