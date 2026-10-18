@@ -223,7 +223,7 @@ add_executable(amber-test-marker-range
   ${CMAKE_SOURCE_DIR}/timeline/marker_range.h
 )
 target_include_directories(amber-test-marker-range PRIVATE ${CMAKE_SOURCE_DIR})
-target_link_libraries(amber-test-marker-range PRIVATE Qt6::Test Qt6::Core)
+target_link_libraries(amber-test-marker-range PRIVATE amber-engine Qt6::Test)  # ResizeMarkerAction
 add_test(NAME amber-test-marker-range COMMAND amber-test-marker-range)
 
 add_executable(amber-test-layoutpresets

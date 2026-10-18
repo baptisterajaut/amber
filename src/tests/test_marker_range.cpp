@@ -1,6 +1,9 @@
 #include <QVector>
 #include <QtTest>
 
+#include <memory>
+
+#include "engine/undo/undo_timeline.h"
 #include "timeline/marker_range.h"
 
 namespace {
@@ -58,15 +61,82 @@ class TestMarkerRange : public QObject {
     QCOMPARE(amber::marker_range::duration_to(10, 10), 0L);
     QCOMPARE(amber::marker_range::duration_to(10, 3), 0L);
   }
-  // Alt-drag from a point marker's head: the end starts on the head (duration 0) and follows the mouse
+  // What TimelineHeader::mousePressEvent grabs (press_hit). Marker offset 0: presses at y <= 0 are on the timecode.
+  void pressEndTickWinsOverHeads() {
+    using amber::marker_range::press_hit;
+    // range 0 ends at frame 30 (x = 50), where point marker 1's head is too
+    const QVector<Marker> markers = {marker(10, 20), marker(30, 0)};
+    QVector<int> selected;
+    auto hit = press_hit(selected, markers, 50, 5, 0, -100, false, false, to_screen);
+    QCOMPARE(hit.end, 0);
+    QCOMPARE(hit.head, -1);
+    QCOMPARE(selected, QVector<int>{0});
+    hit = press_hit(selected, markers, 10, 5, 0, -100, false, false, to_screen);  // range 0's head (x = 10)
+    QCOMPARE(hit.end, -1);
+    QCOMPARE(hit.head, 0);
+    hit = press_hit(selected, markers, 50, 0, 0, -100, false, false, to_screen);  // on the timecode band
+    QCOMPARE(hit.end, -1);
+    QCOMPARE(hit.head, -1);
+  }
+  void pressAltGrabsOnlyAPointMarkersEnd() {
+    using amber::marker_range::press_hit;
+    const QVector<Marker> markers = {marker(10, 20), marker(40, 0)};  // heads at x = 10 and x = 70
+    QVector<int> selected = {0};
+    auto hit = press_hit(selected, markers, 70, 5, 0, -100, true, true, to_screen);  // Shift+Alt on the point head
+    QCOMPARE(hit.end, 1);
+    QCOMPARE(selected, QVector<int>{1});  // the resized marker alone, whatever shift did
+    hit = press_hit(selected, markers, 70, 5, 0, -100, false, false, to_screen);
+    QCOMPARE(hit.end, -1);
+    QCOMPARE(hit.head, 1);
+    hit = press_hit(selected, markers, 10, 5, 0, -100, false, true, to_screen);  // Alt on a range head: a move
+    QCOMPARE(hit.end, -1);
+    QCOMPARE(hit.head, 0);
+  }
+  void pressHeadSelectionAndPlayhead() {
+    using amber::marker_range::press_hit;
+    const QVector<Marker> markers = {marker(10, 0), marker(40, 0)};  // heads at x = 10 and x = 70
+    QVector<int> selected;
+    QCOMPARE(press_hit(selected, markers, 10, 5, 0, -100, false, false, to_screen).head, 0);
+    QCOMPARE(press_hit(selected, markers, 70, 5, 0, -100, true, false, to_screen).head, 1);
+    QCOMPARE(selected, (QVector<int>{0, 1}));
+    QCOMPARE(press_hit(selected, markers, 10, 5, 0, -100, true, false, to_screen).head, 0);  // shift toggles off
+    QCOMPARE(selected, QVector<int>{1});
+    // the playhead's handle sits over head 1: the press goes to the playhead
+    QCOMPARE(press_hit(selected, markers, 70, 5, 0, 72, false, false, to_screen).head, -1);
+  }
+  // Alt-drag from a point marker's head: the end starts on the head (duration 0) and follows the mouse; the release
+  // pushes one Resize Marker step, none when the duration came back to where it was
   void altDragFromPointHead() {
-    const long frame = 30, original_duration = 0, press_frame = 30;
+    using namespace amber::marker_range;
+    QVector<Marker> markers = {marker(30, 0)};  // head at x = 50
+    QVector<int> selected;
+    const PressHit hit = press_hit(selected, markers, 50, 5, 0, -100, false, true, to_screen);
+    QCOMPARE(hit.end, 0);
+    const long press_frame = 30, original = markers.at(0).duration;
     auto drag_to = [&](long mouse_frame) {
-      return amber::marker_range::duration_to(frame, frame + original_duration + (mouse_frame - press_frame));
+      markers[0].duration =
+          duration_to(markers.at(0).frame, dragged_end_frame(markers.at(0).frame, original, press_frame, mouse_frame));
+      return markers.at(0).duration;
     };
-    QCOMPARE(drag_to(30), 0L);
-    QCOMPARE(drag_to(42), 12L);
     QCOMPARE(drag_to(20), 0L);
+    QCOMPARE(drag_to(42), 12L);
+
+    std::unique_ptr<ResizeMarkerAction> step(resize_release_action(&markers, hit.end, original));
+    QVERIFY(step != nullptr);
+    step->undo();
+    QCOMPARE(markers.at(0).duration, 0L);
+    step->redo();
+    QCOMPARE(markers.at(0).duration, 12L);
+
+    drag_to(30);
+    QVERIFY(resize_release_action(&markers, hit.end, original) == nullptr);  // back to a point marker: no step
+    QVERIFY(resize_release_action(&markers, 1, original) == nullptr);        // stale index
+  }
+  // Resizing an existing range: the end moves by what the mouse travelled, not to the mouse
+  void dragEndKeepsThePressOffset() {
+    using amber::marker_range::dragged_end_frame;
+    QCOMPARE(dragged_end_frame(10, 20, 29, 35), 36L);  // grabbed one frame left of the end at 30
+    QCOMPARE(dragged_end_frame(10, 20, 29, 29), 30L);
   }
 };
 
