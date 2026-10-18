@@ -41,13 +41,13 @@ ExportParams batch_export_params(const ExportParams& base, Sequence* seq, bool u
 // finish_export()), with that sequence made the active one meanwhile: the Timecode effect reads the active sequence's
 // playhead. A failed or skipped sequence doesn't stop the batch, Cancel() does. At the end the user's active sequence
 // is back, and every exported sequence's playhead where it was. GUI thread only, as prepare_export().
-// CBA: same settings for every sequence; per-sequence overrides belong to the render queue
 class BatchExport : public QObject {
   Q_OBJECT
  public:
   struct Job {
     SequencePtr seq;
     ExportParams params;
+    VideoCodecParams vparams;  // the export dialog's Advanced settings
   };
 
   struct Outcome {
@@ -57,7 +57,7 @@ class BatchExport : public QObject {
     QString reason;  // Failed: the export error; Skipped: why it didn't start
   };
 
-  BatchExport(const QVector<Job>& jobs, const VideoCodecParams& vparams, QObject* parent = nullptr);
+  explicit BatchExport(const QVector<Job>& jobs, QObject* parent = nullptr);
 
   // Starts the first job. Finished() may come before this returns, when no job can start.
   void Start();
@@ -90,7 +90,6 @@ class BatchExport : public QObject {
 
   QVector<Job> jobs_;
   QVector<Outcome> outcomes_;
-  VideoCodecParams vparams_;
   int index_{0};
   bool cancelled_{false};
   ExportThread* thread_{nullptr};

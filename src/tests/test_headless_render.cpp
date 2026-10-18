@@ -358,6 +358,7 @@ struct Decoded {
   int width = 0;
   int height = 0;
   int pix_fmt = -1;  // of the first decoded frame
+  int video_codec = AV_CODEC_ID_NONE;
   QByteArray first_rgba;
   QVector<QByteArray> rgba;  // every video frame, when decode_file() is asked to keep them
   int audio_rate = 0;
@@ -434,7 +435,10 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
   if (vi >= 0) vctx = open_dec(vi);
   if (ai >= 0) actx = open_dec(ai);
   d.has_video = vctx != nullptr;
-  if (vctx != nullptr) d.video_fps = av_q2d(fmt->streams[vi]->avg_frame_rate);
+  if (vctx != nullptr) {
+    d.video_fps = av_q2d(fmt->streams[vi]->avg_frame_rate);
+    d.video_codec = fmt->streams[vi]->codecpar->codec_id;
+  }
   d.has_audio = actx != nullptr;
   if (actx != nullptr) {
     d.audio_rate = actx->sample_rate;
@@ -849,9 +853,10 @@ class TestHeadlessRender : public QObject {
   }
 
   // Jobs for seqs into folder, named and derived as ExportDialog::start_batch_export() does; a PNG image sequence
-  // with image_sequence
+  // with image_sequence. Every job gets vparams, as the dialog's Advanced settings.
   static QVector<BatchExport::Job> batch_jobs(const QVector<SequencePtr>& seqs, const QString& folder, bool use_inout,
-                                              bool image_sequence = false) {
+                                              bool image_sequence = false,
+                                              const VideoCodecParams& vparams = yuv420p_params()) {
     const QString ext = image_sequence ? "png" : "mp4";
     ExportParams base = batch_base();
     if (image_sequence) base.video_codec = AV_CODEC_ID_PNG;
@@ -861,7 +866,7 @@ class TestHeadlessRender : public QObject {
       const QString name = amber::batch_export_filename(s->name, ext, taken);
       taken.append(name);
       const QString filename = amber::batch_export_path(folder, name, ext, image_sequence);
-      jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename)});
+      jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename), vparams});
     }
     return jobs;
   }
@@ -2552,7 +2557,7 @@ class TestHeadlessRender : public QObject {
     QCOMPARE(whole.start_frame, 0L);
     QCOMPARE(whole.end_frame, 6L);
 
-    BatchExport batch(jobs, yuv420p_params());
+    BatchExport batch(jobs);
     QVector<SequencePtr> active;
     QVector<long> playheads;
     QVERIFY(run_batch(batch, [&](int index) {
@@ -2609,7 +2614,7 @@ class TestHeadlessRender : public QObject {
 
     QVector<BatchExport::Job> jobs = batch_jobs({b.wide, empty, b.tall}, folder, false);
     jobs[0].params.video_encoder = "amber_no_such_encoder";
-    BatchExport batch(jobs, yuv420p_params());
+    BatchExport batch(jobs);
     QVector<int> started;
     QVERIFY(run_batch(batch, [&](int index) { started.append(index); }));
     QCOMPARE(started, (QVector<int>{0, 2}));
@@ -2647,7 +2652,7 @@ class TestHeadlessRender : public QObject {
     vparams.pix_fmt = AV_PIX_FMT_RGB24;
 
     {
-      BatchExport batch(batch_jobs({seq}, folder, false, true), vparams);
+      BatchExport batch(batch_jobs({seq}, folder, false, true, vparams));
       QVERIFY(run_batch(batch));
       QCOMPARE(batch.ExportedCount(), 1);
     }
@@ -2667,10 +2672,10 @@ class TestHeadlessRender : public QObject {
     }
 
     seq->clips.first()->effects.at(1)->row(2)->Field(0)->SetValueAt(0.0, QVariant(QColor(Qt::blue)));  // Solid colour
-    QVector<BatchExport::Job> again = batch_jobs({seq}, folder, false, true);
+    QVector<BatchExport::Job> again = batch_jobs({seq}, folder, false, true, vparams);
     QCOMPARE(QFileInfo(again.at(0).params.filename).fileName(), QString("Sequence 01 (2)%05d.png"));
     {
-      BatchExport batch(again, vparams);
+      BatchExport batch(again);
       QVERIFY(run_batch(batch));
       QCOMPARE(batch.ExportedCount(), 1);
     }
@@ -2692,7 +2697,7 @@ class TestHeadlessRender : public QObject {
     const QString folder = dir_.filePath("batch_cancel");
     QVERIFY(QDir().mkpath(folder));
 
-    BatchExport batch(batch_jobs({b.wide, b.tall}, folder, false), yuv420p_params());
+    BatchExport batch(batch_jobs({b.wide, b.tall}, folder, false));
     connect(&batch, &BatchExport::ProgressChanged, &batch, &BatchExport::Cancel);
     QVector<int> started;
     QVERIFY(run_batch(batch, [&](int index) { started.append(index); }));
@@ -2705,6 +2710,37 @@ class TestHeadlessRender : public QObject {
     QCOMPARE(amber::ActiveSequence, b.user);
     QCOMPARE(b.wide->playhead, 7L);
     QVERIFY(!audio_rendering);
+    pio_->setSequence(nullptr);
+  }
+
+  // Each job its own codec and Advanced settings: an MPEG-4 file in YUV 4:2:0 and a PNG image sequence in RGB, each
+  // pixel format refused by the other's encoder (exportUnsupportedPixelFormatFails()): shared settings would fail one
+  void batchExportPerJobCodecs() {
+    if (avcodec_find_encoder(AV_CODEC_ID_PNG) == nullptr) QSKIP("PNG encoder not in this FFmpeg build");
+    BatchSequences b = batch_sequences();
+    const QString folder = dir_.filePath("batch_per_job_codecs");
+    QVERIFY(QDir().mkpath(folder));
+    VideoCodecParams rgb = yuv420p_params();
+    rgb.pix_fmt = AV_PIX_FMT_RGB24;
+    QVector<BatchExport::Job> jobs = batch_jobs({b.wide}, folder, false);
+    jobs += batch_jobs({b.tall}, folder, false, true, rgb);
+
+    BatchExport batch(jobs);
+    QVERIFY(run_batch(batch));
+    for (const BatchExport::Outcome& o : batch.Outcomes()) {
+      QVERIFY2(o.status == BatchExport::Outcome::Exported, qPrintable(o.name + ": " + o.reason));
+    }
+
+    const Decoded wide = decode_file(QDir(folder).filePath("Wide.mp4"));
+    QVERIFY(wide.ok && wide.has_video);
+    QCOMPARE(wide.video_codec, int(AV_CODEC_ID_MPEG4));
+    QCOMPARE(wide.pix_fmt, int(AV_PIX_FMT_YUV420P));
+    QCOMPARE(wide.video_frames, 10);
+    const Decoded tall = decode_file(jobs.at(1).params.filename);  // the image2 pattern
+    QVERIFY(tall.ok && tall.has_video);
+    QCOMPARE(tall.video_codec, int(AV_CODEC_ID_PNG));
+    QCOMPARE(tall.pix_fmt, int(AV_PIX_FMT_RGB24));
+    QCOMPARE(tall.video_frames, 6);
     pio_->setSequence(nullptr);
   }
 

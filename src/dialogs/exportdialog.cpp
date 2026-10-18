@@ -524,11 +524,11 @@ void ExportDialog::start_batch_export(const QString& ext) {
     const QString name = amber::batch_export_filename(s->name, ext, taken);
     taken.append(name);
     const QString filename = amber::batch_export_path(folder, name, ext, image_sequence);
-    jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename)});
+    jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename), vcodec_params});
   }
 
   batch_folder_ = QDir::toNativeSeparators(folder);
-  batch_export_ = new BatchExport(jobs, vcodec_params, this);
+  batch_export_ = new BatchExport(jobs, this);
   connect(batch_export_, &BatchExport::SequenceStarted, this, [this](int index, int count, const QString& name) {
     batch_label_ = tr("Sequence %1 of %2 — %3").arg(QString::number(index + 1), QString::number(count), name);
     export_pass_.clear();
