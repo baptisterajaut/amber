@@ -294,7 +294,8 @@ static void apply_ripple_delete(const QVector<SilenceSegment>& silence_segments,
       for (int link : c->linked) {
         if (link < 0 || link >= amber::ActiveSequence->clips.size()) continue;
         ClipPtr linked_clip = amber::ActiveSequence->clips.at(link);
-        if (linked_clip != nullptr && linked_clip->timeline_in() == seg.in && linked_clip->timeline_out() == seg.out) {
+        if (linked_clip != nullptr && linked_clip->timeline_in() == seg.in && linked_clip->timeline_out() == seg.out &&
+            !amber::ActiveSequence->track_locked(linked_clip->track())) {
           delete_ca->append(new DeleteClipAction(amber::ActiveSequence.get(), link));
         }
       }

@@ -255,6 +255,11 @@ void Timeline::paste(bool insert) {
   }
 
   if (clipboard_type == CLIPBOARD_TYPE_CLIP) {
+    // pasted clips keep their tracks: refuse before anything (auto-imported media included) is attached
+    QVector<int> pasted_tracks;
+    for (const auto& i : clipboard) pasted_tracks.append(std::static_pointer_cast<Clip>(i)->track());
+    if (refuse_locked_tracks(pasted_tracks)) return;
+
     ComboAction* ca = new ComboAction(tr("Paste"));
     // Auto-imported media from another project — wrapped in the paste ComboAction
     // for undo coherence. Constructor of AddMediaCommand already attaches to project_model.

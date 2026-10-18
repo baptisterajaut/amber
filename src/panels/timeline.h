@@ -37,6 +37,8 @@
 #include "ui/timelinetools.h"
 #include "ui/timelinewidget.h"
 
+class TrackHeaderWidget;
+
 enum CreateObjects : uint8_t {
   ADD_OBJ_TITLE,
   ADD_OBJ_SOLID,
@@ -114,6 +116,9 @@ class Timeline : public Panel {
   void clean_up_selections(QVector<Selection>& areas);
   void deselect_area(long in, long out, int track);
   void delete_areas_and_relink(ComboAction* ca, QVector<Selection>& areas, bool deselect_areas);
+  // True, with "Track V2 is locked" in the status bar for 3 s, if any of these tracks of the active sequence is
+  // locked: the caller then cancels the whole edit (a drop, move, paste or 3-point edit landing on it)
+  bool refuse_locked_tracks(const QVector<int>& tracks);
   void relink_clips_using_ids(QVector<int>& old_clips, QVector<ClipPtr>& new_clips);
   void update_sequence();
 
@@ -215,6 +220,7 @@ class Timeline : public Panel {
   bool block_repaints{false};
 
   TimelineHeader* headers;
+  TrackHeaderWidget* track_headers;
   QLabel* breadcrumb_label;
   AudioMonitor* audio_monitor;
   ResizableScrollBar* horizontalScrollBar;

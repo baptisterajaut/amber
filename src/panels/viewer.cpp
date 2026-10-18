@@ -423,8 +423,12 @@ void Viewer::pause(bool clear_buffer) {
       file_list.append(get_recorded_audio_filename());
       panel_project->process_file_list(file_list);
 
-      // add it to the sequence
+      // add it to the sequence, unless its track was locked meanwhile (the recording stays in the project)
       if (panel_project->last_imported_media.isEmpty()) return;
+      if (seq->track_locked(recording_track)) {
+        if (panel_timeline != nullptr) panel_timeline->refuse_locked_tracks({recording_track});
+        return;
+      }
       ClipPtr c = std::make_shared<Clip>(seq.get());
       Media* m = panel_project->last_imported_media.at(0);
       Footage* f = m->to_footage();

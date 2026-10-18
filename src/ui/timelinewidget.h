@@ -54,6 +54,12 @@ class TimelineWidget : public QWidget {
   explicit TimelineWidget(QWidget* parent = nullptr);
   QScrollBar* scrollBar;
 
+  // Track geometry in this widget's coordinates, shared with the track header column (TrackHeaderWidget) so its rows
+  // match the clip area exactly: same scroll, seam centring and 1 px track lines.
+  QRect track_rect(int track);
+  int track_at(int y);
+  int seam_screen_y();
+
  public slots:
 
  protected:
@@ -129,6 +135,8 @@ class TimelineWidget : public QWidget {
   // paintEvent sub-handlers
   void drawClips(QPainter& p);
   void drawRecordingClip(QPainter& p);
+  // diagonal hatch over the rows of locked tracks, after the clips and before the track lines
+  void drawLockedTracks(QPainter& p, int video_track_limit, int audio_track_limit);
   void drawTrackLines(QPainter& p, int video_track_limit, int audio_track_limit);
   void drawSelections(QPainter& p);
   void drawGhosts(QPainter& p);

@@ -20,6 +20,7 @@
 
 #include "timeline.h"
 
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QScrollBar>
@@ -37,6 +38,7 @@
 #include "ui/resizablescrollbar.h"
 #include "ui/timelineheader.h"
 #include "ui/timelinewidget.h"
+#include "ui/trackheaderwidget.h"
 
 void Timeline::setup_ui() {
   QWidget* dockWidgetContents = new QWidget();
@@ -153,7 +155,9 @@ void Timeline::setup_ui() {
   timeline_area_policy.setHeightForWidth(timeline_area_widget->sizePolicy().hasHeightForWidth());
   timeline_area_widget->setSizePolicy(timeline_area_policy);
 
-  QVBoxLayout* timeline_area_layout = new QVBoxLayout(timeline_area_widget);
+  // Column 0 holds the track header column (TrackHeaderWidget) next to the tracks only, so the ruler and the
+  // horizontal scrollbar in column 1 keep x = 0 on the clip area's x = 0.
+  QGridLayout* timeline_area_layout = new QGridLayout(timeline_area_widget);
   timeline_area_layout->setSpacing(0);
   timeline_area_layout->setContentsMargins(0, 0, 0, 0);
 
@@ -170,10 +174,10 @@ void Timeline::setup_ui() {
   breadcrumb_label->setOpenExternalLinks(false);
   connect(breadcrumb_label, &QLabel::linkActivated, this, &Timeline::breadcrumb_link_clicked);
   breadcrumb_label->hide();
-  timeline_area_layout->addWidget(breadcrumb_label);
+  timeline_area_layout->addWidget(breadcrumb_label, 0, 0, 1, 2);
 
   headers = new TimelineHeader();
-  timeline_area_layout->addWidget(headers);
+  timeline_area_layout->addWidget(headers, 1, 1);
 
   editAreas = new QWidget();
   QHBoxLayout* editAreaLayout = new QHBoxLayout(editAreas);
@@ -197,7 +201,10 @@ void Timeline::setup_ui() {
 
   editAreaLayout->addWidget(timelineContainer);
 
-  timeline_area_layout->addWidget(editAreas);
+  track_headers = new TrackHeaderWidget(timeline_area, verticalScrollbar);
+  timeline_area_layout->addWidget(track_headers, 2, 0);
+  timeline_area_layout->addWidget(editAreas, 2, 1);
+  timeline_area_layout->setRowStretch(2, 1);
 
   horizontalScrollBar = new ResizableScrollBar();
   horizontalScrollBar->setMaximum(0);
@@ -205,7 +212,7 @@ void Timeline::setup_ui() {
   horizontalScrollBar->setOrientation(Qt::Horizontal);
   headers->set_scroll_bar(horizontalScrollBar);
 
-  timeline_area_layout->addWidget(horizontalScrollBar);
+  timeline_area_layout->addWidget(horizontalScrollBar, 3, 1);
 
   horizontalLayout->addWidget(timeline_area_widget);
 
@@ -277,7 +284,7 @@ void Timeline::repaint_timeline() {
       // so the widgets will be updated in that recursive call
       if (amber::CurrentConfig.autoscroll == amber::AUTOSCROLL_PAGE_SCROLL) {
         int playhead_x = getTimelineScreenPointFromFrame(amber::ActiveSequence->playhead);
-        if (playhead_x < 0 || playhead_x > (editAreas->width() - verticalScrollbar->width())) {
+        if (playhead_x < 0 || playhead_x > timeline_area->width()) {
           int old_scroll = horizontalScrollBar->value();
           horizontalScrollBar->setValue(getScreenPointFromFrame(zoom, amber::ActiveSequence->playhead));
           if (horizontalScrollBar->value() != old_scroll) return;
@@ -291,6 +298,7 @@ void Timeline::repaint_timeline() {
 
     headers->update();
     timeline_area->update();
+    track_headers->update();
 
     if (amber::ActiveSequence != nullptr && !zoom_just_changed) {
       set_sb_max();

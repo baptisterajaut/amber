@@ -10,6 +10,7 @@ target_sources(amber-engine PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/clip.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/sequence.h
   ${CMAKE_CURRENT_SOURCE_DIR}/sequence.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/trackstate.h
   ${CMAKE_CURRENT_SOURCE_DIR}/undo/comboaction.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/undo/comboaction.h
   ${CMAKE_CURRENT_SOURCE_DIR}/undo/undoactions.h

@@ -142,6 +142,14 @@ void ripple_clips(ComboAction* ca, Sequence* s, long point, long length, const Q
   ca->append(new RippleAction(s, point, length, ignore));
 }
 
+bool Timeline::refuse_locked_tracks(const QVector<int>& tracks) {
+  if (amber::ActiveSequence == nullptr) return false;
+  std::optional<int> locked = amber::ActiveSequence->first_locked_track(tracks);
+  if (!locked.has_value()) return false;
+  amber::MainWindow->statusBar()->showMessage(tr("Track %1 is locked").arg(amber::track_label(*locked)), 3000);
+  return true;
+}
+
 // toggle_show_all() moved to timeline_ui.cpp
 
 // ---------------------------------------------------------------------------
@@ -388,8 +396,12 @@ void Timeline::add_transition() {
   update_ui(true);
 }
 
-// Move each ghost to a free track if it overlaps an existing clip (excluding selected_clips).
+// Move each ghost to a free track if it overlaps an existing clip (excluding selected_clips). A locked track counts
+// as occupied.
 static void resolve_ghost_track_collisions(QVector<Ghost>& ghosts, Sequence* seq, const QVector<int>& selected_clips) {
+  for (auto& g : ghosts) {
+    while (seq->track_locked(g.track)) g.track += (g.track < 0) ? -1 : 1;
+  }
   for (int j = 0; j < seq->clips.size(); j++) {
     Clip* c = seq->clips.at(j).get();
     if (c == nullptr || selected_clips.contains(j)) continue;
@@ -397,7 +409,9 @@ static void resolve_ghost_track_collisions(QVector<Ghost>& ghosts, Sequence* seq
     for (auto& g : ghosts) {
       bool overlaps = c->track() == g.track && !(c->timeline_out() <= g.in || c->timeline_in() >= g.out);
       if (overlaps) {
-        g.track += (g.track < 0) ? -1 : 1;
+        do {
+          g.track += (g.track < 0) ? -1 : 1;
+        } while (seq->track_locked(g.track));
         j = -1;  // restart scan
         break;
       }
@@ -551,6 +565,13 @@ void Timeline::unnest() {
     return;
   }
 
+  QVector<int> new_tracks;
+  for (const auto& c : new_clips) new_tracks.append(c->track());
+  if (refuse_locked_tracks(new_tracks)) {
+    delete ca;
+    return;
+  }
+
   ca->append(new AddClipCommand(amber::ActiveSequence.get(), new_clips));
 
   panel_graph_editor->set_row(nullptr);
@@ -574,7 +595,7 @@ void Timeline::select_all() {
     amber::ActiveSequence->selections.clear();
     for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
       ClipPtr c = amber::ActiveSequence->clips.at(i);
-      if (c != nullptr) {
+      if (c != nullptr && !amber::ActiveSequence->track_locked(c->track())) {
         Selection s;
         s.in = c->timeline_in();
         s.out = c->timeline_out();
@@ -587,7 +608,7 @@ void Timeline::select_all() {
 }
 
 void Timeline::scroll_to_frame(long frame) {
-  scroll_to_frame_internal(horizontalScrollBar, frame, zoom, timeline_area_widget->width());
+  scroll_to_frame_internal(horizontalScrollBar, frame, zoom, editAreas->width());
 }
 
 void Timeline::scroll_to_track(int track) {
@@ -595,7 +616,7 @@ void Timeline::scroll_to_track(int track) {
 
   amber::timeline_layout::TrackHeights h;
   int video_count = 0, audio_count = 0;
-  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  amber::ActiveSequence->getShownTrackLimits(&video_count, &audio_count);
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t) h.audio.append(GetTrackHeight(t));
 
@@ -623,7 +644,7 @@ int Timeline::SeamY() {
   }
   amber::timeline_layout::TrackHeights h;
   int video_count = 0, audio_count = 0;
-  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  amber::ActiveSequence->getShownTrackLimits(&video_count, &audio_count);
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t) h.audio.append(GetTrackHeight(t));
   // Add an empty drop-zone at the top, mirroring the existing one at the bottom of audio.
@@ -641,7 +662,7 @@ int Timeline::PanelHeight() {
   }
   amber::timeline_layout::TrackHeights h;
   int video_count = 0, audio_count = 0;
-  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  amber::ActiveSequence->getShownTrackLimits(&video_count, &audio_count);
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t) h.audio.append(GetTrackHeight(t));
   // padding: one default-height empty track above video and below audio (drop zones)
@@ -660,7 +681,7 @@ void Timeline::select_from_playhead() {
   for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     ClipPtr c = amber::ActiveSequence->clips.at(i);
     if (c != nullptr && c->timeline_in() <= amber::ActiveSequence->playhead &&
-        c->timeline_out() > amber::ActiveSequence->playhead) {
+        c->timeline_out() > amber::ActiveSequence->playhead && !amber::ActiveSequence->track_locked(c->track())) {
       Selection s;
       s.in = c->timeline_in();
       s.out = c->timeline_out();
@@ -671,6 +692,7 @@ void Timeline::select_from_playhead() {
 }
 
 bool Timeline::can_ripple_empty_space(long frame, int track) {
+  if (amber::ActiveSequence->track_locked(track)) return false;
   bool can_ripple_delete = true;
   bool at_end_of_sequence = true;
   rc_ripple_min = 0;
@@ -794,6 +816,8 @@ static bool compute_ripple_params(const QVector<Selection>& selections, const QV
     ClipPtr c = clips.at(i);
     if (c == nullptr || c->timeline_in() >= ripple_point || c->timeline_out() <= ripple_point) continue;
     if (clip_overlaps_any_selection(c.get(), selections)) continue;
+    // a locked track doesn't shift (RippleAction ignores it), so it can't collide
+    if (amber::ActiveSequence->track_locked(c->track())) continue;
     clamp_ripple_length(c.get(), clips, ripple_length);
   }
   return true;
@@ -895,7 +919,7 @@ void Timeline::ChangeTrackHeightUniformly(int diff) {
 
   // get range of tracks currently active
   int min_track, max_track;
-  amber::ActiveSequence->getTrackLimits(&min_track, &max_track);
+  amber::ActiveSequence->getShownTrackLimits(&min_track, &max_track);
 
   // for each active track, set the track to increase/decrease based on `diff`
   for (int i = min_track; i <= max_track; i++) {
@@ -976,7 +1000,11 @@ void Timeline::delete_areas_and_relink(ComboAction* ca, QVector<Selection>& area
   for (const auto& s : areas) {
     for (int j = 0; j < amber::ActiveSequence->clips.size(); j++) {
       Clip* c = amber::ActiveSequence->clips.at(j).get();
-      if (c == nullptr || c->track() != s.track || c->undeletable) continue;
+      // nothing on a locked track is removed or cut: covers delete, ripple delete, delete in/out, overwrite drops,
+      // paste and 3-point edits
+      if (c == nullptr || c->track() != s.track || c->undeletable || amber::ActiveSequence->track_locked(c->track())) {
+        continue;
+      }
 
       ClipPtr post = process_clip_in_area(this, ca, j, c, s);
       if (post != nullptr) {
@@ -1587,6 +1615,10 @@ void Timeline::three_point_edit(bool insert) {
 
   QVector<ClipPtr> new_clips = build_three_point_clips(
       footage, panel_footage_viewer->media, amber::ActiveSequence.get(), timeline_in, timeline_out, clip_in_dst);
+
+  QVector<int> new_tracks;
+  for (const auto& c : new_clips) new_tracks.append(c->track());
+  if (refuse_locked_tracks(new_tracks)) return;
 
   ComboAction* ca = new ComboAction(insert ? tr("Insert Edit") : tr("Overwrite Edit"));
 

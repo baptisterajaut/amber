@@ -502,6 +502,16 @@ static QVector<Clip*> collect_active_clips(Sequence* s, long playhead, ComposeSe
     if (c == nullptr) continue;
     if ((c->track() < 0) != params.video) continue;
 
+    // Track header toggles of this sequence (s, not params.seq, so a nest's own states apply inside it; a hidden or
+    // muted track holding a nest clip drops the whole nest). Skipped clips close like inactive ones, so they keep no
+    // decoder open.
+    // CBA: toggles take effect after the buffered audio; flush with reset_audio if it's noticeable
+    const bool track_off = params.video ? !s->track_visible_in_render(c->track()) : !s->track_audible(c->track());
+    if (track_off) {
+      if (c->IsOpen()) c->Close(false);
+      continue;
+    }
+
     bool clip_is_active = false;
     if (c->media() != nullptr && c->media()->get_type() == MEDIA_TYPE_FOOTAGE) {
       clip_is_active = activate_footage_clip(c, playhead, params.texture_failed, audio_track_count);

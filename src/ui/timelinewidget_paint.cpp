@@ -447,6 +447,11 @@ void TimelineWidget::drawClips(QPainter& p) {
       continue;
     }
 
+    // a hidden video track, or an audio track muted or silenced by another track's solo, dims its clips
+    const bool track_off = (clip->track() < 0) ? !amber::ActiveSequence->track_visible_in_render(clip->track())
+                                               : !amber::ActiveSequence->track_audible(clip->track());
+    p.setOpacity(track_off ? 0.4 : 1.0);
+
     QRect text_rect(clip_rect.left() + amber::timeline::kClipTextPadding,
                     clip_rect.top() + amber::timeline::kClipTextPadding,
                     clip_rect.width() - amber::timeline::kClipTextPadding - 1,
@@ -473,6 +478,20 @@ void TimelineWidget::drawClips(QPainter& p) {
     if (panel_timeline->tool == TIMELINE_TOOL_TRANSITION) {
       drawTransitionToolOverlay(p, clip_rect, i, width());
     }
+  }
+  p.setOpacity(1.0);
+}
+
+void TimelineWidget::drawLockedTracks(QPainter& p, int video_track_limit, int audio_track_limit) {
+  if (amber::ActiveSequence->track_states.isEmpty()) return;
+  QColor hatch = palette().color(QPalette::WindowText);
+  hatch.setAlpha(48);
+  // the shown range: the sequence's tracks plus the empty one on each side
+  for (int t = video_track_limit - 1; t <= audio_track_limit + 1; t++) {
+    if (!amber::ActiveSequence->track_locked(t)) continue;
+    const QRect row = track_rect(t);
+    if (row.bottom() < 0 || row.top() >= height()) continue;
+    p.fillRect(row, QBrush(hatch, Qt::BDiagPattern));
   }
 }
 
@@ -533,7 +552,7 @@ void TimelineWidget::drawTrackLines(QPainter& p, int video_track_limit, int audi
 
 void TimelineWidget::drawSelections(QPainter& p) {
   for (const auto& s : amber::ActiveSequence->selections) {
-    if (is_track_visible(s.track)) {
+    if (is_track_visible(s.track) && !amber::ActiveSequence->track_locked(s.track)) {
       int selection_y = getScreenPointFromTrack(s.track);
       int selection_x = panel_timeline->getTimelineScreenPointFromFrame(s.in);
       p.setPen(Qt::NoPen);
@@ -565,7 +584,8 @@ void TimelineWidget::drawGhosts(QPainter& p) {
 
         insert_points.append(ghost_y + (ghost_height >> 1));
 
-        p.setPen(QColor(255, 255, 0));
+        // red over a locked track: releasing there cancels the edit
+        p.setPen(amber::ActiveSequence->track_locked(g.track) ? QColor(255, 64, 64) : QColor(255, 255, 0));
         for (int j = 0; j < amber::timeline::kGhostThickness; j++) {
           p.drawRect(ghost_x + j, ghost_y + j, ghost_width - j - j, ghost_height - j - j);
         }
@@ -631,15 +651,10 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
   if (amber::ActiveSequence != nullptr) {
     QPainter p(this);
 
-    // get widget width and height
+    // track range: the clips' tracks and the tracks with a header state, as the header column draws
     int video_track_limit = 0;
     int audio_track_limit = 0;
-    for (auto clip : amber::ActiveSequence->clips) {
-      if (clip != nullptr) {
-        video_track_limit = qMin(video_track_limit, clip->track());
-        audio_track_limit = qMax(audio_track_limit, clip->track());
-      }
-    }
+    amber::ActiveSequence->getShownTrackLimits(&video_track_limit, &audio_track_limit);
 
     int panel_height = compute_panel_height();
     scrollBar->setMaximum(qMax(0, panel_height - height()));
@@ -655,6 +670,7 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
 
     drawClips(p);
     drawRecordingClip(p);
+    drawLockedTracks(p, video_track_limit, audio_track_limit);
     drawTrackLines(p, video_track_limit, audio_track_limit);
     drawSelections(p);
     drawGhosts(p);

@@ -350,9 +350,21 @@ void insert_clips(ComboAction* ca) {
 
 void TimelineWidget::dropEvent(QDropEvent* event) {
   if (panel_timeline->importing && panel_timeline->ghosts.size() > 0) {
-    ComboAction* ca = new ComboAction(tr("Add Clip(s)"));
-
     Sequence* s = amber::ActiveSequence.get();
+
+    // a drop landing on a locked track is cancelled whole, as if the drag had left the timeline
+    if (s != nullptr) {
+      QVector<int> ghost_tracks;
+      for (const auto& g : panel_timeline->ghosts) ghost_tracks.append(g.track);
+      if (panel_timeline->refuse_locked_tracks(ghost_tracks)) {
+        QDragLeaveEvent leave;
+        dragLeaveEvent(&leave);
+        event->ignore();
+        return;
+      }
+    }
+
+    ComboAction* ca = new ComboAction(tr("Add Clip(s)"));
 
     // if we're dropping into nothing, create a new sequences based on the clip being dragged
     if (s == nullptr) {
@@ -415,7 +427,7 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent* event) {
       int clip_index = getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track);
       if (clip_index >= 0) {
         ClipPtr clip = amber::ActiveSequence->clips.at(clip_index);
-        if (clip == nullptr) return;
+        if (clip == nullptr || amber::ActiveSequence->track_locked(clip->track())) return;
         if (!(event->modifiers() & Qt::ShiftModifier)) amber::ActiveSequence->selections.clear();
         Selection s;
         s.in = clip->timeline_in();
@@ -430,8 +442,9 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent* event) {
         ClipPtr c = amber::ActiveSequence->clips.at(clip_index);
         if (c == nullptr) return;
 
-        // double-clicking a text clip opens its text editor directly
+        // double-clicking a text clip opens its text editor directly (not on a locked track)
         for (const EffectPtr& effect : c->effects) {
+          if (amber::ActiveSequence->track_locked(c->track())) break;
           if (effect == nullptr || effect->meta == nullptr ||
               (effect->meta->internal != EFFECT_INTERNAL_TEXT && effect->meta->internal != EFFECT_INTERNAL_RICHTEXT)) {
             continue;
@@ -574,6 +587,8 @@ static void mousePressPointerUnselectedClip(Clip* clip, bool shift, bool alt) {
   if (!alt && panel_timeline->transition_select == kTransitionNone) {
     for (int i : clip->linked) {
       Clip* link = amber::ActiveSequence->clips.at(i).get();
+      // a link on a locked track stays unselected (IsSelected() is false there too)
+      if (amber::ActiveSequence->track_locked(link->track())) continue;
       if (!link->IsSelected()) {
         Selection ss;
         ss.in = link->timeline_in();
@@ -667,6 +682,7 @@ void TimelineWidget::mousePressDispatchTool(int effective_tool, int hovered_clip
             amber::ActiveSequence->selections.append(s);
           }
         }
+        amber::ActiveSequence->remove_locked_selections();
 
         // Enable drag movement (same flow as pointer tool)
         panel_timeline->moving_init = true;
@@ -732,6 +748,11 @@ void TimelineWidget::mousePressEvent(QMouseEvent* event) {
   int hovered_clip = panel_timeline->trim_target == -1
                          ? getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track)
                          : panel_timeline->trim_target;
+  // a clip on a locked track can't be selected, moved or trimmed: clicking it is clicking empty space
+  if (hovered_clip >= 0 &&
+      amber::ActiveSequence->track_locked(amber::ActiveSequence->clips.at(hovered_clip)->track())) {
+    hovered_clip = -1;
+  }
 
   bool shift = (event->modifiers() & Qt::ShiftModifier);
   bool alt = (event->modifiers() & Qt::AltModifier);
@@ -748,6 +769,12 @@ bool TimelineWidget::mouseReleaseCreating(ComboAction* ca, bool shift) {
   if (panel_timeline->ghosts.size() == 0) return false;
 
   const Ghost& g = panel_timeline->ghosts.at(0);
+
+  // nothing new lands on a locked track, recordings included
+  if (panel_timeline->refuse_locked_tracks({g.track})) {
+    if (!shift || panel_timeline->creating_object == ADD_OBJ_AUDIO) panel_timeline->creating = false;
+    return false;
+  }
 
   if (panel_timeline->creating_object == ADD_OBJ_AUDIO) {
     amber::MainWindow->statusBar()->clearMessage();
@@ -1032,6 +1059,19 @@ bool TimelineWidget::mouseReleaseMoving(ComboAction* ca, bool alt, bool ctrl) {
   }
   if (!process_moving) return false;
 
+  // a move (or Alt duplicate) landing on a locked track is cancelled whole
+  QVector<int> ghost_tracks;
+  for (const auto& g : panel_timeline->ghosts) ghost_tracks.append(g.track);
+  if (panel_timeline->refuse_locked_tracks(ghost_tracks)) {
+    // the selections followed the ghosts during the drag: put them back, with no "Select" undo entry
+    if (selection_command != nullptr) {
+      amber::ActiveSequence->selections = selection_command->old_data;
+      delete selection_command;
+      selection_command = nullptr;
+    }
+    return false;
+  }
+
   if (panel_timeline->tool == TIMELINE_TOOL_RIPPLE) {
     mouseReleaseMoveRipple(ca);
   } else if (panel_timeline->tool == TIMELINE_TOOL_POINTER || panel_timeline->tool == TIMELINE_TOOL_TRACK_SELECT) {
@@ -1228,6 +1268,9 @@ void TimelineWidget::mouseMoveSelecting(bool alt) {
       }
     }
   }
+
+  // no selection area on a locked track. Safe mid-drag: everything after selection_offset is rebuilt on each move
+  amber::ActiveSequence->remove_locked_selections();
 
   // if the config is set to seek with the edit too, do so now
   if (amber::CurrentConfig.edit_tool_also_seeks) {
@@ -1442,7 +1485,7 @@ void TimelineWidget::mouseMoveSplitting(bool alt) {
 static QVector<ClipPtr> rectSelectCollectClips(long frame_min, long frame_max, int track_min, int track_max, bool alt) {
   QVector<ClipPtr> selected_clips;
   for (const auto& clip : amber::ActiveSequence->clips) {
-    if (clip == nullptr) continue;
+    if (clip == nullptr || amber::ActiveSequence->track_locked(clip->track())) continue;
     if (clip->track() < track_min || clip->track() > track_max) continue;
     if (clip->timeline_in() < frame_min && clip->timeline_out() < frame_min) continue;
     if (clip->timeline_in() > frame_max && clip->timeline_out() > frame_max) continue;
@@ -1450,7 +1493,10 @@ static QVector<ClipPtr> rectSelectCollectClips(long frame_min, long frame_max, i
     QVector<ClipPtr> session_clips;
     session_clips.append(clip);
     if (!alt) {
-      for (int j : clip->linked) session_clips.append(amber::ActiveSequence->clips.at(j));
+      for (int j : clip->linked) {
+        ClipPtr link = amber::ActiveSequence->clips.at(j);
+        if (!amber::ActiveSequence->track_locked(link->track())) session_clips.append(link);
+      }
     }
 
     for (auto c : session_clips) {
@@ -1630,6 +1676,13 @@ void TimelineWidget::mouseMoveHoverTrimDetection(QMouseEvent* event) {
     max_track = qMax(max_track, c->track());
 
     if (c->track() != panel_timeline->cursor_track) continue;
+    // no trim cursor on a locked clip, but it still counts for the track resize cursor
+    if (amber::ActiveSequence->track_locked(c->track())) {
+      if (panel_timeline->cursor_frame >= c->timeline_in() && panel_timeline->cursor_frame <= c->timeline_out()) {
+        cursor_contains_clip = true;
+      }
+      continue;
+    }
 
     hoverDetectClipTrim(i, c, pos, mouse_frame_lower, mouse_frame_upper, cursor_contains_clip, closeness, found);
   }
@@ -1691,6 +1744,9 @@ void TimelineWidget::mouseMoveHoverTransition(QMouseEvent* event) {
     // set default transition tool references to no clip
     panel_timeline->transition_tool_open_clip = -1;
     panel_timeline->transition_tool_close_clip = -1;
+
+    // no transition on a locked clip (its neighbours on the same track are locked too)
+    if (mouse_clip > -1 && amber::ActiveSequence->track_locked(panel_timeline->cursor_track)) mouse_clip = -1;
 
     if (mouse_clip > -1) {
       // cursor is hovering over a clip
@@ -1787,7 +1843,8 @@ void TimelineWidget::mouseMoveHoverDispatch(QMouseEvent* event) {
       mouseMoveHoverTrimDetection(event);
       break;
     case TIMELINE_TOOL_SLIP:
-      if (getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track) > -1) {
+      if (getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track) > -1 &&
+          !amber::ActiveSequence->track_locked(panel_timeline->cursor_track)) {
         setCursor(amber::cursor::Slip);
       } else {
         unsetCursor();
@@ -1875,6 +1932,14 @@ int TimelineWidget::getScreenPointFromTrack(int track) {
   const int v = scroll - vertical_offset();
   return (track < 0) ? seam - point - v : seam + point - v;
 }
+
+QRect TimelineWidget::track_rect(int track) {
+  return QRect(0, getScreenPointFromTrack(track), width(), panel_timeline->GetTrackHeight(track));
+}
+
+int TimelineWidget::track_at(int y) { return getTrackFromScreenPoint(y); }
+
+int TimelineWidget::seam_screen_y() { return panel_timeline->SeamY() - scroll + vertical_offset(); }
 
 int TimelineWidget::getClipIndexFromCoords(long frame, int track) {
   for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {

@@ -77,7 +77,8 @@ ClipPtr Timeline::split_clip(ComboAction* ca, bool transitions, int p, long fram
 
 ClipPtr Timeline::split_clip(ComboAction* ca, bool transitions, int p, long frame, long post_in) {
   Clip* pre = amber::ActiveSequence->clips.at(p).get();
-  if (pre != nullptr) {
+  // a clip on a locked track is never split (razor, split at playhead, insert splits, freeze frame)
+  if (pre != nullptr && !amber::ActiveSequence->track_locked(pre->track())) {
 
     if (pre->timeline_in() < frame && pre->timeline_out() > frame) {
       // duplicate clip without duplicating its transitions, we'll restore them later

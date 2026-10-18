@@ -309,6 +309,7 @@ set(UI_SOURCES
   ui/timelineheader.cpp ui/timelineheader.h
   ui/timelinetools.h
   ui/timelinewidget.cpp ui/timelinewidget_ghosts.cpp ui/timelinewidget_menu.cpp ui/timelinewidget_paint.cpp ui/timelinewidget.h
+  ui/trackheaderwidget.cpp ui/trackheaderwidget.h
   ui/viewercontainer.cpp ui/viewercontainer.h
   ui/viewerwidget.cpp ui/viewerwidget.h
   ui/viewerwindow.cpp ui/viewerwindow.h

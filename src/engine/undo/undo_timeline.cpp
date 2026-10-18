@@ -20,6 +20,7 @@
 
 #include "undo_timeline.h"
 
+#include "core/appcontext.h"
 #include "global/projectio.h"
 #include "project/footage.h"
 #include "project/media.h"
@@ -32,6 +33,12 @@ RippleAction::RippleAction(Sequence *is, long ipoint, long ilength, const QVecto
   length(ilength),
   ignore(iignore)
 {
+  // Clips on locked tracks stay in place. Taken now, not at redo, so undo/redo stay consistent if the lock changes.
+  if (s != nullptr) {
+    for (int i : s->locked_clip_indexes()) {
+      if (!ignore.contains(i)) ignore.append(i);
+    }
+  }
 }
 
 // ca is only alive while the ripple is redone; delete it if the stack drops us in that state
@@ -63,6 +70,39 @@ void RippleAction::doRedo() {
   }
   ca->redo();
 }
+
+SetTrackStateCommand::SetTrackStateCommand(Sequence* s, QMap<int, TrackState> old_states,
+                                           QMap<int, TrackState> new_states)
+    : seq(s), old_states_(std::move(old_states)), new_states_(std::move(new_states)) {}
+
+void SetTrackStateCommand::apply(const QMap<int, TrackState>& states) {
+  if (!seq) {
+    qWarning() << "SetTrackStateCommand: seq is null";
+    return;
+  }
+  // The render thread reads track_states unlocked (collect_active_clips). Both maps stay shared with this command, so
+  // the assignment only swaps which one the sequence points at and never frees one a render is reading.
+  bool locks_changed = false;
+  for (int track : seq->track_states.keys() + states.keys()) {
+    if (seq->track_states.value(track).locked != states.value(track).locked) {
+      locks_changed = true;
+      break;
+    }
+  }
+  seq->track_states = states;
+  // locking a track drops its selections (selections themselves aren't undone)
+  seq->remove_locked_selections();
+  if (amber::app_ctx) {
+    amber::app_ctx->refreshViewer();
+    amber::app_ctx->refreshTimeline();
+    // Effect Controls and the graph editor may still show a clip that just got locked: rebuild from what is left
+    if (locks_changed) amber::app_ctx->updateUi(true);
+  }
+}
+
+void SetTrackStateCommand::doUndo() { apply(old_states_); }
+
+void SetTrackStateCommand::doRedo() { apply(new_states_); }
 
 ChangeSequenceAction::ChangeSequenceAction(SequencePtr s) {
   new_sequence = std::move(s);
@@ -149,6 +189,8 @@ void SetSelectionsCommand::doUndo() {
     return;
   }
   seq->selections = old_data;
+  // a track locked since then keeps no selection
+  seq->remove_locked_selections();
   done = false;
 }
 
@@ -159,6 +201,7 @@ void SetSelectionsCommand::doRedo() {
   }
   if (!done) {
     seq->selections = new_data;
+    seq->remove_locked_selections();
     done = true;
   }
 }

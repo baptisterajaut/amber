@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Eye outline -->
+  <path d="M 4,32 C 14,14 50,14 60,32 C 50,50 14,50 4,32 Z" fill="none" stroke="#ffffff" stroke-opacity="0.86"
+        stroke-width="6" stroke-linejoin="round"/>
+  <!-- Pupil -->
+  <circle cx="32" cy="32" r="9" fill="#ffffff" fill-opacity="0.86"/>
+</svg>
