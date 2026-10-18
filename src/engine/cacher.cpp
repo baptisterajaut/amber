@@ -624,7 +624,9 @@ bool Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
     retrieve_lock_.lock();
     queue_.lock();
     retrieved_frame = nullptr;
-    int64_t target_pts = clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)));
+    // Audio clips keep the bare clip-time pts: their queue holds decode buffers, not frames to serve
+    int64_t target_pts =
+        (clip->track() < 0) ? videoTargetPts() : seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
     for (int i=0;i<queue_.size();i++) {
 
       if (queue_.at(i)->pts == target_pts) {
