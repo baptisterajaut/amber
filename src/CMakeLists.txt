@@ -521,11 +521,23 @@ if(AMBER_TARGET_WINDOWS AND OPENCOLORIO_FOUND)
   target_link_libraries(${AMBER_TARGET} PRIVATE OpenColorIO)
 endif()
 
-# Link-time optimization for Release builds (recovers overhead from function decomposition)
+# Link-time optimization for Release builds (recovers overhead from function decomposition). On amber-engine too:
+# its objects make up most of the executable, and LTO across the whole program saves ~360 KiB.
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
 if(ipo_supported)
-  set_property(TARGET ${AMBER_TARGET} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  set_property(TARGET ${AMBER_TARGET} amber-engine PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+endif()
+
+# Binary size: Release builds everything at -Os except the per-frame / per-sample hot paths below, which keep -O3
+# (at -O2 or -Os the audio DSP, scopes and CPU text-shadow blur loops run 30-65 % slower). New hot loop: add its file.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(${AMBER_TARGET} PRIVATE $<$<CONFIG:Release>:-Os>)
+  target_compile_options(amber-engine PRIVATE $<$<CONFIG:Release>:-Os>)
+  get_target_property(_amber_hot amber-engine SOURCES)
+  list(APPEND _amber_hot ${UI_SOURCES})
+  list(FILTER _amber_hot INCLUDE REGEX "(^|/)(core/(audiodsp|audio|audiometer|scopes|alpha|blur|curves|gradientramp)|rendering/(audio|audio_ui|renderfunctions|renderthread|exportthread|recordingtap|rhiresourcecache)|engine/(cacher|cacher_video|cacher_audio|clip|sequence)|effects/(effect|transition|keyframe|effectrow|effectfield)|effects/internal/[a-z0-9]+|ui/(viewerwidget|timelinewidget_paint|scopewidget|audiomonitor))\\.cpp$")
+  set_source_files_properties(${_amber_hot} PROPERTIES COMPILE_OPTIONS $<$<CONFIG:Release>:-O3>)
 endif()
 
 # Test suite (only when not cross-compiling)
