@@ -55,5 +55,9 @@
         <file>justify-center.svg</file>
         <file>bold.svg</file>
         <file>listview.svg</file>
+        <file>eye.svg</file>
+        <file>eye-off.svg</file>
+        <file>lock.svg</file>
+        <file>unlock.svg</file>
     </qresource>
 </RCC>

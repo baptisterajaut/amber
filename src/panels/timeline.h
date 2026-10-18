@@ -37,6 +37,8 @@
 #include "ui/timelinetools.h"
 #include "ui/timelinewidget.h"
 
+class TrackHeaderWidget;
+
 enum CreateObjects : uint8_t {
   ADD_OBJ_TITLE,
   ADD_OBJ_SOLID,
@@ -215,6 +217,7 @@ class Timeline : public Panel {
   bool block_repaints{false};
 
   TimelineHeader* headers;
+  TrackHeaderWidget* track_headers;
   QLabel* breadcrumb_label;
   AudioMonitor* audio_monitor;
   ResizableScrollBar* horizontalScrollBar;

@@ -1876,6 +1876,14 @@ int TimelineWidget::getScreenPointFromTrack(int track) {
   return (track < 0) ? seam - point - v : seam + point - v;
 }
 
+QRect TimelineWidget::track_rect(int track) {
+  return QRect(0, getScreenPointFromTrack(track), width(), panel_timeline->GetTrackHeight(track));
+}
+
+int TimelineWidget::track_at(int y) { return getTrackFromScreenPoint(y); }
+
+int TimelineWidget::seam_screen_y() { return panel_timeline->SeamY() - scroll + vertical_offset(); }
+
 int TimelineWidget::getClipIndexFromCoords(long frame, int track) {
   for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
     ClipPtr c = amber::ActiveSequence->clips.at(i);

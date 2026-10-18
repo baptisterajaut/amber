@@ -587,7 +587,7 @@ void Timeline::select_all() {
 }
 
 void Timeline::scroll_to_frame(long frame) {
-  scroll_to_frame_internal(horizontalScrollBar, frame, zoom, timeline_area_widget->width());
+  scroll_to_frame_internal(horizontalScrollBar, frame, zoom, editAreas->width());
 }
 
 void Timeline::scroll_to_track(int track) {

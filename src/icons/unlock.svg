@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Open shackle, swung up and to the right -->
+  <path d="M 36,30 L 36,18 C 36,4 60,4 60,18 L 60,22" fill="none" stroke="#ffffff" stroke-opacity="0.86"
+        stroke-width="7" stroke-linecap="round"/>
+  <!-- Body -->
+  <rect x="4" y="28" width="40" height="30" rx="4" fill="#ffffff" fill-opacity="0.86"/>
+</svg>
