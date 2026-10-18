@@ -743,17 +743,18 @@ double video_start_seconds(const QString& path) {
   return start;
 }
 
-// Index of the frame in frames whose mean red is closest to the RGBA image's, -1 if there is none
+// Index of the frame in frames whose mean red, green and blue is closest to the RGBA image's, -1 if there is none. All
+// three: a coloured frame's red alone saturates.
 int closest_grey_frame(const QVector<QByteArray>& frames, const QByteArray& rgba) {
-  auto mean_red = [](const QByteArray& f) {
+  auto mean_rgb = [](const QByteArray& f) {
     double sum = 0;
-    for (int i = 0; i < f.size(); i += 4) sum += uchar(f[i]);
-    return f.isEmpty() ? 0.0 : sum / (f.size() / 4);
+    for (int i = 0; i < f.size(); i += 4) sum += uchar(f[i]) + uchar(f[i + 1]) + uchar(f[i + 2]);
+    return f.isEmpty() ? 0.0 : sum / (f.size() / 4 * 3);
   };
-  const double target = mean_red(rgba);
+  const double target = mean_rgb(rgba);
   int best = -1;
   for (int i = 0; i < frames.size(); i++) {
-    if (best < 0 || qAbs(mean_red(frames[i]) - target) < qAbs(mean_red(frames[best]) - target)) best = i;
+    if (best < 0 || qAbs(mean_rgb(frames[i]) - target) < qAbs(mean_rgb(frames[best]) - target)) best = i;
   }
   return best;
 }
@@ -1986,7 +1987,8 @@ class TestHeadlessRender : public QObject {
   // base, and its timestamps were compared as the stream's: the export showed each frame twice (half speed), and a
   // clip whose video starts after 0 (MPEG-PS, MPEG-TS) its first frames as whatever the repeated seeks found. The
   // MPEG-PS clip's first seek lands past its first frame and seeks again: yadif kept the frames from before, and the
-  // export opened on one of them.
+  // export opened on one of them. The clip runs to the media's end: yadif lets a frame out once it has the next one,
+  // and held the last one back.
   void interlacedExportKeepsFrames_data() {
     QTest::addColumn<QString>("encoder");
     QTest::addColumn<QString>("file");
@@ -2011,7 +2013,7 @@ class TestHeadlessRender : public QObject {
     {
       QFile f(project);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(fixture(project, video, audio).toUtf8());
+      f.write(fixture(project, video, audio, QString(), kSourceFrames).toUtf8());
     }
     bool succeeded = false;
     auto* lt = new LoadThread(project, false);
@@ -2044,7 +2046,7 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(error.isEmpty(), qPrintable(error));
     const Decoded out = decode_file(params.filename, true);
     QVERIFY(out.ok);
-    QCOMPARE(long(out.video_frames), kClipOut);
+    QCOMPARE(out.video_frames, kSourceFrames);
     QVector<int> matched;
     QVector<int> expected;
     for (int k = 0; k < out.video_frames; k++) {

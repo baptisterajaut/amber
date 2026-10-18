@@ -552,6 +552,12 @@ int Cacher::RetrieveFrameAndProcess(AVFrame** f) {
       // there are no more frames in this file
       if (read_code != AVERROR_EOF) {
         qCritical() << "Failed to read frame." << read_code;
+      } else if (avfilter_graph_get_filter(filter_graph, "yadif") != nullptr) {
+        // yadif lets a frame out once it holds the next one: the last frame waits for the end of the stream. That
+        // closes the graph, which the next seek rebuilds (cacheVideoResetDeinterlacer()).
+        av_buffersrc_add_frame_flags(buffersrc_ctx, nullptr, 0);
+        retrieve_code = av_buffersink_get_frame(buffersink_ctx, *f);
+        if (retrieve_code >= 0) read_code = 0;
       }
       break;
     }
