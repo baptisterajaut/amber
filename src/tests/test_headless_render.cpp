@@ -89,17 +89,8 @@ QByteArray grey_proxy_y4m() {
   return y4m;
 }
 
-// 1 s of a stereo sine (by default 440 Hz at half scale), S16 PCM. With ramp, the amplitude rises linearly from 0 so
-// the signal isn't symmetric in time.
-QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5, bool ramp = false) {
-  const int frames = kAudioRate;
-  QByteArray pcm(frames * 4, Qt::Uninitialized);
-  for (int i = 0; i < frames; i++) {
-    const double a = ramp ? amplitude * i / frames : amplitude;
-    qint16 v = qint16(qRound(32768.0 * a * qSin(2.0 * M_PI * freq * i / kAudioRate)));
-    qToLittleEndian(v, pcm.data() + i * 4);
-    qToLittleEndian(v, pcm.data() + i * 4 + 2);
-  }
+// A WAV file around stereo S16 PCM at kAudioRate
+QByteArray wav_from_pcm(const QByteArray& pcm) {
   QByteArray wav;
   auto u32 = [&wav](quint32 x) {
     char b[4];
@@ -125,6 +116,29 @@ QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5, bool ramp = fal
   u32(pcm.size());
   wav.append(pcm);
   return wav;
+}
+
+// 1 s of a stereo sine (by default 440 Hz at half scale), S16 PCM. With ramp, the amplitude rises linearly from 0 so
+// the signal isn't symmetric in time.
+QByteArray sine_wav(double freq = 440.0, double amplitude = 0.5, bool ramp = false) {
+  const int frames = kAudioRate;
+  QByteArray pcm(frames * 4, Qt::Uninitialized);
+  for (int i = 0; i < frames; i++) {
+    const double a = ramp ? amplitude * i / frames : amplitude;
+    qint16 v = qint16(qRound(32768.0 * a * qSin(2.0 * M_PI * freq * i / kAudioRate)));
+    qToLittleEndian(v, pcm.data() + i * 4);
+    qToLittleEndian(v, pcm.data() + i * 4 + 2);
+  }
+  return wav_from_pcm(pcm);
+}
+
+// Seconds of a constant stereo level, S16 PCM: an envelope applied to it reads back sample by sample
+QByteArray dc_wav(double seconds, double level) {
+  const int frames = int(qRound64(seconds * kAudioRate));
+  QByteArray pcm(frames * 4, Qt::Uninitialized);
+  const qint16 v = qint16(qRound(32768.0 * level));
+  for (int i = 0; i < frames * 2; i++) qToLittleEndian(v, pcm.data() + i * 2);
+  return wav_from_pcm(pcm);
 }
 
 // Same layout Project::save_project() writes: footage 1 (video) and 2 (audio) in folder 1, the open sequence at the
@@ -246,6 +260,34 @@ QString reversed_fixture(const QString& url, const QString& wav) {
 )")
       .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), wav.toHtmlEscaped(), QString::number(kSize),
            QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(kClipOut));
+}
+
+// One WAV clip on A1 over timeline [0, out), at a speed (no pitch correction), optionally reversed
+QString speed_fixture(const QString& url, const QString& wav, long out, double speed, bool reversed) {
+  return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <version>%1</version>
+    <url>%2</url>
+    <folders>
+        <folder id="1" name="Bin" parent="0"/>
+    </folders>
+    <media>
+        <footage id="1" folder="1" name="dc" url="%3"/>
+    </media>
+    <sequences>
+        <sequence id="1" folder="0" name="Speed" width="%4" height="%4" framerate="%5" afreq="%6" alayout="3"
+                  open="1">
+            <clip id="0" enabled="1" name="dc" clipin="0" in="0" out="%7" track="0" r="128" g="192" b="128"
+                  autoscale="1" type="0" media="1" stream="0" speed="%8" maintainpitch="0" reverse="%9">
+                <linked></linked>
+            </clip>
+        </sequence>
+    </sequences>
+</project>
+)")
+      .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), wav.toHtmlEscaped(), QString::number(kSize),
+           QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(out),
+           QString::number(speed, 'f', 3), reversed ? "1" : "0");
 }
 
 // RGBA8 copy of a decoded video frame (BT.601 through swscale's defaults, same for source and output)
@@ -1123,6 +1165,105 @@ class TestHeadlessRender : public QObject {
     qInfo("compressor export: overall peak %.4f, peak over the second half %.4f (%.2f dBFS)", d.audio_peak, tail,
           tail_db);
     QVERIFY2(qAbs(tail_db - -15.0) < 0.5, qPrintable(QString("%1 dBFS").arg(tail_db)));
+  }
+
+  void volumeRampFollowsTimeline_data() {
+    QTest::addColumn<double>("speed");
+    QTest::addColumn<bool>("reversed");
+    QTest::newRow("speed 1") << 1.0 << false;
+    QTest::newRow("speed 2") << 2.0 << false;
+    QTest::newRow("reversed") << 1.0 << true;
+  }
+
+  // A Volume keyframed linearly from 0 at the clip's start to 1 at its end, on a constant level, exports as one
+  // straight ramp over the clip's timeline span whatever the clip's speed or direction: keyframes live in clip-local
+  // timeline time (as for video effects), so each chunk handed to the effect must span its real playback duration
+  void volumeRampFollowsTimeline() {
+    QFETCH(double, speed);
+    QFETCH(bool, reversed);
+    constexpr long kOut = 30;  // 1 s
+    constexpr double kLevel = 0.5;
+    const QString tag = QString("ramp_%1_%2").arg(speed).arg(reversed);
+    const QString wav = dir_.filePath(tag + ".wav");
+    {
+      QFile f(wav);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(dc_wav(3.0, kLevel));  // enough source for 2x
+    }
+    const QString project = dir_.filePath(tag + ".ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(speed_fixture(project, wav, kOut, speed, reversed).toUtf8());
+    }
+
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    QCOMPARE(seq->clips.size(), 1);
+    Clip* clip = seq->clips.at(0).get();
+    QVERIFY(clip->media() != nullptr);
+    QPointer<PreviewGenerator> gen(clip->media()->to_footage()->preview_gen.load());
+    QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+    QCOMPARE(clip->reversed(), reversed);
+    QCOMPARE(clip->speed().value, speed);
+
+    const EffectMeta* meta = get_meta_from_name("Volume");
+    QVERIFY(meta != nullptr);
+    EffectPtr vol = Effect::Create(clip, meta);
+    QVERIFY(vol != nullptr);
+    QVERIFY(vol->row_count() > 0 && vol->row(0)->FieldCount() > 0);
+    EffectRow* row = vol->row(0);
+    row->SetKeyframingInternal(true);
+    EffectField* field = row->Field(0);
+    for (const auto& [time, value] : {std::pair<long, double>{0, 0.0}, {kOut, 1.0}}) {
+      EffectKeyframe k;
+      k.time = time;
+      k.data = value;
+      k.type = EFFECT_KEYFRAME_LINEAR;
+      field->keyframes.append(k);
+    }
+    clip->effects.append(vol);
+
+    ExportParams params{};
+    params.filename = dir_.filePath(tag + "_out.wav");
+    params.video_enabled = false;
+    params.audio_enabled = true;
+    params.audio_codec = AV_CODEC_ID_PCM_S16LE;
+    params.audio_sampling_rate = kAudioRate;
+    params.audio_bitrate = 1536;  // ignored by PCM
+    params.start_frame = 0;
+    params.end_frame = seq->getEndFrame();
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded d = decode_file(params.filename);
+    QVERIFY(d.ok);
+    QVERIFY(d.has_audio);
+
+    // Sample i plays at i / kAudioRate s into the clip: expected kLevel * i / span. A chunk spanning twice its duration
+    // runs the ramp ahead and drops back at the next chunk (a sawtooth). Within half a frame of a keyframe the field
+    // returns the keyframe's own value (GetKeyframeData() rounds the time to a frame), so those plateaus are skipped.
+    const int span = int(qRound64(kOut / kFps * kAudioRate));
+    const int half_frame = int(qRound64(0.5 / kFps * kAudioRate));
+    QVERIFY(d.audio_left.size() >= span);
+    double max_dev = 0;
+    int worst = half_frame;
+    for (int i = half_frame; i < span - half_frame; i++) {
+      const double dev = qAbs(double(d.audio_left[i]) - kLevel * i / span);
+      if (!(dev <= max_dev)) {  // NaN-safe
+        max_dev = dev;
+        worst = i;
+      }
+    }
+    qInfo("volume ramp, speed %.1f%s: max |deviation| %.5f at sample %d (got %.5f, want %.5f)", speed,
+          reversed ? " reversed" : "", max_dev, worst, d.audio_left[worst], kLevel * worst / span);
+    QVERIFY2(max_dev < 0.001, qPrintable(QString("max deviation %1 at sample %2").arg(max_dev).arg(worst)));
   }
 
   // A viewer request (start_render() without pixels or file name, published without the thread's lock) must be rendered

@@ -94,7 +94,9 @@ void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int 
     return;
   }
 
-  double timecode_end = timecode_start + bytes_to_seconds(nb_bytes, frame->ch_layout.nb_channels, frame->sample_rate);
+  // The chunk spans its playback duration in clip-local timeline time: stereo s16 (the filter graph forces it) at the
+  // rate the samples play at, not frame->sample_rate (see below)
+  double timecode_end = timecode_start + bytes_to_seconds(nb_bytes, 2, current_audio_freq());
 
   // The first call (the leaf clip) names the stream for every effect up the nest chain. The rate is the one the
   // samples play at: frame->sample_rate is the source rate before a speed change (24000 at 2x) and 0 for a reversed
