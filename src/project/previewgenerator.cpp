@@ -66,6 +66,24 @@ PreviewGenerator::PreviewGenerator(Media* i) :
   start(QThread::LowPriority);
 }
 
+// The interlacing a stream's field order (container or decoder, after avformat_find_stream_info()) says, -1 when
+// FFmpeg doesn't know (DV, MPEG-4 Part 2...). TB and BT count by their first field: ProRes in MOV and H.264 in MKV
+// flag top-field-first frames TB.
+static int interlacing_from_field_order(AVFieldOrder order) {
+  switch (order) {
+    case AV_FIELD_PROGRESSIVE:
+      return VIDEO_PROGRESSIVE;
+    case AV_FIELD_TT:
+    case AV_FIELD_TB:
+      return VIDEO_TOP_FIELD_FIRST;
+    case AV_FIELD_BB:
+    case AV_FIELD_BT:
+      return VIDEO_BOTTOM_FIELD_FIRST;
+    default:
+      return -1;
+  }
+}
+
 void PreviewGenerator::parse_media() {
   // detect video/audio streams in file
   for (int i=0;i<int(fmt_ctx_->nb_streams);i++) {
@@ -126,9 +144,13 @@ void PreviewGenerator::parse_media() {
         ms.video_width = fmt_ctx_->streams[i]->codecpar->width;
         ms.video_height = fmt_ctx_->streams[i]->codecpar->height;
 
-        // default value, we get the true value later in generate_waveform()
-        ms.video_auto_interlacing = VIDEO_PROGRESSIVE;
-        ms.video_interlacing = VIDEO_PROGRESSIVE;
+        // Known here, without decoding a thumbnail: a cached one (reopened project) keeps it. Unknown: progressive
+        // until the thumbnail decode reads the first frame's flags (process_video_frame())
+        // CBA: an unknown field order under a cached thumbnail still reads progressive (DV); cache the
+        // frame-detected value next to the thumbnail if that matters
+        const int interlacing = interlacing_from_field_order(fmt_ctx_->streams[i]->codecpar->field_order);
+        ms.video_auto_interlacing = (interlacing < 0) ? VIDEO_PROGRESSIVE : interlacing;
+        ms.video_interlacing = ms.video_auto_interlacing;
 
         append = true;
       } else if (fmt_ctx_->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -428,13 +450,20 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
     }
   }
 
-  // is video interlaced?
+  // is video interlaced? Only when the stream's field order didn't say (parse_media())
+  if (interlacing_from_field_order(fmt_ctx_->streams[stream_index]->codecpar->field_order) < 0) {
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
-  s->video_auto_interlacing = (temp_frame->flags & AV_FRAME_FLAG_INTERLACED) ? ((temp_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
+    s->video_auto_interlacing =
+        (temp_frame->flags & AV_FRAME_FLAG_INTERLACED)
+            ? ((temp_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST)
+            : VIDEO_PROGRESSIVE;
 #else
-  s->video_auto_interlacing = temp_frame->interlaced_frame ? (temp_frame->top_field_first ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST) : VIDEO_PROGRESSIVE;
+    s->video_auto_interlacing = temp_frame->interlaced_frame
+                                    ? (temp_frame->top_field_first ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST)
+                                    : VIDEO_PROGRESSIVE;
 #endif
-  s->video_interlacing = s->video_auto_interlacing;
+    s->video_interlacing = s->video_auto_interlacing;
+  }
 
   s->preview_done = true;
 
