@@ -472,6 +472,15 @@ class TestLadspa : public QObject {
     ScopedAppContext app;
     Sequence seq;
     Clip clip(&seq);
+    // ladspa.h: no second activate() without a deactivate() in between. The delay lines have activate() and no
+    // deactivate(), so a restart must re-instantiate; the test plugin counts the violations
+    QLibrary library(QDir(meta->path).filePath(meta->filename));
+    using Violations = int (*)();
+    const auto violations = is_fixture(id) && library.load()
+                                ? reinterpret_cast<Violations>(library.resolve("amber_test_ladspa_violations"))
+                                : nullptr;
+    QVERIFY(violations != nullptr || !is_fixture(id));
+    const int violations_before = violations ? violations() : 0;
     LadspaEffect e(&clip, meta);
     field(&e, "0")->SetValueAt(0, 0.1);
     field(&e, "1")->SetValueAt(0, 1.0);
@@ -489,6 +498,7 @@ class TestLadspa : public QObject {
         QVERIFY(peak(b) > 10000);
       }
     }
+    if (violations) QCOMPARE(violations() - violations_before, 0);
   }
 
   // Two streams processed alternately (two inner clips of a nest) keep their own delay lines
