@@ -108,6 +108,22 @@ void NewSequenceDialog::SetNameEditable(bool enabled)
   sequence_name_label->setVisible(enabled);
 }
 
+void NewSequenceDialog::create_sequence(const QString& name, int width, int height, double frame_rate,
+                                        int audio_frequency) {
+  SequencePtr s = std::make_shared<Sequence>();
+
+  s->name = name;
+  s->width = width;
+  s->height = height;
+  s->frame_rate = frame_rate;
+  s->audio_frequency = audio_frequency;
+  s->audio_layout = AV_CH_LAYOUT_STEREO;
+
+  ComboAction* ca = new ComboAction(tr("Create Sequence"));
+  panel_project->create_sequence_internal(ca, s, true, nullptr);
+  amber::UndoStack.push(ca);
+}
+
 void NewSequenceDialog::accept() {
   double frame_rate = frame_rate_combobox->currentData().toDouble();
   // The constructor matches the existing rate to 2 decimals (23.976024 selects "23.976"): keep it exactly, no re-time
@@ -119,18 +135,8 @@ void NewSequenceDialog::accept() {
 
     // The dialog wasn't given an existing Sequence object, so we'll make a new one
 
-    SequencePtr s = std::make_shared<Sequence>();
-
-    s->name = sequence_name_edit->text();
-    s->width = width_numeric->value();
-    s->height = height_numeric->value();
-    s->frame_rate = frame_rate_combobox->currentData().toDouble();
-    s->audio_frequency = audio_frequency_combobox->currentData().toInt();
-    s->audio_layout = AV_CH_LAYOUT_STEREO;
-
-    ComboAction* ca = new ComboAction(tr("Create Sequence"));
-    panel_project->create_sequence_internal(ca, s, true, nullptr);
-    amber::UndoStack.push(ca);
+    create_sequence(sequence_name_edit->text(), width_numeric->value(), height_numeric->value(),
+                    frame_rate_combobox->currentData().toDouble(), audio_frequency_combobox->currentData().toInt());
 
   } else if (existing_item != nullptr) {
 

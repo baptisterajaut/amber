@@ -584,6 +584,15 @@ struct Config {
   bool show_welcome_dialog{true};
 
   /**
+   * @brief Show the Welcome Screen on startup
+   *
+   * **TRUE** if the Welcome Screen (sequence templates + recent projects) opens on startup when no project is opened.
+   * A key of its own: show_welcome_dialog above is 1.x's "don't show again" for its notice, unused in 2.0 but still
+   * saved so 1.x keeps it.
+   */
+  bool show_welcome_screen{true};
+
+  /**
    * @brief Re-open the most recent project on application startup
    *
    * **TRUE** if the most recently opened project should be re-opened automatically when the application starts

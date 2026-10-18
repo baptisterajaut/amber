@@ -410,6 +410,7 @@ class MainWindow : public QMainWindow {
   QMenu* help_menu;
   QAction* action_search_;
   QAction* debug_log_;
+  QAction* welcome_screen_;
   QAction* about_action_;
 
   // used to store the panel state when one panel is maximized

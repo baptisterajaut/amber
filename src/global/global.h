@@ -198,12 +198,24 @@ class AmberGlobal : public QObject {
   void new_project();
 
   /**
+   * @brief File > New without its "Project Already Empty" box
+   *
+   * An empty, unmodified project is kept as is; otherwise can_close_project() asks to save, then the project is
+   * cleared.
+   *
+   * @return **TRUE** if the project is now empty, **FALSE** if the user cancelled the save prompt.
+   */
+  bool start_new_project();
+
+  /**
    * @brief Open a project from file.
    *
    * Confirms whether the current project can be closed, and if so, shows an open file dialog to allow the user to
    * select a project file and then triggers a project load with it.
+   *
+   * @return **TRUE** if a load was started, **FALSE** if the user cancelled the file dialog or the save prompt.
    */
-  void OpenProject();
+  bool OpenProject();
 
   /**
    * @brief Import project from file
@@ -224,8 +236,10 @@ class AmberGlobal : public QObject {
    * @param index
    *
    * Index in the list of the project file to load
+   *
+   * @return **TRUE** if a load was started, **FALSE** if the file is missing or the user cancelled the save prompt.
    */
-  void open_recent(int index);
+  bool open_recent(int index);
 
   /**
    * @brief Shows a save file dialog and saves the project as the resulting filename
@@ -274,6 +288,11 @@ class AmberGlobal : public QObject {
    * @brief Open the About Amber dialog.
    */
   void open_about_dialog();
+
+  /**
+   * @brief Open the Welcome Screen (Help menu, and startup when no project opens).
+   */
+  void open_welcome_dialog();
 
   /**
    * @brief Open the Debug Log window.

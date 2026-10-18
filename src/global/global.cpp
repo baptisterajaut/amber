@@ -39,6 +39,7 @@
 #include "dialogs/loaddialog.h"
 #include "dialogs/preferencesdialog.h"
 #include "dialogs/speeddialog.h"
+#include "dialogs/welcomedialog.h"
 #include "effects/effectloaders.h"
 #include "engine/sequence.h"
 #include "engine/undo/undostack.h"
@@ -317,19 +318,27 @@ void AmberGlobal::new_project() {
                                  .arg(shortcut));
     return;
   }
-  if (can_close_project()) {
-    ClearProject();
-  }
+  start_new_project();
 }
 
-void AmberGlobal::OpenProject() {
+bool AmberGlobal::start_new_project() {
+  // An empty saved project still gets cleared, so the new work doesn't save over its file
+  if (amber::project_model.childCount() == 0 && !is_modified() && amber::ActiveProjectFilename.isEmpty()) return true;
+  if (!can_close_project()) return false;
+  ClearProject();
+  return true;
+}
+
+bool AmberGlobal::OpenProject() {
   QString fn = QFileDialog::getOpenFileName(amber::MainWindow, tr("Open Project..."), "", project_file_filter);
   if (!fn.isEmpty() && can_close_project()) {
     OpenProjectWorker(fn, false);
+    return true;
   }
+  return false;
 }
 
-void AmberGlobal::open_recent(int index) {
+bool AmberGlobal::open_recent(int index) {
   QString recent_url = amber::project_io->recentProjects().at(index);
   if (!QFile::exists(recent_url)) {
     if (QMessageBox::question(
@@ -342,7 +351,9 @@ void AmberGlobal::open_recent(int index) {
     }
   } else if (can_close_project()) {
     OpenProjectWorker(recent_url, false);
+    return true;
   }
+  return false;
 }
 
 bool AmberGlobal::save_project_as() {
@@ -432,6 +443,9 @@ void AmberGlobal::finished_initialize() {
 
     enable_load_project_on_init = false;
 
+  } else if (amber::CurrentConfig.show_welcome_screen && !autorecovery_loaded_) {
+    // Carries the pre-alpha banner in release builds, so no DemoNotice on top of it
+    open_welcome_dialog();
   } else {
     // 2.0 preview: always show the pre-alpha notice on launch (release builds only)
 #ifndef QT_DEBUG
@@ -534,6 +548,12 @@ void AmberGlobal::paste_insert() {
 void AmberGlobal::open_about_dialog() {
   AboutDialog a(amber::MainWindow);
   a.exec();
+}
+
+void AmberGlobal::open_welcome_dialog() {
+  WelcomeDialog* d = new WelcomeDialog(amber::MainWindow);
+  connect(d, &QDialog::finished, d, &QObject::deleteLater);
+  d->open();
 }
 
 void AmberGlobal::open_debug_log() {
