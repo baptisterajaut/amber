@@ -45,6 +45,7 @@ extern "C" {
 #include "project/media.h"
 #include "project/previewgenerator.h"
 #include "project/projectmodel.h"
+#include "rendering/encoderoptions.h"
 #include "rendering/exportthread.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
@@ -1773,6 +1774,10 @@ class TestHeadlessRender : public QObject {
     QFETCH(double, mbps);
     if (avcodec_find_encoder_by_name(encoder.toUtf8().constData()) == nullptr) QSKIP("encoder not in this build");
     if (avcodec_find_decoder(AVCodecID(codec)) == nullptr) QSKIP("no decoder for this codec");
+    amber::EncoderInfo info;
+    QVERIFY(amber::find_encoder_info(encoder, &info));
+    // libx265 before FFmpeg 8.1 (no x265-stats), libsvtav1 before FFmpeg 8.1 or built against SVT-AV1 < 2.0
+    if (!amber::two_pass_works(info)) QSKIP("no two-pass with this encoder in this FFmpeg build (encoderoptions.cpp)");
     constexpr long kFrames = 60;
     SequencePtr seq;
     load_noise_project("twopass_" + encoder, kFrames, &seq);

@@ -2,13 +2,18 @@
 
 extern "C" {
 #include <libavformat/avformat.h>
+#include <libavutil/frame.h>
 #include <libavutil/opt.h>
 #include <libswscale/swscale.h>
 }
 
 #include <QCoreApplication>
+#include <QDebug>
+#include <QHash>
+#include <QMutex>
 #include <climits>
 #include <cmath>
+#include <cstring>
 
 namespace amber {
 
@@ -65,7 +70,8 @@ QVector<EncoderInfo> build_table() {
   x264.quality_default = 36;
   x264.supports_average_bitrate = true;
   // Two-pass, FFmpeg n9.0 libx264.c:1119-1121: PASS1 sets x264's b_stat_write, PASS2 b_stat_read, through the stats
-  // file of the "stats" option (libx264.c:1545; x264's default name is in the working directory)
+  // file of the "stats" option (libx264.c:1545; x264's default name is in the working directory). The same code and
+  // option back to n3.4 (libx264.c:502-504, 954).
   x264.supports_two_pass = true;
   x264.two_pass_stats_key = "stats";
   x264.options = {x26x_preset()};
@@ -77,7 +83,9 @@ QVector<EncoderInfo> build_table() {
   x265.name = "libx265";
   x265.codec_id = AV_CODEC_ID_HEVC;
   x265.label = "x265";
-  // libx265.c:552-568: PASS1/PASS2 become x265's pass=1/2, the stats file comes from -x265-stats (libx265.c:1050)
+  // libx265.c:552-568: PASS1/PASS2 become x265's pass=1/2, the stats file comes from -x265-stats (libx265.c:1050).
+  // Both came in one commit (d25d133df3, first released in FFmpeg 8.1; n8.0 and older ignore the flags), so the
+  // stats option check of validate_encoder_info() is exact.
   x265.two_pass_stats_key = "x265-stats";
   t.append(x265);
 
@@ -97,8 +105,13 @@ QVector<EncoderInfo> build_table() {
   svt.quality_default = 35;
   svt.supports_average_bitrate = true;
   // libsvtav1.c:366-401: PASS2 decodes stats_in into rc_stats_buffer, PASS1 sets pass=1; 677-710: stats_out once, on
-  // the end-of-stream packet (SVT-AV1 2.0+)
+  // the end-of-stream packet. Since FFmpeg 8.1: commit 5ba2525c7a, on libavcodec 62.23.103 without a bump, so the
+  // next version; n8.0 (62.11.100) and older ignore the flags and pass 1 is a plain encode without stats (FFmpeg 6.1
+  // and SVT-AV1 1.7: 0 bytes). The stats_out code is under SVT_AV1_CHECK_VERSION(2, 0, 0) (n8.1:659, n9.0:677), and
+  // configure takes SVT-AV1 >= 0.9.0: built against 0.9-1.x, FFmpeg takes PASS1 and writes nothing, hence the probe.
   svt.supports_two_pass = true;
+  svt.two_pass_min_avcodec = AV_VERSION_INT(62, 23, 104);
+  svt.two_pass_probe = true;
   svt.options = {int_option("preset", tr("Speed preset:"),
                             tr("0 = slowest, smallest file\n13 = fastest\nDefault lets SVT-AV1 choose"), 0, 13,
                             QString(), tr("Default"))};
@@ -140,7 +153,7 @@ QVector<EncoderInfo> build_table() {
   aom.quality_default = 32;
   aom.supports_average_bitrate = true;
   // libaomenc.c:840-845 and 921-945: PASS1/PASS2 select the first/last pass, PASS2 decodes stats_in; 1387-1397:
-  // stats_out at the drain
+  // stats_out at the drain. Unconditional since the wrapper came in n4.0 (libaomenc.c:325-328, 394-421, 639-648).
   aom.supports_two_pass = true;
   aom.options = {int_option("cpu-used", tr("Speed:"), tr("0 = slowest, smallest file\n8 = fastest"), 0, 8, "1")};
   t.append(aom);
@@ -149,7 +162,8 @@ QVector<EncoderInfo> build_table() {
   // Constant quality needs bit_rate 0 (the -b:v 0 of FFmpeg's VP9 guide, which recommends CRF 31 for 1080p):
   // libvpxenc.c:1104-1111 picks VPX_Q for crf >= 0 without a bitrate, VPX_CQ (crf as a floor under a bitrate)
   // with one. The encoder's codec defaults set b=0 (libvpxenc.c:2097). Two-pass: libvpxenc.c:1097-1100 and
-  // 1189-1213 (PASS2 decodes stats_in), 1964-1974 (stats_out at the drain).
+  // 1189-1213 (PASS2 decodes stats_in), 1964-1974 (stats_out at the drain); unconditional back to n3.4
+  // (libvpxenc.c:502-505, 604-631, 1055-1059).
   EncoderInfo vp9;
   vp9.name = "libvpx-vp9";
   vp9.codec_id = AV_CODEC_ID_VP9;
@@ -271,7 +285,67 @@ EncoderInfo validate_encoder_info(const EncoderInfo& raw, const AVCodec* codec) 
     const AVOption* o = find_codec_option(codec, v.two_pass_stats_key);
     if (o == nullptr || o->type != AV_OPT_TYPE_STRING) v.supports_two_pass = false;
   }
+  // The libavcodec running, not the headers built against: a newer or older one of the same major can be loaded
+  if (avcodec_version() < v.two_pass_min_avcodec) v.supports_two_pass = false;
   return v;
+}
+
+bool pass1_writes_stats(const QString& name) {
+  const AVCodec* codec = avcodec_find_encoder_by_name(name.toUtf8().constData());
+  if (codec == nullptr) return false;
+  AVCodecContext* ctx = avcodec_alloc_context3(codec);
+  AVFrame* frame = av_frame_alloc();
+  AVPacket* packet = av_packet_alloc();
+  bool stats = false;
+  if (ctx != nullptr && frame != nullptr && packet != nullptr) {
+    // 64x64: SVT-AV1 before 3.0 refuses smaller frames (libsvtav1.c n9.0:219-234)
+    ctx->width = 64;
+    ctx->height = 64;
+    ctx->pix_fmt = AV_PIX_FMT_YUV420P;
+    ctx->time_base = {1, 25};
+    ctx->framerate = {25, 1};
+    ctx->bit_rate = 200000;  // average bitrate, as a two-pass export
+    ctx->flags |= AV_CODEC_FLAG_PASS1;
+    frame->format = ctx->pix_fmt;
+    frame->width = ctx->width;
+    frame->height = ctx->height;
+    if (avcodec_open2(ctx, codec, nullptr) >= 0 && av_frame_get_buffer(frame, 0) >= 0) {
+      for (int plane = 0; plane < 3; plane++)
+        memset(frame->data[plane], 128, frame->linesize[plane] * (plane ? 32 : 64));
+      frame->pts = 0;
+      // One frame, then the drain; stats_out read after every packet and at EOF, as ExportThread::Encode() does
+      for (AVFrame* in : {frame, static_cast<AVFrame*>(nullptr)}) {
+        if (avcodec_send_frame(ctx, in) < 0) break;
+        int ret = 0;
+        while (ret >= 0) {
+          ret = avcodec_receive_packet(ctx, packet);
+          if ((ret >= 0 || ret == AVERROR_EOF) && ctx->stats_out != nullptr && ctx->stats_out[0] != '\0') stats = true;
+          av_packet_unref(packet);
+        }
+        if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) break;
+      }
+    }
+  }
+  av_packet_free(&packet);
+  av_frame_free(&frame);
+  avcodec_free_context(&ctx);
+  return stats;
+}
+
+bool two_pass_works(const EncoderInfo& info) {
+  if (!info.supports_two_pass) return false;
+  if (!info.two_pass_probe) return true;
+  // CBA: the export dialog runs the first probe on the GUI thread (~250 ms once, SVT-AV1 4.2); a QtConcurrent run
+  // with the checkbox shown when it ends if that ever shows
+  static QMutex mutex;
+  static QHash<QString, bool> results;
+  QMutexLocker lock(&mutex);  // held during the probe: a second caller waits for its result
+  auto it = results.constFind(info.name);
+  if (it == results.constEnd()) {
+    it = results.insert(info.name, pass1_writes_stats(info.name));
+    qInfo() << "Two-pass:" << info.name << (it.value() ? "writes" : "does not write") << "pass-1 statistics";
+  }
+  return it.value();
 }
 
 bool find_encoder_info(const QString& name, EncoderInfo* out) {
