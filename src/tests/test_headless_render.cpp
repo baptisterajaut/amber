@@ -884,7 +884,7 @@ class TestHeadlessRender : public QObject {
     return QTest::qWaitFor([&finished]() { return finished; }, 120000);
   }
 
-  // A render queue row of seq into path, as ExportDialog::queue_export() queues it: the batch base settings at seq's
+  // A render queue row of seq into path, as ExportDialog::QueueExport() queues it: the batch base settings at seq's
   // size, the whole sequence
   static amber::QueuedJob queue_job(const SequencePtr& seq, const QString& path) {
     amber::QueuedJob job;
