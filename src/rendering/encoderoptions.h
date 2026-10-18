@@ -92,7 +92,8 @@ bool pass1_writes_stats(const QString& name);
 
 // A hardware descriptor's hw_sw_formats that encode on the default device, in the descriptor's order; empty for a
 // software encoder, an encoder that isn't installed, or without a usable device. Each format is a test encode (one
-// frame through a hw_frames_ctx, hardware_encode_test()), run at most once per process and encoder. Thread-safe.
+// frame through a hw_frames_ctx), run at most once per process and encoder: the first call probes every installed
+// table encoder of the same device type on one device. Thread-safe.
 QVector<int> hardware_encoder_formats(const EncoderInfo& info);
 // A hardware descriptor whose encoder works here: hardware_encoder_formats() isn't empty
 bool hardware_encoder_works(const EncoderInfo& info);

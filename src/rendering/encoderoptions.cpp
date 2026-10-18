@@ -402,23 +402,17 @@ AVPixelFormat hardware_frame_format(AVHWDeviceType type) {
   return type == AV_HWDEVICE_TYPE_VAAPI ? AV_PIX_FMT_VAAPI : AV_PIX_FMT_NONE;
 }
 
-bool hardware_encode_test(const QString& name, AVHWDeviceType type, int sw_format, const char* device) {
-  const AVCodec* codec = avcodec_find_encoder_by_name(name.toUtf8().constData());
-  const AVPixelFormat hw_format = hardware_frame_format(type);
-  if (codec == nullptr || hw_format == AV_PIX_FMT_NONE) return false;
+namespace {
+
+// codec opens on device_ref with a 256x256 hw_frames_ctx of sw_format and encodes one uploaded frame into a packet
+bool encode_test_on_device(AVBufferRef* device_ref, const AVCodec* codec, AVPixelFormat hw_format, int sw_format) {
   constexpr int kSize = 256;
-  AVBufferRef* device_ref = nullptr;
-  AVBufferRef* frames_ref = nullptr;
+  AVBufferRef* frames_ref = av_hwframe_ctx_alloc(device_ref);
   AVCodecContext* ctx = nullptr;
   AVFrame* sw_frame = av_frame_alloc();
   AVFrame* hw_frame = av_frame_alloc();
   AVPacket* packet = av_packet_alloc();
-  bool ok = sw_frame != nullptr && hw_frame != nullptr && packet != nullptr &&
-            av_hwdevice_ctx_create(&device_ref, type, device, nullptr, 0) >= 0;
-  if (ok) {
-    frames_ref = av_hwframe_ctx_alloc(device_ref);
-    ok = frames_ref != nullptr;
-  }
+  bool ok = frames_ref != nullptr && sw_frame != nullptr && hw_frame != nullptr && packet != nullptr;
   if (ok) {
     auto* frames = reinterpret_cast<AVHWFramesContext*>(frames_ref->data);
     frames->format = hw_format;
@@ -473,8 +467,36 @@ bool hardware_encode_test(const QString& name, AVHWDeviceType type, int sw_forma
   av_frame_free(&sw_frame);
   avcodec_free_context(&ctx);
   av_buffer_unref(&frames_ref);
-  av_buffer_unref(&device_ref);
   return got_packet;
+}
+
+// info's hw_sw_formats that encode on device_ref (null: none), NV12 first: when the first fails nothing else is tried
+QVector<int> probe_formats(AVBufferRef* device_ref, const EncoderInfo& info) {
+  const AVCodec* codec = avcodec_find_encoder_by_name(info.name.toUtf8().constData());
+  const AVPixelFormat hw_format = hardware_frame_format(info.hw_device_type);
+  QVector<int> formats;
+  if (device_ref == nullptr || codec == nullptr || hw_format == AV_PIX_FMT_NONE) return formats;
+  for (int f : info.hw_sw_formats) {
+    if (encode_test_on_device(device_ref, codec, hw_format, f)) {
+      formats.append(f);
+    } else if (formats.isEmpty()) {
+      break;
+    }
+  }
+  return formats;
+}
+
+}  // namespace
+
+bool hardware_encode_test(const QString& name, AVHWDeviceType type, int sw_format, const char* device) {
+  const AVCodec* codec = avcodec_find_encoder_by_name(name.toUtf8().constData());
+  const AVPixelFormat hw_format = hardware_frame_format(type);
+  if (codec == nullptr || hw_format == AV_PIX_FMT_NONE) return false;
+  AVBufferRef* device_ref = nullptr;
+  if (av_hwdevice_ctx_create(&device_ref, type, device, nullptr, 0) < 0) return false;
+  const bool ok = encode_test_on_device(device_ref, codec, hw_format, sw_format);
+  av_buffer_unref(&device_ref);
+  return ok;
 }
 
 QVector<int> hardware_encoder_formats(const EncoderInfo& info) {
@@ -485,25 +507,32 @@ QVector<int> hardware_encoder_formats(const EncoderInfo& info) {
   static QHash<QString, QVector<int>> results;
   QMutexLocker lock(&mutex);  // held during the probe: a second caller waits for its result
   auto it = results.constFind(info.name);
-  if (it == results.constEnd()) {
-    QElapsedTimer timer;
-    timer.start();
-    QVector<int> formats;
-    QStringList names;
-    for (int f : info.hw_sw_formats) {
-      if (!hardware_encode_test(info.name, info.hw_device_type, f)) {
-        if (formats.isEmpty()) break;  // the first format failing (no device, no profile): don't try the others
-        continue;
-      }
-      formats.append(f);
-      names.append(QString::fromUtf8(av_get_pix_fmt_name(static_cast<AVPixelFormat>(f))));
+  if (it != results.constEnd()) return it.value();
+
+  // Creating the device is most of the cost (radeonsi: ~95 ms the first time in a process, ~20 ms after, against
+  // ~1 ms to open an encoder): one device for every installed encoder of this type, all cached at once
+  QElapsedTimer timer;
+  timer.start();
+  AVBufferRef* device_ref = nullptr;
+  if (av_hwdevice_ctx_create(&device_ref, info.hw_device_type, nullptr, nullptr, 0) < 0) device_ref = nullptr;
+  QVector<EncoderInfo> probed = {info};
+  for (const EncoderInfo& e : encoder_table()) {
+    if (e.hw_device_type == info.hw_device_type && e.name != info.name && !results.contains(e.name) &&
+        avcodec_find_encoder_by_name(e.name.toUtf8().constData()) != nullptr) {
+      probed.append(e);
     }
-    it = results.insert(info.name, formats);
-    qInfo().noquote() << "Hardware encoder:" << info.name
-                      << (formats.isEmpty() ? QStringLiteral("unavailable") : "encodes " + names.join(", "))
-                      << QString("(probe %1 ms)").arg(timer.elapsed());
   }
-  return it.value();
+  QStringList summary;
+  for (const EncoderInfo& e : probed) {
+    const QVector<int> formats = probe_formats(device_ref, e);
+    results.insert(e.name, formats);
+    QStringList names;
+    for (int f : formats) names.append(QString::fromUtf8(av_get_pix_fmt_name(static_cast<AVPixelFormat>(f))));
+    summary.append(e.name + ": " + (formats.isEmpty() ? QStringLiteral("unavailable") : names.join(", ")));
+  }
+  av_buffer_unref(&device_ref);
+  qInfo().noquote() << "Hardware encoders:" << summary.join("; ") << QString("(probe %1 ms)").arg(timer.elapsed());
+  return results.value(info.name);
 }
 
 bool hardware_encoder_works(const EncoderInfo& info) { return !hardware_encoder_formats(info).isEmpty(); }
