@@ -1119,7 +1119,8 @@ EffectPtr Effect::copy(Clip* c) {
   return copy;
 }
 
-void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData, QSize renderSize) {
+void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData, QSize renderSize,
+                            float renderScale) {
   if (uboData.size() < fragUboSize_) uboData.resize(fragUboSize_);
 
   // Use actual FBO/render size for resolution uniforms (shaders that use gl_FragCoord need this
@@ -1134,6 +1135,12 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QB
     if (entry.name == QLatin1String("lutSize")) {
       float v = float(lutSize_);
       memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("render_scale")) {
+      // CBA: only the 2.0 pixel-unit shaders read it (Gaussian Blur, Sharpen, Find Edges, Glow, Denoise, Privacy
+      // Mask, Alpha Mask); the Olive ones (Box/Directional/Radial Blur, Chromatic Aberration, Emboss, Bulge, Swirl,
+      // Cross Stitch) still work in render pixels and look wider at a preview divider. Upgrade: declare
+      // `float render_scale;` in their FragParams and multiply their pixel distances by it
+      memcpy(uboData.data() + entry.offset, &renderScale, 4);
     } else if (entry.name == QLatin1String("mask_size")) {
       // The loaded mask's pixel size, (0, 0) with none: process_effect runs process_mask before the passes
       float v[2] = {float(maskSize_.width()), float(maskSize_.height())};

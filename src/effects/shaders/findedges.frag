@@ -5,6 +5,7 @@ layout(std140, binding = 1) uniform FragParams {
     float strength;
     int mode;
     bool invert;
+    float render_scale;  // auto: taps one sequence pixel apart, closer on a smaller render target (preview divider)
 };
 layout(binding = 2) uniform sampler2D myTexture;
 layout(location = 0) in vec2 vTexCoord;
@@ -12,7 +13,7 @@ layout(location = 0) out vec4 fragColor;
 
 // input is premultiplied: the edges are found on the straight colour of each tap
 vec3 tap(vec2 offset) {
-	vec4 c = texture(myTexture, vTexCoord + offset / resolution);
+	vec4 c = texture(myTexture, vTexCoord + offset * render_scale / resolution);
 	return c.a > 0.0 ? c.rgb / c.a : vec3(0.0);
 }
 

@@ -8,6 +8,7 @@ layout(std140, binding = 1) uniform FragParams {
     float intensity;
     int blend_mode;
     int iteration;
+    float render_scale;  // auto: radius is in sequence pixels, the render target may be smaller (preview divider)
 };
 layout(binding = 2) uniform sampler2D image;
 layout(binding = 3) uniform sampler2D originalTexture;
@@ -28,10 +29,10 @@ float gaussian(float x, float sigma) {
 }
 
 void main(void) {
-	// radius in render-target pixels, sampled via gl_FragCoord like gaussianblur.frag
-	// CBA: like Gaussian Blur the halo looks wider at reduced preview resolution, scale by the preview divider if it matters
-	float sigma = radius / 3.0;
-	float rad = ceil(radius);
+	// radius in sequence pixels, converted to render-target pixels, sampled via gl_FragCoord like gaussianblur.frag
+	float r = radius * render_scale;
+	float sigma = r / 3.0;
+	float rad = ceil(r);
 
 	if (iteration == 0) {
 		if (rad == 0.0) {

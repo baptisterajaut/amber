@@ -236,6 +236,9 @@ class TestEffectsGpu : public QObject {
   void alphaMaskFillCropsSides();
   void alphaMaskHugeHeaderRejected();
 
+  // Pixel-unit shaders at a preview divider (render_scale auto uniform).
+  void pixelUnitShadersFollowPreviewDivider();
+
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
   void yuvDecodeNV12();
@@ -4375,6 +4378,77 @@ void TestEffectsGpu::alphaMaskHugeHeaderRejected() {
 // All other slots use generator clips (RGBA-direct, bypass YUV). This slot
 // loads a committed 1-frame H.264 yuv420p MP4 containing an 8x8 checkerboard,
 // decodes it via the Cacher, and asserts the readback recovers the pattern.
+void TestEffectsGpu::pixelUnitShadersFollowPreviewDivider() {
+  // At preview 1/2 the clip textures are half size: a distance in pixels (blur sigma, sharpen radius, tap spacing,
+  // feather) must cover the same share of the frame as in the export, so the half-resolution render matches a 2 x 2
+  // box downsample of the full one. Without render_scale the half render spreads every distance twice as far.
+  QTemporaryDir dir;
+  const QString mask = save_mask(dir, "m.png", split_mask(32, 32, QColor(Qt::white), QColor(0, 0, 0, 0)));
+  QVERIFY(!mask.isEmpty());
+  struct Case {
+    const char* effect;
+    std::function<void(Effect*)> configure;
+  };
+  const Case cases[] = {
+      {"Gaussian Blur", [this](Effect* e) { h_->set_field_double(e, 0, 0, 4.0); }},  // sigma
+      {"Sharpen", [this](Effect* e) { h_->set_field_double(e, 1, 0, 4.0); }},        // radius
+      {"Find Edges", [this](Effect* e) { h_->set_field_double(e, 0, 0, 20.0); }},    // strength, unclamped edges
+      {"Glow",
+       [this](Effect* e) {
+         h_->set_field_double(e, 0, 0, 30.0);  // threshold
+         h_->set_field_double(e, 1, 0, 8.0);   // radius
+       }},
+      {"Privacy Mask",
+       [this](Effect* e) {
+         h_->set_field_double(e, 1, 0, 100.0);  // radius: the whole frame
+         h_->set_field_double(e, 2, 0, 0.0);    // softness
+         h_->set_field_bool(e, 4, 0, false);    // blur mode
+       }},
+      {"Alpha Mask", [this](Effect* e) { h_->set_field_double(e, 5, 0, 8.0); }},  // feather
+  };
+  for (const Case& cs : cases) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    EffectPtr fx;
+    if (QLatin1String(cs.effect) == QLatin1String("Alpha Mask")) {
+      Effect* e = add_masked_white(h_.get(), seq.get(), mask);
+      cs.configure(e);
+    } else {
+      // Grey/black checkerboard, 16 px cells (aligned on the 2 x 2 downsample)
+      Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+      Effect* solid = c->effects[1].get();
+      h_->set_field_combo(solid, 0, 0, 2);  // Type = SOLID_TYPE_CHECKERBOARD
+      h_->set_field_color(solid, 2, 0, QColor(160, 160, 160));
+      h_->set_field_double(solid, 3, 0, 16.0);
+      fx = h_->attach_xml_shader(c, cs.effect);
+      QVERIFY2(fx != nullptr, cs.effect);
+      cs.configure(fx.get());
+    }
+    const QByteArray full = h_->render_frame(seq.get(), 0);
+    const QByteArray half = h_->render_frame(seq.get(), 0, 2);
+    QCOMPARE(full.size(), 64 * 64 * 4);
+    QCOMPARE(half.size(), 32 * 32 * 4);
+    int total = 0;
+    int worst = 0;
+    for (int y = 0; y < 32; y++) {
+      for (int x = 0; x < 32; x++) {
+        const int down = (pixel_at(full, 64, 2 * x, 2 * y).r + pixel_at(full, 64, 2 * x + 1, 2 * y).r +
+                          pixel_at(full, 64, 2 * x, 2 * y + 1).r + pixel_at(full, 64, 2 * x + 1, 2 * y + 1).r + 2) /
+                         4;
+        const int d = qAbs(pixel_at(half, 32, x, y).r - down);
+        total += d;
+        worst = qMax(worst, d);
+      }
+    }
+    // Measured: 10 to 25 mean without render_scale, under 2 with it (worst taps on the edges, where the
+    // downsample itself is lossy)
+    const double mean = total / 1024.0;
+    QVERIFY2(mean <= 3.0, qPrintable(QString("%1 at 1/2: mean diff %2 (worst %3) against the downsampled full render")
+                                         .arg(cs.effect)
+                                         .arg(mean, 0, 'f', 2)
+                                         .arg(worst)));
+  }
+}
+
 void TestEffectsGpu::yuvDecodeRoundtrip() {
   if (!avcodec_find_decoder(AV_CODEC_ID_H264)) {
     QSKIP("H.264 decoder unavailable in this build of libavcodec");

@@ -12,6 +12,7 @@ layout(std140, binding = 1) uniform FragParams {
   float feather;
   bool invert;
   float opacity;
+  float render_scale;  // auto: render pixels per sequence pixel (below 1 at a preview divider)
 };
 layout(binding = 2) uniform sampler2D myTexture;
 layout(binding = 3) uniform sampler2D maskTex;
@@ -47,10 +48,10 @@ void main(void) {
   vec2 rect = maskRect();
   float m = maskAt(vTexCoord, rect);
   if (feather > 0.0) {
-    // 24-tap golden-angle disk of radius `feather` clip px, one tap at the centre
+    // 24-tap golden-angle disk of radius `feather` sequence px (render_scale render px), one tap at the centre
     for (int i = 1; i < 24; i++) {
       float a = float(i) * 2.39996323;
-      vec2 offset = vec2(cos(a), sin(a)) * (feather * sqrt(float(i) / 23.0));
+      vec2 offset = vec2(cos(a), sin(a)) * (feather * render_scale * sqrt(float(i) / 23.0));
       m += maskAt(vTexCoord + offset / resolution, rect);
     }
     m /= 24.0;
