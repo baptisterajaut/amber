@@ -683,7 +683,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="777"/>
         <source>Failed to open &quot;%1&quot; for writing.</source>
-        <translation>Neuspješno otvaranje &quot;%1&quot; za uređivanje.</translation>
+        <translation>Neuspješno otvaranje &quot;%1&quot; za pisanje.</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="785"/>
@@ -800,7 +800,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="356"/>
         <source>Failed to open &quot;%1&quot; for writing.</source>
-        <translation>Neuspješno otvaranje &quot;%1&quot; za uređivanje.</translation>
+        <translation>Neuspješno otvaranje &quot;%1&quot; za pisanje.</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="606"/>
@@ -1018,10 +1018,10 @@
 51 = lowest quality possible</source>
         <translation>Faktor kvalitete:
 
-0 = besprijekorno
-17-18 = oku besprijekorno (komprimirano, ali neprimjetno)
+0 = bez gubitaka
+17-18 = vizuelno bez gubitaka (komprimirano, ali neprimjetno)
 23 = visoka kvaliteta
-51 = najniža kvaliteta moguća</translation>
+51 = najniža moguća kvaliteta</translation>
     </message>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="75"/>
@@ -1329,10 +1329,10 @@ Zadano prepušta izbor rav1e (6)</translation>
 51 = lowest quality possible</source>
         <translation>Faktor kvalitete:
 
-0 = besprijekorno
-17-18 = oku besprijekorno (komprimirano, ali neprimjetno)
+0 = bez gubitaka
+17-18 = vizuelno bez gubitaka (komprimirano, ali neprimjetno)
 23 = visoka kvaliteta
-51 = najniža kvaliteta moguća</translation>
+51 = najniža moguća kvaliteta</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="959"/>

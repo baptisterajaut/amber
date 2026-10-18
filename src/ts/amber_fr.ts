@@ -1028,7 +1028,7 @@
         <location filename="../rendering/encoderoptions.cpp" line="111"/>
         <location filename="../rendering/encoderoptions.cpp" line="163"/>
         <source>Quality-based (Constant Rate Factor)</source>
-        <translation>Qualitatif (Constant Rate Factor)</translation>
+        <translation>Basé sur la qualité (Constant Rate Factor)</translation>
     </message>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="76"/>
@@ -1061,7 +1061,7 @@ Par défaut laisse SVT-AV1 choisir</translation>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="139"/>
         <source>Quality-based (Constant Quantizer)</source>
-        <translation>Qualitatif (Constant Quantizer)</translation>
+        <translation>Basé sur la qualité (Constant Quantizer)</translation>
     </message>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="140"/>
@@ -1100,7 +1100,7 @@ Par défaut laisse rav1e choisir (6)</translation>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="188"/>
         <source>Quality-based (Constant Quality)</source>
-        <translation>Qualitatif (Constant Quality)</translation>
+        <translation>Basé sur la qualité (Constant Quality)</translation>
     </message>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="197"/>
@@ -1125,7 +1125,7 @@ Par défaut laisse rav1e choisir (6)</translation>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="224"/>
         <source>Quality-based (Constant QP)</source>
-        <translation>Qualitatif (Constant QP)</translation>
+        <translation>Basé sur la qualité (Constant QP)</translation>
     </message>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="225"/>
@@ -1235,7 +1235,7 @@ Par défaut laisse rav1e choisir (6)</translation>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="112"/>
         <source>In to Out exports each sequence&apos;s in/out range; a sequence without one exports whole.</source>
-        <translation>L&apos;entrée/sortie exporte la plage entrée/sortie de chaque séquence ; une séquence sans plage est exportée en entier.</translation>
+        <translation>« Du point d&apos;entrée au point de sortie » exporte la plage entrée/sortie de chaque séquence ; une séquence sans plage est exportée en entier.</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="119"/>
@@ -1250,7 +1250,7 @@ Par défaut laisse rav1e choisir (6)</translation>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="125"/>
         <source>Each sequence&apos;s own rate</source>
-        <translation>Propre à chaque séquence</translation>
+        <translation>Cadence propre à chaque séquence</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="539"/>
@@ -1458,7 +1458,7 @@ Par défaut laisse rav1e choisir (6)</translation>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="1150"/>
         <source>Queue</source>
-        <translation>File d&apos;attente</translation>
+        <translation>Mettre en file d&apos;attente</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="1151"/>
@@ -4569,7 +4569,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="887"/>
         <source>Render scrub frames at half the preview resolution so the viewer keeps up; the frame is re-rendered at full preview resolution when you stop.</source>
-        <translation>Rendre les images de défilement à la moitié de la résolution de prévisualisation pour que le lecteur suive ; l&apos;image est rendue à nouveau en pleine résolution de prévisualisation quand vous vous arrêtez.</translation>
+        <translation>Effectuer le rendu des images de défilement à la moitié de la résolution de prévisualisation pour que le lecteur suive ; l&apos;image est rendue à nouveau en pleine résolution de prévisualisation quand vous vous arrêtez.</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="894"/>
@@ -5256,7 +5256,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
     <message>
         <location filename="../dialogs/renderqueuedialog.cpp" line="140"/>
         <source>Render</source>
-        <translation>Rendu</translation>
+        <translation>Lancer le rendu</translation>
     </message>
     <message>
         <location filename="../dialogs/renderqueuedialog.cpp" line="141"/>
@@ -5266,7 +5266,7 @@ Une valeur plus élevée rend la lecture plus fluide mais utilise plus de mémoi
     <message>
         <location filename="../dialogs/renderqueuedialog.cpp" line="142"/>
         <source>Render every row that isn&apos;t done, one after the other</source>
-        <translation>Rendre chaque ligne non terminée, l&apos;une après l&apos;autre</translation>
+        <translation>Effectuer le rendu de chaque ligne non terminée, l&apos;une après l&apos;autre</translation>
     </message>
     <message>
         <location filename="../dialogs/renderqueuedialog.cpp" line="171"/>

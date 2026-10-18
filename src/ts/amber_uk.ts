@@ -1024,10 +1024,10 @@
 17-18 = visually lossless (compressed, but unnoticeable)
 23 = high quality
 51 = lowest quality possible</source>
-        <translation>Коефіцієнт Якості:
+        <translation>Коефіцієнт якості:
 
 0 = без втрат
-17-18 = візульно без втрат (стиснуто, але майже непомітно)
+17-18 = візуально без втрат (стиснуто, але майже непомітно)
 23 = висока якість
 51 = найнижча можлива якість</translation>
     </message>
@@ -1338,10 +1338,10 @@ Default lets rav1e choose (6)</source>
 17-18 = visually lossless (compressed, but unnoticeable)
 23 = high quality
 51 = lowest quality possible</source>
-        <translation>Коефіцієнт Якості:
+        <translation>Коефіцієнт якості:
 
 0 = без втрат
-17-18 = візульно без втрат (стиснуто, але майже непомітно)
+17-18 = візуально без втрат (стиснуто, але майже непомітно)
 23 = висока якість
 51 = найнижча можлива якість</translation>
     </message>

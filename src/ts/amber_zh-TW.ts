@@ -2501,7 +2501,7 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1164"/>
         <source>Render the exports queued from the Export dialog</source>
-        <translation>算繪從匯出對話框加入佇列的匯出工作</translation>
+        <translation>算繪從匯出對話方塊加入佇列的匯出工作</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1165"/>
@@ -6461,7 +6461,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="76"/>
         <source>Reveal %</source>
-        <translation>顯示比例 %</translation>
+        <translation>顯示進度 %</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="82"/>

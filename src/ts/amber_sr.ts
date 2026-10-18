@@ -683,7 +683,7 @@
     <message>
         <location filename="../effects/effect.cpp" line="777"/>
         <source>Failed to open &quot;%1&quot; for writing.</source>
-        <translation>Неуспешно отварање &quot;%1&quot; за уређивање.</translation>
+        <translation>Неуспешно отварање &quot;%1&quot; за уписивање.</translation>
     </message>
     <message>
         <location filename="../effects/effect.cpp" line="785"/>
@@ -800,7 +800,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="356"/>
         <source>Failed to open &quot;%1&quot; for writing.</source>
-        <translation>Неуспешно отварање &quot;%1&quot; за уређивање.</translation>
+        <translation>Неуспешно отварање &quot;%1&quot; за уписивање.</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="606"/>
@@ -1016,12 +1016,12 @@
 17-18 = visually lossless (compressed, but unnoticeable)
 23 = high quality
 51 = lowest quality possible</source>
-        <translation>Фактор квалитете:
+        <translation>Фактор квалитета:
 
-0 = беспрекорно
-17-18 = оку беспрекорно (компримирано, али неприметљиво)
-23 = висока квалитета
-51 = најнижа квалитета могућа</translation>
+0 = без губитака
+17-18 = визуелно без губитака (компримовано, али неприметно)
+23 = висок квалитет
+51 = најнижи могући квалитет</translation>
     </message>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="75"/>
@@ -1327,12 +1327,12 @@ Default lets rav1e choose (6)</source>
 17-18 = visually lossless (compressed, but unnoticeable)
 23 = high quality
 51 = lowest quality possible</source>
-        <translation>Фактор квалитете:
+        <translation>Фактор квалитета:
 
-0 = беспрекорно
-17-18 = оку беспрекорно (компримирано, али неприметљиво)
-23 = висока квалитета
-51 = најнижа квалитета могућа</translation>
+0 = без губитака
+17-18 = визуелно без губитака (компримовано, али неприметно)
+23 = висок квалитет
+51 = најнижи могући квалитет</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="959"/>

@@ -5398,7 +5398,7 @@ Un valor más alto hace la reproducción más fluida pero usa más memoria.</tra
     <message>
         <location filename="../effects/internal/reverbeffect.cpp" line="36"/>
         <source>Width (%)</source>
-        <translation>Amplitud (%)</translation>
+        <translation>Anchura (%)</translation>
     </message>
     <message>
         <location filename="../effects/internal/reverbeffect.cpp" line="41"/>

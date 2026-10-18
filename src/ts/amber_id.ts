@@ -2031,22 +2031,22 @@ Default membiarkan rav1e memilih (6)</translation>
     <message>
         <location filename="../panels/grapheditor.cpp" line="179"/>
         <source>Frame Selected</source>
-        <translation>Bingkai Pilihan</translation>
+        <translation>Paskan ke Pilihan</translation>
     </message>
     <message>
         <location filename="../panels/grapheditor.cpp" line="180"/>
         <source>Frame the selected keys, or all keys when none is selected (F)</source>
-        <translation>Bingkai keyframe yang dipilih, atau semua keyframe jika tidak ada yang dipilih (F)</translation>
+        <translation>Paskan tampilan ke keyframe yang dipilih, atau semua keyframe jika tidak ada yang dipilih (F)</translation>
     </message>
     <message>
         <location filename="../panels/grapheditor.cpp" line="181"/>
         <source>Frame All</source>
-        <translation>Bingkai Semua</translation>
+        <translation>Paskan Semua</translation>
     </message>
     <message>
         <location filename="../panels/grapheditor.cpp" line="182"/>
         <source>Frame all keys (Shift+F)</source>
-        <translation>Bingkai semua keyframe (Shift+F)</translation>
+        <translation>Paskan tampilan ke semua keyframe (Shift+F)</translation>
     </message>
     <message>
         <location filename="../panels/grapheditor.cpp" line="183"/>

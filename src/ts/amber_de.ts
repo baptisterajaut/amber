@@ -433,7 +433,7 @@
     <message>
         <location filename="../ui/curveeditor.cpp" line="48"/>
         <source>Click the curve to add a point and drag points to shape it. Double-click a point, or drag it out of the square, to remove it.</source>
-        <translation>Auf die Kurve klicken, um einen Punkt hinzuzufügen, und Punkte ziehen, um sie zu formen. Einen Punkt doppelklicken oder aus dem Quadrat ziehen, um ihn zu entfernen.</translation>
+        <translation>Auf die Kurve klicken, um einen Punkt hinzuzufügen, und Punkte ziehen, um die Kurve zu formen. Einen Punkt doppelklicken oder aus dem Quadrat ziehen, um ihn zu entfernen.</translation>
     </message>
     <message>
         <location filename="../ui/curveeditor.cpp" line="54"/>
@@ -1025,15 +1025,15 @@
 
 0 = verlustfrei (lossless)
 17-18 = optisch verlustfrei (komprimiert, aber nicht bemerkbar)
-23 = höchste Qualität
-51 = kleinstmögliche Qualität</translation>
+23 = hohe Qualität
+51 = niedrigstmögliche Qualität</translation>
     </message>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="75"/>
         <location filename="../rendering/encoderoptions.cpp" line="111"/>
         <location filename="../rendering/encoderoptions.cpp" line="163"/>
         <source>Quality-based (Constant Rate Factor)</source>
-        <translation>Qualität (Constant Rate Factor)</translation>
+        <translation>Qualitätsbasiert (Constant Rate Factor)</translation>
     </message>
     <message>
         <location filename="../rendering/encoderoptions.cpp" line="76"/>
@@ -1256,7 +1256,7 @@ Standard lässt rav1e wählen (6)</translation>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="125"/>
         <source>Each sequence&apos;s own rate</source>
-        <translation>Eigene Rate jeder Sequenz</translation>
+        <translation>Eigene Bildrate jeder Sequenz</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="539"/>

@@ -188,12 +188,12 @@
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="55"/>
         <source>Release Threshold:</source>
-        <translation>Sürüm Eşik:</translation>
+        <translation>Bırakma Eşiği:</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="60"/>
         <source>Release Time:</source>
-        <translation>Sürüm Tarihi:</translation>
+        <translation>Bırakma Süresi:</translation>
     </message>
     <message>
         <location filename="../dialogs/autocutsilencedialog.cpp" line="67"/>
@@ -785,7 +785,7 @@
     <message>
         <location filename="../panels/effectcontrols.cpp" line="351"/>
         <source>Replace preset &apos;%1&apos;?</source>
-        <translation>&apos;%1&apos; ön ayarı değiştirilsin mi?</translation>
+        <translation>&apos;%1&apos; ön ayarının üzerine yazılsın mı?</translation>
     </message>
     <message>
         <location filename="../panels/effectcontrols.cpp" line="356"/>
@@ -2794,7 +2794,7 @@ Kolay Yumuşatma Girişi: Shift+F9, Kolay Yumuşatma Çıkışı: Ctrl+Shift+F9<
     <message>
         <location filename="../ui/mainwindow.cpp" line="1251"/>
         <source>Scopes</source>
-        <translation>Kapsamlar</translation>
+        <translation>Ölçerler</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1252"/>
@@ -3008,7 +3008,7 @@ Kolay Yumuşatma Girişi: Shift+F9, Kolay Yumuşatma Çıkışı: Ctrl+Shift+F9<
     <message>
         <location filename="../ui/mainwindow.cpp" line="300"/>
         <source>Replace layout &apos;%1&apos;?</source>
-        <translation>&apos;%1&apos; düzeni değiştirilsin mi?</translation>
+        <translation>&apos;%1&apos; düzeninin üzerine yazılsın mı?</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="306"/>
@@ -4558,12 +4558,12 @@ Daha yüksek değerler oynatmayı daha akıcı yapar ancak daha fazla bellek kul
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="878"/>
         <source>Scrubbing</source>
-        <translation>Kaydırma</translation>
+        <translation>Oynatma Kafasını Sürükleme</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="880"/>
         <source>Half Resolution While Scrubbing:</source>
-        <translation>Kaydırırken Yarım Çözünürlük:</translation>
+        <translation>Oynatma Kafası Sürüklenirken Yarım Çözünürlük:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="882"/>
@@ -4583,7 +4583,7 @@ Daha yüksek değerler oynatmayı daha akıcı yapar ancak daha fazla bellek kul
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="887"/>
         <source>Render scrub frames at half the preview resolution so the viewer keeps up; the frame is re-rendered at full preview resolution when you stop.</source>
-        <translation>Görüntüleyicinin yetişebilmesi için kaydırma karelerini önizleme çözünürlüğünün yarısında işle; durduğunuzda kare tam önizleme çözünürlüğünde yeniden işlenir.</translation>
+        <translation>Görüntüleyicinin yetişebilmesi için oynatma kafası sürüklenirken kareleri önizleme çözünürlüğünün yarısında işle; durduğunuzda kare tam önizleme çözünürlüğünde yeniden işlenir.</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="894"/>
@@ -5588,7 +5588,7 @@ Daha yüksek değerler oynatmayı daha akıcı yapar ancak daha fazla bellek kul
     <message>
         <location filename="../panels/scopespanel.cpp" line="77"/>
         <source>Scopes</source>
-        <translation>Kapsamlar</translation>
+        <translation>Ölçerler</translation>
     </message>
     <message>
         <location filename="../panels/scopespanel.cpp" line="78"/>

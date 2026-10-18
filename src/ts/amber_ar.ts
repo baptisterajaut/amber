@@ -388,7 +388,7 @@
     <message>
         <location filename="../effects/internal/compressoreffect.cpp" line="41"/>
         <source>Release (ms)</source>
-        <translation>التحرير (ms)</translation>
+        <translation>الإفراج (ms)</translation>
     </message>
     <message>
         <location filename="../effects/internal/compressoreffect.cpp" line="42"/>
@@ -464,7 +464,7 @@
     <message>
         <location filename="../ui/curveeditor.cpp" line="56"/>
         <source>Luminance curve (keeps the colours&apos; hue)</source>
-        <translation>منحنى السطوع (يحافظ على تدرج الألوان)</translation>
+        <translation>منحنى السطوع (يحافظ على درجة اللون)</translation>
     </message>
     <message>
         <location filename="../ui/curveeditor.cpp" line="56"/>
@@ -2309,7 +2309,7 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
     <message>
         <location filename="../effects/internal/limitereffect.cpp" line="31"/>
         <source>Release (ms)</source>
-        <translation>التحرير (ms)</translation>
+        <translation>الإفراج (ms)</translation>
     </message>
 </context>
 <context>
@@ -2784,7 +2784,7 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1251"/>
         <source>Scopes</source>
-        <translation>المقاييس</translation>
+        <translation>مناظير الفيديو</translation>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="1252"/>
@@ -4550,12 +4550,12 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="878"/>
         <source>Scrubbing</source>
-        <translation>التمرير السريع</translation>
+        <translation>سحب رأس التشغيل</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="880"/>
         <source>Half Resolution While Scrubbing:</source>
-        <translation>نصف الدقة أثناء التمرير السريع:</translation>
+        <translation>نصف الدقة أثناء سحب رأس التشغيل:</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="882"/>
@@ -4575,7 +4575,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="887"/>
         <source>Render scrub frames at half the preview resolution so the viewer keeps up; the frame is re-rendered at full preview resolution when you stop.</source>
-        <translation>معالجة إطارات التمرير السريع بنصف دقة المعاينة كي يواكب العارض؛ ويُعاد معالجة الإطار بدقة المعاينة الكاملة عند التوقف.</translation>
+        <translation>معالجة الإطارات بنصف دقة المعاينة أثناء سحب رأس التشغيل كي يواكب العارض؛ ويُعاد معالجة الإطار بدقة المعاينة الكاملة عند التوقف.</translation>
     </message>
     <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="894"/>
@@ -5563,7 +5563,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../panels/scopespanel.cpp" line="77"/>
         <source>Scopes</source>
-        <translation>المقاييس</translation>
+        <translation>مناظير الفيديو</translation>
     </message>
     <message>
         <location filename="../panels/scopespanel.cpp" line="78"/>

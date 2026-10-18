@@ -6461,7 +6461,7 @@ More makes playback smoother and uses more memory.</source>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="76"/>
         <source>Reveal %</source>
-        <translation>显示比例 %</translation>
+        <translation>显示进度 %</translation>
     </message>
     <message>
         <location filename="../effects/internal/texteffect.cpp" line="82"/>
