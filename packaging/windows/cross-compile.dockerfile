@@ -8,6 +8,7 @@ RUN dnf install -y \
     mingw64-qt6-qttools \
     mingw64-qt6-qtmultimedia \
     mingw64-qt6-qtshadertools \
+    mingw64-qt6-qttranslations \
     qt6-qtbase-devel \
     qt6-qttools-devel \
     qt6-qtshadertools-devel \
@@ -61,7 +62,7 @@ RUN curl -sL -o /tmp/frei0r.zip \
 
 # Collect everything into /out
 RUN SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \
-    mkdir -p /out/platforms /out/imageformats /out/multimedia /out/effects /out/ts && \
+    mkdir -p /out/platforms /out/imageformats /out/multimedia /out/effects /out/ts /out/translations && \
     cp amber-editor.exe /out/ && \
     cp "${SYSROOT}/bin/"*.dll /out/ && \
     cp "${SYSROOT}/lib/qt6/plugins/platforms/qwindows.dll" /out/platforms/ && \
@@ -70,6 +71,7 @@ RUN SYSROOT=/usr/x86_64-w64-mingw32/sys-root/mingw && \
     cp /src/effects/shaders/*.xml /src/effects/shaders/*.frag /src/effects/shaders/*.vert /out/effects/ 2>/dev/null || true && \
     cp -r /tmp/frei0r/frei0r-*/. /out/effects/frei0r-1/ 2>/dev/null || true && \
     cp /src/build/*.qm /out/ts/ 2>/dev/null || true && \
+    cp "${SYSROOT}/share/qt6/translations/qtbase_"*.qm /out/translations/ && \
     mkdir -p /out/exportpresets && \
     cp /src/exportpresets/* /out/exportpresets/ 2>/dev/null || true
 
