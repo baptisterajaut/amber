@@ -139,7 +139,7 @@ bool same_file_path(const QString& a, const QString& b) {
 }
 
 QString proxy_file_path(const QString& source, const QString& folder, const QStringList& avoid) {
-  const QString name = QFileInfo(source).baseName();
+  const QString name = QFileInfo(source).completeBaseName();
   const QDir dir(folder);
   for (int i = 0;; i++) {
     QString candidate =
