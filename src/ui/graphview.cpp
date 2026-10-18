@@ -26,6 +26,7 @@
 #include <QtMath>
 #include <cfloat>
 
+#include "core/graphmath.h"
 #include "effects/effect.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
@@ -73,6 +74,13 @@ static void drop_stale_selection(EffectRow* row, QVector<int>& keys, QVector<int
       key_fields.removeAt(i);
     }
   }
+}
+
+// A value set from the mouse stays inside the field's range
+static double clamp_to_field(EffectField* field, double value) {
+  if (field->type() != EffectField::EFFECT_FIELD_DOUBLE) return value;
+  DoubleField* df = static_cast<DoubleField*>(field);
+  return amber::graph::ClampToRange(value, df->GetMinimum(), df->GetMaximum());
 }
 
 GraphView::GraphView(QWidget* parent) : QWidget(parent) {
@@ -476,7 +484,7 @@ void GraphView::mousePressEvent(QMouseEvent* event) {
 
     EffectKeyframe key;
     key.time = get_value_x(event->position().toPoint().x());
-    key.data = get_value_y(event->position().toPoint().y());
+    key.data = clamp_to_field(click_add_field, get_value_y(event->position().toPoint().y()));
     key.type = click_add_type;
     click_add_key = click_add_field->keyframes.size();
     click_add_field->keyframes.append(key);
@@ -508,7 +516,8 @@ void GraphView::handle_mouse_click_add_drag(QMouseEvent* event) {
     return;
   }
   click_add_field->keyframes[click_add_key].time = get_value_x(event->position().toPoint().x());
-  click_add_field->keyframes[click_add_key].data = get_value_y(event->position().toPoint().y());
+  click_add_field->keyframes[click_add_key].data =
+      clamp_to_field(click_add_field, get_value_y(event->position().toPoint().y()));
   update_ui(false);
 }
 
@@ -554,13 +563,15 @@ void GraphView::handle_mouse_keyframe_drag(QMouseEvent* event) {
     return;
   }
   for (int i = 0; i < selected_keys.size(); i++) {
-    row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].time =
+    EffectField* field = row->Field(selected_keys_fields.at(i));
+    field->keyframes[selected_keys.at(i)].time =
         qRound(selected_keys_old_vals.at(i) + (double(event->position().toPoint().x() - start_x) / x_zoom));
     if (event->modifiers() & Qt::ShiftModifier) {
-      row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].data = selected_keys_old_doubles.at(i);
+      field->keyframes[selected_keys.at(i)].data = selected_keys_old_doubles.at(i);
     } else {
-      row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].data =
-          qRound(selected_keys_old_doubles.at(i) + (double(start_y - event->position().toPoint().y()) / y_zoom));
+      // Unrounded: a 0-1 field (opacity) must not jump between whole numbers
+      field->keyframes[selected_keys.at(i)].data = clamp_to_field(
+          field, selected_keys_old_doubles.at(i) + (double(start_y - event->position().toPoint().y()) / y_zoom));
     }
   }
   moved_keys = true;

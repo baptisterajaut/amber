@@ -20,6 +20,8 @@ target_sources(amber-engine PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/fpsmeter.h
   ${CMAKE_CURRENT_SOURCE_DIR}/gradientramp.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/gradientramp.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/graphmath.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/graphmath.h
   ${CMAKE_CURRENT_SOURCE_DIR}/pixelsampler.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/pixelsampler.h
   ${CMAKE_CURRENT_SOURCE_DIR}/shortcutfile.cpp
