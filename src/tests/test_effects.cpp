@@ -3,6 +3,7 @@
 #include "core/math.h"
 #include "effects/effect.h"
 #include "effects/internal/subtitleeffect.h"
+#include "effects/internal/voideffect.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "engine/undo/undo_effect.h"
@@ -183,6 +184,86 @@ class TestEffects : public QObject {
     for (int y = 0; y < ph; y++) {
       for (int x = 0; x < pw; x++) QCOMPARE(int(uchar(pout[y * stride + x * 4])), 255 - (10 + 20 * y));
       QCOMPARE(int(uchar(pout[y * stride + pw * 4])), 0);  // padding untouched
+    }
+  }
+
+  // Positions saved before they were scaled from the fields' 0-100 to the plugin's 0-1 were sent as is, so only 0-1
+  // meant anything: loading such data scales them by 100, static values, keyframes and their handles alike. Data
+  // saved now carries a marker and loads unchanged, even a position within 1% of the corner.
+  void frei0rOldPositionsScaledOnLoad() {
+    const QString dir = "/usr/lib/frei0r-1";
+    if (!QFileInfo::exists(dir + "/perspective.so")) QSKIP("perspective Frei0r plugin not installed");
+    EffectMeta meta;
+    meta.name = "Perspective";
+    meta.category = "Frei0r";
+    meta.path = dir;
+    meta.filename = "perspective.so";
+    meta.internal = EFFECT_INTERNAL_FREI0R;
+    ScopedAppContext app_ctx;
+    Sequence seq;
+    Clip clip(&seq);
+
+    auto load = [](Frei0rEffect& e, const QByteArray& xml) {
+      QXmlStreamReader reader(xml);
+      while (reader.readNextStartElement() && reader.name() != QLatin1String("effect")) {
+      }
+      e.load(reader);
+    };
+    auto value = [](Frei0rEffect& e, QStringView id) { return e.FindFieldById(id)->persistent_data_.toDouble(); };
+
+    // Perspective's params are four positions: 0 Top Left, 1 Top Right, 2 Bottom Left, 3 Bottom Right
+    const QByteArray old_xml =
+        "<effect name=\"Frei0r/Perspective\" enabled=\"1\">"
+        "<row><field id=\"0X\" value=\"0.2\"/><field id=\"0Y\" value=\"0.1\"/></row>"
+        "<row><field id=\"1X\" value=\"1\"/><field id=\"1Y\" value=\"0\"/></row>"
+        "<row><field id=\"2X\" value=\"0\"><key value=\"0\" frame=\"0\" type=\"2\" prehx=\"0\" prehy=\"0\" "
+        "posthx=\"5\" posthy=\"0.25\"/><key value=\"0.5\" frame=\"10\" type=\"2\" prehx=\"-5\" prehy=\"-0.25\" "
+        "posthx=\"0\" posthy=\"0\"/></field><field id=\"2Y\" value=\"1\"/></row>"
+        "<row><field id=\"3X\" value=\"75\"/><field id=\"3Y\" value=\"1\"/></row>"  // 75: already 0-100
+        "</effect>";
+    Frei0rEffect old_effect(&clip, &meta);
+    QCOMPARE(old_effect.row_count(), 4);
+    load(old_effect, old_xml);
+    QCOMPARE(value(old_effect, u"0X"), 20.0);
+    QCOMPARE(value(old_effect, u"0Y"), 10.0);
+    QCOMPARE(value(old_effect, u"1X"), 100.0);
+    QCOMPARE(value(old_effect, u"1Y"), 0.0);
+    EffectField* kx = old_effect.FindFieldById(u"2X");
+    QCOMPARE(kx->keyframes.size(), 2);
+    QCOMPARE(kx->keyframes.at(1).data.toDouble(), 50.0);
+    QCOMPARE(kx->keyframes.at(0).post_handle_y, 25.0);
+    QCOMPARE(kx->keyframes.at(1).pre_handle_y, -25.0);
+    QCOMPARE(kx->keyframes.at(1).pre_handle_x, -5.0);  // time offsets unchanged
+    QCOMPARE(value(old_effect, u"2Y"), 100.0);
+    QCOMPARE(value(old_effect, u"3X"), 75.0);  // a pair with a value above 1 is left whole
+    QCOMPARE(value(old_effect, u"3Y"), 1.0);
+
+    // Saved again (with the marker) and reloaded: nothing is scaled twice, a tiny 0-100 pair stays tiny. Also through
+    // a Missing Effect (plugin not installed when the project was re-saved), which keeps the marker.
+    old_effect.FindFieldById(u"0X")->persistent_data_ = 0.5;
+    old_effect.FindFieldById(u"0Y")->persistent_data_ = 0.25;
+    auto save = [](Effect& e) {
+      QByteArray xml;
+      QXmlStreamWriter writer(&xml);
+      writer.writeStartElement("effect");
+      e.save(writer);
+      writer.writeEndElement();
+      return xml;
+    };
+    const QByteArray saved = save(old_effect);
+    VoidEffect missing(&clip, "Frei0r/Perspective");
+    {
+      QXmlStreamReader reader(saved);
+      reader.readNextStartElement();
+      missing.load(reader);
+    }
+    for (const QByteArray& xml : {saved, save(missing)}) {
+      Frei0rEffect reloaded(&clip, &meta);
+      load(reloaded, xml);
+      QCOMPARE(value(reloaded, u"0X"), 0.5);
+      QCOMPARE(value(reloaded, u"0Y"), 0.25);
+      QCOMPARE(value(reloaded, u"1X"), 100.0);
+      QCOMPARE(reloaded.FindFieldById(u"2X")->keyframes.at(1).data.toDouble(), 50.0);
     }
   }
 #endif
