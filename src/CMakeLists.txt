@@ -150,6 +150,7 @@ add_library(amber-engine OBJECT
   # effects/internal/
   effects/internal/audionoiseeffect.cpp effects/internal/audionoiseeffect.h
   effects/internal/audiostreamstate.h
+  effects/internal/choruseffect.cpp effects/internal/choruseffect.h
   effects/internal/compressoreffect.cpp effects/internal/compressoreffect.h
   effects/internal/cornerpineffect.cpp effects/internal/cornerpineffect.h
   effects/internal/crossdissolvetransition.cpp effects/internal/crossdissolvetransition.h
@@ -166,6 +167,7 @@ add_library(amber-engine OBJECT
   effects/internal/paneffect.cpp effects/internal/paneffect.h
   effects/internal/parametriceqeffect.cpp effects/internal/parametriceqeffect.h
   effects/internal/progressbareffect.cpp effects/internal/progressbareffect.h
+  effects/internal/reverbeffect.cpp effects/internal/reverbeffect.h
   effects/internal/richtexteffect.cpp effects/internal/richtexteffect.h
   effects/internal/shakeeffect.cpp effects/internal/shakeeffect.h
   effects/internal/solideffect.cpp effects/internal/solideffect.h

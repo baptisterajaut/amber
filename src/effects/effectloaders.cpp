@@ -92,6 +92,14 @@ void load_internal_effects() {
   em.internal = EFFECT_INTERNAL_DELAY;
   effects.push_back(em);
 
+  em.name = "Reverb";
+  em.internal = EFFECT_INTERNAL_REVERB;
+  effects.push_back(em);
+
+  em.name = "Chorus";
+  em.internal = EFFECT_INTERNAL_CHORUS;
+  effects.push_back(em);
+
   em.subtype = EFFECT_TYPE_VIDEO;
 
   em.name = "Transform";

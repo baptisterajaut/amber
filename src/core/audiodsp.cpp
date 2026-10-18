@@ -173,5 +173,128 @@ void DelayLine::process(float* frames, int n) {
   }
 }
 
+namespace {
+
+// Freeverb's tuning.h, at 44.1 kHz
+constexpr int kCombTuning[Reverb::kCombs] = {1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617};
+constexpr int kAllpassTuning[Reverb::kAllpasses] = {556, 441, 341, 225};
+constexpr int kStereoSpread = 23;  // the right channel's lines are this much longer
+constexpr float kFixedGain = 0.015f;
+// Freeverb's default wet gain, initialwet 1/3 * scalewet 3. Its full scale (3) puts a 100 % wet default room 3 to 6 dB
+// above the dry signal on white noise (peaks 4 to 6 at full scale); at 1 it sits 4 to 7 dB below it.
+constexpr double kWetGain = 1;
+constexpr double kScaleDamp = 0.4;
+constexpr double kScaleRoom = 0.28;
+constexpr double kOffsetRoom = 0.7;
+constexpr float kAllpassFeedback = 0.5f;
+
+// Allocates a zeroed line of len frames, or zeroes it in place when it already has that length
+void clear_line(std::vector<float>& buffer, int len) {
+  if (int(buffer.size()) == len) {
+    std::fill(buffer.begin(), buffer.end(), 0.0f);
+  } else {
+    buffer.assign(size_t(len), 0.0f);
+  }
+}
+
+}  // namespace
+
+void Reverb::reset(int rate) {
+  const double scale = rate / 44100.0;
+  for (int ch = 0; ch < 2; ch++) {
+    const int spread = ch ? kStereoSpread : 0;
+    for (int k = 0; k < kCombs; k++) {
+      clear_line(combs_[ch][k].buffer, std::max(1, int(std::lround((kCombTuning[k] + spread) * scale))));
+      combs_[ch][k].index = 0;
+      combs_[ch][k].store = 0;
+    }
+    for (int k = 0; k < kAllpasses; k++) {
+      clear_line(allpasses_[ch][k].buffer, std::max(1, int(std::lround((kAllpassTuning[k] + spread) * scale))));
+      allpasses_[ch][k].index = 0;
+    }
+  }
+  rate_ = rate;
+}
+
+void Reverb::set(double room, double damp, double width, double mix) {
+  feedback_ = float(std::clamp(room, 0.0, 1.0) * kScaleRoom + kOffsetRoom);
+  damp_ = float(std::clamp(damp, 0.0, 1.0) * kScaleDamp);
+  width = std::clamp(width, 0.0, 1.0);
+  wet1_ = float(kWetGain * (width / 2 + 0.5));
+  wet2_ = float(kWetGain * ((1 - width) / 2));
+  mix_ = float(std::clamp(mix, 0.0, 1.0));
+}
+
+void Reverb::process(float* frames, int n) {
+  if (rate_ == 0) return;
+  for (int i = 0; i < n; i++) {
+    const float input = (frames[i * 2] + frames[i * 2 + 1]) * kFixedGain;
+    float tank[2];
+    for (int ch = 0; ch < 2; ch++) {
+      float out = 0;
+      for (Comb& c : combs_[ch]) {
+        const float y = c.buffer[size_t(c.index)];
+        c.store = float(flush_denormal(y * (1.0f - damp_) + c.store * damp_));
+        c.buffer[size_t(c.index)] = float(flush_denormal(input + c.store * feedback_));
+        if (++c.index == int(c.buffer.size())) c.index = 0;
+        out += y;
+      }
+      for (Allpass& a : allpasses_[ch]) {
+        const float b = a.buffer[size_t(a.index)];
+        a.buffer[size_t(a.index)] = float(flush_denormal(out + b * kAllpassFeedback));
+        if (++a.index == int(a.buffer.size())) a.index = 0;
+        out = b - out;
+      }
+      tank[ch] = out;
+    }
+    const float wet_l = tank[0] * wet1_ + tank[1] * wet2_;
+    const float wet_r = tank[1] * wet1_ + tank[0] * wet2_;
+    frames[i * 2] = frames[i * 2] * (1.0f - mix_) + wet_l * mix_;
+    frames[i * 2 + 1] = frames[i * 2 + 1] * (1.0f - mix_) + wet_r * mix_;
+  }
+}
+
+void Chorus::reset(int rate) {
+  const int capacity = int(std::ceil(kBufferMs * rate / 1000.0)) + 2;
+  if (capacity == capacity_) {
+    std::fill(buffer_.begin(), buffer_.end(), 0.0f);
+  } else {
+    capacity_ = capacity;
+    buffer_.assign(size_t(capacity_) * 2, 0.0f);
+  }
+  write_ = 0;
+  phase_ = 0;
+}
+
+void Chorus::set(double rate_hz, double depth_ms, double mix, int rate) {
+  phase_step_ = 2.0 * M_PI * std::max(rate_hz, 0.0) / rate;
+  base_ = kBaseMs * rate / 1000.0;
+  depth_ = std::clamp(depth_ms, 0.0, kMaxDepthMs) * rate / 1000.0;
+  mix_ = float(std::clamp(mix, 0.0, 1.0));
+}
+
+void Chorus::process(float* frames, int n) {
+  if (capacity_ < 2) return;
+  const double max_delay = capacity_ - 2;
+  for (int i = 0; i < n; i++) {
+    for (int ch = 0; ch < 2; ch++) {
+      const float dry = frames[i * 2 + ch];
+      buffer_[size_t(write_) * 2 + ch] = dry;
+      // Right channel a quarter turn ahead: the two sweeps never line up, which is the stereo width
+      const double lfo = (1.0 + std::sin(phase_ + (ch ? M_PI / 2 : 0.0))) / 2.0;
+      const double delay = std::min(base_ + depth_ * lfo, max_delay);
+      const int whole = int(delay);
+      const float frac = float(delay - whole);
+      const int a = (write_ - whole + capacity_) % capacity_;
+      const int b = (a - 1 + capacity_) % capacity_;
+      const float delayed = buffer_[size_t(a) * 2 + ch] * (1.0f - frac) + buffer_[size_t(b) * 2 + ch] * frac;
+      frames[i * 2 + ch] = dry * (1.0f - mix_) + delayed * mix_;
+    }
+    write_ = (write_ + 1) % capacity_;
+    phase_ += phase_step_;
+    if (phase_ >= 2.0 * M_PI) phase_ -= 2.0 * M_PI;
+  }
+}
+
 }  // namespace audiodsp
 }  // namespace amber
