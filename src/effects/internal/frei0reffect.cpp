@@ -249,6 +249,60 @@ void Frei0rEffect::refresh() {
   instance_height = 0;
 }
 
+namespace {
+// Saved in every Frei0r effect since position fields reach the plugin scaled from 0-100 to 0-1
+constexpr char kPositionUnitTag[] = "positionunit";
+
+bool in_unit_range(const QVariant& v) { return v.toDouble() >= 0.0 && v.toDouble() <= 1.0; }
+}  // namespace
+
+void Frei0rEffect::load(QXmlStreamReader& stream) {
+  positions_in_percent_ = false;
+  Effect::load(stream);
+  if (!positions_in_percent_) migrate_old_positions();
+}
+
+void Frei0rEffect::custom_load(QXmlStreamReader& stream) {
+  if (stream.name() == QLatin1String(kPositionUnitTag)) positions_in_percent_ = true;
+}
+
+void Frei0rEffect::save(QXmlStreamWriter& stream) {
+  Effect::save(stream);
+  // A child element, not an attribute: a Missing Effect (plugin not installed) keeps its children through a re-save
+  stream.writeEmptyElement(kPositionUnitTag);
+  stream.writeAttribute("value", "percent");
+}
+
+// Data saved without kPositionUnitTag dates from when a position field's value went to the plugin as is: only 0-1
+// meant anything (0.5 = centre). A position whose values, static and keyframed, on both axes, are all within 0-1 is
+// such an old one and is scaled to the fields' 0-100; any value above 1 can only be the 0-100 unit, left alone.
+// CBA: the marker-less data of a build between the 0-100 fix and the marker (never released) is misread when a
+// position sits within 1% of the top-left corner on both axes; re-entering it once fixes it, and the marker saved
+// from then on ends the guess.
+void Frei0rEffect::migrate_old_positions() {
+  for (int i = 0; i < row_count(); i++) {
+    EffectRow* r = row(i);
+    if (r->FieldCount() != 2) continue;  // only a position param has two fields (X, Y)
+    bool old_unit = true;
+    for (int j = 0; j < 2; j++) {
+      EffectField* f = r->Field(j);
+      old_unit = old_unit && in_unit_range(f->persistent_data_);
+      for (const EffectKeyframe& key : f->keyframes) old_unit = old_unit && in_unit_range(key.data);
+    }
+    if (!old_unit) continue;
+    for (int j = 0; j < 2; j++) {
+      EffectField* f = r->Field(j);
+      f->persistent_data_ = f->persistent_data_.toDouble() * 100.0;
+      for (EffectKeyframe& key : f->keyframes) {
+        key.data = key.data.toDouble() * 100.0;
+        key.pre_handle_y *= 100.0;  // bezier handles are value offsets
+        key.post_handle_y *= 100.0;
+      }
+      f->Changed();
+    }
+  }
+}
+
 void Frei0rEffect::destruct_module() {
   if (open) {
     f0rDestructFunc destruct = reinterpret_cast<f0rDestructFunc>(handle.resolve("f0r_destruct"));

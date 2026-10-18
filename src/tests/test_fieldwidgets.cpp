@@ -1,5 +1,9 @@
 #include <QCheckBox>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QMouseEvent>
+#include <QScopeGuard>
+#include <QTimer>
 #include <QtTest>
 
 #include "effects/effect.h"
@@ -13,6 +17,7 @@
 #include "engine/undo/undo_effect.h"
 #include "engine/undo/undostack.h"
 #include "ui/comboboxex.h"
+#include "ui/decimalinput.h"
 #include "ui/labelslider.h"
 
 // Several clips selected with the same effect: Effect Controls shows one row per field and attaches every clip's
@@ -33,6 +38,7 @@ class TestFieldWidgets : public QObject {
   void doubleSameValueAddsNoEntry();
   void comboPickIsOneEntry();
   void singleClipEntryIsUnchanged();
+  void valuePromptIgnoresLocale();
   void followerStaysWithItsWidget();
   void voidEffectCopyKeepsStoredXml();
 
@@ -48,6 +54,8 @@ class TestFieldWidgets : public QObject {
   QWidget* SharedWidget(EffectField* a, EffectField* b);
   Fields MakeEffect(Clip* clip);
   void SendMouse(QWidget* w, QEvent::Type type, Qt::MouseButtons buttons);
+  // Answers the next modal value prompt: keeps its prefilled text, types `typed` over it and presses Return
+  static void AnswerPrompt(const QString& typed, QString* prefill);
 
   Clip* clip_a_{nullptr};
   Clip* clip_b_{nullptr};
@@ -265,6 +273,47 @@ void TestFieldWidgets::voidEffectCopyKeepsStoredXml() {
   const QByteArray saved = save(&missing);
   QVERIFY2(saved.contains(R"(<field id="0" value="0.5"/>)"), saved.constData());
   QCOMPARE(save(missing.copy(clip_b_).get()), saved);
+}
+
+void TestFieldWidgets::AnswerPrompt(const QString& typed, QString* prefill) {
+  QTimer::singleShot(0, [typed, prefill] {
+    QWidget* modal = QApplication::activeModalWidget();
+    QLineEdit* edit = qobject_cast<QInputDialog*>(modal) != nullptr ? modal->findChild<QLineEdit*>() : nullptr;
+    if (edit == nullptr) {
+      if (modal != nullptr) modal->close();  // never leave a prompt open: the test would hang in its exec()
+      return;
+    }
+    *prefill = edit->text();
+    edit->selectAll();
+    QTest::keyClicks(edit, typed);
+    QTest::keyClick(edit, Qt::Key_Return);
+  });
+}
+
+// The value prompts under a French locale, where ',' is the decimal separator and '.' the group one: "0.5" and "0,5"
+// both read 0.5, and the prompt is prefilled with a dot as the slider shows it. Drives LabelSlider::ShowDialog() (a
+// click without a drag) and amber::get_decimal() with the arguments of ViewerWidget::set_custom_zoom().
+void TestFieldWidgets::valuePromptIgnoresLocale() {
+  const auto restore = qScopeGuard([locale = QLocale()] { QLocale::setDefault(locale); });
+  QLocale::setDefault(QLocale(QLocale::French, QLocale::France));
+  for (const QString& typed : {QStringLiteral("0.5"), QStringLiteral("0,5")}) {
+    LabelSlider ls;
+    ls.SetDecimalPlaces(2);
+    ls.SetValue(12.5);
+    QString prefill;
+    AnswerPrompt(typed, &prefill);
+    QVERIFY(QMetaObject::invokeMethod(&ls, "ShowDialog"));
+    QCOMPARE(ls.value(), 0.5);
+    QCOMPARE(prefill, QStringLiteral("12.50"));
+
+    bool ok = false;
+    AnswerPrompt(typed, &prefill);
+    const double zoom =
+        amber::get_decimal(nullptr, "Viewer Zoom", "Set Custom Zoom Value:", 100, 0, 2147483647, 2, &ok);
+    QVERIFY(ok);
+    QCOMPARE(zoom, 0.5);
+    QCOMPARE(prefill, QStringLiteral("100.00"));
+  }
 }
 
 QTEST_MAIN(TestFieldWidgets)

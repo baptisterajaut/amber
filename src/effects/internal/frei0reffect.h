@@ -41,7 +41,15 @@ public:
   void process_image(double timecode, uint8_t* input, uint8_t* output, int width, int height, int stride) override;
 
   void refresh() override;
-private:
+
+  void load(QXmlStreamReader& stream) override;
+  void custom_load(QXmlStreamReader& stream) override;
+  void save(QXmlStreamWriter& stream) override;
+
+ private:
+  // set by custom_load() when the loaded data says its positions are in the fields' 0-100 unit
+  bool positions_in_percent_{false};
+  void migrate_old_positions();
   QLibrary handle;
   f0r_instance_t instance{nullptr};
   int param_count;
