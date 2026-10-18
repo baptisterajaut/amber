@@ -425,14 +425,20 @@ void Cacher::CacheVideoWorker() {
 // Feed one packet (or EOF flush) to the decoder.
 // Returns 0 on success, AVERROR_EOF if flush packet sent, or negative error code.
 static int feedNextPacketToDecoder(AVFormatContext* formatCtx, AVCodecContext* codecCtx, AVPacket* pkt, Clip* clip) {
+  // A packet the decoder refuses as invalid is skipped for the next one: after a seek into MPEG-PS the first MP2 packet
+  // starts mid-frame, and giving up there left the clip silent from the seek on.
+  // CBA: at most kMaxInvalidPackets in a row, then the error goes up as before (a stream that never decodes).
+  constexpr int kMaxInvalidPackets = 64;
   int read_ret = 0;
-  do {
-    if (pkt->buf != nullptr) av_packet_unref(pkt);
-    read_ret = av_read_frame(formatCtx, pkt);
-  } while (read_ret >= 0 && pkt->stream_index != clip->media_stream_index());
+  for (int invalid = 0;; invalid++) {
+    do {
+      if (pkt->buf != nullptr) av_packet_unref(pkt);
+      read_ret = av_read_frame(formatCtx, pkt);
+    } while (read_ret >= 0 && pkt->stream_index != clip->media_stream_index());
+    if (read_ret < 0) break;
 
-  if (read_ret >= 0) {
     int send_ret = avcodec_send_packet(codecCtx, pkt);
+    if (send_ret == AVERROR_INVALIDDATA && invalid < kMaxInvalidPackets) continue;
     if (send_ret < 0) {
       qCritical() << "Failed to send packet to decoder." << send_ret;
       return send_ret;
