@@ -126,7 +126,8 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
 void AdvancedVideoDialog::accept() {
   // store settings back into struct
 
-  params_.pix_fmt = pix_fmt_combo_->currentData().toInt();
+  // An empty list (a hardware encoder whose probe failed) keeps the previous format: currentData() reads 0, yuv420p
+  if (pix_fmt_combo_->count() > 0) params_.pix_fmt = pix_fmt_combo_->currentData().toInt();
   params_.threads = thread_spinbox_->value();
 
   QDialog::accept();
