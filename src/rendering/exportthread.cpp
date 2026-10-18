@@ -53,13 +53,6 @@ extern "C" {
 
 namespace {
 
-// The named encoder, or the codec's default one when name is empty. Null if missing or not an encoder of codec_id.
-const AVCodec* find_encoder(const QString& name, int codec_id) {
-  if (name.isEmpty()) return avcodec_find_encoder(static_cast<AVCodecID>(codec_id));
-  const AVCodec* codec = avcodec_find_encoder_by_name(name.toUtf8().constData());
-  return (codec != nullptr && codec->id == codec_id) ? codec : nullptr;
-}
-
 void add_options(AVDictionary** dict, const QVector<QPair<QString, QString>>& options) {
   for (const auto& o : options) av_dict_set(dict, o.first.toUtf8().constData(), o.second.toUtf8().constData(), 0);
 }
@@ -123,7 +116,7 @@ bool ExportThread::SetupVideo() {
   if (!params_.video_enabled) return true;
 
   // find video encoder
-  vcodec = find_encoder(params_.video_encoder, params_.video_codec);
+  vcodec = amber::find_encoder(params_.video_encoder, static_cast<AVCodecID>(params_.video_codec));
   if (!vcodec) {
     qCritical() << "Could not find video encoder" << params_.video_encoder;
     export_error = params_.video_encoder.isEmpty()
@@ -321,7 +314,7 @@ bool ExportThread::SetupAudio() {
   if (!params_.audio_enabled) return true;
 
   // Find encoder for this codec
-  acodec = find_encoder(params_.audio_encoder, params_.audio_codec);
+  acodec = amber::find_encoder(params_.audio_encoder, static_cast<AVCodecID>(params_.audio_codec));
   if (!acodec) {
     qCritical() << "Could not find audio encoder" << params_.audio_encoder;
     export_error = params_.audio_encoder.isEmpty()

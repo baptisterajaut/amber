@@ -39,10 +39,11 @@ struct EncoderOption {
 struct EncoderInfo {
   QString name;  // FFmpeg encoder name (avcodec_find_encoder_by_name)
   AVCodecID codec_id = AV_CODEC_ID_NONE;
-  QString label;            // shown in the Encoder combo
-  QString quality_key;      // AVOption of the quality-based mode; empty: no quality mode
-  QString quality_label;    // "Quality (CRF):"
-  QString quality_tooltip;  // empty: a generic "min = best ... max = smallest"
+  QString label;               // shown in the Encoder combo
+  QString quality_key;         // AVOption of the quality-based mode; empty: no quality mode
+  QString quality_mode_label;  // "Quality-based (Constant Rate Factor)"
+  QString quality_label;       // "Quality (CRF):"
+  QString quality_tooltip;     // empty: a generic "min = best ... max = smallest"
   int quality_min = 0;
   int quality_max = 0;
   int quality_default = 0;
@@ -66,6 +67,14 @@ bool find_encoder_info(const QString& name, EncoderInfo* out);
 // Installed encoders of id from the table, in preference order. A codec without table entries gets its default
 // encoder (avcodec_find_encoder), if any. A codec whose table encoders are all missing gets none.
 QStringList available_encoders(AVCodecID id);
+
+// The named encoder, or the codec's default one (avcodec_find_encoder) when name is empty. Null when missing or when
+// it encodes another codec.
+const AVCodec* find_encoder(const QString& name, AVCodecID id);
+
+// The export can write this pixel format: swscale converts the RGBA composite to it, except PAL8 which goes through
+// the palettegen/paletteuse filters (ExportThread::SetupPaletteGraph)
+bool export_supports_pix_fmt(int pix_fmt);
 
 // The muxer has movflags=+faststart (the MOV family: mp4, mov, 3gp...)
 bool format_supports_faststart(const AVOutputFormat* fmt);

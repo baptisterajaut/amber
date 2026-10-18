@@ -22,7 +22,9 @@
 #define EXPORTDIALOG_H
 
 #include <QDialog>
+#include <QCheckBox>
 #include <QComboBox>
+#include <QGridLayout>
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QLabel>
@@ -30,6 +32,7 @@
 #include <QGroupBox>
 
 #include "engine/sequence.h"
+#include "rendering/encoderoptions.h"
 #include "rendering/exportthread.h"
 
 /**
@@ -114,6 +117,22 @@ private slots:
   void vcodec_changed(int index);
 
   /**
+   * @brief Slot for when the video encoder changes (or the codec, which repopulates the encoders)
+   *
+   * Sets up the compression types, the default pixel format and the encoder's option rows.
+   *
+   * @param index
+   *
+   * Current vencoderCombobox index - its item data contains the FFmpeg encoder name.
+   */
+  void vencoder_changed(int index);
+
+  /**
+   * @brief Slot for when the audio codec changes: rebuilds the audio encoder's option rows
+   */
+  void acodec_changed(int index);
+
+  /**
    * @brief Slot for when the compression type changes
    *
    * Different UI objects should be displayed for different compression types.
@@ -184,6 +203,49 @@ private:
   void add_codec_to_combobox(QComboBox* box, enum AVCodecID codec);
 
   /**
+   * @brief One row of an encoder option (rendering/encoderoptions.h) in the video or audio grid
+   */
+  struct OptionRow {
+    amber::EncoderOption option;
+    QLabel* label;
+    QWidget* editor;  // QComboBox for a Choice, QSpinBox for an Int
+  };
+
+  /**
+   * @brief Replaces rows with one row per option of info (none for nullptr), from first_row down in grid
+   */
+  static void rebuild_option_rows(QGridLayout* grid, int first_row, QWidget* parent, const amber::EncoderInfo* info,
+                                  QVector<OptionRow>& rows);
+
+  /**
+   * @brief The rows' values that differ from the encoder's defaults, as encoder options
+   */
+  static amber::EncoderOptionValues option_values(const QVector<OptionRow>& rows);
+
+  /**
+   * @brief Sets the row of key to value, if there is such a row and value is one of its values
+   */
+  static void apply_option_value(const QVector<OptionRow>& rows, const QString& key, const QString& value);
+
+  /**
+   * @brief Shows the fast start checkbox only for formats whose muxer has movflags=+faststart
+   */
+  void update_faststart();
+
+  /**
+   * @brief Fits the dialog's height to its rows, once the current event is done
+   *
+   * Option rows, the encoder row and the fast start checkbox come and go with the format and encoder. Without this
+   * the dialog keeps the height of the tallest set and spreads the spare height between the rows.
+   */
+  void fit_height();
+
+  /**
+   * @brief The selected video encoder's name, empty when the codec has none
+   */
+  QString current_video_encoder() const;
+
+  /**
    * @brief Internal array of human-readable names corresponding to enum ExportFormats
    */
   QVector<QString> format_strings;
@@ -243,6 +305,36 @@ private:
    * @brief ComboBox for the exported video codec
    */
   QComboBox* vcodecCombobox;
+
+  /**
+   * @brief Video encoder choice, shown only when the codec has more than one installed encoder (AV1)
+   */
+  QLabel* vencoderLabel;
+  QComboBox* vencoderCombobox;
+
+  /**
+   * @brief Descriptor of the selected video encoder; has_vencoder_info_ is false for an encoder without one
+   */
+  amber::EncoderInfo vencoder_info_;
+  bool has_vencoder_info_{false};
+
+  /**
+   * @brief Option rows of the video and audio encoders, and the grids that hold them
+   */
+  QGridLayout* videoGridLayout;
+  QGridLayout* audioGridLayout;
+  QVector<OptionRow> video_option_rows_;
+  QVector<OptionRow> audio_option_rows_;
+
+  /**
+   * @brief Encoder of the selected audio codec
+   */
+  QString aencoder_name_;
+
+  /**
+   * @brief movflags=+faststart, for the MOV family of formats
+   */
+  QCheckBox* faststartCheckbox;
 
   /**
    * @brief ComboBox for the exported audio's codec

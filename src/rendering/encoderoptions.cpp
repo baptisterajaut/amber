@@ -3,6 +3,7 @@
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
+#include <libswscale/swscale.h>
 }
 
 #include <QCoreApplication>
@@ -19,7 +20,7 @@ QString tr(const char* s) { return QCoreApplication::translate("EncoderOptions",
 EncoderOption x26x_preset() {
   EncoderOption o;
   o.key = "preset";
-  o.label = tr("Preset:");
+  o.label = tr("Speed preset:");  // "Preset:" is the export preset row at the top of the dialog
   o.tooltip = tr("Slower presets make smaller files at the same quality");
   o.kind = EncoderOption::Choice;
   o.choices = {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"};
@@ -56,6 +57,7 @@ QVector<EncoderInfo> build_table() {
   x264.codec_id = AV_CODEC_ID_H264;
   x264.label = "x264";
   x264.quality_key = "crf";
+  x264.quality_mode_label = tr("Quality-based (Constant Rate Factor)");
   x264.quality_label = tr("Quality (CRF):");
   x264.quality_tooltip = x26x_crf_tooltip;
   x264.quality_min = 0;
@@ -82,6 +84,7 @@ QVector<EncoderInfo> build_table() {
   svt.codec_id = AV_CODEC_ID_AV1;
   svt.label = tr("SVT-AV1 (fast)");
   svt.quality_key = "crf";
+  svt.quality_mode_label = tr("Quality-based (Constant Rate Factor)");
   svt.quality_label = tr("Quality (CRF):");
   svt.quality_min = 1;
   svt.quality_max = 63;
@@ -99,6 +102,7 @@ QVector<EncoderInfo> build_table() {
   rav1e.codec_id = AV_CODEC_ID_AV1;
   rav1e.label = "rav1e";
   rav1e.quality_key = "qp";
+  rav1e.quality_mode_label = tr("Quality-based (Constant Quantizer)");
   rav1e.quality_label = tr("Quantizer (QP):");
   rav1e.quality_min = 0;
   rav1e.quality_max = 255;
@@ -117,6 +121,7 @@ QVector<EncoderInfo> build_table() {
   aom.codec_id = AV_CODEC_ID_AV1;
   aom.label = tr("libaom (slow)");
   aom.quality_key = "crf";
+  aom.quality_mode_label = tr("Quality-based (Constant Rate Factor)");
   aom.quality_label = tr("Quality (CRF):");
   aom.quality_min = 0;
   aom.quality_max = 63;
@@ -252,6 +257,16 @@ QStringList available_encoders(AVCodecID id) {
     if (codec != nullptr) names.append(QString::fromUtf8(codec->name));
   }
   return names;
+}
+
+const AVCodec* find_encoder(const QString& name, AVCodecID id) {
+  if (name.isEmpty()) return avcodec_find_encoder(id);
+  const AVCodec* codec = avcodec_find_encoder_by_name(name.toUtf8().constData());
+  return (codec != nullptr && codec->id == id) ? codec : nullptr;
+}
+
+bool export_supports_pix_fmt(int pix_fmt) {
+  return pix_fmt == AV_PIX_FMT_PAL8 || sws_isSupportedOutput(static_cast<AVPixelFormat>(pix_fmt)) > 0;
 }
 
 bool format_supports_faststart(const AVOutputFormat* fmt) {
