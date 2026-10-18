@@ -32,8 +32,11 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 }
 
+#include "rendering/encoderoptions.h"
+
 AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
                                          AVCodecID encoding_codec,
+                                         const QString& encoder,
                                          VideoCodecParams &iparams) :
   QDialog(parent),
   params_(iparams)
@@ -44,7 +47,7 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
   int row = 0;
 
   // get encoder information for this codec from FFmpeg
-  const AVCodec* codec_info = avcodec_find_encoder(static_cast<AVCodecID>(encoding_codec));
+  const AVCodec* codec_info = amber::find_encoder(encoder, encoding_codec);
 
   // set up grid layout for dialog
   QGridLayout* layout = new QGridLayout(this);
@@ -57,14 +60,18 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
   const enum AVPixelFormat *pix_fmts = nullptr;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
   int num_pix_fmts = 0;
-  if (avcodec_get_supported_config(nullptr, codec_info, AV_CODEC_CONFIG_PIX_FORMAT, 0,
+  if (codec_info != nullptr &&
+      avcodec_get_supported_config(nullptr, codec_info, AV_CODEC_CONFIG_PIX_FORMAT, 0,
                                    (const void **)&pix_fmts, &num_pix_fmts) == 0 && pix_fmts) {
     for (int i = 0; i < num_pix_fmts; i++) {
 #else
-  pix_fmts = codec_info->pix_fmts;
+  pix_fmts = codec_info != nullptr ? codec_info->pix_fmts : nullptr;
   if (pix_fmts) {
     for (int i = 0; pix_fmts[i] != AV_PIX_FMT_NONE; i++) {
 #endif
+      // only formats the export can convert the RGBA composite to
+      if (!amber::export_supports_pix_fmt(pix_fmts[i])) continue;
+
       // get the name of the pixel format and add it to the combobox (with the pixel format constant)
       pix_fmt_combo_->addItem(av_get_pix_fmt_name(pix_fmts[i]), pix_fmts[i]);
 

@@ -43,12 +43,29 @@ extern "C" {
 #include "global/debug.h"
 #include "global/projectio.h"
 #include "rendering/audio.h"
+#include "rendering/encoderoptions.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
 
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
+
+namespace {
+
+void add_options(AVDictionary** dict, const QVector<QPair<QString, QString>>& options) {
+  for (const auto& o : options) av_dict_set(dict, o.first.toUtf8().constData(), o.second.toUtf8().constData(), 0);
+}
+
+// avcodec_open2() and avformat_write_header() leave the entries nobody used in the dictionary
+void warn_unused_options(AVDictionary* dict, const char* what) {
+  const AVDictionaryEntry* e = nullptr;
+  while ((e = av_dict_get(dict, "", e, AV_DICT_IGNORE_SUFFIX)) != nullptr) {
+    qWarning() << what << "ignored option" << e->key << "=" << e->value;
+  }
+}
+
+}  // namespace
 
 ExportThread::ExportThread(Sequence* seq, const ExportParams& params, const VideoCodecParams& vparams, QObject* parent)
     : QThread(parent), seq_(seq), params_(params), vcodec_params_(vparams), interrupt_(false) {}
@@ -99,10 +116,12 @@ bool ExportThread::SetupVideo() {
   if (!params_.video_enabled) return true;
 
   // find video encoder
-  vcodec = avcodec_find_encoder(static_cast<enum AVCodecID>(params_.video_codec));
+  vcodec = amber::find_encoder(params_.video_encoder, static_cast<AVCodecID>(params_.video_codec));
   if (!vcodec) {
-    qCritical() << "Could not find video encoder";
-    export_error = tr("could not video encoder for %1").arg(QString::number(params_.video_codec));
+    qCritical() << "Could not find video encoder" << params_.video_encoder;
+    export_error = params_.video_encoder.isEmpty()
+                       ? tr("could not video encoder for %1").arg(QString::number(params_.video_codec))
+                       : tr("could not find video encoder %1").arg(params_.video_encoder);
     return false;
   }
 
@@ -134,7 +153,8 @@ bool ExportThread::SetupVideo() {
   // Always the sequence rate: EncodeAllFrames() stamps one frame per sequence frame, so any other rate gives
   // duplicate pts (export fails) or uneven frame timing. A codec that can't encode it fails in avcodec_open2() below.
   vcodec_ctx->framerate = av_d2q(seq_->frame_rate, INT_MAX);
-  if (params_.video_compression_type == COMPRESSION_TYPE_CBR) {
+  if (params_.video_compression_type == COMPRESSION_TYPE_CBR ||
+      params_.video_compression_type == COMPRESSION_TYPE_TARGETBR) {
     vcodec_ctx->bit_rate = qRound(params_.video_bitrate * 1000000);
   }
   vcodec_ctx->time_base = av_inv_q(vcodec_ctx->framerate);
@@ -154,23 +174,6 @@ bool ExportThread::SetupVideo() {
     vcodec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
   }
 
-  // Some codecs require special settings so we set that up here
-  switch (vcodec_ctx->codec_id) {
-    /// H.264 specific settings
-    case AV_CODEC_ID_H264:
-    case AV_CODEC_ID_H265:
-      switch (params_.video_compression_type) {
-        case COMPRESSION_TYPE_CFR:
-          av_opt_set(vcodec_ctx->priv_data, "crf", QString::number(static_cast<int>(params_.video_bitrate)).toUtf8(),
-                     AV_OPT_SEARCH_CHILDREN);
-          break;
-      }
-      break;
-
-    default:
-      break;
-  }
-
   // Set export to be multithreaded
   AVDictionary* opts = nullptr;
   if (vcodec_params_.threads == 0) {
@@ -179,8 +182,26 @@ bool ExportThread::SetupVideo() {
     av_dict_set(&opts, "threads", QString::number(vcodec_params_.threads).toUtf8(), 0);
   }
 
+  // Quality-based: the encoder's quality option gets the value. An H.264/H.265 encoder without a descriptor gets crf,
+  // as before descriptors. Bit rate stays 0 (libaom needs that for constant quality).
+  if (params_.video_compression_type == COMPRESSION_TYPE_CFR) {
+    amber::EncoderInfo info;
+    QString key;
+    if (amber::find_encoder_info(QString::fromUtf8(vcodec->name), &info)) {
+      key = info.quality_key;
+    } else if (vcodec->id == AV_CODEC_ID_H264 || vcodec->id == AV_CODEC_ID_HEVC) {
+      key = QStringLiteral("crf");
+    }
+    if (!key.isEmpty()) {
+      av_dict_set(&opts, key.toUtf8().constData(),
+                  QString::number(static_cast<int>(params_.video_bitrate)).toUtf8().constData(), 0);
+    }
+  }
+  add_options(&opts, params_.video_options);
+
   // Open video encoder
   ret = avcodec_open2(vcodec_ctx, vcodec, &opts);
+  if (ret >= 0) warn_unused_options(opts, "video encoder");  // a failed open evaluated nothing
   av_dict_free(&opts);
   if (ret < 0) {
     qCritical() << "Could not open output video encoder." << ret;
@@ -293,10 +314,12 @@ bool ExportThread::SetupAudio() {
   if (!params_.audio_enabled) return true;
 
   // Find encoder for this codec
-  acodec = avcodec_find_encoder(static_cast<AVCodecID>(params_.audio_codec));
+  acodec = amber::find_encoder(params_.audio_encoder, static_cast<AVCodecID>(params_.audio_codec));
   if (!acodec) {
-    qCritical() << "Could not find audio encoder";
-    export_error = tr("could not audio encoder for %1").arg(QString::number(params_.audio_codec));
+    qCritical() << "Could not find audio encoder" << params_.audio_encoder;
+    export_error = params_.audio_encoder.isEmpty()
+                       ? tr("could not audio encoder for %1").arg(QString::number(params_.audio_codec))
+                       : tr("could not find audio encoder %1").arg(params_.audio_encoder);
     return false;
   }
 
@@ -349,7 +372,11 @@ bool ExportThread::SetupAudio() {
   }
 
   // Open encoder
-  ret = avcodec_open2(acodec_ctx, acodec, nullptr);
+  AVDictionary* aopts = nullptr;
+  add_options(&aopts, params_.audio_options);
+  ret = avcodec_open2(acodec_ctx, acodec, &aopts);
+  if (ret >= 0) warn_unused_options(aopts, "audio encoder");
+  av_dict_free(&aopts);
   if (ret < 0) {
     qCritical() << "Could not open output audio encoder." << ret;
     export_error = tr("could not open output audio encoder (%1)").arg(QString::number(ret));
@@ -659,7 +686,14 @@ bool ExportThread::Export() {
   if (!SetupVideo()) return false;
   if (!SetupAudio()) return false;
 
-  ret = avformat_write_header(fmt_ctx, nullptr);
+  AVDictionary* mux_opts = nullptr;
+  if (params_.faststart && amber::format_supports_faststart(fmt_ctx->oformat)) {
+    // A second pass at the end of the export moves the moov atom in front of mdat
+    av_dict_set(&mux_opts, "movflags", "+faststart", 0);
+  }
+  ret = avformat_write_header(fmt_ctx, &mux_opts);
+  if (ret >= 0) warn_unused_options(mux_opts, "muxer");
+  av_dict_free(&mux_opts);
   if (ret < 0) {
     qCritical() << "Could not write output file header." << ret;
     export_error = tr("could not write output file header (%1)").arg(QString::number(ret));

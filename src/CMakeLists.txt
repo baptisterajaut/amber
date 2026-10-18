@@ -186,6 +186,7 @@ add_library(amber-engine OBJECT
   # rendering/ (not audio_ui)
   rendering/audio.cpp rendering/audio.h
   rendering/clipqueue.cpp rendering/clipqueue.h
+  rendering/encoderoptions.cpp rendering/encoderoptions.h
   rendering/exportthread.cpp rendering/exportthread.h
   rendering/recordingtap.cpp rendering/recordingtap.h
   rendering/renderfunctions.cpp rendering/renderfunctions.h

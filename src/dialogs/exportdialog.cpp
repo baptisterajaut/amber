@@ -36,6 +36,7 @@ extern "C" {
 #include <QSet>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
@@ -74,6 +75,12 @@ enum ExportFormats {
   FORMAT_WMV,
   FORMAT_SIZE
 };
+
+// Rows of the video grid: encoder options from kVideoOptionRow down, the Advanced button below them all. Audio
+// options from kAudioOptionRow down.
+constexpr int kVideoOptionRow = 7;
+constexpr int kLastRow = 50;
+constexpr int kAudioOptionRow = 4;
 
 ExportDialog::ExportDialog(QWidget* parent) : QDialog(parent) {
   setWindowTitle(tr("Export \"%1\"").arg(amber::ActiveSequence->name));
@@ -123,12 +130,27 @@ ExportDialog::ExportDialog(QWidget* parent) : QDialog(parent) {
   vcodec_params.threads = 0;
 }
 
+// The encoders the dialog offers for codec: the table's installed ones, or else FFmpeg's default encoder of the codec
+// (what the export used before the table, e.g. H.264 without libx264). AV1 is only listed with a table encoder
+// (format_changed).
+static QStringList dialog_encoders(AVCodecID codec) {
+  QStringList encoders = amber::available_encoders(codec);
+  const AVCodec* fallback = encoders.isEmpty() ? avcodec_find_encoder(codec) : nullptr;
+  if (fallback != nullptr) encoders.append(QString::fromUtf8(fallback->name));
+  return encoders;
+}
+
 void ExportDialog::add_codec_to_combobox(QComboBox* box, enum AVCodecID codec) {
   QString codec_name;
 
-  const AVCodec* codec_info = avcodec_find_encoder(codec);
+  // A codec with an encoder choice is named for itself, a single encoder by its own name (as FFmpeg's default one was)
+  const QStringList encoders = dialog_encoders(codec);
+  const AVCodecDescriptor* desc = avcodec_descriptor_get(codec);
+  const AVCodec* codec_info = encoders.isEmpty() ? nullptr : amber::find_encoder(encoders.first(), codec);
 
-  if (codec_info == nullptr) {
+  if (encoders.size() > 1 && desc != nullptr) {
+    codec_name = desc->long_name;
+  } else if (codec_info == nullptr) {
     codec_name = tr("Unknown codec name %1").arg(static_cast<int>(codec));
   } else {
     codec_name = codec_info->long_name;
@@ -182,8 +204,9 @@ static const QVector<FormatCodecs>& get_format_codec_table() {
        {AV_CODEC_ID_AC3, AV_CODEC_ID_MP2, AV_CODEC_ID_MP3, AV_CODEC_ID_PCM_S16LE},
        0,
        1},
+      // AV1 stays last in its rows: presets store codec indexes, and it's left out when no AV1 encoder is installed
       {FORMAT_MPEG4,
-       {AV_CODEC_ID_MPEG4, AV_CODEC_ID_H264, AV_CODEC_ID_H265},
+       {AV_CODEC_ID_MPEG4, AV_CODEC_ID_H264, AV_CODEC_ID_H265, AV_CODEC_ID_AV1},
        {AV_CODEC_ID_AAC, AV_CODEC_ID_AC3, AV_CODEC_ID_MP2, AV_CODEC_ID_MP3},
        1,
        0},
@@ -193,7 +216,7 @@ static const QVector<FormatCodecs>& get_format_codec_table() {
        0,
        2},
       {FORMAT_MKV,
-       {AV_CODEC_ID_MPEG4, AV_CODEC_ID_H264, AV_CODEC_ID_H265},
+       {AV_CODEC_ID_MPEG4, AV_CODEC_ID_H264, AV_CODEC_ID_H265, AV_CODEC_ID_AV1},
        {AV_CODEC_ID_AAC, AV_CODEC_ID_AC3, AV_CODEC_ID_EAC3, AV_CODEC_ID_FLAC, AV_CODEC_ID_MP2, AV_CODEC_ID_MP3,
         AV_CODEC_ID_OPUS, AV_CODEC_ID_PCM_S16LE, AV_CODEC_ID_VORBIS, AV_CODEC_ID_WAVPACK, AV_CODEC_ID_WMAV1,
         AV_CODEC_ID_WMAV2},
@@ -207,7 +230,7 @@ static const QVector<FormatCodecs>& get_format_codec_table() {
        2,
        0},
       {FORMAT_WAV, {}, {AV_CODEC_ID_PCM_S16LE}, 0, 0},
-      {FORMAT_WEBM, {AV_CODEC_ID_VP8, AV_CODEC_ID_VP9}, {AV_CODEC_ID_OPUS, AV_CODEC_ID_VORBIS}, 1, 0},
+      {FORMAT_WEBM, {AV_CODEC_ID_VP8, AV_CODEC_ID_VP9, AV_CODEC_ID_AV1}, {AV_CODEC_ID_OPUS, AV_CODEC_ID_VORBIS}, 1, 0},
       {FORMAT_WMV, {AV_CODEC_ID_WMV1, AV_CODEC_ID_WMV2}, {AV_CODEC_ID_WMAV1, AV_CODEC_ID_WMAV2}, 1, 1},
   };
   return kTable;
@@ -225,7 +248,10 @@ void ExportDialog::format_changed(int index) {
   for (const auto& entry : table) {
     if (entry.format != index) continue;
     found = true;
-    for (AVCodecID id : entry.vcodecs) add_codec_to_combobox(vcodecCombobox, id);
+    for (AVCodecID id : entry.vcodecs) {
+      if (id == AV_CODEC_ID_AV1 && amber::available_encoders(id).isEmpty()) continue;
+      add_codec_to_combobox(vcodecCombobox, id);
+    }
     for (AVCodecID id : entry.acodecs) add_codec_to_combobox(acodecCombobox, id);
     default_vcodec = entry.default_vcodec;
     default_acodec = entry.default_acodec;
@@ -244,6 +270,8 @@ void ExportDialog::format_changed(int index) {
   audioGroupbox->setChecked(audio_enabled);
   videoGroupbox->setEnabled(video_enabled);
   audioGroupbox->setEnabled(audio_enabled);
+
+  update_faststart();
 }
 
 void ExportDialog::export_thread_finished() {
@@ -300,6 +328,7 @@ void ExportDialog::reject() {
 void ExportDialog::prep_ui_for_render(bool r) {
   export_button->setEnabled(!r);
   cancel_button->setEnabled(!r);
+  faststartCheckbox->setEnabled(!r);
   videoGroupbox->setEnabled(!r);
   audioGroupbox->setEnabled(!r);
   renderCancel->setEnabled(r);
@@ -377,13 +406,18 @@ ExportParams ExportDialog::build_export_params(const QString& filename) const {
     params.video_height = heightSpinbox->value();
     params.video_compression_type = compressionTypeCombobox->currentData().toInt();
     params.video_bitrate = videobitrateSpinbox->value();
+    params.video_encoder = current_video_encoder();
+    params.video_options = option_values(video_option_rows_);
   }
   params.audio_enabled = audioGroupbox->isChecked();
   if (params.audio_enabled) {
     params.audio_codec = acodecCombobox->currentData().toInt();
     params.audio_sampling_rate = samplingRateSpinbox->value();
     params.audio_bitrate = audiobitrateSpinbox->value();
+    params.audio_encoder = aencoder_name_;
+    params.audio_options = option_values(audio_option_rows_);
   }
+  params.faststart = !faststartCheckbox->isHidden() && faststartCheckbox->isChecked();
   params.start_frame = 0;
   params.end_frame = amber::ActiveSequence->getEndFrame();
   if (rangeCombobox->currentIndex() == 1) {
@@ -492,48 +526,175 @@ void ExportDialog::update_progress_bar(int value, qint64 remaining_ms) {
 }
 
 void ExportDialog::vcodec_changed(int index) {
+  // Repopulate the encoders of this codec; vencoder_changed() below does the rest
+  vencoderCombobox->blockSignals(true);
+  vencoderCombobox->clear();
+  if (index >= 0 && vcodecCombobox->count() > 0) {
+    const auto codec = static_cast<AVCodecID>(vcodecCombobox->itemData(index).toInt());
+    for (const QString& name : dialog_encoders(codec)) {
+      amber::EncoderInfo info;
+      vencoderCombobox->addItem(amber::find_encoder_info(name, &info) ? info.label : name, name);
+    }
+  }
+  vencoderCombobox->blockSignals(false);
+  const bool choice = vencoderCombobox->count() > 1;
+  vencoderLabel->setVisible(choice);
+  vencoderCombobox->setVisible(choice);
+
+  vencoder_changed(vencoderCombobox->currentIndex());
+}
+
+QString ExportDialog::current_video_encoder() const { return vencoderCombobox->currentData().toString(); }
+
+void ExportDialog::vencoder_changed(int) {
   compressionTypeCombobox->clear();
 
-  if (vcodecCombobox->count() > 0) {
-    if (vcodecCombobox->itemData(index) == AV_CODEC_ID_H264 || vcodecCombobox->itemData(index) == AV_CODEC_ID_H265) {
-      compressionTypeCombobox->setEnabled(true);
-      compressionTypeCombobox->addItem(tr("Quality-based (Constant Rate Factor)"), COMPRESSION_TYPE_CFR);
-      //		compressionTypeCombobox->addItem("File size-based (Two-Pass)", COMPRESSION_TYPE_TARGETSIZE);
-      //		compressionTypeCombobox->addItem("Average bitrate (Two-Pass)", COMPRESSION_TYPE_TARGETBR);
-    } else {
-      compressionTypeCombobox->addItem(tr("Constant Bitrate"), COMPRESSION_TYPE_CBR);
-      compressionTypeCombobox->setCurrentIndex(0);
-      compressionTypeCombobox->setEnabled(false);
-    }
+  const QString name = current_video_encoder();
+  has_vencoder_info_ = !name.isEmpty() && amber::find_encoder_info(name, &vencoder_info_);
+  rebuild_option_rows(videoGridLayout, kVideoOptionRow, videoGroupbox, has_vencoder_info_ ? &vencoder_info_ : nullptr,
+                      video_option_rows_);
+  fit_height();  // covers the encoder row too: vcodec_changed() always ends here
 
-    // set default pix_fmt for this codec
-    const AVCodec* codec_info = avcodec_find_encoder(static_cast<AVCodecID>(vcodecCombobox->itemData(index).toInt()));
-    if (codec_info == nullptr) {
-      QMessageBox::critical(this, tr("Invalid Codec"),
-                            tr("Failed to find a suitable encoder for this codec. Export will likely fail."));
-    } else {
-      const enum AVPixelFormat* pix_fmts = nullptr;
+  if (vcodecCombobox->count() == 0) return;
+  const auto codec = static_cast<AVCodecID>(vcodecCombobox->currentData().toInt());
+
+  // Quality-based first: older presets saved compression_type_index 0 for it
+  if (has_vencoder_info_ && (!vencoder_info_.quality_key.isEmpty() || vencoder_info_.supports_average_bitrate)) {
+    compressionTypeCombobox->setEnabled(true);
+    if (!vencoder_info_.quality_key.isEmpty()) {
+      compressionTypeCombobox->addItem(vencoder_info_.quality_mode_label, COMPRESSION_TYPE_CFR);
+    }
+    if (vencoder_info_.supports_average_bitrate) {
+      compressionTypeCombobox->addItem(tr("Average Bitrate"), COMPRESSION_TYPE_TARGETBR);
+    }
+  } else {
+    compressionTypeCombobox->addItem(tr("Constant Bitrate"), COMPRESSION_TYPE_CBR);
+    compressionTypeCombobox->setCurrentIndex(0);
+    compressionTypeCombobox->setEnabled(false);
+  }
+
+  // set default pix_fmt for this encoder: its first one the export can write
+  const AVCodec* codec_info = amber::find_encoder(name, codec);
+  if (codec_info == nullptr) {
+    QMessageBox::critical(this, tr("Invalid Codec"),
+                          tr("Failed to find a suitable encoder for this codec. Export will likely fail."));
+  } else {
+    vcodec_params.pix_fmt = -1;
+    const enum AVPixelFormat* pix_fmts = nullptr;
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 13, 100)
-      int num_pix_fmts = 0;
-      if (avcodec_get_supported_config(nullptr, codec_info, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void**)&pix_fmts,
-                                       &num_pix_fmts) == 0 &&
-          pix_fmts && num_pix_fmts > 0) {
+    int num_pix_fmts = 0;
+    if (avcodec_get_supported_config(nullptr, codec_info, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void**)&pix_fmts,
+                                     &num_pix_fmts) == 0 &&
+        pix_fmts) {
+      for (int i = 0; i < num_pix_fmts; i++) {
 #else
-      pix_fmts = codec_info->pix_fmts;
-      if (pix_fmts && pix_fmts[0] != AV_PIX_FMT_NONE) {
+    pix_fmts = codec_info->pix_fmts;
+    if (pix_fmts) {
+      for (int i = 0; pix_fmts[i] != AV_PIX_FMT_NONE; i++) {
 #endif
-        vcodec_params.pix_fmt = pix_fmts[0];
-      } else {
-        vcodec_params.pix_fmt = -1;
-        QMessageBox::critical(this, tr("Invalid Codec"),
-                              tr("Failed to find pixel format for this encoder. Export will likely fail."));
+        if (amber::export_supports_pix_fmt(pix_fmts[i])) {
+          vcodec_params.pix_fmt = pix_fmts[i];
+          break;
+        }
       }
+    }
+    if (vcodec_params.pix_fmt == -1) {
+      QMessageBox::critical(this, tr("Invalid Codec"),
+                            tr("Failed to find pixel format for this encoder. Export will likely fail."));
+    }
+  }
+}
+
+void ExportDialog::acodec_changed(int index) {
+  aencoder_name_.clear();
+  amber::EncoderInfo info;
+  bool has_info = false;
+  if (index >= 0 && acodecCombobox->count() > 0) {
+    const QStringList encoders = dialog_encoders(static_cast<AVCodecID>(acodecCombobox->itemData(index).toInt()));
+    if (!encoders.isEmpty()) {
+      aencoder_name_ = encoders.first();
+      has_info = amber::find_encoder_info(aencoder_name_, &info);
+    }
+  }
+  rebuild_option_rows(audioGridLayout, kAudioOptionRow, audioGroupbox, has_info ? &info : nullptr, audio_option_rows_);
+  fit_height();
+}
+
+void ExportDialog::rebuild_option_rows(QGridLayout* grid, int first_row, QWidget* parent,
+                                       const amber::EncoderInfo* info, QVector<OptionRow>& rows) {
+  for (const OptionRow& r : rows) {
+    delete r.label;
+    delete r.editor;
+  }
+  rows.clear();
+  if (info == nullptr) return;
+
+  int row = first_row;
+  for (const amber::EncoderOption& o : info->options) {
+    OptionRow r;
+    r.option = o;
+    // Children of the group box from the start, so an unchecked group disables them too
+    r.label = new QLabel(o.label, parent);
+    if (o.kind == amber::EncoderOption::Choice) {
+      auto* combo = new QComboBox(parent);
+      for (int i = 0; i < o.choices.size(); i++) {
+        combo->addItem(o.choice_labels.value(i, o.choices.at(i)), o.choices.at(i));
+      }
+      combo->setCurrentIndex(qMax(0, combo->findData(o.default_value)));
+      r.editor = combo;
+    } else {
+      auto* spin = new QSpinBox(parent);
+      // An unset default gets the extra step below min, showing unset_label and passing nothing
+      const bool unset = !o.unset_label.isEmpty();
+      spin->setRange(unset ? o.min - 1 : o.min, o.max);
+      if (unset) spin->setSpecialValueText(o.unset_label);
+      spin->setValue(o.default_value.isEmpty() ? spin->minimum() : o.default_value.toInt());
+      r.editor = spin;
+    }
+    r.label->setToolTip(o.tooltip);
+    r.editor->setToolTip(o.tooltip);
+    grid->addWidget(r.label, row, 0, 1, 1);
+    grid->addWidget(r.editor, row, 1, 1, 1);
+    row++;
+    rows.append(r);
+  }
+}
+
+amber::EncoderOptionValues ExportDialog::option_values(const QVector<OptionRow>& rows) {
+  amber::EncoderOptionValues values;
+  for (const OptionRow& r : rows) {
+    QString value;
+    if (r.option.kind == amber::EncoderOption::Choice) {
+      value = static_cast<QComboBox*>(r.editor)->currentData().toString();
+    } else {
+      const int v = static_cast<QSpinBox*>(r.editor)->value();
+      if (v < r.option.min) continue;  // the unset step
+      value = QString::number(v);
+    }
+    // The encoder's defaults aren't passed: an untouched row encodes exactly as before the row existed
+    if (value != r.option.default_value) values.append({r.option.key, value});
+  }
+  return values;
+}
+
+void ExportDialog::apply_option_value(const QVector<OptionRow>& rows, const QString& key, const QString& value) {
+  for (const OptionRow& r : rows) {
+    if (r.option.key != key) continue;
+    if (r.option.kind == amber::EncoderOption::Choice) {
+      auto* combo = static_cast<QComboBox*>(r.editor);
+      const int i = combo->findData(value);
+      if (i >= 0) combo->setCurrentIndex(i);
+    } else {
+      bool ok = false;
+      const int v = value.toInt(&ok);
+      if (ok && v >= r.option.min && v <= r.option.max) static_cast<QSpinBox*>(r.editor)->setValue(v);
     }
   }
 }
 
 void ExportDialog::comp_type_changed(int) {
   videobitrateSpinbox->setToolTip("");
+  videobitrateSpinbox->setDecimals(2);
   videobitrateSpinbox->setMinimum(0);
   videobitrateSpinbox->setMaximum(99.99);
   switch (compressionTypeCombobox->currentData().toInt()) {
@@ -543,12 +704,26 @@ void ExportDialog::comp_type_changed(int) {
       videobitrateSpinbox->setValue(qMax(0.5, (double)qRound((0.01528 * amber::ActiveSequence->height) - 4.5)));
       break;
     case COMPRESSION_TYPE_CFR:
-      videoBitrateLabel->setText(tr("Quality (CRF):"));
-      videobitrateSpinbox->setValue(36);
-      videobitrateSpinbox->setMaximum(51);
-      videobitrateSpinbox->setToolTip(
-          tr("Quality Factor:\n\n0 = lossless\n17-18 = visually lossless (compressed, but unnoticeable)\n23 = high "
-             "quality\n51 = lowest quality possible"));
+      // Whole steps: the encoder's quality option gets an integer (ExportThread::SetupVideo)
+      videobitrateSpinbox->setDecimals(0);
+      if (has_vencoder_info_ && !vencoder_info_.quality_key.isEmpty()) {
+        const amber::EncoderInfo& e = vencoder_info_;
+        videoBitrateLabel->setText(e.quality_label);
+        videobitrateSpinbox->setRange(e.quality_min, e.quality_max);
+        videobitrateSpinbox->setValue(e.quality_default);
+        videobitrateSpinbox->setToolTip(!e.quality_tooltip.isEmpty()
+                                            ? e.quality_tooltip
+                                            : tr("%1 = best quality, largest file\n%2 = smallest file, lowest quality")
+                                                  .arg(e.quality_min)
+                                                  .arg(e.quality_max));
+      } else {
+        videoBitrateLabel->setText(tr("Quality (CRF):"));
+        videobitrateSpinbox->setValue(36);
+        videobitrateSpinbox->setMaximum(51);
+        videobitrateSpinbox->setToolTip(
+            tr("Quality Factor:\n\n0 = lossless\n17-18 = visually lossless (compressed, but unnoticeable)\n23 = high "
+               "quality\n51 = lowest quality possible"));
+      }
       break;
     case COMPRESSION_TYPE_TARGETSIZE:
       videoBitrateLabel->setText(tr("Target File Size (MB):"));
@@ -558,8 +733,23 @@ void ExportDialog::comp_type_changed(int) {
 }
 
 void ExportDialog::open_advanced_video_dialog() {
-  AdvancedVideoDialog avd(this, static_cast<AVCodecID>(vcodecCombobox->currentData().toInt()), vcodec_params);
+  AdvancedVideoDialog avd(this, static_cast<AVCodecID>(vcodecCombobox->currentData().toInt()), current_video_encoder(),
+                          vcodec_params);
   avd.exec();
+}
+
+void ExportDialog::update_faststart() {
+  const QString ext =
+      GetFormatExtension(formatCombobox->currentIndex(), vcodecCombobox->currentData().toInt(), true, true);
+  faststartCheckbox->setVisible(!ext.isEmpty() && amber::filename_supports_faststart("x." + ext));
+  fit_height();
+}
+
+void ExportDialog::fit_height() {
+  QTimer::singleShot(0, this, [this]() {
+    layout()->activate();
+    resize(width(), sizeHint().height());
+  });
 }
 
 void ExportDialog::setup_ui() {
@@ -599,30 +789,46 @@ void ExportDialog::setup_ui() {
 
   verticalLayout->addLayout(range_layout);
 
+  faststartCheckbox = new QCheckBox(tr("Fast start (web playback)"), this);
+  faststartCheckbox->setToolTip(
+      tr("Moves the index to the start of the file so it plays while downloading. Takes a moment longer at the end of "
+         "the export."));
+  faststartCheckbox->setChecked(true);
+  verticalLayout->addWidget(faststartCheckbox);
+
   videoGroupbox = new QGroupBox(this);
   videoGroupbox->setTitle(tr("Video"));
   videoGroupbox->setFlat(false);
   videoGroupbox->setCheckable(true);
 
-  QGridLayout* videoGridLayout = new QGridLayout(videoGroupbox);
+  videoGridLayout = new QGridLayout(videoGroupbox);
 
   videoGridLayout->addWidget(new QLabel(tr("Codec:"), this), 0, 0, 1, 1);
   vcodecCombobox = new QComboBox(videoGroupbox);
   videoGridLayout->addWidget(vcodecCombobox, 0, 1, 1, 1);
 
-  videoGridLayout->addWidget(new QLabel(tr("Width:"), this), 1, 0, 1, 1);
+  // Hidden unless the codec has a choice of encoders (vcodec_changed)
+  vencoderLabel = new QLabel(tr("Encoder:"), videoGroupbox);
+  videoGridLayout->addWidget(vencoderLabel, 1, 0, 1, 1);
+  vencoderCombobox = new QComboBox(videoGroupbox);
+  vencoderCombobox->setToolTip(tr("The program that encodes this codec. Faster encoders make larger files."));
+  videoGridLayout->addWidget(vencoderCombobox, 1, 1, 1, 1);
+  vencoderLabel->setVisible(false);
+  vencoderCombobox->setVisible(false);
+
+  videoGridLayout->addWidget(new QLabel(tr("Width:"), this), 2, 0, 1, 1);
   widthSpinbox = new QSpinBox(videoGroupbox);
   widthSpinbox->setMinimum(2);
   widthSpinbox->setMaximum(16777216);
-  videoGridLayout->addWidget(widthSpinbox, 1, 1, 1, 1);
+  videoGridLayout->addWidget(widthSpinbox, 2, 1, 1, 1);
 
-  videoGridLayout->addWidget(new QLabel(tr("Height:"), this), 2, 0, 1, 1);
+  videoGridLayout->addWidget(new QLabel(tr("Height:"), this), 3, 0, 1, 1);
   heightSpinbox = new QSpinBox(videoGroupbox);
   heightSpinbox->setMinimum(2);
   heightSpinbox->setMaximum(16777216);
-  videoGridLayout->addWidget(heightSpinbox, 2, 1, 1, 1);
+  videoGridLayout->addWidget(heightSpinbox, 3, 1, 1, 1);
 
-  videoGridLayout->addWidget(new QLabel(tr("Frame Rate:"), this), 3, 0, 1, 1);
+  videoGridLayout->addWidget(new QLabel(tr("Frame Rate:"), this), 4, 0, 1, 1);
   framerateSpinbox = new QDoubleSpinBox(videoGroupbox);
   // Display only: the export always uses the sequence frame rate (ExportThread::SetupVideo)
   framerateSpinbox->setEnabled(false);
@@ -632,22 +838,23 @@ void ExportDialog::setup_ui() {
   // CBA: display ceiling only, no sequence (even from high-speed footage) comes near it
   framerateSpinbox->setMaximum(1000);
   framerateSpinbox->setValue(0);
-  videoGridLayout->addWidget(framerateSpinbox, 3, 1, 1, 1);
+  videoGridLayout->addWidget(framerateSpinbox, 4, 1, 1, 1);
 
-  videoGridLayout->addWidget(new QLabel(tr("Compression Type:"), this), 4, 0, 1, 1);
+  videoGridLayout->addWidget(new QLabel(tr("Compression Type:"), this), 5, 0, 1, 1);
   compressionTypeCombobox = new QComboBox(videoGroupbox);
-  videoGridLayout->addWidget(compressionTypeCombobox, 4, 1, 1, 1);
+  videoGridLayout->addWidget(compressionTypeCombobox, 5, 1, 1, 1);
 
   videoBitrateLabel = new QLabel(videoGroupbox);
-  videoGridLayout->addWidget(videoBitrateLabel, 5, 0, 1, 1);
+  videoGridLayout->addWidget(videoBitrateLabel, 6, 0, 1, 1);
   videobitrateSpinbox = new QDoubleSpinBox(videoGroupbox);
   videobitrateSpinbox->setMaximum(100);
   videobitrateSpinbox->setValue(2);
-  videoGridLayout->addWidget(videobitrateSpinbox, 5, 1, 1, 1);
+  videoGridLayout->addWidget(videobitrateSpinbox, 6, 1, 1, 1);
 
+  // Encoder option rows go from kVideoOptionRow down (rebuild_option_rows); empty grid rows take no space
   QPushButton* advanced_video_button = new QPushButton(tr("Advanced"));
   connect(advanced_video_button, &QPushButton::clicked, this, &ExportDialog::open_advanced_video_dialog);
-  videoGridLayout->addWidget(advanced_video_button, 6, 1);
+  videoGridLayout->addWidget(advanced_video_button, kLastRow, 1);
 
   verticalLayout->addWidget(videoGroupbox);
 
@@ -655,7 +862,7 @@ void ExportDialog::setup_ui() {
   audioGroupbox->setTitle(tr("Audio"));
   audioGroupbox->setCheckable(true);
 
-  QGridLayout* audioGridLayout = new QGridLayout(audioGroupbox);
+  audioGridLayout = new QGridLayout(audioGroupbox);
 
   audioGridLayout->addWidget(new QLabel(tr("Codec:"), this), 0, 0, 1, 1);
   acodecCombobox = new QComboBox(audioGroupbox);
@@ -713,6 +920,8 @@ void ExportDialog::setup_ui() {
   connect(compressionTypeCombobox, qOverload<int>(&QComboBox::currentIndexChanged), this,
           &ExportDialog::comp_type_changed);
   connect(vcodecCombobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ExportDialog::vcodec_changed);
+  connect(vencoderCombobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ExportDialog::vencoder_changed);
+  connect(acodecCombobox, qOverload<int>(&QComboBox::currentIndexChanged), this, &ExportDialog::acodec_changed);
 }
 
 QString ExportDialog::UserPresetDir() {
@@ -766,13 +975,19 @@ void ExportDialog::PopulatePresetCombo() {
 
 void ExportDialog::preset_selected(int index) {
   if (index <= 0) {
-    // "Default" selected - reset to built-in defaults
-    formatCombobox->setCurrentIndex(FORMAT_MPEG4);
+    // "Default" selected - reset to built-in defaults. Already on MP4, the index doesn't change: refill the codecs
+    // anyway so the encoder, its option rows and the compression type are reset too
+    if (formatCombobox->currentIndex() == FORMAT_MPEG4) {
+      format_changed(FORMAT_MPEG4);
+    } else {
+      formatCombobox->setCurrentIndex(FORMAT_MPEG4);
+    }
     widthSpinbox->setValue(amber::ActiveSequence->width);
     heightSpinbox->setValue(amber::ActiveSequence->height);
     framerateSpinbox->setValue(amber::ActiveSequence->frame_rate);
     samplingRateSpinbox->setValue(amber::ActiveSequence->audio_frequency);
     audiobitrateSpinbox->setValue(256);
+    faststartCheckbox->setChecked(true);
     return;
   }
   QString name = preset_combo_->itemText(index);
@@ -818,12 +1033,29 @@ void ExportDialog::SavePreset(const QString& name) {
   stream.writeTextElement("height", QString::number(heightSpinbox->value()));
   stream.writeTextElement("compression_type_index", QString::number(compressionTypeCombobox->currentIndex()));
   stream.writeTextElement("video_bitrate", QString::number(videobitrateSpinbox->value(), 'f', 6));
+  // Encoder and its non-default options (2.0; 1.x ignores these tags)
+  if (!current_video_encoder().isEmpty()) stream.writeTextElement("video_encoder", current_video_encoder());
+  for (const auto& o : option_values(video_option_rows_)) {
+    stream.writeStartElement("video_option");
+    stream.writeAttribute("key", o.first);
+    stream.writeCharacters(o.second);
+    stream.writeEndElement();
+  }
 
   // Audio settings
   stream.writeTextElement("audio_enabled", QString::number(audioGroupbox->isChecked() ? 1 : 0));
   stream.writeTextElement("audio_codec_index", QString::number(acodecCombobox->currentIndex()));
   stream.writeTextElement("sampling_rate", QString::number(samplingRateSpinbox->value()));
   stream.writeTextElement("audio_bitrate", QString::number(audiobitrateSpinbox->value()));
+  if (!aencoder_name_.isEmpty()) stream.writeTextElement("audio_encoder", aencoder_name_);
+  for (const auto& o : option_values(audio_option_rows_)) {
+    stream.writeStartElement("audio_option");
+    stream.writeAttribute("key", o.first);
+    stream.writeCharacters(o.second);
+    stream.writeEndElement();
+  }
+
+  stream.writeTextElement("faststart", QString::number(faststartCheckbox->isChecked() ? 1 : 0));
 
   stream.writeEndElement();  // export_preset
   stream.writeEndDocument();
@@ -863,6 +1095,11 @@ void ExportDialog::LoadPreset(const QString& name) {
   int audio_codec_index = -1;
   int sampling_rate = -1;
   int audio_bitrate = -1;
+  QString video_encoder;
+  QString audio_encoder;
+  amber::EncoderOptionValues video_options;
+  amber::EncoderOptionValues audio_options;
+  int faststart = -1;
 
   while (!stream.atEnd()) {
     stream.readNext();
@@ -890,6 +1127,16 @@ void ExportDialog::LoadPreset(const QString& name) {
         sampling_rate = stream.readElementText().toInt();
       } else if (tag == "audio_bitrate") {
         audio_bitrate = stream.readElementText().toInt();
+      } else if (tag == "video_encoder") {
+        video_encoder = stream.readElementText();
+      } else if (tag == "audio_encoder") {
+        audio_encoder = stream.readElementText();
+      } else if (tag == "video_option" || tag == "audio_option") {
+        const QString key = stream.attributes().value("key").toString();
+        const QString value = stream.readElementText();
+        (tag == "video_option" ? video_options : audio_options).append({key, value});
+      } else if (tag == "faststart") {
+        faststart = stream.readElementText().toInt();
       }
     }
   }
@@ -907,10 +1154,15 @@ void ExportDialog::LoadPreset(const QString& name) {
     formatCombobox->setCurrentIndex(format_index);
   }
 
-  // 2. Video codec (triggers vcodec_changed -> repopulates compression type)
+  // 2. Video codec (triggers vcodec_changed -> repopulates encoders, compression type and option rows)
   if (video_codec_index >= 0 && video_codec_index < vcodecCombobox->count()) {
     vcodecCombobox->setCurrentIndex(video_codec_index);
   }
+  // The preset's encoder, when installed; rebuilt even when already selected so its option rows start at their
+  // defaults. Options of an encoder that isn't installed (or of an older preset, which has none) are ignored.
+  const int encoder_index = video_encoder.isEmpty() ? -1 : vencoderCombobox->findData(video_encoder);
+  if (encoder_index >= 0) vencoderCombobox->setCurrentIndex(encoder_index);
+  vencoder_changed(vencoderCombobox->currentIndex());
 
   // 3. Video settings (after codec is set so compression type combo is populated)
   if (width >= 0) widthSpinbox->setValue(width);
@@ -920,6 +1172,9 @@ void ExportDialog::LoadPreset(const QString& name) {
     compressionTypeCombobox->setCurrentIndex(compression_type_index);
   }
   if (video_bitrate >= 0) videobitrateSpinbox->setValue(video_bitrate);
+  if (encoder_index >= 0) {
+    for (const auto& o : video_options) apply_option_value(video_option_rows_, o.first, o.second);
+  }
 
   // 4. Video/audio group enable (after codecs are set)
   if (video_enabled >= 0) {
@@ -932,6 +1187,10 @@ void ExportDialog::LoadPreset(const QString& name) {
   if (audio_codec_index >= 0 && audio_codec_index < acodecCombobox->count()) {
     acodecCombobox->setCurrentIndex(audio_codec_index);
   }
+  acodec_changed(acodecCombobox->currentIndex());  // option rows back to their defaults
+  if (!audio_encoder.isEmpty() && audio_encoder == aencoder_name_) {
+    for (const auto& o : audio_options) apply_option_value(audio_option_rows_, o.first, o.second);
+  }
 
   // 6. Audio settings
   if (sampling_rate >= 0) samplingRateSpinbox->setValue(sampling_rate);
@@ -942,4 +1201,7 @@ void ExportDialog::LoadPreset(const QString& name) {
     audioGroupbox->setChecked(audio_enabled != 0 && has_audio);
     audioGroupbox->setEnabled(has_audio);
   }
+
+  // On by default, older presets included
+  faststartCheckbox->setChecked(faststart != 0);
 }

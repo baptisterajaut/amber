@@ -47,12 +47,17 @@ public:
    *
    * The AVCodecID of the selected export codec.
    *
+   * @param encoder
+   *
+   * The FFmpeg name of the selected encoder; empty for the codec's default encoder.
+   *
    * @param iparams
    *
    * A VideoCodecParams struct containing the extra codec data.
    */
   AdvancedVideoDialog(QWidget* parent,
                       AVCodecID encoding_codec,
+                      const QString& encoder,
                       VideoCodecParams& iparams);
 
 public slots:

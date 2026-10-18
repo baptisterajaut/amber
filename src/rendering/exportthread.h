@@ -23,7 +23,9 @@
 
 #include <QMutex>
 #include <QOffscreenSurface>
+#include <QPair>
 #include <QThread>
+#include <QVector>
 #include <QWaitCondition>
 #include <atomic>
 
@@ -45,9 +47,9 @@ extern "C" {
 }
 
 #define COMPRESSION_TYPE_CBR 0
-#define COMPRESSION_TYPE_CFR 1
+#define COMPRESSION_TYPE_CFR 1  // quality-based: the encoder's quality option (crf, qp...) gets video_bitrate
 #define COMPRESSION_TYPE_TARGETSIZE 2
-#define COMPRESSION_TYPE_TARGETBR 3
+#define COMPRESSION_TYPE_TARGETBR 3  // average bitrate, one pass: bit_rate alone (ABR/VBR)
 
 // structs that store parameters passed from the export dialogs to this thread
 
@@ -66,6 +68,14 @@ struct ExportParams {
   int audio_bitrate;
   long start_frame;
   long end_frame;
+  // FFmpeg encoder names (rendering/encoderoptions.h); empty: avcodec_find_encoder() of the codec
+  QString video_encoder;
+  QString audio_encoder;
+  // Extra encoder options for avcodec_open2(), only those differing from the encoder's defaults
+  QVector<QPair<QString, QString>> video_options;
+  QVector<QPair<QString, QString>> audio_options;
+  // movflags=+faststart when the muxer has it (MOV family): the index goes before the media data
+  bool faststart = false;
 };
 
 struct VideoCodecParams {

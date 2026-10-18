@@ -261,6 +261,12 @@ target_compile_definitions(amber-test-effect-presets PRIVATE SOURCE_DIR="${CMAKE
 target_link_libraries(amber-test-effect-presets PRIVATE amber-engine Qt6::Gui Qt6::Test)
 add_test(NAME amber-test-effect-presets COMMAND amber-test-effect-presets)
 
+# Encoder descriptors — validation against the installed FFmpeg, encoder order, muxer fast start
+add_executable(amber-test-encoder-options test_encoderoptions.cpp)
+target_include_directories(amber-test-encoder-options PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-encoder-options PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-encoder-options COMMAND amber-test-encoder-options)
+
 # Headless export — loads a hand-written .ove and exports it through prepare_export() + ExportThread, then decodes
 # the file. Proof that the engine renders without the UI: amber-engine + Qt Gui/Test only, no QtWidgets.
 add_executable(amber-test-headless-render test_headless_render.cpp)
