@@ -49,6 +49,9 @@ VoidEffect::VoidEffect(Clip* c, const QString& n) : Effect(c, nullptr) {
 EffectPtr VoidEffect::copy(Clip* c) {
   auto copy = std::make_shared<VoidEffect>(c, name);
   copy->void_meta.subtype = void_meta.subtype;  // copies to the clipboard have no clip
+  // The stored XML and id are all a Missing Effect is: a split or duplicated clip keeps its parameters
+  copy->bytes = bytes;
+  copy->ladspa_id_ = ladspa_id_;
   copy->SetEnabled(IsEnabled());
   copy_field_keyframes(copy);
   return copy;

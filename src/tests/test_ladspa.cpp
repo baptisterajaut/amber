@@ -312,6 +312,9 @@ class TestLadspa : public QObject {
     const QByteArray saved = missing.save_to_string();
     QVERIFY2(saved.contains(R"(<effect name="LADSPA/Gone" enabled="1" ladspa_id="4242999">)"), saved.constData());
     QVERIFY2(saved.contains(R"(<field id="0" value="0.5"/>)"), saved.constData());
+    // A split or duplicated clip copies its effects: the copy keeps the id and the stored values too
+    Clip other(&seq);
+    QCOMPARE(missing.copy(&other)->save_to_string(), saved);
   }
 
   // $LADSPA_PATH replaces the default folders; libraries that aren't LADSPA plugins are skipped
