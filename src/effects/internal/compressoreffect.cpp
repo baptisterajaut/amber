@@ -49,6 +49,7 @@ void CompressorEffect::process_audio(double timecode_start, double, quint8* samp
   const amber::AudioProcessContext& ctx = amber::current_audio_context();
   bool reset;
   std::shared_ptr<amber::audiodsp::Compressor> comp = states_.acquire(ctx, timecode_start, frames, &reset);
+  if (reset) comp->reset();
   // CBA: parameters per chunk; per-sample interpolation if zipper noise shows up
   comp->set(threshold_val->GetDoubleAt(timecode_start), ratio_val->GetDoubleAt(timecode_start),
             attack_val->GetDoubleAt(timecode_start), release_val->GetDoubleAt(timecode_start),

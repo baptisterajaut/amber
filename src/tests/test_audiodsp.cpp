@@ -214,7 +214,7 @@ class TestAudioDsp : public QObject {
     QVERIFY(!reset);  // continuous
     *states.acquire(ctx, 0.2005, 4800, &reset) = 8;
     QVERIFY(!reset);  // within the 2 ms tolerance
-    QCOMPARE(*states.acquire(ctx, 1.3, 4800, &reset), 0);
+    states.acquire(ctx, 1.3, 4800, &reset);
     QVERIFY(reset);  // 1 s jump
     *states.acquire(ctx, 1.4, 4800, &reset) = 9;
     QVERIFY(!reset);
@@ -227,21 +227,69 @@ class TestAudioDsp : public QObject {
     amber::StreamStates<int> states;
     bool reset = false;
     *states.acquire(amber::AudioProcessContext{nullptr, 48000}, 0.0, 4800, &reset) = 3;
-    QCOMPARE(*states.acquire(amber::AudioProcessContext{nullptr, 44100}, 0.1, 4410, &reset), 0);
+    states.acquire(amber::AudioProcessContext{nullptr, 44100}, 0.1, 4410, &reset);
     QVERIFY(reset);
   }
 
-  void clearPastMaxStreamsKeepsHeldStates() {
+  void evictsTheLeastRecentlyUsedStreamPast64() {
     amber::StreamStates<int> states;
-    std::vector<int> keys(amber::StreamStates<int>::kMaxStreams + 1);
+    std::vector<int> keys(amber::StreamStates<int>::kMaxStreams + 2);
+    auto ctx = [&keys](size_t i) { return amber::AudioProcessContext{&keys[i], kRate}; };
     bool reset = false;
-    std::shared_ptr<int> held = states.acquire(amber::AudioProcessContext{&keys[0], kRate}, 0.0, 4800, &reset);
+    std::shared_ptr<int> held = states.acquire(ctx(0), 0.0, 4800, &reset);
     *held = 5;
-    for (size_t i = 1; i < keys.size(); i++)
-      states.acquire(amber::AudioProcessContext{&keys[i], kRate}, 0.0, 4800, &reset);
-    QCOMPARE(*held, 5);  // still alive after the clear-all
-    states.acquire(amber::AudioProcessContext{&keys[0], kRate}, 0.1, 4800, &reset);
-    QVERIFY(reset);  // dropped by the clear, so it starts over
+    // 64 more streams: the 65th evicts key 0, the least recently used
+    for (size_t i = 1; i <= size_t(amber::StreamStates<int>::kMaxStreams); i++) {
+      *states.acquire(ctx(i), 0.0, 4800, &reset) = int(i);
+    }
+    QCOMPARE(*held, 5);  // still alive in the caller's hands
+    // Key 1 survived: same state, no reset
+    QCOMPARE(*states.acquire(ctx(1), 0.1, 4800, &reset), 1);
+    QVERIFY(!reset);
+    // Key 0 was dropped, so it comes back as a new stream (and evicts key 2, now the oldest)
+    QCOMPARE(*states.acquire(ctx(0), 0.1, 4800, &reset), 0);
+    QVERIFY(reset);
+    QCOMPARE(*states.acquire(ctx(3), 0.1, 4800, &reset), 3);
+    QVERIFY(!reset);
+    states.acquire(ctx(2), 0.1, 4800, &reset);
+    QVERIFY(reset);
+  }
+
+  void delayResetEmptiesTheBuffer() {
+    std::vector<float> v(size_t(kRate) * 2, 0.0f);
+    v[0] = v[1] = 1.0f;
+    DelayLine d;
+    d.reset(kRate);
+    d.set(250, 0.5, 0.5, kRate);
+    d.process(v.data(), 1000);  // the impulse is in the buffer, its echo not out yet
+    d.reset(kRate);             // same rate: cleared in place
+    std::fill(v.begin(), v.end(), 0.0f);
+    d.process(v.data(), kRate);
+    QCOMPARE(peak(v, 0), 0.0);
+  }
+
+  void delayFeedbackIsCappedAndTailsFlushToZero() {
+    // Feedback 1.0 is capped at 0.95: each echo is 0.95 of the previous one, and after 1000 echoes (5e-23) the
+    // tail is flushed to exact zeros instead of running on in denormals
+    const int lag = kRate / 100;  // 10 ms
+    std::vector<float> v(size_t(kRate) * 12 * 2, 0.0f);
+    v[0] = v[1] = 1.0f;
+    DelayLine d;
+    d.reset(kRate);
+    d.set(10, 1.0, 1.0, kRate);
+    d.process(v.data(), kRate * 12);
+    QVERIFY(qAbs(v[size_t(lag) * 2] - 1.0f) < 1e-6);
+    QVERIFY(qAbs(v[size_t(lag) * 4] - 0.95f) < 1e-6);
+    QCOMPARE(peak(v, kRate * 11), 0.0);
+  }
+
+  void biquadTailFlushesToZero() {
+    std::vector<float> v(size_t(kRate) * 2 * 2, 0.0f);
+    v[0] = v[1] = 1.0f;
+    Biquad b;
+    b.set(peaking(1000, 12, 4, kRate));
+    b.process(v.data(), kRate * 2);
+    QCOMPARE(peak(v, kRate), 0.0);
   }
 
   void scopeKeepsTheOutermostContext() {

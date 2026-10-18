@@ -57,6 +57,11 @@ void ParametricEQEffect::process_audio(double timecode_start, double, quint8* sa
   const amber::AudioProcessContext& ctx = amber::current_audio_context();
   bool reset;
   std::shared_ptr<Bands> bands = states_.acquire(ctx, timecode_start, frames, &reset);
+  if (reset) {
+    bands->low.reset();
+    bands->mid.reset();
+    bands->high.reset();
+  }
 
   std::vector<float> buf(size_t(frames) * 2);
   amber::audiodsp::s16_to_float(samples, buf.data(), frames);

@@ -46,6 +46,7 @@ class Biquad {
 class Compressor {
  public:
   void set(double threshold_db, double ratio, double attack_ms, double release_ms, double makeup_db, int rate);
+  void reset() { level_ = reduction_db_ = 0; }
   void process(float* frames, int n);
 
  private:
@@ -64,6 +65,7 @@ class Compressor {
 class Limiter {
  public:
   void set(double ceiling_db, double release_ms, int rate);
+  void reset() { gain_ = 1; }
   void process(float* frames, int n);
 
  private:
@@ -77,8 +79,10 @@ class Limiter {
 class DelayLine {
  public:
   static constexpr int kMaxSeconds = 2;
+  static constexpr double kMaxFeedback = 0.95;  // the echoes always die out
+  // Empties the buffer; reallocates only when the rate changes
   void reset(int rate);
-  // mix and feedback in [0, 1]
+  // mix in [0, 1], feedback in [0, kMaxFeedback]
   void set(double time_ms, double feedback, double mix, int rate);
   void process(float* frames, int n);
 

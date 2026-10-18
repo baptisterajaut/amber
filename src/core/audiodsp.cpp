@@ -16,6 +16,11 @@ double time_coef(double t_ms, int rate) {
   return samples > 0 ? std::exp(-1.0 / samples) : 0.0;
 }
 
+// The decaying tails of filter memories, envelopes and echoes go denormal in silence, which is slow on x86: flush
+// them to 0 well before (no FTZ/DAZ, the flags are per thread and would leak into the rest of the cacher)
+constexpr double kDenormalFloor = 1e-20;
+double flush_denormal(double v) { return std::fabs(v) < kDenormalFloor ? 0.0 : v; }
+
 double clamp_freq(double freq, int rate) { return std::clamp(freq, 10.0, 0.45 * rate); }
 
 BiquadCoeffs normalise(double b0, double b1, double b2, double a0, double a1, double a2) {
@@ -85,8 +90,8 @@ void Biquad::process(float* frames, int n) {
     for (int ch = 0; ch < 2; ch++) {
       const double x = frames[i * 2 + ch];
       const double y = c_.b0 * x + s1_[ch];
-      s1_[ch] = c_.b1 * x - c_.a1 * y + s2_[ch];
-      s2_[ch] = c_.b2 * x - c_.a2 * y;
+      s1_[ch] = flush_denormal(c_.b1 * x - c_.a1 * y + s2_[ch]);
+      s2_[ch] = flush_denormal(c_.b2 * x - c_.a2 * y);
       frames[i * 2 + ch] = float(y);
     }
   }
@@ -105,10 +110,12 @@ void Compressor::process(float* frames, int n) {
   for (int i = 0; i < n; i++) {
     const double peak = std::max(std::fabs(frames[i * 2]), std::fabs(frames[i * 2 + 1]));
     level_ = std::max(peak, release_coef_ * level_);
+    if (level_ < 1e-12) level_ = 0;
     const double in_db = 20.0 * std::log10(std::max(level_, 1e-9));
     const double target = in_db < threshold_db_ ? 0.0 : threshold_db_ + (in_db - threshold_db_) / ratio_ - in_db;
     const double coef = target < reduction_db_ ? attack_coef_ : release_coef_;
     reduction_db_ = coef * reduction_db_ + (1.0 - coef) * target;
+    if (reduction_db_ > -1e-12) reduction_db_ = 0;
     const float gain = float(std::pow(10.0, (reduction_db_ + makeup_db_) / 20.0));
     frames[i * 2] *= gain;
     frames[i * 2 + 1] *= gain;
@@ -134,15 +141,21 @@ void Limiter::process(float* frames, int n) {
 }
 
 void DelayLine::reset(int rate) {
-  capacity_ = kMaxSeconds * rate + 1;
-  buffer_.assign(size_t(capacity_) * 2, 0.0f);
+  // A seek or a scrub grain resets at the same rate: clear the buffer in place rather than reallocate 2 s of audio
+  const int capacity = kMaxSeconds * rate + 1;
+  if (capacity == capacity_) {
+    std::fill(buffer_.begin(), buffer_.end(), 0.0f);
+  } else {
+    capacity_ = capacity;
+    buffer_.assign(size_t(capacity_) * 2, 0.0f);
+  }
   write_ = 0;
 }
 
 void DelayLine::set(double time_ms, double feedback, double mix, int rate) {
   delay_ = int(std::lround(time_ms * rate / 1000.0));
   delay_ = std::clamp(delay_, 1, std::max(1, capacity_ - 1));
-  feedback_ = float(std::clamp(feedback, 0.0, 1.0));
+  feedback_ = float(std::clamp(feedback, 0.0, kMaxFeedback));
   mix_ = float(std::clamp(mix, 0.0, 1.0));
 }
 
@@ -154,7 +167,7 @@ void DelayLine::process(float* frames, int n) {
       const float dry = frames[i * 2 + ch];
       const float delayed = buffer_[size_t(read) * 2 + ch];
       frames[i * 2 + ch] = dry * (1.0f - mix_) + delayed * mix_;
-      buffer_[size_t(write_) * 2 + ch] = dry + delayed * feedback_;
+      buffer_[size_t(write_) * 2 + ch] = float(flush_denormal(dry + delayed * feedback_));
     }
     write_ = (write_ + 1) % capacity_;
   }
