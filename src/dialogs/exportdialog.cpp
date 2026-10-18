@@ -78,7 +78,7 @@ enum ExportFormats {
 
 // Rows of the video grid: encoder options from kVideoOptionRow down, the Advanced button below them all. Audio
 // options from kAudioOptionRow down.
-constexpr int kVideoOptionRow = 7;
+constexpr int kVideoOptionRow = 8;
 constexpr int kLastRow = 50;
 constexpr int kAudioOptionRow = 4;
 
@@ -329,7 +329,7 @@ void ExportDialog::prep_ui_for_render(bool r) {
   export_button->setEnabled(!r);
   cancel_button->setEnabled(!r);
   faststartCheckbox->setEnabled(!r);
-  videoGroupbox->setEnabled(!r);
+  videoGroupbox->setEnabled(!r);  // the two-pass checkbox with it
   audioGroupbox->setEnabled(!r);
   renderCancel->setEnabled(r);
 }
@@ -408,6 +408,7 @@ ExportParams ExportDialog::build_export_params(const QString& filename) const {
     params.video_bitrate = videobitrateSpinbox->value();
     params.video_encoder = current_video_encoder();
     params.video_options = option_values(video_option_rows_);
+    params.two_pass = !twoPassCheckbox->isHidden() && twoPassCheckbox->isChecked();
   }
   params.audio_enabled = audioGroupbox->isChecked();
   if (params.audio_enabled) {
@@ -432,6 +433,11 @@ void ExportDialog::launch_export_thread(const ExportParams& params) {
 
   connect(export_thread_, &QThread::finished, this, &ExportDialog::export_thread_finished);
   connect(export_thread_, &ExportThread::ProgressChanged, this, &ExportDialog::update_progress_bar);
+  export_pass_.clear();
+  connect(export_thread_, &ExportThread::PassChanged, this, [this](int pass, int passes) {
+    export_pass_ = tr("Pass %1 of %2").arg(pass).arg(passes);
+    progressBar->setFormat(export_pass_ + ": %p%");  // until the pass's first frame gives an ETA
+  });
   connect(renderCancel, &QPushButton::clicked, export_thread_, &ExportThread::Interrupt);
 
   panel_effect_controls->Clear();
@@ -520,6 +526,8 @@ void ExportDialog::update_progress_bar(int value, qint64 remaining_ms) {
     progressBar->setFormat(tr("%p% (ETA: %1:%2:%3)")
                                .arg(QString::number(hours), QString::number(minutes).rightJustified(2, '0'),
                                     QString::number(seconds).rightJustified(2, '0')));
+    // Two-pass: "Pass 1 of 2: 23% (ETA: ...)"
+    if (!export_pass_.isEmpty()) progressBar->setFormat(export_pass_ + ": " + progressBar->format());
   }
 
   progressBar->setValue(value);
@@ -547,6 +555,7 @@ void ExportDialog::vcodec_changed(int index) {
 QString ExportDialog::current_video_encoder() const { return vencoderCombobox->currentData().toString(); }
 
 void ExportDialog::vencoder_changed(int) {
+  twoPassCheckbox->setChecked(false);  // off by default for every encoder
   compressionTypeCombobox->clear();
 
   const QString name = current_video_encoder();
@@ -730,6 +739,13 @@ void ExportDialog::comp_type_changed(int) {
       videobitrateSpinbox->setValue(100);
       break;
   }
+  update_two_pass();
+}
+
+void ExportDialog::update_two_pass() {
+  twoPassCheckbox->setVisible(has_vencoder_info_ && vencoder_info_.supports_two_pass &&
+                              compressionTypeCombobox->currentData().toInt() == COMPRESSION_TYPE_TARGETBR);
+  fit_height();
 }
 
 void ExportDialog::open_advanced_video_dialog() {
@@ -844,12 +860,20 @@ void ExportDialog::setup_ui() {
   compressionTypeCombobox = new QComboBox(videoGroupbox);
   videoGridLayout->addWidget(compressionTypeCombobox, 5, 1, 1, 1);
 
+  // Hidden unless Average bitrate with an encoder that has two-pass (update_two_pass)
+  twoPassCheckbox = new QCheckBox(tr("Two-pass encoding"), videoGroupbox);
+  twoPassCheckbox->setToolTip(
+      tr("Analyses the whole sequence first, then encodes, so the bitrate goes where the picture needs it. The export "
+         "takes about twice as long."));
+  twoPassCheckbox->setVisible(false);
+  videoGridLayout->addWidget(twoPassCheckbox, 6, 1, 1, 1);
+
   videoBitrateLabel = new QLabel(videoGroupbox);
-  videoGridLayout->addWidget(videoBitrateLabel, 6, 0, 1, 1);
+  videoGridLayout->addWidget(videoBitrateLabel, 7, 0, 1, 1);
   videobitrateSpinbox = new QDoubleSpinBox(videoGroupbox);
   videobitrateSpinbox->setMaximum(100);
   videobitrateSpinbox->setValue(2);
-  videoGridLayout->addWidget(videobitrateSpinbox, 6, 1, 1, 1);
+  videoGridLayout->addWidget(videobitrateSpinbox, 7, 1, 1, 1);
 
   // Encoder option rows go from kVideoOptionRow down (rebuild_option_rows); empty grid rows take no space
   QPushButton* advanced_video_button = new QPushButton(tr("Advanced"));
@@ -1032,6 +1056,9 @@ void ExportDialog::SavePreset(const QString& name) {
   stream.writeTextElement("width", QString::number(widthSpinbox->value()));
   stream.writeTextElement("height", QString::number(heightSpinbox->value()));
   stream.writeTextElement("compression_type_index", QString::number(compressionTypeCombobox->currentIndex()));
+  // The COMPRESSION_TYPE_* value: the index alone changed meaning when VP9 got a quality mode (2.0; 1.x ignores it)
+  stream.writeTextElement("compression_type", QString::number(compressionTypeCombobox->currentData().toInt()));
+  stream.writeTextElement("two_pass", QString::number(twoPassCheckbox->isChecked() ? 1 : 0));
   stream.writeTextElement("video_bitrate", QString::number(videobitrateSpinbox->value(), 'f', 6));
   // Encoder and its non-default options (2.0; 1.x ignores these tags)
   if (!current_video_encoder().isEmpty()) stream.writeTextElement("video_encoder", current_video_encoder());
@@ -1090,6 +1117,8 @@ void ExportDialog::LoadPreset(const QString& name) {
   int width = -1;
   int height = -1;
   int compression_type_index = -1;
+  int compression_type = -1;
+  int two_pass = -1;
   double video_bitrate = -1;
   int audio_enabled = -1;
   int audio_codec_index = -1;
@@ -1117,6 +1146,10 @@ void ExportDialog::LoadPreset(const QString& name) {
         height = stream.readElementText().toInt();
       } else if (tag == "compression_type_index") {
         compression_type_index = stream.readElementText().toInt();
+      } else if (tag == "compression_type") {
+        compression_type = stream.readElementText().toInt();
+      } else if (tag == "two_pass") {
+        two_pass = stream.readElementText().toInt();
       } else if (tag == "video_bitrate") {
         video_bitrate = stream.readElementText().toDouble();
       } else if (tag == "audio_enabled") {
@@ -1168,9 +1201,19 @@ void ExportDialog::LoadPreset(const QString& name) {
   if (width >= 0) widthSpinbox->setValue(width);
   if (height >= 0) heightSpinbox->setValue(height);
   // An older preset's frame_rate is skipped: the export always uses the sequence frame rate
-  if (compression_type_index >= 0 && compression_type_index < compressionTypeCombobox->count()) {
+  if (compression_type >= 0) {
+    // By value; a mode this encoder doesn't have leaves the default
+    const int i = compressionTypeCombobox->findData(compression_type);
+    if (i >= 0) compressionTypeCombobox->setCurrentIndex(i);
+  } else if (vcodecCombobox->currentData().toInt() == AV_CODEC_ID_VP9 && current_video_encoder() == "libvpx-vp9") {
+    // A VP9 preset from before VP9's quality mode: its index 0 was Constant Bitrate, and its bitrate in Mbps would
+    // read as a CRF in the new first entry
+    const int i = compressionTypeCombobox->findData(COMPRESSION_TYPE_TARGETBR);
+    if (i >= 0) compressionTypeCombobox->setCurrentIndex(i);
+  } else if (compression_type_index >= 0 && compression_type_index < compressionTypeCombobox->count()) {
     compressionTypeCombobox->setCurrentIndex(compression_type_index);
   }
+  twoPassCheckbox->setChecked(two_pass > 0);  // older presets: off
   if (video_bitrate >= 0) videobitrateSpinbox->setValue(video_bitrate);
   if (encoder_index >= 0) {
     for (const auto& o : video_options) apply_option_value(video_option_rows_, o.first, o.second);
