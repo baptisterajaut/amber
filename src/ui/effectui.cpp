@@ -505,6 +505,8 @@ void EffectUI::show_context_menu(const QPoint& pos) {
 
     menu.addAction(tr("Save Settings to File"), GetEffect(), &Effect::save_to_file);
 
+    menu.addAction(tr("Save as Preset..."), this, &EffectUI::SavePresetRequested);
+
     menu.exec(title_bar->mapToGlobal(pos));
   }
 }

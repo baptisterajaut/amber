@@ -219,6 +219,13 @@ target_compile_definitions(amber-test-projectsaver PRIVATE SOURCE_DIR="${CMAKE_S
 target_link_libraries(amber-test-projectsaver PRIVATE amber-engine Qt6::Gui Qt6::Test)
 add_test(NAME amber-test-projectsaver COMMAND amber-test-projectsaver)
 
+# Effect presets — save -> load onto another clip, listing, unknown effects skipped
+add_executable(amber-test-effect-presets test_effect_presets.cpp)
+target_include_directories(amber-test-effect-presets PRIVATE ${CMAKE_SOURCE_DIR})
+target_compile_definitions(amber-test-effect-presets PRIVATE SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(amber-test-effect-presets PRIVATE amber-engine Qt6::Gui Qt6::Test)
+add_test(NAME amber-test-effect-presets COMMAND amber-test-effect-presets)
+
 # Headless export — loads a hand-written .ove and exports it through prepare_export() + ExportThread, then decodes
 # the file. Proof that the engine renders without the UI: amber-engine + Qt Gui/Test only, no QtWidgets.
 add_executable(amber-test-headless-render test_headless_render.cpp)

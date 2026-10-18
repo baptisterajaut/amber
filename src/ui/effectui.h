@@ -22,6 +22,7 @@ class EffectUI : public CollapsibleWidget {
  signals:
   void CutRequested();
   void CopyRequested();
+  void SavePresetRequested();
 
  private:
   QWidget* Widget(int row, int field);
