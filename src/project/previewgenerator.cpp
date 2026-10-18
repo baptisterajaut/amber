@@ -31,6 +31,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QHash>
 #include <QPainter>
 #include <QPixmap>
 #include <QSemaphore>
@@ -124,6 +125,48 @@ static int first_frame_interlacing(const QString& url, int start_number, int str
   }
   avformat_close_input(&fmt);
   return result;
+}
+
+// The media's length, AV_TIME_BASE units. MPEG-PS/TS lengths are FFmpeg's estimate from the last packets' pts, and a
+// packet without a pts of its own (a PS packet starting several frames gives the later ones none) doesn't count: the
+// media's last frames fell past its length. Their dts, which FFmpeg interpolates, plus the stream's pts - dts offset,
+// says where the media ends. Through a separate open of the file's last 256 KiB, so the thumbnail and waveform pass
+// keeps its own read position.
+// CBA: taken up to a second past FFmpeg's estimate (a PS carries a pts at least every 0.7 s); a timestamp discontinuity
+// in the tail could otherwise stretch the media. Scan the whole file if that ceiling bites.
+static int64_t media_length(const AVFormatContext* fmt_ctx, const QString& url) {
+  const int64_t estimate = fmt_ctx->duration;
+  if (estimate <= 0 || fmt_ctx->duration_estimation_method != AVFMT_DURATION_FROM_PTS ||
+      fmt_ctx->start_time == AV_NOPTS_VALUE) {
+    return estimate;
+  }
+  AVFormatContext* fmt = nullptr;
+  if (avformat_open_input(&fmt, url.toUtf8().constData(), nullptr, nullptr) != 0) return estimate;
+  int64_t end = AV_NOPTS_VALUE;
+  const int64_t size = avio_size(fmt->pb);
+  constexpr int64_t kTail = 256 * 1024;
+  if (size > 0 && av_seek_frame(fmt, -1, qMax(int64_t(0), size - kTail), AVSEEK_FLAG_BYTE) >= 0) {
+    QHash<int, int64_t> pts_after_dts;  // per stream, from its last packet with both
+    AVPacket* pkt = av_packet_alloc();
+    while (av_read_frame(fmt, pkt) >= 0) {
+      const AVStream* st = fmt->streams[pkt->stream_index];
+      const AVMediaType type = st->codecpar->codec_type;
+      if (type == AVMEDIA_TYPE_VIDEO || type == AVMEDIA_TYPE_AUDIO) {
+        if (pkt->pts != AV_NOPTS_VALUE && pkt->dts != AV_NOPTS_VALUE) {
+          pts_after_dts[pkt->stream_index] = pkt->pts - pkt->dts;
+        }
+        int64_t ts = pkt->pts;
+        if (ts == AV_NOPTS_VALUE && pkt->dts != AV_NOPTS_VALUE) ts = pkt->dts + pts_after_dts.value(pkt->stream_index);
+        if (ts != AV_NOPTS_VALUE) end = qMax(end, av_rescale_q(ts + pkt->duration, st->time_base, AV_TIME_BASE_Q));
+      }
+      av_packet_unref(pkt);
+    }
+    av_packet_free(&pkt);
+  }
+  avformat_close_input(&fmt);
+  if (end == AV_NOPTS_VALUE) return estimate;
+  const int64_t length = end - fmt_ctx->start_time;
+  return (length > estimate && length - estimate < AV_TIME_BASE) ? length : estimate;
 }
 
 // Parse a video stream and populate `ms`. Returns true if the stream should be appended.
@@ -240,7 +283,7 @@ void PreviewGenerator::parse_media() {
     if (need_append) stream_list.append(ms);
   }
 
-  footage_->length = fmt_ctx_->duration;
+  footage_->length = media_length(fmt_ctx_, footage_->url);
   if (fmt_ctx_->duration == INT64_MIN) {
     retrieve_duration_ = true;
   } else {

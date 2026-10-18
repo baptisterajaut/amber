@@ -627,7 +627,7 @@ void write_offset_mp4(const QString& path, int frames, int64_t start, int frames
 // frames frames of a flat colour, luma 24 + 16 * i under a non-neutral chroma (a dropped or swapped chroma plane
 // shows), as interlaced (top field first) video in the container path's extension names: MBAFF H.264 from libx264 by
 // default (mpeg2video in .mpg: MPEG-PS, whose video starts at 0.5 s)
-void write_interlaced_video(const QString& path, int frames, const char* encoder = "libx264") {
+void write_interlaced_video(const QString& path, int frames, const char* encoder = "libx264", int ps_packet_size = 64) {
   const AVRational rate{int(kFps), 1};
   const QByteArray p = path.toUtf8();
   const AVCodec* codec = avcodec_find_encoder_by_name(encoder);
@@ -635,8 +635,8 @@ void write_interlaced_video(const QString& path, int frames, const char* encoder
   AVFormatContext* fmt = nullptr;
   QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
   // MPEG-PS packs these tiny frames several to a 2048-byte packet, which carries one pts: small packets give every
-  // frame its own, as a real recording's frames have
-  if (strcmp(fmt->oformat->name, "mpeg") == 0) fmt->packet_size = 64;
+  // frame its own, as a real recording's frames have; larger ones leave a frame here and there without
+  if (strcmp(fmt->oformat->name, "mpeg") == 0) fmt->packet_size = ps_packet_size;
   AVStream* st = avformat_new_stream(fmt, nullptr);
   AVCodecContext* enc = avcodec_alloc_context3(codec);
   enc->width = kSize;
@@ -741,6 +741,24 @@ double video_start_seconds(const QString& path) {
   }
   avformat_close_input(&fmt);
   return start;
+}
+
+// The video packets' pts in path, AV_NOPTS_VALUE for those without one
+QVector<int64_t> video_packet_pts(const QString& path) {
+  QVector<int64_t> pts;
+  AVFormatContext* fmt = nullptr;
+  if (avformat_open_input(&fmt, path.toUtf8().constData(), nullptr, nullptr) < 0) return pts;
+  if (avformat_find_stream_info(fmt, nullptr) >= 0) {
+    const int vi = av_find_best_stream(fmt, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    AVPacket* pkt = av_packet_alloc();
+    while (vi >= 0 && av_read_frame(fmt, pkt) >= 0) {
+      if (pkt->stream_index == vi) pts.append(pkt->pts);
+      av_packet_unref(pkt);
+    }
+    av_packet_free(&pkt);
+  }
+  avformat_close_input(&fmt);
+  return pts;
 }
 
 // Index of the frame in frames whose mean red, green and blue is closest to the RGBA image's, -1 if there is none. All
@@ -2063,21 +2081,33 @@ class TestHeadlessRender : public QObject {
   // clip whose video starts after 0 (MPEG-PS, MPEG-TS) its first frames as whatever the repeated seeks found. The
   // MPEG-PS clip's first seek lands past its first frame and seeks again: yadif kept the frames from before, and the
   // export opened on one of them. The clip runs to the media's end: yadif lets a frame out once it has the next one,
-  // and held the last one back.
+  // and held the last one back. MPEG-PS carries a pts per packet, not per frame: in larger packets a frame starting
+  // after another one gets none of its own, the decoder only a best_effort_timestamp, and the cacher dropped it (the
+  // export showed the frame before in its place); FFmpeg's length estimate skips such packets, and the last frames fell
+  // past the footage's length (black).
   void interlacedExportKeepsFrames_data() {
     QTest::addColumn<QString>("encoder");
     QTest::addColumn<QString>("file");
-    QTest::newRow("h264-mp4") << "libx264" << "frames_interlaced.mp4";
-    QTest::newRow("mpeg2-ps") << "mpeg2video" << "frames_interlaced.mpg";
+    QTest::addColumn<int>("ps_packet_size");
+    QTest::newRow("h264-mp4") << "libx264" << "frames_interlaced.mp4" << 0;
+    QTest::newRow("mpeg2-ps") << "mpeg2video" << "frames_interlaced.mpg" << 64;
+    QTest::newRow("mpeg2-ps-frames-without-pts") << "mpeg2video" << "frames_without_pts.mpg" << 600;
   }
 
   void interlacedExportKeepsFrames() {
     QFETCH(QString, encoder);
     QFETCH(QString, file);
+    QFETCH(int, ps_packet_size);
     if (avcodec_find_encoder_by_name(qPrintable(encoder)) == nullptr) QSKIP("encoder not in this FFmpeg build");
     const QString video = dir_.filePath(file);
-    write_interlaced_video(video, kSourceFrames, qPrintable(encoder));
+    write_interlaced_video(video, kSourceFrames, qPrintable(encoder), ps_packet_size);
     if (QTest::currentTestFailed()) return;
+    if (ps_packet_size > 64) {
+      // Packets without a pts of their own
+      const QVector<int64_t> pts = video_packet_pts(video);
+      QCOMPARE(pts.size(), kSourceFrames);
+      QVERIFY(pts.count(AV_NOPTS_VALUE) > 0);
+    }
     const QString audio = dir_.filePath(file + "_tone.wav");
     {
       QFile f(audio);

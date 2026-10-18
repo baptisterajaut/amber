@@ -75,6 +75,7 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
 
     seeked_to_zero = (seek_ts == 0);
     avcodec_flush_buffers(codecCtx);
+    last_raw_video_pts_ = AV_NOPTS_VALUE;
     cacheVideoResetDeinterlacer();
     av_seek_frame(formatCtx, clip->media_stream_index(), seek_ts, AVSEEK_FLAG_BACKWARD);
 
@@ -523,6 +524,15 @@ int Cacher::RetrieveFrameAndProcess(AVFrame** f) {
     if (read_code >= 0) {
       // we retrieved a decoded video frame, which we will send to the AVFilter stack to convert to RGBA (with other
       // adjustments if necessary)
+
+      // A frame whose packet had no pts of its own (MPEG-PS: one pts per packet, a packet can start several frames)
+      // has only the decoder's guess, and the last one out of the decoder not even that: the frame before's plus a
+      // frame. Without a timestamp the frame has no place in the queue and is dropped.
+      if (frame_->pts == AV_NOPTS_VALUE) frame_->pts = frame_->best_effort_timestamp;
+      if (frame_->pts == AV_NOPTS_VALUE && last_raw_video_pts_ != AV_NOPTS_VALUE && stream->avg_frame_rate.num > 0) {
+        frame_->pts = last_raw_video_pts_ + av_rescale_q(1, av_inv_q(stream->avg_frame_rate), stream->time_base);
+      }
+      last_raw_video_pts_ = frame_->pts;
 
       // On the first successful decode after (re)opening the filter graph, lock the buffersrc
       // to the actual frame layout. For software decoding this matches what we seeded from
