@@ -86,6 +86,9 @@ class TestEffectsGpu : public QObject {
   void volumePassthrough();
   void panHardLeft();
   void audioFillLeftRightRestoresChannel();
+  void audioDynamicsDefaultsProcess();
+  void parametricEqDefaultsAreBitExact();
+  void limiterHoldsFullScaleSquare();
 
   // Phase 3a — Blur family (XML shader effects).
   void boxblurRadiusZero();
@@ -1529,6 +1532,52 @@ void TestEffectsGpu::audioFillLeftRightRestoresChannel() {
   QByteArray buf = h_->render_audio(c, 0.0, 100);
   h_->assert_audio_non_silence(buf, /*min_abs_threshold=*/1000);
   h_->assert_channels_equal(buf, /*tolerance=*/2);
+}
+
+void TestEffectsGpu::audioDynamicsDefaultsProcess() {
+  // Tone -> each stateful audio effect at its defaults: processes the chunk and leaves an audible signal. The
+  // harness calls process_audio() outside a cacher, so the effects see stream nullptr at 48 kHz.
+  const EffectInternal ids[] = {EFFECT_INTERNAL_PARAMETRICEQ, EFFECT_INTERNAL_COMPRESSOR, EFFECT_INTERNAL_LIMITER,
+                                EFFECT_INTERNAL_DELAY};
+  for (EffectInternal id : ids) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+    h_->set_field_double(c->effects[0].get(), 2, 0, 50.0);
+    EffectPtr fx = h_->attach_internal(c, id, EFFECT_TYPE_EFFECT);
+    QVERIFY(fx != nullptr);
+    QByteArray buf = h_->render_audio(c, 0.0, 100);
+    h_->assert_audio_non_silence(buf, /*min_abs_threshold=*/1000);
+  }
+}
+
+void TestEffectsGpu::parametricEqDefaultsAreBitExact() {
+  // All three bands at 0 dB are skipped: the samples come out byte for byte
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+  h_->set_field_double(c->effects[0].get(), 2, 0, 50.0);
+  const QByteArray ref = h_->render_audio(c, 0.0, 100);
+  EffectPtr eq = h_->attach_internal(c, EFFECT_INTERNAL_PARAMETRICEQ, EFFECT_TYPE_EFFECT);
+  QByteArray buf = ref;
+  eq->process_audio(0.0, 0.1, reinterpret_cast<quint8*>(buf.data()), buf.size(), 2);
+  QVERIFY(buf == ref);
+}
+
+void TestEffectsGpu::limiterHoldsFullScaleSquare() {
+  // A full-scale square (+32767 / -32768, 100 frames per half period) through the Limiter at defaults (-1 dB
+  // ceiling): no sample above 32768 * 10^(-1/20) = 29204.6, one LSB of rounding allowed
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+  EffectPtr limiter = h_->attach_internal(c, EFFECT_INTERNAL_LIMITER, EFFECT_TYPE_EFFECT);
+  const int frames = 4800;
+  QByteArray buf(frames * 4, Qt::Uninitialized);
+  qint16* p = reinterpret_cast<qint16*>(buf.data());
+  for (int i = 0; i < frames; i++) p[i * 2] = p[i * 2 + 1] = (i / 100) % 2 ? qint16(-32768) : qint16(32767);
+  limiter->process_audio(0.0, 0.1, reinterpret_cast<quint8*>(buf.data()), buf.size(), 2);
+  int peak = 0;
+  for (int i = 0; i < frames * 2; i++) peak = qMax(peak, qAbs(int(p[i])));
+  qInfo("limiter on a full-scale square: peak %d (ceiling %.1f)", peak, 32768 * qPow(10.0, -1.0 / 20.0));
+  QVERIFY2(peak <= 29205, qPrintable(QString("peak %1").arg(peak)));
+  QVERIFY2(peak >= 29000, qPrintable(QString("peak %1").arg(peak)));
 }
 
 // ---------------------------------------------------------------------------

@@ -149,17 +149,22 @@ add_library(amber-engine OBJECT
   effects/fields/stringfield.cpp effects/fields/stringfield.h
   # effects/internal/
   effects/internal/audionoiseeffect.cpp effects/internal/audionoiseeffect.h
+  effects/internal/audiostreamstate.h
+  effects/internal/compressoreffect.cpp effects/internal/compressoreffect.h
   effects/internal/cornerpineffect.cpp effects/internal/cornerpineffect.h
   effects/internal/crossdissolvetransition.cpp effects/internal/crossdissolvetransition.h
   effects/internal/cubetransition.h
+  effects/internal/delayeffect.cpp effects/internal/delayeffect.h
   effects/internal/dropshadoweffect.cpp effects/internal/dropshadoweffect.h
   effects/internal/exponentialfadetransition.cpp effects/internal/exponentialfadetransition.h
   effects/internal/fillleftrighteffect.cpp effects/internal/fillleftrighteffect.h
   effects/internal/frei0reffect.cpp effects/internal/frei0reffect.h
   effects/internal/gradienteffect.cpp effects/internal/gradienteffect.h
+  effects/internal/limitereffect.cpp effects/internal/limitereffect.h
   effects/internal/linearfadetransition.cpp effects/internal/linearfadetransition.h
   effects/internal/logarithmicfadetransition.cpp effects/internal/logarithmicfadetransition.h
   effects/internal/paneffect.cpp effects/internal/paneffect.h
+  effects/internal/parametriceqeffect.cpp effects/internal/parametriceqeffect.h
   effects/internal/progressbareffect.cpp effects/internal/progressbareffect.h
   effects/internal/richtexteffect.cpp effects/internal/richtexteffect.h
   effects/internal/shakeeffect.cpp effects/internal/shakeeffect.h

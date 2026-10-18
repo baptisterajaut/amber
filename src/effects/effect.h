@@ -87,6 +87,10 @@ enum EffectInternal : uint8_t {
   EFFECT_INTERNAL_TIMER,
   EFFECT_INTERNAL_PROGRESSBAR,
   EFFECT_INTERNAL_DROPSHADOW,
+  EFFECT_INTERNAL_PARAMETRICEQ,
+  EFFECT_INTERNAL_COMPRESSOR,
+  EFFECT_INTERNAL_LIMITER,
+  EFFECT_INTERNAL_DELAY,
   EFFECT_INTERNAL_COUNT
 };
 
@@ -232,6 +236,8 @@ class Effect : public QObject {
                               QSize renderSize = QSize());
   virtual void process_coords(double timecode, GLTextureCoords& coords, int data);
   virtual QRhiTexture* process_superimpose(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode);
+  // In place on interleaved S16 stereo. Called from the clip's cacher thread; amber::current_audio_context()
+  // (effects/internal/audiostreamstate.h) names the stream and the rate the samples play at, for stateful effects.
   virtual void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes,
                              int channel_count);
 

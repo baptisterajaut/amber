@@ -99,6 +99,11 @@ target_include_directories(amber-test-audio PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-audio PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-audio COMMAND amber-test-audio)
 
+add_executable(amber-test-audiodsp test_audiodsp.cpp)
+target_include_directories(amber-test-audiodsp PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-audiodsp PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-audiodsp COMMAND amber-test-audiodsp)
+
 add_executable(amber-test-headers test_core_headers.cpp)
 target_include_directories(amber-test-headers PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-headers PRIVATE amber-engine Qt6::Test)

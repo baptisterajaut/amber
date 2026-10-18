@@ -57,12 +57,16 @@
 #include "transition.h"
 
 #include "effects/internal/audionoiseeffect.h"
+#include "effects/internal/compressoreffect.h"
 #include "effects/internal/cornerpineffect.h"
+#include "effects/internal/delayeffect.h"
 #include "effects/internal/dropshadoweffect.h"
 #include "effects/internal/fillleftrighteffect.h"
 #include "effects/internal/frei0reffect.h"
 #include "effects/internal/gradienteffect.h"
+#include "effects/internal/limitereffect.h"
 #include "effects/internal/paneffect.h"
+#include "effects/internal/parametriceqeffect.h"
 #include "effects/internal/progressbareffect.h"
 #include "effects/internal/richtexteffect.h"
 #include "effects/internal/shakeeffect.h"
@@ -348,6 +352,14 @@ static EffectPtr CreateInternalEffect(Clip* c, const EffectMeta* em) {
       return std::make_shared<ProgressBarEffect>(c, em);
     case EFFECT_INTERNAL_DROPSHADOW:
       return std::make_shared<DropShadowEffect>(c, em);
+    case EFFECT_INTERNAL_PARAMETRICEQ:
+      return std::make_shared<ParametricEQEffect>(c, em);
+    case EFFECT_INTERNAL_COMPRESSOR:
+      return std::make_shared<CompressorEffect>(c, em);
+    case EFFECT_INTERNAL_LIMITER:
+      return std::make_shared<LimiterEffect>(c, em);
+    case EFFECT_INTERNAL_DELAY:
+      return std::make_shared<DelayEffect>(c, em);
     default:
       return nullptr;
   }
