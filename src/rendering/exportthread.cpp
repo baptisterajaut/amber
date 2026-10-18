@@ -709,6 +709,8 @@ cleanup_state:
   if (!export_error.isEmpty()) {
     return false;
   }
+  // Interrupt() no longer waits for the drain: a cancel during it lands here, and run() removes the file
+  if (interrupt_) return false;
 
   // Write container trailer
   ret = av_write_trailer(fmt_ctx);
