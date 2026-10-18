@@ -2,10 +2,11 @@
 
 #include <QFile>
 #include <QRegularExpression>
-#include <QTextStream>
+#include <QStringDecoder>
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace {
 
@@ -22,11 +23,13 @@ qint64 parse_timestamp(const QStringView& s) {
   return h * 3600000 + min * 60000 + sec * 1000 + ms;
 }
 
-// Strip unsupported HTML tags, keep <i>, <b>, <u> and their closing tags.
+// Strip the SRT markup the renderer doesn't draw: <font ...> and </font> (the effect's Font and Color fields own
+// those) and ASS override blocks ({\an8}, {\i1}...). The style tags stay (<i>, <b>, <u>, <s>), and so does any other
+// '<' or '>': it is text ("a < b"), cue_text_to_html() escapes it for the renderer.
 QString strip_unsupported_tags(const QString& text) {
-  static const QRegularExpression tag_re(QStringLiteral("</?(?!/?(?:i|b|u)>)[^>]*>"),
-                                         QRegularExpression::CaseInsensitiveOption);
-  return QString(text).remove(tag_re);
+  static const QRegularExpression markup_re(QStringLiteral("</?font\\b[^>]*>|\\{\\\\[^}]*\\}"),
+                                            QRegularExpression::CaseInsensitiveOption);
+  return QString(text).remove(markup_re);
 }
 
 // Parse timecode line: "00:00:05,000 --> 00:00:08,500"
@@ -130,14 +133,33 @@ struct SrtParserCtx {
 
 SrtParseResult parse_srt(const QString& filepath) {
   QFile file(filepath);
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+  if (!file.open(QIODevice::ReadOnly)) {
     SrtParseResult result;
     result.skipped = 0;
     return result;
   }
 
-  QTextStream stream(&file);
-  return parse_srt_text(stream.readAll());
+  return parse_srt_text(decode_srt_bytes(file.readAll()));
+}
+
+QString decode_srt_bytes(const QByteArray& bytes) {
+  // A BOM names the encoding (UTF-8, UTF-16, UTF-32)
+  std::optional<QStringConverter::Encoding> bom = QStringConverter::encodingForData(bytes);
+  if (bom) return QStringDecoder(*bom).decode(bytes);
+
+  // Stateless: a multibyte sequence cut by the end of the data (a Windows-1252 file ending in "\xE9") is an error, not
+  // state kept for a next chunk that never comes
+  QStringDecoder utf8(QStringConverter::Utf8, QStringConverter::Flag::Stateless);
+  QString text = utf8.decode(bytes);
+  if (!utf8.hasError()) return text;
+
+  // Not UTF-8: the legacy Western encoding most such SRTs use, the usual fallback of subtitle players.
+  // CBA: no charset detection, a Cyrillic/Greek/CJK legacy file decodes as Windows-1252 mojibake; detect (e.g. ICU's
+  // ucsdet) if those turn up. Windows-1252 needs Qt's ICU support, Latin-1 (same letters, no 0x80-0x9F punctuation)
+  // without it
+  QStringDecoder cp1252("Windows-1252");
+  if (cp1252.isValid()) return cp1252.decode(bytes);
+  return QStringDecoder(QStringConverter::Latin1).decode(bytes);
 }
 
 SrtParseResult parse_srt_text(QString content) {
@@ -251,6 +273,26 @@ QString cue_lines_to_text(const QString& lines) {
   text.replace(QChar(QChar::LineSeparator), QLatin1Char('\n'));
   text.replace(QChar(QChar::ParagraphSeparator), QLatin1Char('\n'));
   return non_blank_lines(text).join(QLatin1String("<br>"));
+}
+
+QString cue_text_to_html(const QString& text) {
+  static const QRegularExpression tag_re(QStringLiteral("</?(?:i|b|u|s)>|<br\\s*/?>"),
+                                         QRegularExpression::CaseInsensitiveOption);
+  auto escaped = [](QStringView s) {
+    return s.toString()
+        .replace(QLatin1Char('<'), QLatin1String("&lt;"))
+        .replace(QLatin1Char('>'), QLatin1String("&gt;"));
+  };
+  QString html;
+  qsizetype pos = 0;
+  for (QRegularExpressionMatchIterator it = tag_re.globalMatch(text); it.hasNext();) {
+    QRegularExpressionMatch m = it.next();
+    html += escaped(QStringView(text).mid(pos, m.capturedStart() - pos));
+    html += m.captured();
+    pos = m.capturedEnd();
+  }
+  html += escaped(QStringView(text).mid(pos));
+  return html;
 }
 
 qint64 cue_ms_at_frame(long local_frame, double frame_rate) {

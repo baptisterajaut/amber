@@ -1,6 +1,7 @@
 #ifndef SRTPARSER_H
 #define SRTPARSER_H
 
+#include <QByteArray>
 #include <QString>
 #include <QVector>
 
@@ -17,7 +18,12 @@ struct SrtParseResult {
   int skipped;
 };
 
+// Reads the file and decodes it with decode_srt_bytes()
 SrtParseResult parse_srt(const QString& filepath);
+
+// SRT file bytes to text: the encoding its BOM names, else UTF-8 when the bytes are valid UTF-8, else Windows-1252
+// (Latin-1 if this Qt has no Windows-1252 decoder)
+QString decode_srt_bytes(const QByteArray& bytes);
 
 // Parses SRT text that is already decoded (parse_srt() reads the file and calls this)
 SrtParseResult parse_srt_text(QString content);
@@ -41,6 +47,11 @@ bool cue_times_valid(qint64 start_ms, qint64 end_ms);
 // going back to cue text (write_srt() drops them too): in SRT a blank line ends the cue.
 QString cue_text_to_lines(const QString& text);
 QString cue_lines_to_text(const QString& lines);
+
+// Cue text as the HTML the SubtitleEffect renders: the style tags (<i>, <b>, <u>, <s>, their closers, any case) and
+// <br> are kept, every other '<' and '>' is escaped so "a < b and c > d" shows as written instead of being read as a
+// tag
+QString cue_text_to_html(const QString& text);
 
 // The SubtitleEffect's time in ms at a clip-local frame (playhead - timeline_in + clip_in), computed exactly the way
 // rendering does: get_timecode() = frame / frame_rate seconds, then qRound64(timecode * 1000). Clip speed plays no

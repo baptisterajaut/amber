@@ -23,6 +23,7 @@
 #include <QVBoxLayout>
 #include <QDialogButtonBox>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QTimer>
 #include <QDebug>
 
@@ -191,7 +192,11 @@ void TextEditDialog::UpdateUIFromTextCursor()
   if (rich_text_) {
     italic_button->setChecked(textEdit->fontItalic());
     underline_button->setChecked(textEdit->fontUnderline());
-    font_list->setCurrentText(textEdit->fontFamily());
+    {
+      // Showing the family must not apply it: currentTextChanged sets it on the whole selection
+      QSignalBlocker block(font_list);
+      font_list->setCurrentText(textEdit->fontFamily());
+    }
     font_size->SetValue(textEdit->fontPointSize());
     font_color->set_color(textEdit->textColor());
 

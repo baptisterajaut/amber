@@ -458,10 +458,7 @@ static void kbd_save_action(QByteArray& file, QAction* a) {
   if (a->property("default").isNull()) return;
   QKeySequence defks(a->property("default").toString());
   if (a->shortcut() == defks) return;
-  if (!file.isEmpty()) file.append('\n');
-  file.append(a->property("id").toString().toUtf8());
-  file.append('\t');
-  file.append(a->shortcut().toString().toUtf8());
+  amber::append_shortcut_line(file, a->property("id").toString(), a->shortcut().toString());
 }
 
 static void kbd_load_action(QByteArray& file, QAction* a, bool first) {
@@ -471,10 +468,11 @@ static void kbd_load_action(QByteArray& file, QAction* a, bool first) {
     a->setShortcut(a->property("default").toString());
   }
   if (a->property("id").isNull()) return;
-  // Exact id match ("import" must not pick up an "importsubtitle" line), as the Preferences importer does
+  // Exact id match ("import" must not pick up an "importsubtitle" line), as the Preferences importer does. A shortcut
+  // saved empty was cleared: it loads empty, not as the default.
   bool found = false;
   QKeySequence ks(amber::find_shortcut_in_file(file, a->property("id").toString(), &found));
-  if (found && !ks.isEmpty()) a->setShortcut(ks);
+  if (found) a->setShortcut(ks);
 }
 
 void kbd_shortcut_processor(QByteArray& file, QMenu* menu, bool save, bool first) {
@@ -1335,6 +1333,9 @@ void MainWindow::updateTitle() {
 
 void MainWindow::closeEvent(QCloseEvent* e) {
   if (amber::Global->can_close_project()) {
+    // the layout saved below must be the real one, not the maximized panel (others hidden and floating)
+    leave_maximized_panel();
+
     // stop proxy generator thread
     amber::proxy_generator.cancel();
 
@@ -1563,6 +1564,8 @@ void MainWindow::relink_media() {
   } else {
     FootageRelinkDialog dlg(this, invalid);
     dlg.exec();
+    // the new paths are only saved with the project (not on the undo stack): like the relink offered at load
+    if (dlg.relinked_any()) amber::Global->set_modified(true);
   }
 }
 
