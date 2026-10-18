@@ -455,5 +455,14 @@ double ProxyGenerator::get_proxy_progress(Media* m) {
   return 0.0;
 }
 
+QStringList ProxyGenerator::queued_paths(const QVector<Media*>& skip) {
+  QMutexLocker locker(&mutex);
+  QStringList paths;
+  for (const ProxyInfo& info : proxy_queue) {
+    if (!skip.contains(info.media)) paths.append(info.path);
+  }
+  return paths;
+}
+
 // proxy generator is a global omnipotent entity
 ProxyGenerator amber::proxy_generator;

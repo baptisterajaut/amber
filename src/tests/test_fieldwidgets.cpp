@@ -1,5 +1,9 @@
 #include <QCheckBox>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QMouseEvent>
+#include <QScopeGuard>
+#include <QTimer>
 #include <QtTest>
 
 #include "effects/effect.h"
@@ -24,6 +28,7 @@
 #include "tests/test_appcontext_stub.h"
 #include "ui/comboboxex.h"
 #include "ui/curveeditor.h"
+#include "ui/decimalinput.h"
 #include "ui/gradientrampeditor.h"
 #include "ui/labelslider.h"
 
@@ -51,6 +56,7 @@ class TestFieldWidgets : public QObject {
   void rampEndColorIsOneEntry();
   void rampReverseIsOneEntry();
   void singleClipEntryIsUnchanged();
+  void valuePromptIgnoresLocale();
 
  private:
   enum Row { kBool, kDouble, kCombo, kCurve, kStart, kEnd, kRamp };
@@ -62,6 +68,8 @@ class TestFieldWidgets : public QObject {
   EffectField* FieldB(Row row) { return effect_b_->row(row)->Field(0); }
   EffectPtr MakeEffect(Clip* clip);
   void SendMouse(QWidget* w, QEvent::Type type, Qt::MouseButtons buttons);
+  // Answers the next modal value prompt: keeps its prefilled text, types `typed` over it and presses Return
+  static void AnswerPrompt(const QString& typed, QString* prefill);
 
   TestAppContext ctx_;
   SequencePtr seq_;
@@ -364,6 +372,47 @@ void TestFieldWidgets::singleClipEntryIsUnchanged() {
   QVERIFY(dynamic_cast<const KeyframeDataChange*>(amber::UndoStack.command(0)) != nullptr);
   QVERIFY(FieldA(kBool)->GetValueAt(0).toBool());
   QVERIFY(!FieldB(kBool)->GetValueAt(0).toBool());
+}
+
+void TestFieldWidgets::AnswerPrompt(const QString& typed, QString* prefill) {
+  QTimer::singleShot(0, [typed, prefill] {
+    QWidget* modal = QApplication::activeModalWidget();
+    QLineEdit* edit = qobject_cast<QInputDialog*>(modal) != nullptr ? modal->findChild<QLineEdit*>() : nullptr;
+    if (edit == nullptr) {
+      if (modal != nullptr) modal->close();  // never leave a prompt open: the test would hang in its exec()
+      return;
+    }
+    *prefill = edit->text();
+    edit->selectAll();
+    QTest::keyClicks(edit, typed);
+    QTest::keyClick(edit, Qt::Key_Return);
+  });
+}
+
+// The value prompts under a French locale, where ',' is the decimal separator and '.' the group one: "0.5" and "0,5"
+// both read 0.5, and the prompt is prefilled with a dot as the slider shows it. Drives LabelSlider::ShowDialog() (a
+// click without a drag) and amber::get_decimal() with the arguments of ViewerWidget::set_custom_zoom().
+void TestFieldWidgets::valuePromptIgnoresLocale() {
+  const auto restore = qScopeGuard([locale = QLocale()] { QLocale::setDefault(locale); });
+  QLocale::setDefault(QLocale(QLocale::French, QLocale::France));
+  for (const QString& typed : {QStringLiteral("0.5"), QStringLiteral("0,5")}) {
+    LabelSlider ls;
+    ls.SetDecimalPlaces(2);
+    ls.SetValue(12.5);
+    QString prefill;
+    AnswerPrompt(typed, &prefill);
+    QVERIFY(QMetaObject::invokeMethod(&ls, "ShowDialog"));
+    QCOMPARE(ls.value(), 0.5);
+    QCOMPARE(prefill, QStringLiteral("12.50"));
+
+    bool ok = false;
+    AnswerPrompt(typed, &prefill);
+    const double zoom =
+        amber::get_decimal(nullptr, "Viewer Zoom", "Set Custom Zoom Value:", 100, 0, 2147483647, 2, &ok);
+    QVERIFY(ok);
+    QCOMPARE(zoom, 0.5);
+    QCOMPARE(prefill, QStringLiteral("100.00"));
+  }
 }
 
 QTEST_MAIN(TestFieldWidgets)
