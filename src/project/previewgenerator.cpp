@@ -174,7 +174,11 @@ bool PreviewGenerator::parse_video_stream(int stream_index, FootageStream& ms) {
   AVStream* stream = fmt_ctx_->streams[stream_index];
   if (stream->codecpar->width <= 0 || stream->codecpar->height <= 0) return false;
 
-  bool is_still_image = (stream->avg_frame_rate.den == 0 && stream->codecpar->codec_id != AV_CODEC_ID_DNXHD);
+  // No average frame rate alone isn't a still: MPEG-4 Part 2 in MPEG-TS has none, only r_frame_rate (it played as its
+  // first frame held). A still has neither, or the fallback FFmpeg puts there, the time base (an MP3's cover art)
+  const AVRational r = stream->r_frame_rate;
+  const bool no_rate = r.num <= 0 || r.den <= 0 || av_cmp_q(r, av_inv_q(stream->time_base)) == 0;
+  bool is_still_image = (stream->avg_frame_rate.den == 0 && no_rate && stream->codecpar->codec_id != AV_CODEC_ID_DNXHD);
 
   if (!is_still_image && fmt_ctx_->iformat != nullptr && !footage_->url.contains('%')) {
     QString fmt_name(fmt_ctx_->iformat->name);

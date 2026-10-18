@@ -487,6 +487,7 @@ void Cacher::OpenWorker() {
   video_end_pts_ = AV_NOPTS_VALUE;
   latest_decoded_pts_ = AV_NOPTS_VALUE;
   last_raw_video_pts_ = AV_NOPTS_VALUE;
+  seek_overshoot_ = 0;
   queue_.unlock();
 
   if (clip->media() == nullptr) {

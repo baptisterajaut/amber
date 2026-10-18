@@ -363,6 +363,11 @@ class Cacher : public QThread {
   static constexpr int kSeekSkipFrames = 300;
 
   /**
+   * @brief How far past their seek point this clip's video seeks have landed, at most (cacheVideoSeekToTarget())
+   */
+  int64_t seek_overshoot_{0};
+
+  /**
    * @brief Current Sequence scrubbing state set by Cache()
    */
   bool scrubbing_;

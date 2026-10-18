@@ -192,13 +192,16 @@ QByteArray dc_wav(double seconds, double level) {
 }
 
 // wav's PCM (a wav_from_pcm() file) as audio-only MPEG-TS, SMPTE 302M (PCM, read back sample for sample): audio that
-// starts after 0, at 1.4 s as FFmpeg's own MPEG-TS muxing puts it, as a camera's MPEG-TS
-bool write_audio_ts(const QString& path, const QByteArray& wav) {
-  const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_S302M);
+// starts after 0, at 1.4 s as FFmpeg's own MPEG-TS muxing puts it, as a camera's MPEG-TS. Another codec in the
+// container the path's extension names (MP2 in .mpg: a DVD's or a camcorder's MPEG-PS audio), whole frames only.
+bool write_audio_ts(const QString& path, const QByteArray& wav, AVCodecID codec_id = AV_CODEC_ID_S302M) {
+  const AVCodec* codec = avcodec_find_encoder(codec_id);
   if (codec == nullptr) return false;
   const QByteArray p = path.toUtf8();
   AVFormatContext* fmt = nullptr;
-  if (avformat_alloc_output_context2(&fmt, nullptr, "mpegts", p.constData()) < 0) return false;
+  if (avformat_alloc_output_context2(&fmt, nullptr, path.endsWith(".ts") ? "mpegts" : nullptr, p.constData()) < 0) {
+    return false;
+  }
   AVStream* st = avformat_new_stream(fmt, nullptr);
   AVCodecContext* enc = avcodec_alloc_context3(codec);
   enc->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
@@ -206,11 +209,13 @@ bool write_audio_ts(const QString& path, const QByteArray& wav) {
   enc->sample_rate = kAudioRate;
   av_channel_layout_default(&enc->ch_layout, 2);
   enc->time_base = AVRational{1, kAudioRate};
+  enc->bit_rate = 192000;  // MP2's; PCM ignores it
   bool ok = avcodec_open2(enc, codec, nullptr) >= 0 && avcodec_parameters_from_context(st->codecpar, enc) >= 0;
   st->time_base = enc->time_base;
   ok = ok && avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0 && avformat_write_header(fmt, nullptr) >= 0;
   const QByteArray pcm = wav.mid(44);  // after wav_from_pcm()'s header
-  constexpr int kFrameSamples = 1024;
+  const int kFrameSamples = (enc->frame_size > 0) ? enc->frame_size : 1024;
+  const bool whole_frames = !(codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) && enc->frame_size > 0;
   AVFrame* frame = av_frame_alloc();
   AVPacket* pkt = av_packet_alloc();
   auto write_packets = [&]() {
@@ -222,6 +227,7 @@ bool write_audio_ts(const QString& path, const QByteArray& wav) {
   };
   for (int offset = 0; ok && offset < pcm.size(); offset += kFrameSamples * 4) {
     frame->nb_samples = qMin(int(pcm.size()) - offset, kFrameSamples * 4) / 4;
+    if (whole_frames && frame->nb_samples < kFrameSamples) break;
     frame->format = AV_SAMPLE_FMT_S16;
     frame->sample_rate = kAudioRate;
     av_channel_layout_default(&frame->ch_layout, 2);
@@ -1930,6 +1936,123 @@ class TestHeadlessRender : public QObject {
     QCOMPARE(shown / kStep, int(kFar / kStep));
   }
 
+  // Images stay stills (infinite length, no frame rate) next to mpeg4InMpegTsPlays()'s looser still test
+  void stillsStayStills_data() {
+    QTest::addColumn<QString>("file");
+    QTest::newRow("png") << "still.png";
+    QTest::newRow("jpeg") << "still.jpg";
+  }
+
+  void stillsStayStills() {
+    QFETCH(QString, file);
+    const QString image = dir_.filePath(file);
+    QImage img(kSize, kSize, QImage::Format_RGB32);
+    img.fill(Qt::darkCyan);
+    QVERIFY(img.save(image));
+    const QString audio = dir_.filePath(file + "_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath(file + ".ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, image, audio).toUtf8());
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    QCOMPARE(vf->video_tracks.size(), 1);
+    QVERIFY(vf->video_tracks.at(0).infinite_length);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+  }
+
+  // MPEG-4 Part 2 in MPEG-TS has no average frame rate (avg_frame_rate 0/0), only r_frame_rate: the probe took it for a
+  // still image, and the export held its first frame
+  void mpeg4InMpegTsPlays() {
+    constexpr int kFrames = 12;
+    const QString video = dir_.filePath("mpeg4_plays.ts");
+    write_offset_mp4(video, kFrames, 0);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("mpeg4_plays_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("mpeg4_plays.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    QVERIFY(!vf->video_tracks.at(0).infinite_length);
+    QCOMPARE(vf->video_tracks.at(0).video_frame_rate, kFps);
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kFrames);
+
+    const ExportParams params = video_params(dir_.filePath("mpeg4_plays_out.mp4"), seq.get(), AV_CODEC_ID_MPEG4,
+                                             QString(), COMPRESSION_TYPE_CBR, 2.0);
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded out = decode_file(params.filename, true);
+    QVERIFY(out.ok);
+    QCOMPARE(long(out.video_frames), kClipOut);
+    QVector<int> matched;
+    QVector<int> expected;
+    for (int k = 0; k < out.video_frames; k++) {
+      matched.append(closest_grey_frame(src.rgba, out.rgba[k]));
+      expected.append(k);
+    }
+    QString shown;
+    for (int m : matched) shown += QString::number(m) + ' ';
+    qInfo("export frames show source frames: %s", qPrintable(shown));
+    QCOMPARE(matched, expected);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+  }
+
   // A seek into MPEG-4 Part 2 in MPEG-PS (no index: the seek lands between keyframes) starts decoding on frames whose
   // reference is missing; that decoder hands them out anyway, grey, and the export opened on them. A clip trimmed into
   // the middle of a GOP seeks there on its first frame.
@@ -2538,6 +2661,56 @@ class TestHeadlessRender : public QObject {
           rev.audio_peak, fwd.audio_peak);
     QVERIFY2(fwd.audio_peak > 0.25, "forward export is silent or too quiet");
     QVERIFY2(best_delta <= 2.0f / 32768, qPrintable(QString("max delta %1 at lag %2").arg(best_delta).arg(best_lag)));
+  }
+
+  // MP2 audio in MPEG-PS, read from after a seek: a clip trimmed in, or reversed (which seeks a second back at a time).
+  // The seek lands mid-frame, the decoder refuses that first packet (AVERROR_INVALIDDATA) and the clip's audio stopped
+  // there: the export came out silent.
+  void mp2InMpegPsAfterSeek_data() {
+    QTest::addColumn<bool>("reversed");
+    QTest::newRow("clip-in") << false;
+    QTest::newRow("reversed") << true;
+  }
+
+  void mp2InMpegPsAfterSeek() {
+    QFETCH(bool, reversed);
+    if (avcodec_find_encoder(AV_CODEC_ID_MP2) == nullptr) QSKIP("no MP2 encoder in this FFmpeg build");
+    constexpr long kClipIn = 30;  // 1 s
+    constexpr long kOut = 30;
+    const QString media = dir_.filePath("mp2.mpg");
+    QVERIFY(write_audio_ts(media, sine_wav(440.0, 0.5, true, 4.0), AV_CODEC_ID_MP2));
+    const Decoded src = decode_file(media);
+    QVERIFY(src.ok);
+    SequencePtr seq;
+    load_ramp_project(dir_.filePath(reversed ? "mp2_reversed.ove" : "mp2_in.ove"), media, reversed ? 0 : kClipIn, kOut,
+                      1.0, reversed, &seq);
+    if (QTest::currentTestFailed()) return;
+    const QString file = dir_.filePath(reversed ? "mp2_reversed.wav" : "mp2_in.wav");
+    const QString error = export_audio(seq.get(), file, AV_CODEC_ID_PCM_S16LE, 0);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded out = decode_file(file);
+    QVERIFY(out.ok);
+    const int span = int(qRound64(kOut / kFps * kAudioRate));
+    QVERIFY(out.audio_left.size() >= span);
+    // The source span the clip reads: [kClipIn, kClipIn + kOut) frames, or the media's last kOut frames backwards
+    const int src_start = reversed ? src.audio_left.size() - span : int(qRound64(kClipIn / kFps * kAudioRate));
+    QVERIFY(src_start >= 0 && src_start + span <= src.audio_left.size());
+    double out_energy = 0;
+    double src_energy = 0;
+    for (int i = 0; i < span; i++) {
+      out_energy += double(out.audio_left[i]) * out.audio_left[i];
+      src_energy += double(src.audio_left[src_start + i]) * src.audio_left[src_start + i];
+    }
+    const double ratio = std::sqrt(out_energy / src_energy);
+    qInfo("export RMS / source span RMS = %.4f", ratio);
+    QVERIFY2(qAbs(ratio - 1.0) < 0.05, qPrintable(QString("RMS ratio %1").arg(ratio)));
+    if (reversed) return;
+    // In sync: past the decoder's first frame after the seek, sample for sample the source's span
+    constexpr int kSkip = 4 * 1152;
+    float delta = 0;
+    for (int i = kSkip; i < span; i++) delta = qMax(delta, qAbs(out.audio_left[i] - src.audio_left[src_start + i]));
+    qInfo("max |delta| past the first %d samples: %f", kSkip, delta);
+    QVERIFY2(delta < 0.01f, qPrintable(QString("max delta %1").arg(delta)));
   }
 
   // Track volume and pan scale the exported mix: -6 dB on A1 brings the RMS to about half (x0.501), a hard right pan
