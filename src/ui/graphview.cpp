@@ -987,6 +987,7 @@ void GraphView::wheelEvent(QWheelEvent* event) {
 
 void GraphView::set_row(EffectRow* r) {
   if (row != r) {
+    entry_active = false;  // a Time/Value drag cut short by the row change: its snapshot belongs to the old row
     selected_keys.clear();
     selected_keys_fields.clear();
     selected_keys_old_vals.clear();
