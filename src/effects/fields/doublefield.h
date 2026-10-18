@@ -60,6 +60,10 @@ class DoubleField : public EffectField {
    */
   void SetFrameRate(const double& rate);
 
+  // Decimal places the slider shows and its value dialog accepts (LabelSlider::SetDecimalPlaces)
+  void SetDecimalPlaces(int places) { decimal_places_ = places; }
+  int GetDecimalPlaces() const { return decimal_places_; }
+
   int GetDisplayType() const { return static_cast<int>(display_type_); }
   double GetMinimum() const { return min_; }
   double GetMaximum() const { return max_; }
@@ -146,6 +150,8 @@ class DoubleField : public EffectField {
    * \see SetFrameRate().
    */
   double frame_rate_{30};
+
+  int decimal_places_{1};  // LabelSlider's own default
 
   /**
    * @brief Internal value used to allow SetDefault() to set the value as well if none has been set
