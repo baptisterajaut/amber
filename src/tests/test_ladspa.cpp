@@ -6,6 +6,7 @@
 #include <QTemporaryDir>
 
 #include <cmath>
+#include <deque>
 #include <vector>
 
 #include "effects/effect.h"
@@ -14,6 +15,7 @@
 #include "effects/fields/doublefield.h"
 #include "effects/internal/audiostreamstate.h"
 #include "effects/internal/ladspaeffect.h"
+#include "effects/internal/voideffect.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "test_appcontext_stub.h"
@@ -232,6 +234,49 @@ class TestLadspa : public QObject {
     QCOMPARE(metas[3].name, QString("Echo (300)"));
   }
 
+  // A LADSPA effect is found by the UniqueID it was saved with, whatever name the installed set gives it now
+  void savedIdFindsThePlugin() {
+    auto meta = [](const char* name, const char* category, unsigned long id) {
+      EffectMeta em;
+      em.name = name;
+      em.category = category;
+      em.internal = id != 0 ? EFFECT_INTERNAL_LADSPA : EFFECT_INTERNAL_VOLUME;
+      em.plugin_id = id;
+      return em;
+    };
+    // Both installed: the later UniqueID got the suffix. Saved: "LADSPA/Echo" id 100, "LADSPA/Echo (200)" id 200.
+    std::deque<EffectMeta> both{meta("Echo", "LADSPA", 100), meta("Echo (200)", "LADSPA", 200), meta("Echo", "", 0)};
+    QCOMPARE(find_effect_meta(both, "LADSPA/Echo", 100), &both[0]);
+    QCOMPARE(find_effect_meta(both, "LADSPA/Echo (200)", 200), &both[1]);
+    // 100 uninstalled: 200 is now plain "Echo". Each saved effect still finds its own plugin or none, never the other
+    std::deque<EffectMeta> only_200{meta("Echo", "LADSPA", 200), meta("Echo", "", 0)};
+    QCOMPARE(find_effect_meta(only_200, "LADSPA/Echo (200)", 200), &only_200[0]);
+    QCOMPARE(find_effect_meta(only_200, "LADSPA/Echo", 100), nullptr);
+    // Saved while only 200 was installed ("LADSPA/Echo" id 200), then 100 installed: 200 is "Echo (200)" again
+    QCOMPARE(find_effect_meta(both, "LADSPA/Echo", 200), &both[1]);
+    // Without an id (a hand-written project): by name, as before
+    QCOMPARE(find_effect_meta(both, "LADSPA/Echo", 0), &both[0]);
+    QCOMPARE(find_effect_meta(both, "/Echo", 0), &both[0]);  // empty category matches any, first wins
+    QCOMPARE(find_effect_meta(both, "Missing/Thing", 0), nullptr);
+  }
+
+  // A plugin that isn't installed loads as a Missing Effect that writes its UniqueID back, so reinstalling the plugin
+  // finds it again
+  void missingPluginKeepsItsId() {
+    ScopedAppContext app;
+    Sequence seq;
+    Clip clip(&seq);
+    QXmlStreamReader reader(QByteArray(R"(<effect name="LADSPA/Gone" enabled="1" ladspa_id="4242999">)"
+                                       R"(<row><field id="0" value="0.5"/></row></effect>)"));
+    QVERIFY(reader.readNextStartElement());
+    QCOMPARE(get_meta_from_attributes(reader.attributes()), nullptr);
+    VoidEffect missing(&clip, "LADSPA/Gone");
+    missing.load(reader);
+    const QByteArray saved = missing.save_to_string();
+    QVERIFY2(saved.contains(R"(<effect name="LADSPA/Gone" enabled="1" ladspa_id="4242999">)"), saved.constData());
+    QVERIFY2(saved.contains(R"(<field id="0" value="0.5"/>)"), saved.constData());
+  }
+
   // $LADSPA_PATH replaces the default folders; libraries that aren't LADSPA plugins are skipped
   void discoveryFromLadspaPath() {
     if (amp_dir_.isEmpty() || delay_dir_.isEmpty()) QSKIP("the LADSPA SDK's amp.so / delay.so are not installed");
@@ -307,6 +352,9 @@ class TestLadspa : public QObject {
     QCOMPARE(wet->GetDefault(), 0.5);
     QCOMPARE(wet->GetDecimalPlaces(), 3);
     QCOMPARE(delay->GetDoubleAt(0), 1.0);
+    // Saved with its UniqueID next to the name
+    QVERIFY2(e.save_to_string().contains(R"(<effect name="LADSPA/Simple Delay Line" enabled="1" ladspa_id="1043">)"),
+             e.save_to_string().constData());
     // The copy reconstructs through the meta and keeps the values
     wet->SetValueAt(0, 0.25);
     EffectPtr copy = e.copy(&clip);

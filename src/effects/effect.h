@@ -137,6 +137,14 @@ struct GLTextureCoords {
 };
 
 const EffectMeta* get_meta_from_name(const QString& input);
+// The meta a saved <effect> element refers to. A LADSPA effect is found by its ladspa_id attribute (the plugin's
+// UniqueID: its displayed name gets a " (<UniqueID>)" suffix or loses it as same-named plugins come and go); an id that
+// isn't installed finds nothing (Missing Effect), never another plugin with that name. Everything else, and a LADSPA
+// effect saved without the id, is found by name as get_meta_from_name() does.
+const EffectMeta* find_effect_meta(const std::deque<EffectMeta>& list, const QString& saved_name,
+                                   unsigned long ladspa_id);
+// find_effect_meta() over the registered effects, with the element's name and ladspa_id attributes
+const EffectMeta* get_meta_from_attributes(const QXmlStreamAttributes& attrs);
 
 qint16 mix_audio_sample(qint16 a, qint16 b);
 

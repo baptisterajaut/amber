@@ -493,7 +493,8 @@ class TestProjectSaver : public QObject {
     QVERIFY(fb.open(QFile::ReadOnly));
     const QByteArray ba = fa.readAll(), bb = fb.readAll();
     QVERIFY2(ba == bb, qPrintable(first_difference(ba, bb)));
-    QVERIFY(ba.contains(QString(R"(<effect name="%1" enabled="1">)").arg(saved_name).toUtf8()));
+    // Loaded by name (the fixture has no id), saved with the plugin's UniqueID
+    QVERIFY(ba.contains(QString(R"(<effect name="%1" enabled="1" ladspa_id="1048">)").arg(saved_name).toUtf8()));
   }
 #endif
 };

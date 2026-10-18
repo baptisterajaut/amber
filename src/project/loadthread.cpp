@@ -149,7 +149,7 @@ void LoadThread::load_effect(QXmlStreamReader& stream, Clip* c) {
   // Effect loading occurs in another thread, and while it's usually very quick, just for safety we wait here
   // for all the effects to finish loading
   effects_loaded_mutex.lock();
-  const EffectMeta* meta = effect_name.isEmpty() ? nullptr : get_meta_from_name(effect_name);
+  const EffectMeta* meta = get_meta_from_attributes(stream.attributes());
   effects_loaded_mutex.unlock();
 
   int type = kTransitionNone;
