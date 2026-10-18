@@ -1192,7 +1192,20 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
             stream.writeAttribute("height", QString::number(ms.video_height));
             stream.writeAttribute("framerate", QString::number(ms.video_frame_rate, 'f', 10));
             stream.writeAttribute("infinite", QString::number(ms.infinite_length));
+            // The Media Properties choice, only when it differs from the detected value: absent = auto
+            if (ms.video_interlacing != ms.video_auto_interlacing) {
+              stream.writeAttribute("interlacing", QString::number(ms.video_interlacing));
+            }
             stream.writeEndElement();  // video
+          }
+          // Footage never analysed (missing file): keep the choice it was loaded with
+          if (f->video_tracks.isEmpty()) {
+            for (auto it = f->saved_interlacing.cbegin(); it != f->saved_interlacing.cend(); ++it) {
+              stream.writeStartElement("video");
+              stream.writeAttribute("id", QString::number(it.key()));
+              stream.writeAttribute("interlacing", QString::number(it.value()));
+              stream.writeEndElement();  // video
+            }
           }
 
           // save audio stream metadata
