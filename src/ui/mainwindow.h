@@ -149,6 +149,36 @@ class MainWindow : public QMainWindow {
   void reset_layout();
 
   /**
+   * @brief Built-in "3-Point Editing" layout: source and program viewers side by side, bin next to the timeline.
+   */
+  void layout_3point();
+
+  /**
+   * @brief Built-in "Color" layout: big sequence viewer, scopes shown, Effect Controls at hand.
+   */
+  void layout_color();
+
+  /**
+   * @brief Fills Window > Layouts with the built-ins, the user layouts and the save/delete items.
+   */
+  void layoutsMenu_About_To_Be_Shown();
+
+  /**
+   * @brief Asks for a name and saves the current layout to get_config_dir()/layouts/<name>.xml.
+   */
+  void save_layout_as();
+
+  /**
+   * @brief Restores the user layout whose file path is the sender QAction's data.
+   */
+  void load_user_layout();
+
+  /**
+   * @brief Deletes, after confirmation, the user layout whose file path is the sender QAction's data.
+   */
+  void delete_user_layout();
+
+  /**
    * @brief Function to prepare File menu.
    *
    * Primarily used to populate the Open Recent Projects menu.
@@ -228,6 +258,12 @@ class MainWindow : public QMainWindow {
    * aforementioned layout file.
    */
   void setup_layout(bool reset);
+
+  /**
+   * @brief Restores the layout saved by maximize_panel(), if a panel is maximized, so that switching layouts
+   * starts from the normal state.
+   */
+  void leave_maximized_panel();
 
   /**
    * @brief Initialize menu bar menus and items.
@@ -344,7 +380,12 @@ class MainWindow : public QMainWindow {
 
   QAction* maximize_panel_;
   QAction* lock_panels_;
-  QAction* reset_default_layout_;
+  QMenu* layouts_menu_;
+  QAction* layout_default_;
+  QAction* layout_3point_;
+  QAction* layout_color_;
+  QAction* save_layout_;
+  QMenu* delete_layout_menu_;
 
   // tools menu
   QMenu* tools_menu;

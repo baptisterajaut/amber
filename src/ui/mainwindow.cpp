@@ -20,6 +20,8 @@
 
 #include "mainwindow.h"
 
+#include <algorithm>
+
 #include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
@@ -61,6 +63,7 @@
 #include "ui/cursors.h"
 #include "ui/focusfilter.h"
 #include "ui/icons.h"
+#include "ui/layoutpresets.h"
 #include "ui/menuhelper.h"
 #include "ui/sourceiconview.h"
 #include "ui/sourcetable.h"
@@ -70,47 +73,50 @@
 
 MainWindow* amber::MainWindow;
 
-static void layout_restore_panel_element(QXmlStreamReader& stream) {
-  QString panel_name;
-  for (const auto& attr : stream.attributes()) {
-    if (attr.name() == QLatin1String("name")) {
-      panel_name = attr.value().toString();
-      break;
+static amber::LayoutData capture_layout(QMainWindow* win, const QString& name = QString()) {
+  amber::LayoutData data;
+  data.name = name;
+  data.state = win->saveState(0);
+
+  // if the panels have any specific layout data to save, save it now
+  for (int i = 0; i < amber::panels.size(); i++) {
+    QByteArray layout_data = amber::panels.at(i)->SaveLayoutState();
+
+    if (!layout_data.isEmpty()) {
+      // layout data is matched with the panel's objectName(), which we can't do if the panel has no name
+      const QString& panel_name = amber::panels.at(i)->objectName();
+      if (panel_name.isEmpty()) {
+        qWarning() << "Panel" << i << "had layout state data but no objectName(). Layout was not saved.";
+      } else {
+        data.panels.append({panel_name, layout_data});
+      }
     }
   }
-  if (panel_name.isEmpty()) {
-    qWarning() << "Layout file specified data for a panel but didn't specify a name. Layout wasn't loaded.";
-    return;
+  return data;
+}
+
+static void apply_layout(QMainWindow* win, const amber::LayoutData& data) {
+  win->restoreState(data.state, 0);
+  for (const auto& panel_data : data.panels) {
+    auto it = std::find_if(amber::panels.begin(), amber::panels.end(),
+                           [&](Panel* p) { return p->objectName() == panel_data.first; });
+    if (it == amber::panels.end()) {
+      qWarning() << "Panel specified in layout data doesn't exist. Layout wasn't loaded.";
+    } else {
+      (*it)->LoadLayoutState(panel_data.second);
+    }
   }
-  for (auto panel : amber::panels) {
-    if (panel->objectName() != panel_name) continue;
-    stream.readNext();
-    panel->LoadLayoutState(QByteArray::fromBase64(stream.text().toUtf8()));
-    return;
-  }
-  qWarning() << "Panel specified in layout data doesn't exist. Layout wasn't loaded.";
 }
 
 // Returns false if reset should remain false (layout was loaded successfully).
 static bool load_layout_from_file(QMainWindow* win) {
-  QFile panel_config(get_config_dir().filePath("layout"));
-  if (!panel_config.exists() || !panel_config.open(QFile::ReadOnly)) return true;
-
-  bool reset = true;
-  QXmlStreamReader stream(&panel_config);
-  while (!stream.atEnd()) {
-    stream.readNext();
-    if (stream.name() == QLatin1String("panels") && stream.isStartElement()) {
-      stream.readNext();
-      win->restoreState(QByteArray::fromBase64(stream.text().toUtf8()), 0);
-      reset = false;
-    } else if (stream.name() == QLatin1String("panel") && stream.isStartElement()) {
-      layout_restore_panel_element(stream);
-    }
-  }
-  panel_config.close();
-  return reset;
+  amber::LayoutData data;
+  if (!amber::read_layout_file(get_config_dir().filePath("layout"), &data)) return true;
+  apply_layout(win, data);
+  return false;
 }
+
+static QDir user_layouts_dir() { return QDir(get_config_dir().filePath("layouts")); }
 
 void MainWindow::setup_layout(bool reset) {
   if (!reset) {
@@ -156,6 +162,174 @@ void MainWindow::setup_layout(bool reset) {
   }
 
   layout()->update();
+}
+
+void MainWindow::leave_maximized_panel() {
+  if (temp_panel_state.isEmpty()) return;
+  restoreState(temp_panel_state);
+  temp_panel_state.clear();
+}
+
+void MainWindow::layout_3point() {
+  // Source and program side by side, bin next to the timeline (Premiere's "Editing" workspace)
+  leave_maximized_panel();
+  for (auto panel : amber::panels) {
+    removeDockWidget(panel);
+  }
+
+  addDockWidget(Qt::TopDockWidgetArea, panel_graph_editor);
+  addDockWidget(Qt::TopDockWidgetArea, panel_footage_viewer);
+  addDockWidget(Qt::TopDockWidgetArea, panel_sequence_viewer);
+  addDockWidget(Qt::BottomDockWidgetArea, panel_project);
+  tabifyDockWidget(panel_project, panel_effect_controls);
+  tabifyDockWidget(panel_project, panel_undo_history);
+  tabifyDockWidget(panel_project, panel_scopes);
+  addDockWidget(Qt::BottomDockWidgetArea, panel_timeline);
+
+  panel_project->show();
+  panel_effect_controls->show();
+  panel_undo_history->show();
+  panel_footage_viewer->show();
+  panel_sequence_viewer->show();
+  panel_timeline->show();
+  panel_graph_editor->hide();
+  panel_scopes->hide();
+
+  panel_project->setFloating(false);
+  panel_effect_controls->setFloating(false);
+  panel_undo_history->setFloating(false);
+  panel_footage_viewer->setFloating(false);
+  panel_sequence_viewer->setFloating(false);
+  panel_timeline->setFloating(false);
+  panel_graph_editor->setFloating(true);
+
+  panel_project->raise();
+
+  resizeDocks({panel_footage_viewer, panel_sequence_viewer}, {width() / 2, width() / 2}, Qt::Horizontal);
+  resizeDocks({panel_project, panel_timeline}, {width() * 30 / 100, width() * 70 / 100}, Qt::Horizontal);
+  resizeDocks({panel_footage_viewer, panel_project}, {height() * 55 / 100, height() * 45 / 100}, Qt::Vertical);
+
+  layout()->update();
+}
+
+void MainWindow::layout_color() {
+  // Big program monitor, scopes visible, controls at hand
+  leave_maximized_panel();
+  for (auto panel : amber::panels) {
+    removeDockWidget(panel);
+  }
+
+  addDockWidget(Qt::TopDockWidgetArea, panel_graph_editor);
+  addDockWidget(Qt::TopDockWidgetArea, panel_sequence_viewer);
+  addDockWidget(Qt::TopDockWidgetArea, panel_scopes);
+  addDockWidget(Qt::TopDockWidgetArea, panel_effect_controls);
+  tabifyDockWidget(panel_effect_controls, panel_project);
+  tabifyDockWidget(panel_effect_controls, panel_footage_viewer);
+  tabifyDockWidget(panel_effect_controls, panel_undo_history);
+  addDockWidget(Qt::BottomDockWidgetArea, panel_timeline);
+
+  panel_sequence_viewer->show();
+  panel_scopes->show();
+  panel_effect_controls->show();
+  panel_project->show();
+  panel_footage_viewer->show();
+  panel_timeline->show();
+  panel_graph_editor->hide();
+  panel_undo_history->hide();
+
+  panel_sequence_viewer->setFloating(false);
+  panel_scopes->setFloating(false);
+  panel_effect_controls->setFloating(false);
+  panel_project->setFloating(false);
+  panel_footage_viewer->setFloating(false);
+  panel_timeline->setFloating(false);
+  panel_graph_editor->setFloating(true);
+
+  panel_effect_controls->raise();
+
+  resizeDocks({panel_sequence_viewer, panel_scopes, panel_effect_controls},
+              {width() * 45 / 100, width() * 25 / 100, width() * 30 / 100}, Qt::Horizontal);
+  resizeDocks({panel_sequence_viewer, panel_timeline}, {height() * 65 / 100, height() * 35 / 100}, Qt::Vertical);
+
+  layout()->update();
+}
+
+void MainWindow::layoutsMenu_About_To_Be_Shown() {
+  // Rebuilt on every show, like Open Recent: the built-in actions persist (they carry the shortcuts), the user
+  // layout actions are owned by the menus and deleted by clear()
+  layouts_menu_->clear();
+  delete_layout_menu_->clear();
+
+  layouts_menu_->addAction(layout_default_);
+  layouts_menu_->addAction(layout_3point_);
+  layouts_menu_->addAction(layout_color_);
+  layouts_menu_->addSeparator();
+
+  const QVector<amber::LayoutEntry> layouts = amber::list_layouts(user_layouts_dir());
+  for (const auto& layout : layouts) {
+    const QString text = QString(layout.name).replace('&', QLatin1String("&&"));
+
+    QAction* load = layouts_menu_->addAction(text, this, &MainWindow::load_user_layout);
+    load->setProperty("keyignore", true);
+    load->setData(layout.path);
+
+    QAction* del = delete_layout_menu_->addAction(text, this, &MainWindow::delete_user_layout);
+    del->setProperty("keyignore", true);
+    del->setData(layout.path);
+    del->setProperty("layoutname", layout.name);
+  }
+  if (!layouts.isEmpty()) layouts_menu_->addSeparator();
+
+  layouts_menu_->addAction(save_layout_);
+  if (!layouts.isEmpty()) layouts_menu_->addMenu(delete_layout_menu_);
+}
+
+void MainWindow::save_layout_as() {
+  bool ok = false;
+  const QString name =
+      QInputDialog::getText(this, tr("Save Layout"), tr("Layout name:"), QLineEdit::Normal, QString(), &ok).trimmed();
+  if (!ok || name.isEmpty()) return;
+
+  QDir dir = user_layouts_dir();
+  dir.mkpath(".");
+  const QString path = dir.filePath(amber::sanitize_layout_name(name) + ".xml");
+  if (QFileInfo::exists(path) && QMessageBox::question(this, tr("Save Layout"), tr("Replace layout '%1'?").arg(name),
+                                                       QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
+    return;
+  }
+
+  if (!amber::write_layout_file(path, capture_layout(this, name))) {
+    QMessageBox::critical(this, tr("Save Layout"), tr("Failed to save layout to '%1'.").arg(path));
+    return;
+  }
+  // refresh now so Action Search sees the new layout before the menu is next opened
+  QTimer::singleShot(0, this, &MainWindow::layoutsMenu_About_To_Be_Shown);
+}
+
+void MainWindow::load_user_layout() {
+  const QString path = static_cast<QAction*>(sender())->data().toString();
+  amber::LayoutData data;
+  if (!amber::read_layout_file(path, &data)) {
+    QMessageBox::warning(this, tr("Layouts"), tr("Failed to load layout from '%1'.").arg(path));
+    return;
+  }
+  leave_maximized_panel();
+  apply_layout(this, data);
+}
+
+void MainWindow::delete_user_layout() {
+  QAction* action = static_cast<QAction*>(sender());
+  if (QMessageBox::question(this, tr("Delete Layout"),
+                            tr("Delete layout '%1'?").arg(action->property("layoutname").toString()),
+                            QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
+    return;
+  }
+  if (!QFile::remove(action->data().toString())) {
+    QMessageBox::critical(this, tr("Delete Layout"), tr("Failed to delete '%1'.").arg(action->data().toString()));
+    return;
+  }
+  // deferred: this rebuild deletes the action that's being triggered
+  QTimer::singleShot(0, this, &MainWindow::layoutsMenu_About_To_Be_Shown);
 }
 
 static int purge_old_files(const QDir& dir, const QString& pattern, qint64 cutoff_ms, bool use_last_read = false) {
@@ -820,7 +994,17 @@ void MainWindow::setup_menus() {
 
   window_menu->addSeparator();
 
-  reset_default_layout_ = MenuHelper::create_menu_action(window_menu, "resetdefaultlayout", this, SLOT(reset_layout()));
+  // Built-ins first, then the user layouts from get_config_dir()/layouts (filled in layoutsMenu_About_To_Be_Shown()).
+  // "Default" keeps the id of the old "Reset to Default Layout" item so existing shortcut overrides still apply.
+  layouts_menu_ = MenuHelper::create_submenu(window_menu);
+  connect(layouts_menu_, &QMenu::aboutToShow, this, &MainWindow::layoutsMenu_About_To_Be_Shown);
+  layout_default_ = MenuHelper::create_menu_action(nullptr, "resetdefaultlayout", this, SLOT(reset_layout()));
+  layout_3point_ = MenuHelper::create_menu_action(nullptr, "layout3point", this, SLOT(layout_3point()));
+  layout_color_ = MenuHelper::create_menu_action(nullptr, "layoutcolor", this, SLOT(layout_color()));
+  save_layout_ = MenuHelper::create_menu_action(nullptr, "savelayout", this, SLOT(save_layout_as()));
+  delete_layout_menu_ = new Menu(layouts_menu_);
+  delete_layout_menu_->menuAction()->setProperty("keyignore", true);
+  layoutsMenu_About_To_Be_Shown();
 
   // INITIALIZE TOOLS MENU
 
@@ -1054,7 +1238,12 @@ void MainWindow::Retranslate() {
 
   maximize_panel_->setText(tr("Maximize Panel"));
   lock_panels_->setText(tr("Lock Panels"));
-  reset_default_layout_->setText(tr("Reset to Default Layout"));
+  layouts_menu_->setTitle(tr("Layouts"));
+  layout_default_->setText(tr("Default"));
+  layout_3point_->setText(tr("3-Point Editing"));
+  layout_color_->setText(tr("Color"));
+  save_layout_->setText(tr("Save Layout As..."));
+  delete_layout_menu_->setTitle(tr("Delete Layout"));
 
   tools_menu->setTitle(tr("&Tools"));
 
@@ -1158,42 +1347,7 @@ void MainWindow::closeEvent(QCloseEvent* e) {
       amber::CurrentConfig.save(config_fn);
 
       // save panel layout
-      QFile panel_config(get_config_dir().filePath("layout"));
-      if (panel_config.open(QFile::WriteOnly)) {
-        QXmlStreamWriter stream(&panel_config);
-        stream.setAutoFormatting(true);
-        stream.writeStartDocument();
-
-        stream.writeStartElement("layout");
-
-        stream.writeTextElement("panels", saveState(0).toBase64());
-
-        // if the panels have any specific layout data to save, save it now
-        for (int i = 0; i < amber::panels.size(); i++) {
-          QByteArray layout_data = amber::panels.at(i)->SaveLayoutState();
-
-          if (!layout_data.isEmpty()) {
-            // layout data is matched with the panel's objectName(), which we can't do if the panel has no name
-            const QString& panel_name = amber::panels.at(i)->objectName();
-            if (panel_name.isEmpty()) {
-              qWarning() << "Panel" << i << "had layout state data but no objectName(). Layout was not saved.";
-            } else {
-              stream.writeStartElement("panel");
-
-              stream.writeAttribute("name", panel_name);
-
-              stream.writeCharacters(layout_data.toBase64());
-
-              stream.writeEndElement();
-            }
-          }
-        }
-
-        stream.writeEndElement();  // layout
-
-        stream.writeEndDocument();
-        panel_config.close();
-      } else {
+      if (!amber::write_layout_file(get_config_dir().filePath("layout"), capture_layout(this))) {
         qCritical() << "Failed to save layout";
       }
 
@@ -1246,7 +1400,10 @@ void MainWindow::changeEvent(QEvent* e) {
   }
 }
 
-void MainWindow::reset_layout() { setup_layout(true); }
+void MainWindow::reset_layout() {
+  leave_maximized_panel();
+  setup_layout(true);
+}
 
 void MainWindow::maximize_panel() {
   // toggles between normal state and a state of one panel being maximized
