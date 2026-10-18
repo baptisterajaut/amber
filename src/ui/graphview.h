@@ -24,6 +24,7 @@
 #include <QVector>
 #include <QWidget>
 
+#include "core/graphmath.h"
 #include "effects/effectfields.h"
 #include "effects/effectrow.h"
 
@@ -39,6 +40,8 @@ class GraphView : public QWidget {
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
+  bool event(QEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
 
   void set_row(EffectRow* r);
   void set_visible_in(long i);
@@ -48,6 +51,20 @@ class GraphView : public QWidget {
 
   void delete_selected_keys();
   void select_all();
+
+  // Number of selected keys; the first one's field, time (sequence frames, as the timeline shows it) and value
+  int selected_key_info(EffectField** field, long* sequence_time, double* value);
+  // Value / Time entry of the toolbar: applied live while a slider drags (final false), one undo step when final.
+  // Value goes to every selected key, Time only with a single key selected.
+  void set_selected_value(double value, bool final);
+  void set_selected_time(long sequence_time, bool final);
+
+  // Easy Ease (F9), Easy Ease In (Shift+F9), Easy Ease Out (Ctrl+Shift+F9) on the selected keys, one undo step
+  void easy_ease(amber::graph::EaseSide side);
+
+  // Framing (F / Shift+F): the selected keys, or all keys when none is selected; all keys
+  void frame_selected();
+  void frame_all();
  signals:
   void x_scroll_changed(int);
   void y_scroll_changed(int);
@@ -75,6 +92,11 @@ class GraphView : public QWidget {
 
   void selection_update();
 
+  void begin_entry();
+  bool entry_active{false};
+  QVector<long> entry_old_times;
+  QVector<QVariant> entry_old_values;
+
   void handle_mouse_pan(QMouseEvent* event);
   void handle_mouse_click_add_drag(QMouseEvent* event);
   void handle_mouse_rect_select(QMouseEvent* event);
@@ -82,6 +104,8 @@ class GraphView : public QWidget {
   void handle_mouse_bezier_handle_drag(QMouseEvent* event, double x_diff, double y_diff);
   void handle_mouse_hover(QMouseEvent* event);
   bool is_hovering_keyframe(const QPoint& pos) const;
+  // A double field whose visibility toggle is on: the only curves drawn, hit-tested and selectable
+  bool field_is_shown(int field) const;
   bool test_click_add_on_field(QMouseEvent* event, EffectField* field, int field_index);
   bool press_find_key(const QPoint& pos, int& sel_key, int& sel_key_field);
   void press_apply_selection(int sel_key, int sel_key_field, QMouseEvent* event);
@@ -102,11 +126,14 @@ class GraphView : public QWidget {
   int handle_index;
 
   bool moved_keys;
+  long last_frame_diff;  // frame offset of the previous key drag move, to step away from collisions
+  bool snapped;          // the key drag snapped, to the playhead or to snap_time (key time)
+  bool snap_is_playhead;
+  long snap_time;
 
   int current_handle;
 
-  void draw_lines(QPainter& p, bool vert);
-  void draw_line_text(QPainter& p, bool vert, int line_no, int line_pos, int next_line_pos);
+  void draw_grid(QPainter& p);
   void paint_field_curves(QPainter& p, int field_index);
 
   EffectRow* row;
@@ -130,7 +157,7 @@ class GraphView : public QWidget {
   void reset_view();
   void set_view_to_selection();
   void set_view_to_all();
-  void set_view_to_rect(int x1, double y1, int x2, double y2);
+  void set_view_to_rect(double x1, double y1, double x2, double y2);
 };
 
 #endif  // GRAPHVIEW_H

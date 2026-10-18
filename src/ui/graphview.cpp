@@ -20,13 +20,18 @@
 
 #include "graphview.h"
 
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QtMath>
 #include <cfloat>
+#include <cmath>
+#include <limits>
 
+#include "core/graphmath.h"
 #include "effects/effect.h"
+#include "effects/keyframe.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "engine/undo/undo.h"
@@ -42,7 +47,6 @@
 
 const double kGraphZoomSpeed = 0.05;
 const double kGraphMinZoom = 1e-4;  // set_zoom floor: mouse deltas are divided by the zoom
-const int kGraphSize = 100;
 const int kBezierHandleSize = 3;
 const int kBezierLineSize = 2;
 
@@ -75,6 +79,15 @@ static void drop_stale_selection(EffectRow* row, QVector<int>& keys, QVector<int
   }
 }
 
+// CBA: one row at a time; multi-property overlay, speed graph and auto-bezier handles if asked
+
+// A value set from the mouse stays inside the field's range (a dragged key that started outside it stays where it is)
+static double clamp_to_field(EffectField* field, double value, double start = qQNaN()) {
+  if (field->type() != EffectField::EFFECT_FIELD_DOUBLE) return value;
+  DoubleField* df = static_cast<DoubleField*>(field);
+  return amber::graph::ClampDragValue(value, start, df->GetMinimum(), df->GetMaximum());
+}
+
 GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   x_scroll = 0;
   y_scroll = 0;
@@ -83,6 +96,10 @@ GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   y_zoom = 1.0;
   row = nullptr;
   moved_keys = false;
+  last_frame_diff = 0;
+  snapped = false;
+  snap_is_playhead = false;
+  snap_time = 0;
   current_handle = kBezierHandleNone;
   rect_select = false;
   visible_in = 0;
@@ -94,10 +111,74 @@ GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   connect(this, &GraphView::customContextMenuRequested, this, &GraphView::show_context_menu);
 }
 
+// The Graph Editor's own keys, taken before the main window's shortcuts while the view has focus
+static bool is_view_key(const QKeyEvent* e) {
+  const Qt::KeyboardModifiers mods = e->modifiers() & (Qt::ShiftModifier | Qt::ControlModifier | Qt::AltModifier);
+  if (e->key() == Qt::Key_F9) {
+    return mods == Qt::NoModifier || mods == Qt::ShiftModifier || mods == (Qt::ControlModifier | Qt::ShiftModifier);
+  }
+  // Shift+F is also Freeze Frame in the main window: the Graph Editor takes it while its view has focus
+  if (e->key() == Qt::Key_F) return mods == Qt::NoModifier || mods == Qt::ShiftModifier;
+  return false;
+}
+
+bool GraphView::event(QEvent* e) {
+  if (e->type() == QEvent::ShortcutOverride && row != nullptr && is_view_key(static_cast<QKeyEvent*>(e))) {
+    e->accept();
+    return true;
+  }
+  return QWidget::event(e);
+}
+
+void GraphView::keyPressEvent(QKeyEvent* e) {
+  if (row == nullptr || !is_view_key(e)) {
+    QWidget::keyPressEvent(e);
+    return;
+  }
+  const bool shift = e->modifiers() & Qt::ShiftModifier;
+  const bool ctrl = e->modifiers() & Qt::ControlModifier;
+  if (e->key() == Qt::Key_F9) {
+    easy_ease(ctrl ? amber::graph::EaseSide::kOut
+                   : (shift ? amber::graph::EaseSide::kIn : amber::graph::EaseSide::kBoth));
+  } else if (e->key() == Qt::Key_F) {
+    if (shift) {
+      frame_all();
+    } else {
+      frame_selected();
+    }
+  }
+}
+
+void GraphView::frame_selected() {
+  if (row == nullptr) return;
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
+  if (selected_keys.isEmpty()) {
+    set_view_to_all();
+  } else {
+    set_view_to_selection();
+  }
+}
+
+void GraphView::frame_all() { set_view_to_all(); }
+
 void GraphView::show_context_menu(const QPoint& pos) {
   Menu menu(this);
 
+  const bool has_selection = (row != nullptr && selected_keys.size() > 0);
+  QAction* ease = menu.addAction(tr("Easy Ease"), this, [this]() { easy_ease(amber::graph::EaseSide::kBoth); });
+  ease->setShortcut(QKeySequence(Qt::Key_F9));
+  QAction* ease_in = menu.addAction(tr("Easy Ease In"), this, [this]() { easy_ease(amber::graph::EaseSide::kIn); });
+  ease_in->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F9));
+  QAction* ease_out = menu.addAction(tr("Easy Ease Out"), this, [this]() { easy_ease(amber::graph::EaseSide::kOut); });
+  ease_out->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_F9));
+  ease->setEnabled(has_selection);
+  ease_in->setEnabled(has_selection);
+  ease_out->setEnabled(has_selection);
+
+  menu.addSeparator();
+
   QAction* zoom_to_selection = menu.addAction(tr("Zoom to Selection"));
+  zoom_to_selection->setShortcut(QKeySequence(Qt::Key_F));
   if (selected_keys.size() == 0 || row == nullptr) {
     zoom_to_selection->setEnabled(false);
   } else {
@@ -105,6 +186,7 @@ void GraphView::show_context_menu(const QPoint& pos) {
   }
 
   QAction* zoom_to_all = menu.addAction(tr("Zoom to Show All"));
+  zoom_to_all->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F));
   if (row == nullptr) {
     zoom_to_all->setEnabled(false);
   } else {
@@ -138,7 +220,7 @@ void GraphView::set_view_to_selection() {
     long min_time = LONG_MAX;
     long max_time = LONG_MIN;
     double min_dbl = DBL_MAX;
-    double max_dbl = DBL_MIN;
+    double max_dbl = std::numeric_limits<double>::lowest();  // not DBL_MIN, the smallest positive double
     for (int i = 0; i < selected_keys.size(); i++) {
       const EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes.at(selected_keys.at(i));
       min_time = qMin(key.time, min_time);
@@ -161,8 +243,9 @@ void GraphView::set_view_to_all() {
     long min_time = LONG_MAX;
     long max_time = LONG_MIN;
     double min_dbl = DBL_MAX;
-    double max_dbl = DBL_MIN;
+    double max_dbl = std::numeric_limits<double>::lowest();  // not DBL_MIN, the smallest positive double
     for (int i = 0; i < row->FieldCount(); i++) {
+      if (!field_is_shown(i)) continue;  // hidden curves take no room
       for (const auto& key : row->Field(i)->keyframes) {
         min_time = qMin(key.time, min_time);
         max_time = qMax(key.time, max_time);
@@ -180,51 +263,58 @@ void GraphView::set_view_to_all() {
   }
 }
 
-void GraphView::set_view_to_rect(int x1, double y1, int x2, double y2) {
-  double padding = 1.5;
-  double x_diff = double(x2 - x1);
-  double y_diff = (y2 - y1);
-  double x_diff_padded = (x_diff + 10) * padding;
-  double y_diff_padded = (y_diff + 10) * padding;
-  set_zoom(double(width()) / x_diff_padded, double(height()) / y_diff_padded);
+void GraphView::set_view_to_rect(double x1, double y1, double x2, double y2) {
+  const amber::graph::FitRect r = amber::graph::FitRange(x1, x2, y1, y2);
+  set_zoom(double(width()) / (r.max_time - r.min_time), double(height()) / (r.max_value - r.min_value));
 
-  set_scroll_x(qRound((double(x1) - ((x_diff_padded - x_diff) / 2)) * x_zoom));
-  set_scroll_y(qRound((double(y1) - ((y_diff_padded - y_diff) / 2)) * y_zoom));
+  set_scroll_x(qRound(r.min_time * x_zoom));
+  set_scroll_y(qRound(r.min_value * y_zoom));
+  update();
 }
 
-void GraphView::draw_line_text(QPainter& p, bool vert, int line_no, int line_pos, int next_line_pos) {
-  // draws last line's text
-  QString str = QString::number(line_no * kGraphSize);
-  int text_sz = vert ? fontMetrics().height() : fontMetrics().horizontalAdvance(str);
-  if (text_sz < (next_line_pos - line_pos)) {
-    QRect text_rect = vert ? QRect(0, line_pos - 50, 50, 50) : QRect(line_pos, height() - 50, 50, 50);
-    p.drawText(text_rect, Qt::AlignBottom | Qt::AlignLeft, str);
-  }
-}
+// Adaptive grid: value lines at 1/2/5 x 10^n, time lines on whole frames of the sequence, both from the zoom
+void GraphView::draw_grid(QPainter& p) {
+  const QColor bg = palette().color(QPalette::Window);
+  const QColor fg = palette().color(QPalette::WindowText);
+  auto mix = [&bg, &fg](double t) {
+    return QColor::fromRgbF(bg.redF() + (fg.redF() - bg.redF()) * t, bg.greenF() + (fg.greenF() - bg.greenF()) * t,
+                            bg.blueF() + (fg.blueF() - bg.blueF()) * t);
+  };
+  const QColor line_color = mix(0.12);
+  const QColor zero_color = mix(0.3);
+  const QColor label_color = mix(0.55);
 
-void GraphView::draw_lines(QPainter& p, bool vert) {
-  int last_line = INT_MIN;
-  int last_line_x = INT_MIN;
-  int lim = vert ? height() : width();
-  int scroll = vert ? y_scroll : x_scroll;
-  for (int i = 0; i < lim; i++) {
-    int scroll_offs = vert ? height() - i + scroll : i + scroll;
-    int this_line = qFloor(scroll_offs / (kGraphSize * (vert ? y_zoom : x_zoom)));
-    if (vert) this_line++;
-    if (this_line != last_line) {
-      if (vert) {
-        p.drawLine(0, i, width(), i);
-      } else {
-        p.drawLine(i, 0, i, height());
-      }
-
-      draw_line_text(p, vert, last_line, last_line_x, i);
-
-      last_line_x = i;
-      last_line = this_line;
+  // Value lines, labelled along the left
+  const double v_step = amber::graph::ValueGridStep(y_zoom);
+  const int decimals = amber::graph::StepDecimals(v_step);
+  const long v_first = long(std::floor(get_value_y(height()) / v_step));
+  const long v_last = long(std::ceil(get_value_y(0) / v_step));
+  for (long k = v_first; k <= v_last && v_last - v_first < 1000; k++) {
+    const double v = double(k) * v_step;
+    const int y = get_screen_y(v);
+    p.setPen(k == 0 ? zero_color : line_color);
+    p.drawLine(0, y, width(), y);
+    if (y < height() - fontMetrics().height() - 2) {  // clear of the time labels along the bottom
+      p.setPen(label_color);
+      p.drawText(4, y - 3, QString::number(v, 'f', decimals));
     }
   }
-  draw_line_text(p, vert, last_line, last_line_x, width());
+
+  // Time lines on sequence frames, labelled along the bottom in the user's timecode format
+  const Sequence* seq = panel_sequence_viewer->seq.get();
+  const long t_step = amber::graph::TimeGridStep(x_zoom, seq->frame_rate);
+  const long t_first = long(std::floor((double(x_scroll) / x_zoom + visible_in) / t_step));
+  const long t_last = long(std::ceil((double(x_scroll + width()) / x_zoom + visible_in) / t_step));
+  for (long k = t_first; k <= t_last && t_last - t_first < 1000; k++) {
+    const long frame = k * t_step;
+    const int x = qRound(double(frame - visible_in) * x_zoom - x_scroll);
+    p.setPen(frame == 0 ? zero_color : line_color);
+    p.drawLine(x, 0, x, height());
+    if (frame >= 0) {
+      p.setPen(label_color);
+      p.drawText(x + 3, height() - 4, frame_to_timecode(frame, amber::CurrentConfig.timecode_view, seq->frame_rate));
+    }
+  }
 }
 
 // Build a path for the curve segment between two keyframes (used for hit-testing).
@@ -328,7 +418,7 @@ void GraphView::paint_field_curves(QPainter& p, int field_index) {
     const EffectKeyframe& key = field->keyframes.at(sorted_key);
     int key_x = get_screen_x(key.time);
     int key_y = get_screen_y(key.data.toDouble());
-    if (key.type == EFFECT_KEYFRAME_BEZIER) {
+    if (keyframe_shows_handles(key.type)) {
       p.setPen(Qt::gray);
       QPointF pre_point(key_x + key.pre_handle_x * x_zoom, key_y - key.pre_handle_y * y_zoom);
       p.drawLine(pre_point, QPointF(key_x, key_y));
@@ -352,17 +442,22 @@ void GraphView::paintEvent(QPaintEvent*) {
   QPainter p(this);
 
   if (panel_sequence_viewer->seq != nullptr) {
-    p.setPen(Qt::gray);
-    draw_lines(p, true);
-    draw_lines(p, false);
+    draw_grid(p);
 
     if (row != nullptr) {
       for (int i = row->FieldCount() - 1; i >= 0; i--) {
         paint_field_curves(p, i);
       }
 
+      // a key snapped to another curve's key: white line there (snapped to the playhead: the playhead turns white)
+      const bool dragging_snapped = (snapped && mousedown && moved_keys);
+      if (dragging_snapped && !snap_is_playhead) {
+        p.setPen(Qt::white);
+        p.drawLine(get_screen_x(snap_time), 0, get_screen_x(snap_time), height());
+      }
+
       // draw playhead (only meaningful when a row is selected; visible_in is row-dependent)
-      p.setPen(Qt::red);
+      p.setPen((dragging_snapped && snap_is_playhead) ? Qt::white : Qt::red);
       int playhead_x = qRound((double(panel_sequence_viewer->seq->playhead - visible_in) * x_zoom) - x_scroll);
       p.drawLine(playhead_x, 0, playhead_x, height());
     }
@@ -402,6 +497,8 @@ bool GraphView::press_find_key(const QPoint& pos, int& sel_key, int& sel_key_fie
         sel_key_field = i;
         return true;
       }
+
+      if (!keyframe_shows_handles(key.type)) continue;
 
       QPointF pre_point(key_x + key.pre_handle_x * x_zoom, key_y - key.pre_handle_y * y_zoom);
       QPointF post_point(key_x + key.post_handle_x * x_zoom, key_y - key.post_handle_y * y_zoom);
@@ -463,6 +560,7 @@ void GraphView::mousePressEvent(QMouseEvent* event) {
   if (row == nullptr) return;
 
   mousedown = true;
+  last_frame_diff = 0;
   start_x = event->position().toPoint().x();
   start_y = event->position().toPoint().y();
 
@@ -476,7 +574,7 @@ void GraphView::mousePressEvent(QMouseEvent* event) {
 
     EffectKeyframe key;
     key.time = get_value_x(event->position().toPoint().x());
-    key.data = get_value_y(event->position().toPoint().y());
+    key.data = clamp_to_field(click_add_field, get_value_y(event->position().toPoint().y()));
     key.type = click_add_type;
     click_add_key = click_add_field->keyframes.size();
     click_add_field->keyframes.append(key);
@@ -508,7 +606,8 @@ void GraphView::handle_mouse_click_add_drag(QMouseEvent* event) {
     return;
   }
   click_add_field->keyframes[click_add_key].time = get_value_x(event->position().toPoint().x());
-  click_add_field->keyframes[click_add_key].data = get_value_y(event->position().toPoint().y());
+  click_add_field->keyframes[click_add_key].data =
+      clamp_to_field(click_add_field, get_value_y(event->position().toPoint().y()));
   update_ui(false);
 }
 
@@ -525,6 +624,7 @@ void GraphView::handle_mouse_rect_select(QMouseEvent* event) {
 
   for (int i = 0; i < row->FieldCount(); i++) {
     EffectField* f = row->Field(i);
+    if (!field_is_shown(i)) continue;  // a hidden curve's keys are not drawn, so not selectable
     for (int j = 0; j < f->keyframes.size(); j++) {
       bool already_selected = false;
       for (int k = 0; k < selected_keys.size(); k++) {
@@ -553,14 +653,60 @@ void GraphView::handle_mouse_keyframe_drag(QMouseEvent* event) {
     qWarning() << "handle_mouse_keyframe_drag: event is null";
     return;
   }
+  // Times of the keys that are not moving, per moving key's field
+  QVector<QVector<long>> fixed_times(selected_keys.size());
   for (int i = 0; i < selected_keys.size(); i++) {
-    row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].time =
-        qRound(selected_keys_old_vals.at(i) + (double(event->position().toPoint().x() - start_x) / x_zoom));
+    const EffectField* field = row->Field(selected_keys_fields.at(i));
+    for (int j = 0; j < field->keyframes.size(); j++) {
+      bool moving = false;
+      for (int k = 0; k < selected_keys.size() && !moving; k++) {
+        moving = (selected_keys.at(k) == j && selected_keys_fields.at(k) == selected_keys_fields.at(i));
+      }
+      if (!moving) fixed_times[i].append(field->keyframes.at(j).time);
+    }
+  }
+  long frame_diff = qRound(double(event->position().toPoint().x() - start_x) / x_zoom);
+
+  // Snapping (timeline toggle): to the playhead and to the other curves' keys. Not to the keys of the key's own field:
+  // landing on one is a collision, refused below.
+  snapped = false;
+  if (panel_timeline->snapping && panel_sequence_viewer->seq != nullptr) {
+    Clip* c = row->GetParentEffect()->parent_clip;
+    const long playhead = panel_sequence_viewer->seq->playhead - visible_in + c->clip_in();
+    QVector<QVector<long>> targets(selected_keys.size());
+    for (int i = 0; i < selected_keys.size(); i++) {
+      targets[i].append(playhead);
+      for (int f = 0; f < row->FieldCount(); f++) {
+        if (f == selected_keys_fields.at(i) || !field_is_shown(f)) continue;
+        for (int j = 0; j < row->Field(f)->keyframes.size(); j++) {
+          bool moving = false;
+          for (int k = 0; k < selected_keys.size() && !moving; k++) {
+            moving = (selected_keys.at(k) == j && selected_keys_fields.at(k) == f);
+          }
+          if (!moving) targets[i].append(row->Field(f)->keyframes.at(j).time);
+        }
+      }
+    }
+    snapped = amber::graph::SnapKeyDrag(frame_diff, selected_keys_old_vals, targets,
+                                        amber::graph::kSnapRangePx / x_zoom, &snap_time);
+    snap_is_playhead = (snapped && snap_time == playhead);
+  }
+
+  const long wanted_diff = frame_diff;
+  frame_diff = amber::graph::AvoidKeyCollisions(frame_diff, last_frame_diff, selected_keys_old_vals, fixed_times);
+  if (frame_diff != wanted_diff) snapped = false;
+  last_frame_diff = frame_diff;
+
+  for (int i = 0; i < selected_keys.size(); i++) {
+    EffectField* field = row->Field(selected_keys_fields.at(i));
+    field->keyframes[selected_keys.at(i)].time = selected_keys_old_vals.at(i) + frame_diff;
     if (event->modifiers() & Qt::ShiftModifier) {
-      row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].data = selected_keys_old_doubles.at(i);
+      field->keyframes[selected_keys.at(i)].data = selected_keys_old_doubles.at(i);
     } else {
-      row->Field(selected_keys_fields.at(i))->keyframes[selected_keys.at(i)].data =
-          qRound(selected_keys_old_doubles.at(i) + (double(start_y - event->position().toPoint().y()) / y_zoom));
+      // Unrounded: a 0-1 field (opacity) must not jump between whole numbers
+      field->keyframes[selected_keys.at(i)].data = clamp_to_field(
+          field, selected_keys_old_doubles.at(i) + (double(start_y - event->position().toPoint().y()) / y_zoom),
+          selected_keys_old_doubles.at(i));
     }
   }
   moved_keys = true;
@@ -605,11 +751,14 @@ void GraphView::handle_mouse_bezier_handle_drag(QMouseEvent* event, double x_dif
 
 bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
   for (int i = 0; i < row->FieldCount(); i++) {
+    if (!field_is_shown(i)) continue;
     for (const auto& key : row->Field(i)->keyframes) {
       int key_x = get_screen_x(key.time);
       int key_y = get_screen_y(key.data.toDouble());
       QRect test_rect(key_x - KEYFRAME_SIZE, key_y - KEYFRAME_SIZE, KEYFRAME_SIZE + KEYFRAME_SIZE,
                       KEYFRAME_SIZE + KEYFRAME_SIZE);
+      if (test_rect.contains(pos)) return true;
+      if (!keyframe_shows_handles(key.type)) continue;
       QRect pre_rect(qRound(key_x + key.pre_handle_x * x_zoom - kBezierHandleSize),
                      qRound(key_y - key.pre_handle_y * y_zoom - kBezierHandleSize),
                      kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
@@ -617,7 +766,7 @@ bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
                       qRound(key_y - key.post_handle_y * y_zoom - kBezierHandleSize),
                       kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
 
-      if (test_rect.contains(pos) || pre_rect.contains(pos) || post_rect.contains(pos)) {
+      if (pre_rect.contains(pos) || post_rect.contains(pos)) {
         return true;
       }
     }
@@ -776,6 +925,7 @@ void GraphView::mouseReleaseEvent(QMouseEvent*) {
   }
   moved_keys = false;
   mousedown = false;
+  snapped = false;
   click_add = false;
   click_add_proc = false;
   if (rect_select) {
@@ -837,6 +987,7 @@ void GraphView::wheelEvent(QWheelEvent* event) {
 
 void GraphView::set_row(EffectRow* r) {
   if (row != r) {
+    entry_active = false;  // a Time/Value drag cut short by the row change: its snapshot belongs to the old row
     selected_keys.clear();
     selected_keys_fields.clear();
     selected_keys_old_vals.clear();
@@ -873,6 +1024,10 @@ void GraphView::set_selected_keyframe_type(int type) {
   }
 }
 
+bool GraphView::field_is_shown(int field) const {
+  return row->Field(field)->type() == EffectField::EFFECT_FIELD_DOUBLE && field_visibility.at(field);
+}
+
 void GraphView::set_field_visibility(int field, bool b) {
   field_visibility[field] = b;
   update();
@@ -897,6 +1052,7 @@ void GraphView::select_all() {
     selected_keys_fields.clear();
     for (int i = 0; i < row->FieldCount(); i++) {
       EffectField* field = row->Field(i);
+      if (!field_is_shown(i)) continue;  // Select All then Delete must not remove a hidden curve's keys
       for (int j = 0; j < field->keyframes.size(); j++) {
         selected_keys.append(j);
         selected_keys_fields.append(i);
@@ -904,6 +1060,96 @@ void GraphView::select_all() {
     }
     selection_update();
   }
+}
+
+int GraphView::selected_key_info(EffectField** field, long* sequence_time, double* value) {
+  if (row == nullptr) return 0;
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
+  if (selected_keys.isEmpty()) return 0;
+  EffectField* f = row->Field(selected_keys_fields.at(0));
+  const EffectKeyframe& key = f->keyframes.at(selected_keys.at(0));
+  Clip* c = row->GetParentEffect()->parent_clip;
+  if (field) *field = f;
+  if (sequence_time) *sequence_time = key.time - c->clip_in() + c->timeline_in();
+  if (value) *value = key.data.toDouble();
+  return selected_keys.size();
+}
+
+// Snapshot of the selected keys when a Value/Time entry starts: the undo step's old values
+void GraphView::begin_entry() {
+  if (entry_active) return;
+  entry_old_times.clear();
+  entry_old_values.clear();
+  for (int i = 0; i < selected_keys.size(); i++) {
+    const EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes.at(selected_keys.at(i));
+    entry_old_times.append(key.time);
+    entry_old_values.append(key.data);
+  }
+  entry_active = true;
+}
+
+void GraphView::set_selected_value(double value, bool final) {
+  if (row == nullptr) return;
+  if (!entry_active) drop_stale_selection(row, selected_keys, selected_keys_fields);
+  if (selected_keys.isEmpty()) return;
+  begin_entry();
+
+  QVector<EffectField*> fields;
+  for (int i = 0; i < selected_keys.size(); i++) {
+    EffectField* f = row->Field(selected_keys_fields.at(i));
+    fields.append(f);
+    f->keyframes[selected_keys.at(i)].data = clamp_to_field(f, value);
+  }
+  if (final) {
+    ComboAction* ca = keyframe_value_entry(fields, selected_keys, entry_old_values, value);
+    if (ca != nullptr) amber::UndoStack.push(ca);
+    entry_active = false;
+    selection_update();
+  }
+  update_ui(false);
+}
+
+void GraphView::set_selected_time(long sequence_time, bool final) {
+  if (row == nullptr) return;
+  if (!entry_active) drop_stale_selection(row, selected_keys, selected_keys_fields);
+  if (selected_keys.size() != 1) return;
+  begin_entry();
+
+  EffectField* f = row->Field(selected_keys_fields.at(0));
+  const int k = selected_keys.at(0);
+  Clip* c = row->GetParentEffect()->parent_clip;
+  const long old_time = entry_old_times.at(0);
+  QVector<long> fixed;
+  for (int j = 0; j < f->keyframes.size(); j++) {
+    if (j != k) fixed.append(f->keyframes.at(j).time);
+  }
+  // A time already taken by another key of the field steps back toward the key's old time
+  const long diff = amber::graph::AvoidKeyCollisions(sequence_time - c->timeline_in() + c->clip_in() - old_time, 0,
+                                                     {old_time}, {fixed});
+  f->keyframes[k].time = old_time + diff;
+  if (final) {
+    if (diff != 0) {
+      auto* cmd =
+          new KeyframeMemberChange(f, k, KeyframeMemberChange::kTime, qlonglong(old_time), qlonglong(old_time + diff));
+      cmd->setText(tr("Move Keyframe(s)"));
+      amber::UndoStack.push(cmd);
+    }
+    entry_active = false;
+    selection_update();
+  }
+  update_ui(false);
+}
+
+void GraphView::easy_ease(amber::graph::EaseSide side) {
+  if (row == nullptr) return;
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
+  QVector<EffectField*> fields;
+  for (int f : selected_keys_fields) fields.append(row->Field(f));
+  ComboAction* ca = keyframe_easy_ease(fields, selected_keys, side);
+  if (ca == nullptr) return;
+  amber::UndoStack.push(ca);
+  selection_update();  // the keys are Bezier now: the type buttons follow
+  update_ui(false);
 }
 
 void GraphView::set_scroll_x(int s) {

@@ -165,6 +165,11 @@ target_include_directories(amber-test-keyframes PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-keyframes PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-keyframes COMMAND amber-test-keyframes)
 
+add_executable(amber-test-graph-view-math test_graphviewmath.cpp)
+target_include_directories(amber-test-graph-view-math PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-graph-view-math PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-graph-view-math COMMAND amber-test-graph-view-math)
+
 add_executable(amber-test-undo-markers test_undo_markers.cpp)
 target_include_directories(amber-test-undo-markers PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-undo-markers PRIVATE amber-engine Qt6::Test)

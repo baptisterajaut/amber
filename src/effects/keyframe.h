@@ -21,12 +21,30 @@
 #ifndef KEYFRAME_H
 #define KEYFRAME_H
 
+#include "core/graphmath.h"
 #include "core/keyframe.h"
 
+#include <QVariant>
 #include <QVector>
 
+class ComboAction;
 class EffectField;
 
 void delete_keyframes(QVector<EffectField *> &selected_key_fields, QVector<int> &selected_keys);
+
+// Whether the Graph Editor draws a key's bezier handles, and so whether they can be grabbed: both rely on this one
+// test so a hidden handle (the default +-40 of a Linear or Hold key) is never hit.
+bool keyframe_shows_handles(int type);
+
+// Graph Editor Value entry: one undo step setting the same value, clamped to each field's range, on several keys.
+// old_values are the keys' values from before a live slider drag (the keys may already hold the new value).
+// nullptr when no key changes.
+ComboAction *keyframe_value_entry(const QVector<EffectField *> &fields, const QVector<int> &keys,
+                                  const QVector<QVariant> &old_values, double value);
+
+// Graph Editor Easy Ease on the given keys: Bezier type, handles from amber::graph::EasyEase() against each key's
+// neighbours in time within its field. One undo step; nullptr when no key changes.
+ComboAction *keyframe_easy_ease(const QVector<EffectField *> &fields, const QVector<int> &keys,
+                                amber::graph::EaseSide side);
 
 #endif // KEYFRAME_H
