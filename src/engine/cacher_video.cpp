@@ -183,8 +183,15 @@ void Cacher::CacheVideoWorker() {
     if (need_seek) {
       // we need to seek to retrieve this frame
 
-      int64_t seek_ts = target_pts;
       int64_t zero = 0;
+
+      // A seek landing past its target pays another, a second earlier. MPEG-PS/TS (no keyframe index; PS indexes
+      // every packet as one) always land past it, on the keyframe after the packet the seek finds, DV a frame past.
+      // Start each seek as far before the target as this clip's seeks have overshot so far: after its first, they land
+      // at or before.
+      // CBA: an overshoot counts for at most a second, so one wild landing can't make every later seek decode far
+      // back; a format overshooting more keeps paying the step back.
+      int64_t seek_ts = qMax(zero, target_pts - seek_overshoot_);
 
       // Some formats don't seek reliably to the last keyframe, as a result we need to seek in a loop to ensure we
       // get a frame prior to the timestamp: a second further back while the landing frame is past the target. EOF
@@ -211,6 +218,10 @@ void Cacher::CacheVideoWorker() {
         av_seek_frame(formatCtx, clip->media_stream_index(), seek_ts, AVSEEK_FLAG_BACKWARD);
 
         seek_retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
+        if (seek_retrieve_code >= 0 && decoded_frame->pts != AV_NOPTS_VALUE && decoded_frame->pts > target_pts
+            && !seeked_to_zero) {
+          seek_overshoot_ = qMax(seek_overshoot_, qMin(second_pts, decoded_frame->pts - seek_ts));
+        }
 
         //qDebug() << "Target:" << target_pts << "Seek:" << seek_ts << "Frame:" << decoded_frame->pts;
 
@@ -488,6 +499,12 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
   int result = 0;
   int receive_ret;
 
+  // A packet the decoder refuses as invalid is skipped for the next one: after a seek into MPEG-PS the first MP2 packet
+  // starts mid-frame, and giving up there left the clip silent from the seek on.
+  // CBA: at most kMaxInvalidPackets in a row, then the error goes up as before (a stream that never decodes).
+  constexpr int kMaxInvalidPackets = 64;
+  int invalid_packets = 0;
+
   // do we need to retrieve a new packet for a new frame?
   av_frame_unref(f);
   while ((receive_ret = avcodec_receive_frame(codecCtx, f)) == AVERROR(EAGAIN)) {
@@ -501,6 +518,7 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
 
     if (read_ret >= 0) {
       int send_ret = avcodec_send_packet(codecCtx, pkt);
+      if (send_ret == AVERROR_INVALIDDATA && invalid_packets++ < kMaxInvalidPackets) continue;
       if (send_ret < 0) {
         qCritical() << "Failed to send packet to decoder." << send_ret;
         return send_ret;

@@ -200,7 +200,12 @@ void PreviewGenerator::parse_media() {
         // heuristic to determine if video is a still image (if it is, we treat it differently in the playback/render process)
         bool is_still_image = false;
 
-        if (fmt_ctx_->streams[i]->avg_frame_rate.den == 0
+        // No average frame rate alone isn't a still: MPEG-4 Part 2 in MPEG-TS has none, only r_frame_rate (it played
+        // as its first frame held). A still has neither, or the fallback FFmpeg puts there, the time base (an MP3's
+        // cover art)
+        const AVRational r = fmt_ctx_->streams[i]->r_frame_rate;
+        const bool no_rate = r.num <= 0 || r.den <= 0 || av_cmp_q(r, av_inv_q(fmt_ctx_->streams[i]->time_base)) == 0;
+        if (fmt_ctx_->streams[i]->avg_frame_rate.den == 0 && no_rate
             && fmt_ctx_->streams[i]->codecpar->codec_id != AV_CODEC_ID_DNXHD) {
           is_still_image = true;
         }
