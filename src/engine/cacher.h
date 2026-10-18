@@ -344,7 +344,12 @@ class Cacher : public QThread {
   /**
    * @brief Current Sequence playhead set by Cache()
    */
-  long playhead_;
+  std::atomic<long> playhead_{0};
+
+  /**
+   * @brief The playhead_ the running video pass decodes for (passServesRequest())
+   */
+  long pass_playhead_{0};
 
   /**
    * @brief Current Sequence scrubbing state set by Cache()
@@ -474,7 +479,7 @@ class Cacher : public QThread {
     return (video_end_pts_ != AV_NOPTS_VALUE && target_pts > video_end_pts_) ? video_end_pts_ : target_pts;
   }
   int64_t cacheVideoLastDecodable(int64_t seek_ts);
-  int64_t videoTargetPts() const;
+  int64_t videoTargetPts(long playhead) const;
 
   /**
    * @brief FFmpeg buffer sink
@@ -799,6 +804,11 @@ class Cacher : public QThread {
    * seeked_to_zero may be cleared if the seeked-to-zero fallback is used.
    */
   void cacheVideoMaybeSetRetrieved(AVFrame* decoded_frame, int64_t target_pts, bool& seeked_to_zero);
+
+  /**
+   * @brief Whether the running pass may serve the request waiting now (see cacher_video.cpp)
+   */
+  bool passServesRequest() const;
 
   /**
    * @brief Trim the front of the queue when FRAME_QUEUE_TYPE_FRAMES previous limit is exceeded.

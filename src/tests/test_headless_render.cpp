@@ -562,10 +562,10 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
   return d;
 }
 
-// frames frames of uniform grey, frame i at luma 24 + 16 * i (still told apart after a codec round trip), as MPEG-4 in
-// MP4 at 1/90000 with the first frame at pts start: video that starts after 0, as a camera's MPEG-TS or an MP4 muxed
-// audio first
-void write_offset_mp4(const QString& path, int frames, int64_t start) {
+// frames frames of uniform grey, frame i at luma 24 + 16 * (i / frames_per_step) (still told apart after a codec round
+// trip), as MPEG-4 in MP4 at 1/90000 with the first frame at pts start: video that starts after 0, as a camera's
+// MPEG-TS or an MP4 muxed audio first
+void write_offset_mp4(const QString& path, int frames, int64_t start, int frames_per_step = 1) {
   const AVRational rate{int(kFps), 1};
   const QByteArray p = path.toUtf8();
   const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_MPEG4);
@@ -607,7 +607,7 @@ void write_offset_mp4(const QString& path, int frames, int64_t start) {
   QVERIFY(av_frame_get_buffer(frame, 0) >= 0);
   for (int i = 0; i < frames; i++) {
     av_frame_make_writable(frame);
-    memset(frame->data[0], 24 + 16 * i, frame->linesize[0] * kSize);
+    memset(frame->data[0], 24 + 16 * (i / frames_per_step), frame->linesize[0] * kSize);
     memset(frame->data[1], 128, frame->linesize[1] * kSize / 2);
     memset(frame->data[2], 128, frame->linesize[2] * kSize / 2);
     frame->pts = i;
@@ -1744,6 +1744,81 @@ class TestHeadlessRender : public QObject {
 
     QCOMPARE(matched, expected);
     QCOMPARE(viewer, int(kViewerFrame));
+  }
+
+  // A frame asked while the cacher still fills its queue for the previous one is that frame, not the previous request's
+  // latest: the running pass served the new request with its own queue's last frame. A long upcoming queue keeps the
+  // first pass decoding (5 minutes of tiny frames) while the paused viewer (speed 0) asks for a frame far ahead.
+  void viewerGetsTheFrameItAsked() {
+    constexpr int kFrames = 9000;
+    constexpr int kStep = 700;  // frames per grey level: 13 levels over the file
+    constexpr long kFar = 8900;
+    const int saved_type = amber::CurrentConfig.upcoming_queue_type;
+    const double saved_size = amber::CurrentConfig.upcoming_queue_size;
+    const auto restore = qScopeGuard([saved_type, saved_size] {
+      amber::CurrentConfig.upcoming_queue_type = saved_type;
+      amber::CurrentConfig.upcoming_queue_size = saved_size;
+    });
+    amber::CurrentConfig.upcoming_queue_type = amber::FRAME_QUEUE_TYPE_SECONDS;
+    amber::CurrentConfig.upcoming_queue_size = 600;
+    const QString video = dir_.filePath("far_request.mp4");
+    write_offset_mp4(video, kFrames, 0, kStep);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("far_request_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("far_request.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio, QString(), kFrames).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+    }
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kFrames);
+
+    QOffscreenSurface* surface = QRhiGles2InitParams::newFallbackSurface();
+    auto* rt = new RenderThread();
+    rt->setGlFallbackSurface(surface);
+    rt->start();
+    const QString first = dir_.filePath("far_request_0.png");
+    const QString far = dir_.filePath("far_request_far.png");
+    seq->playhead = 0;
+    rt->start_render(seq.get(), 0, first);
+    const bool first_saved = QTest::qWaitFor([&] { return QFileInfo::exists(first); }, 10000);
+    seq->playhead = kFar;  // the first pass is still decoding towards the queue's end
+    rt->start_render(seq.get(), 0, far);
+    const bool far_saved = QTest::qWaitFor([&] { return QFileInfo::exists(far); }, 10000);
+    close_active_clips(seq.get());  // before the render thread drains the deferred RHI deletions on shutdown
+    rt->cancel();
+    delete rt;
+    delete surface;
+    QVERIFY(first_saved);
+    QVERIFY(far_saved);
+    const QImage img = QImage(far).convertToFormat(QImage::Format_RGBA8888);
+    const int shown = closest_grey_frame(
+        src.rgba, QByteArray(reinterpret_cast<const char*>(img.constBits()), int(img.sizeInBytes())));
+    qInfo("viewer frame %ld shows grey level %d (source frame %d), expected level %ld", kFar, shown / kStep, shown,
+          kFar / kStep);
+    QCOMPARE(shown / kStep, int(kFar / kStep));
   }
 
   // Interlaced video decoded in hardware: the VAAPI transfer hands NV12 to a filter link negotiated from the stream's

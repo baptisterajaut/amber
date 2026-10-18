@@ -104,11 +104,20 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
   return retrieve_code;
 }
 
+// Whether this pass may serve the request waiting now. One that came in while it ran (playhead_ moved on) waits for the
+// next pass (CacheVideoWorker() runs again) when it needs that exact frame: an export, a paused viewer. The pass used
+// to hand it its own queue's last frame, a frame or more early. Playback and scrubbing keep taking it: the nearest
+// frame decoded so far beats waiting while the decode is behind (the next pass may seek and re-decode a GOP).
+bool Cacher::passServesRequest() const {
+  if (pass_playhead_ == playhead_) return true;
+  return !clip->OpenedForExport() && (playback_speed_ != 0 || scrubbing_);
+}
+
 // ---------------------------------------------------------------------------
 // cacheVideoMaybeSetRetrieved
 // ---------------------------------------------------------------------------
 void Cacher::cacheVideoMaybeSetRetrieved(AVFrame* decoded_frame, int64_t target_pts, bool& seeked_to_zero) {
-  if (retrieved_frame != nullptr) return;
+  if (retrieved_frame != nullptr || !passServesRequest()) return;
 
   if (decoded_frame->pts == target_pts) {
     SetRetrievedFrame(decoded_frame);
@@ -307,7 +316,7 @@ static int64_t seek_landing_timestamp(AVFormatContext* formatCtx, int stream_ind
 // ---------------------------------------------------------------------------
 void Cacher::cacheVideoDynamicClip() {
   bool reversed = IsReversed();
-  int64_t target_pts = videoTargetPts();
+  int64_t target_pts = videoTargetPts(pass_playhead_);
   int64_t second_pts = seconds_to_timestamp(clip, 1);
 
   QueueStats stats = scan_queue(queue_, target_pts);
@@ -386,6 +395,7 @@ void Cacher::CacheVideoWorker() {
     return;
   }
 
+  pass_playhead_ = playhead_;
   WakeMainThread();
 
   if (clip->media_stream() != nullptr && clip->media_stream()->infinite_length) {
@@ -395,7 +405,7 @@ void Cacher::CacheVideoWorker() {
   }
 
   // If we couldn't find the exact target frame, fall back to the closest available frame
-  if (retrieved_frame == nullptr) {
+  if (retrieved_frame == nullptr && passServesRequest()) {
     if (!queue_.isEmpty()) {
       qDebug() << "Exact frame not found, using closest available frame from queue";
       SetRetrievedFrame(queue_.last());
