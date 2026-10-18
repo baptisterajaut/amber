@@ -538,6 +538,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   list(APPEND _amber_hot ${UI_SOURCES})
   list(FILTER _amber_hot INCLUDE REGEX "(^|/)(core/(audiodsp|audio|audiometer|scopes|alpha|blur|curves|gradientramp)|rendering/(audio|audio_ui|renderfunctions|renderthread|exportthread|recordingtap|rhiresourcecache)|engine/(cacher|cacher_video|cacher_audio|clip|sequence)|effects/(effect|transition|keyframe|effectrow|effectfield)|effects/internal/[a-z0-9]+|ui/(viewerwidget|timelinewidget_paint|scopewidget|audiomonitor))\\.cpp$")
   set_source_files_properties(${_amber_hot} PROPERTIES COMPILE_OPTIONS $<$<CONFIG:Release>:-O3>)
+  # MinGW GCC (12-14 at least) ICEs in binds_to_current_def_p when linking -Os objects with LTO: GCC PR 106103.
+  # -Os enables ctor/dtor decloning, which triggers it; turning only that off keeps the rest of -Os + LTO.
+  if(AMBER_TARGET_WINDOWS AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${AMBER_TARGET} PRIVATE $<$<CONFIG:Release>:-fno-declone-ctor-dtor>)
+    target_compile_options(amber-engine PRIVATE $<$<CONFIG:Release>:-fno-declone-ctor-dtor>)
+  endif()
 endif()
 
 # Test suite (only when not cross-compiling)

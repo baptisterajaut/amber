@@ -6,12 +6,18 @@
 #include <QRegularExpression>
 #include <QSurfaceFormat>
 #include <QTest>
+#include <QVersionNumber>
 
 #include "rendering/rhiresourcecache.h"
 #include "tests/test_gpu_required.h"
 
+// Same Vulkan availability guard as rendering/renderthread.cpp: QT_CONFIG(vulkan) can be set without a real
+// vulkan.h (macOS aqtinstall Qt), in which case QVulkanInstance is stub-only.
 #if QT_CONFIG(vulkan)
 #include <QVulkanInstance>
+#endif
+#if QT_CONFIG(vulkan) && defined(VK_VERSION_1_0)
+#define AMBER_HAS_VULKAN 1
 #endif
 
 #include <memory>
@@ -35,7 +41,7 @@ class TestRhiCache : public QObject {
   QRhiTextureRenderTarget* makeTarget(QRhiTexture** tex, QRhiRenderPassDescriptor** rpd, bool preserve);
 
   QSurface* surface_ = nullptr;
-#if QT_CONFIG(vulkan)
+#if AMBER_HAS_VULKAN
   QVulkanInstance vk_;
 #endif
   std::unique_ptr<QRhi> rhi_;
@@ -51,7 +57,7 @@ QShader TestRhiCache::load(const QString& name) {
 void TestRhiCache::initTestCase() {
   // AMBER_TEST_RHI=vulkan runs the same checks on Vulkan (local only; CI is GL)
   if (qEnvironmentVariable("AMBER_TEST_RHI") == QLatin1String("vulkan")) {
-#if QT_CONFIG(vulkan)
+#if AMBER_HAS_VULKAN
     vk_.setApiVersion(QVersionNumber(1, 1));
     if (vk_.create()) {
       QRhiVulkanInitParams p;
