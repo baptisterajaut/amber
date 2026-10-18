@@ -257,9 +257,9 @@ void PreferencesDialog::accept() {
   bool restart_after_saving = false;
 
   if (SettingsRequireRestart()) {
-    int ret = QMessageBox::question(this, "Restart Required",
-                                    "Some of the changed settings will require a restart of Amber. Would you like "
-                                    "to restart now?",
+    int ret = QMessageBox::question(this, tr("Restart Required"),
+                                    tr("Some of the changed settings will require a restart of Amber. Would you like "
+                                       "to restart now?"),
                                     QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
     if (ret == QMessageBox::Cancel) return;
     if (ret == QMessageBox::Yes) {
