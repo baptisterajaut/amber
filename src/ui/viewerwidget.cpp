@@ -121,6 +121,10 @@ ViewerWidget::ViewerWidget(QWidget* parent)
 }
 
 ViewerWidget::~ViewerWidget() {
+  // QRhiWidget only calls releaseResources() for an early release (another window, or its QRhi destroyed first); at
+  // destruction the subclass frees its own resources, while the top-level's QRhi still exists. Left to that QRhi,
+  // they were never freed (listed as unreleased when it went down at exit). The renderer has a QRhi of its own.
+  releaseResources();
   renderer->cancel();
   delete renderer;
   delete gl_fallback_surface_;
