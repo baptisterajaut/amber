@@ -29,4 +29,11 @@ QString find_shortcut_in_file(const QByteArray& file, const QString& action_name
   }
 }
 
+void append_shortcut_line(QByteArray& file, const QString& action_name, const QString& shortcut) {
+  if (!file.isEmpty()) file.append('\n');
+  file.append(action_name.toUtf8());
+  file.append('\t');
+  file.append(shortcut.toUtf8());
+}
+
 }  // namespace amber
