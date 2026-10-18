@@ -469,6 +469,7 @@ void Cacher::OpenWorker() {
   queue_.lock();
   video_end_pts_ = AV_NOPTS_VALUE;
   latest_decoded_pts_ = AV_NOPTS_VALUE;
+  last_raw_video_pts_ = AV_NOPTS_VALUE;
   queue_.unlock();
 
   if (clip->media() == nullptr) {
@@ -643,7 +644,7 @@ bool Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
     retrieved_frame = nullptr;
     // Audio clips keep the bare clip-time pts: their queue holds decode buffers, not frames to serve
     int64_t target_pts =
-        (clip->track() < 0) ? videoTargetPts() : seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
+        (clip->track() < 0) ? videoTargetPts(playhead_) : seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
     for (int i=0;i<queue_.size();i++) {
 
       if (queue_.at(i)->pts == target_pts) {
