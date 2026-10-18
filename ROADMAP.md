@@ -126,7 +126,7 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 - **Master loudness on export** — optional loudness normalization (EBU R128 `loudnorm`, e.g. −14 LUFS for YouTube) and brickwall limiter (`alimiter`) on the final mix. The export audio path uses libswresample only today, so this adds a small libavfilter graph before the encoder.
 
 ### UI polish
-- **Welcome screen** — QDialog at startup with recent projects + new project with sequence templates.
+- **Welcome screen** — done in 2.0: `WelcomeDialog` at startup (when no project opens and no auto-recovery was chosen) and from Help > Welcome Screen…. Left: one-click sequence templates (1080p 30/25/60, 4K UHD 30, 720p 30, vertical 1080x1920 30, Custom… opens New Sequence, Empty Project); right: recent projects (missing files greyed, Enter opens the most recent). The release pre-alpha notice is a banner in it; "Show this window at startup" off (`ShowWelcomeScreen`) brings the DemoNotice back. Not done: recent thumbnails, pinning, custom templates.
 - **Effect controls alignment** — done in 2.0: every effect's values start at one shared column, after the widest label of the expanded effects, and wide fields end at the same edge. Values stay left-aligned at that column rather than right-aligned. (#12)
 - **Audio plugin parameters in EffectControls** — expose VST2 parameters as native EffectField rows instead of "open GUI" button only. Depends on plugin API exposing param metadata. (#12)
 - **Graph Editor improvements** — better curve editing UX, currently minimal on 0.1.x (#15)
