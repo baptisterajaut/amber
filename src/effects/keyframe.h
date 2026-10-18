@@ -29,4 +29,8 @@ class EffectField;
 
 void delete_keyframes(QVector<EffectField *> &selected_key_fields, QVector<int> &selected_keys);
 
+// Whether the Graph Editor draws a key's bezier handles, and so whether they can be grabbed: both rely on this one
+// test so a hidden handle (the default +-40 of a Linear or Hold key) is never hit.
+bool keyframe_shows_handles(int type);
+
 #endif // KEYFRAME_H

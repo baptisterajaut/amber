@@ -29,6 +29,7 @@
 
 #include "core/graphmath.h"
 #include "effects/effect.h"
+#include "effects/keyframe.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "engine/undo/undo.h"
@@ -334,7 +335,7 @@ void GraphView::paint_field_curves(QPainter& p, int field_index) {
     const EffectKeyframe& key = field->keyframes.at(sorted_key);
     int key_x = get_screen_x(key.time);
     int key_y = get_screen_y(key.data.toDouble());
-    if (key.type == EFFECT_KEYFRAME_BEZIER) {
+    if (keyframe_shows_handles(key.type)) {
       p.setPen(Qt::gray);
       QPointF pre_point(key_x + key.pre_handle_x * x_zoom, key_y - key.pre_handle_y * y_zoom);
       p.drawLine(pre_point, QPointF(key_x, key_y));
@@ -408,6 +409,8 @@ bool GraphView::press_find_key(const QPoint& pos, int& sel_key, int& sel_key_fie
         sel_key_field = i;
         return true;
       }
+
+      if (!keyframe_shows_handles(key.type)) continue;
 
       QPointF pre_point(key_x + key.pre_handle_x * x_zoom, key_y - key.pre_handle_y * y_zoom);
       QPointF post_point(key_x + key.post_handle_x * x_zoom, key_y - key.post_handle_y * y_zoom);
@@ -619,6 +622,8 @@ bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
       int key_y = get_screen_y(key.data.toDouble());
       QRect test_rect(key_x - KEYFRAME_SIZE, key_y - KEYFRAME_SIZE, KEYFRAME_SIZE + KEYFRAME_SIZE,
                       KEYFRAME_SIZE + KEYFRAME_SIZE);
+      if (test_rect.contains(pos)) return true;
+      if (!keyframe_shows_handles(key.type)) continue;
       QRect pre_rect(qRound(key_x + key.pre_handle_x * x_zoom - kBezierHandleSize),
                      qRound(key_y - key.pre_handle_y * y_zoom - kBezierHandleSize),
                      kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
@@ -626,7 +631,7 @@ bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
                       qRound(key_y - key.post_handle_y * y_zoom - kBezierHandleSize),
                       kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
 
-      if (test_rect.contains(pos) || pre_rect.contains(pos) || post_rect.contains(pos)) {
+      if (pre_rect.contains(pos) || post_rect.contains(pos)) {
         return true;
       }
     }

@@ -23,6 +23,7 @@
 #include <QVector>
 
 #include "core/appcontext.h"
+#include "effect.h"
 #include "effectfields.h"
 #include "engine/undo/undo.h"
 #include "engine/undo/undostack.h"
@@ -58,3 +59,5 @@ void delete_keyframes(QVector<EffectField*>& selected_key_fields, QVector<int>& 
     amber::app_ctx->updateUi(false);
   }
 }
+
+bool keyframe_shows_handles(int type) { return type == EFFECT_KEYFRAME_BEZIER; }
