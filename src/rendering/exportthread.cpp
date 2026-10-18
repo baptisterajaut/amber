@@ -136,6 +136,9 @@ bool ExportThread::SetupVideo() {
     return false;
   }
 
+  amber::EncoderInfo vinfo;
+  const bool has_vinfo = amber::find_encoder_info(QString::fromUtf8(vcodec->name), &vinfo);
+
   // create video stream
   video_stream = avformat_new_stream(fmt_ctx, vcodec);
   if (!video_stream) {
@@ -161,6 +164,7 @@ bool ExportThread::SetupVideo() {
   vcodec_ctx->height = params_.video_height;
   vcodec_ctx->sample_aspect_ratio = {1, 1};
   vcodec_ctx->pix_fmt = static_cast<AVPixelFormat>(vcodec_params_.pix_fmt);
+  sws_pix_fmt_ = vcodec_ctx->pix_fmt;
   // Always the sequence rate: EncodeAllFrames() stamps one frame per sequence frame, so any other rate gives
   // duplicate pts (export fails) or uneven frame timing. A codec that can't encode it fails in avcodec_open2() below.
   vcodec_ctx->framerate = av_d2q(seq_->frame_rate, INT_MAX);
@@ -194,6 +198,13 @@ bool ExportThread::SetupVideo() {
     if (!pass1_stats_.isEmpty()) vcodec_ctx->stats_in = pass1_stats_.data();
   }
 
+  // A hardware encoder takes frames already on its device: pix_fmt becomes the device's (AV_PIX_FMT_VAAPI) and
+  // vcodec_params_.pix_fmt the software format they are uploaded from
+  if (has_vinfo && vinfo.hw_device_type != AV_HWDEVICE_TYPE_NONE &&
+      !SetupHardwareFrames(vinfo.hw_device_type, vinfo.hw_sw_formats)) {
+    return false;
+  }
+
   // Set export to be multithreaded
   AVDictionary* opts = nullptr;
   if (vcodec_params_.threads == 0) {
@@ -206,11 +217,13 @@ bool ExportThread::SetupVideo() {
   // as before descriptors. A descriptor's encoder gets no bit rate: libvpx-vp9 and libaom only encode at constant
   // quality without one (constrained quality with one). Their codec defaults already say b=0; this makes sure.
   if (params_.video_compression_type == COMPRESSION_TYPE_CFR) {
-    amber::EncoderInfo info;
     QString key;
-    if (amber::find_encoder_info(QString::fromUtf8(vcodec->name), &info)) {
-      key = info.quality_key;
-      if (!key.isEmpty()) vcodec_ctx->bit_rate = 0;
+    if (has_vinfo) {
+      key = vinfo.quality_key;
+      if (!key.isEmpty()) {
+        vcodec_ctx->bit_rate = 0;
+        add_options(&opts, vinfo.quality_mode_options);
+      }
     } else if (vcodec->id == AV_CODEC_ID_H264 || vcodec->id == AV_CODEC_ID_HEVC) {
       key = QStringLiteral("crf");
     }
@@ -231,6 +244,13 @@ bool ExportThread::SetupVideo() {
   if (ret < 0) {
     qCritical() << "Could not open output video encoder." << ret;
     export_error = tr("could not open output video encoder (%1)").arg(QString::number(ret));
+    // The usual cause is a size outside the hardware's range (radeonsi: 128x128 and up), which FFmpeg only logs
+    if (hw_frames_ctx_ != nullptr) {
+      export_error =
+          tr("hardware encoder failed: %1 (%2)")
+              .arg(tr("could not open the encoder at %1x%2").arg(params_.video_width).arg(params_.video_height),
+                   QString::number(ret));
+    }
     return false;
   }
 
@@ -265,11 +285,11 @@ bool ExportThread::SetupVideo() {
     if (!SetupPaletteGraph()) return false;
   } else {
     sws_ctx = sws_getContext(seq_->width, seq_->height, AV_PIX_FMT_RGBA, params_.video_width, params_.video_height,
-                             vcodec_ctx->pix_fmt, SWS_BILINEAR, nullptr, nullptr, nullptr);
+                             sws_pix_fmt_, SWS_BILINEAR, nullptr, nullptr, nullptr);
     if (sws_ctx == nullptr) {
       qCritical() << "Could not create pixel format conversion context";
       export_error =
-          tr("could not convert to pixel format %1").arg(QString::fromUtf8(av_get_pix_fmt_name(vcodec_ctx->pix_fmt)));
+          tr("could not convert to pixel format %1").arg(QString::fromUtf8(av_get_pix_fmt_name(sws_pix_fmt_)));
       return false;
     }
   }
@@ -278,9 +298,51 @@ bool ExportThread::SetupVideo() {
   // A format without alpha drops it, leaving the composite over black, which is what an opaque file should show.
   // CBA: scaling to another size filters straight colour, so semi-transparent edges can darken slightly; scale the
   // premultiplied frame first if that ever shows
-  const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(vcodec_ctx->pix_fmt);
+  const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(sws_pix_fmt_);
   unpremultiply_ = desc != nullptr && (desc->flags & AV_PIX_FMT_FLAG_ALPHA);
 
+  return true;
+}
+
+// Creates the hardware device and a pool of frames of one of sw_formats (vcodec_params_.pix_fmt if it is one, else
+// the first) at the export size, and points the encoder at it. Cleanup() frees both, on failure too.
+bool ExportThread::SetupHardwareFrames(AVHWDeviceType type, const QVector<int>& sw_formats) {
+  auto fail = [this](const QString& what, int code) {
+    qCritical() << "Hardware encoder:" << what << code;
+    export_error = tr("hardware encoder failed: %1 (%2)").arg(what, QString::number(code));
+    return false;
+  };
+  if (sw_formats.isEmpty()) return fail(tr("no pixel format"), AVERROR(EINVAL));
+  int sw_format = vcodec_params_.pix_fmt;
+  if (!sw_formats.contains(sw_format)) {
+    qWarning() << "Hardware encoder: pixel format" << sw_format << "not available, using" << sw_formats.first();
+    sw_format = sw_formats.first();
+  }
+
+  // The default device, as the decoder's hardware acceleration (Cacher::openWorkerTryHwAccel)
+  ret = av_hwdevice_ctx_create(&hw_device_ctx_, type, nullptr, nullptr, 0);
+  if (ret < 0) {
+    return fail(tr("could not open the %1 device").arg(QString::fromUtf8(av_hwdevice_get_type_name(type)).toUpper()),
+                ret);
+  }
+  hw_frames_ctx_ = av_hwframe_ctx_alloc(hw_device_ctx_);
+  if (hw_frames_ctx_ == nullptr) return fail(tr("could not allocate the frame pool"), AVERROR(ENOMEM));
+  auto* frames = reinterpret_cast<AVHWFramesContext*>(hw_frames_ctx_->data);
+  frames->format = amber::hardware_frame_format(type);
+  frames->sw_format = static_cast<AVPixelFormat>(sw_format);
+  frames->width = params_.video_width;
+  frames->height = params_.video_height;
+  // initial_pool_size 0: a pool that grows as the encoder holds frames, as FFmpeg's hwupload filter makes it
+  ret = av_hwframe_ctx_init(hw_frames_ctx_);
+  if (ret < 0) {
+    return fail(tr("could not create %1 frames")
+                    .arg(QString::fromUtf8(av_get_pix_fmt_name(static_cast<AVPixelFormat>(sw_format)))),
+                ret);
+  }
+  vcodec_ctx->hw_frames_ctx = av_buffer_ref(hw_frames_ctx_);
+  if (vcodec_ctx->hw_frames_ctx == nullptr) return fail(tr("could not allocate the frame pool"), AVERROR(ENOMEM));
+  vcodec_ctx->pix_fmt = frames->format;
+  sws_pix_fmt_ = frames->sw_format;
   return true;
 }
 
@@ -546,7 +608,7 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
   // Alloc/free sws_frame every frame — required to avoid GIF getting stuck on first frame
   // (see https://stackoverflow.com/a/38997739)
   sws_frame = av_frame_alloc();
-  sws_frame->format = vcodec_ctx->pix_fmt;
+  sws_frame->format = sws_pix_fmt_;
   sws_frame->width = params_.video_width;
   sws_frame->height = params_.video_height;
   av_frame_get_buffer(sws_frame, 0);
@@ -555,7 +617,23 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
             sws_frame->linesize);
   sws_frame->pts = qRound(timecode_secs / av_q2d(vcodec_ctx->time_base));
 
-  bool ok = Encode(fmt_ctx, vcodec_ctx, sws_frame, video_pkt, video_stream);
+  AVFrame* frame = sws_frame;
+  if (hw_frames_ctx_ != nullptr) {
+    // Up to the device: a pool frame, then the copy. The encoder keeps its own reference.
+    hw_frame = av_frame_alloc();
+    ret = hw_frame != nullptr ? av_hwframe_get_buffer(hw_frames_ctx_, hw_frame, 0) : AVERROR(ENOMEM);
+    if (ret >= 0) ret = av_hwframe_transfer_data(hw_frame, sws_frame, 0);
+    if (ret < 0) {
+      qCritical() << "Could not upload the frame to the hardware encoder." << ret;
+      export_error = tr("hardware encoder failed: %1 (%2)").arg(tr("could not upload a frame"), QString::number(ret));
+      return false;  // Cleanup() frees both frames
+    }
+    hw_frame->pts = sws_frame->pts;
+    frame = hw_frame;
+  }
+
+  bool ok = Encode(fmt_ctx, vcodec_ctx, frame, video_pkt, video_stream);
+  av_frame_free(&hw_frame);
   av_frame_free(&sws_frame);
   sws_frame = nullptr;
   return ok;
@@ -895,6 +973,11 @@ void ExportThread::Cleanup() {
   if (sws_frame != nullptr) {
     av_frame_free(&sws_frame);
   }
+
+  // After vcodec_ctx, which holds its own references to both
+  av_frame_free(&hw_frame);
+  av_buffer_unref(&hw_frames_ctx_);
+  av_buffer_unref(&hw_device_ctx_);
 }
 
 void ExportThread::run() {

@@ -3,12 +3,15 @@
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/frame.h>
+#include <libavutil/hwcontext.h>
 #include <libavutil/opt.h>
+#include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 }
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QMutex>
 #include <climits>
@@ -190,6 +193,46 @@ QVector<EncoderInfo> build_table() {
                              tr("Higher = smaller file, slower export; always lossless"), 0, 12, "5")};
   t.append(flac);
 
+  // Hardware encoders last: available_encoders() keeps the table order, so they come after the software ones of their
+  // codec. VAAPI, ffmpeg -h encoder=h264_vaapi (FFmpeg 9.0): -rc_mode (default auto); -qp <int> (from 0 to 52)
+  // (default 0, "not set": CQP then takes the codec's default_quality, 20 for H.264, vaapi_encode_h264.c:967, 25 for
+  // HEVC, vaapi_encode_h265.c:1036). Quality-based passes rc_mode=CQP so a driver without it fails the export instead
+  // of quietly encoding another way. Average bitrate passes bit_rate alone: vaapi_encode.c:1341-1347 picks AVBR, else
+  // VBR, else CBR (radeonsi on FFmpeg 9.0.2: VBR, average = bit_rate). No two-pass, no speed preset that maps.
+  EncoderInfo h264_vaapi;
+  h264_vaapi.name = "h264_vaapi";
+  h264_vaapi.codec_id = AV_CODEC_ID_H264;
+  h264_vaapi.label = tr("Hardware (VAAPI)");
+  h264_vaapi.quality_key = "qp";
+  h264_vaapi.quality_mode_label = tr("Quality-based (Constant QP)");
+  h264_vaapi.quality_label = tr("Quality (QP):");
+  h264_vaapi.quality_min = 1;
+  h264_vaapi.quality_max = 51;
+  h264_vaapi.quality_default = 20;
+  h264_vaapi.supports_average_bitrate = true;
+  h264_vaapi.quality_mode_options = {{"rc_mode", "CQP"}};
+  h264_vaapi.hw_device_type = AV_HWDEVICE_TYPE_VAAPI;
+  // P010 needs a High 10 encode profile (radeonsi has none: the probe drops it)
+  h264_vaapi.hw_sw_formats = {AV_PIX_FMT_NV12, AV_PIX_FMT_P010};
+  t.append(h264_vaapi);
+
+  EncoderInfo hevc_vaapi = h264_vaapi;
+  hevc_vaapi.name = "hevc_vaapi";
+  hevc_vaapi.codec_id = AV_CODEC_ID_HEVC;
+  hevc_vaapi.quality_default = 25;
+  t.append(hevc_vaapi);
+
+  // ffmpeg -h encoder=av1_vaapi: no qp option; CQP takes global_quality as the base_q_idx (0-255,
+  // vaapi_encode.c:1418-1428, vaapi_encode_av1.c:140), else default_quality 25 (vaapi_encode_av1.c:851)
+  EncoderInfo av1_vaapi = h264_vaapi;
+  av1_vaapi.name = "av1_vaapi";
+  av1_vaapi.codec_id = AV_CODEC_ID_AV1;
+  av1_vaapi.quality_key = "global_quality";
+  av1_vaapi.quality_label = tr("Quantizer (QP):");
+  av1_vaapi.quality_max = 255;
+  av1_vaapi.quality_default = 25;
+  t.append(av1_vaapi);
+
   return t;
 }
 
@@ -280,6 +323,12 @@ EncoderInfo validate_encoder_info(const EncoderInfo& raw, const AVCodec* codec) 
     v.options.append(opt);
   }
 
+  // Fixed options this FFmpeg doesn't know are left out like the rows
+  v.quality_mode_options.clear();
+  for (const auto& o : raw.quality_mode_options) {
+    if (find_codec_option(codec, o.first) != nullptr) v.quality_mode_options.append(o);
+  }
+
   // A stats file option this FFmpeg doesn't know: no two-pass
   if (v.supports_two_pass && !v.two_pass_stats_key.isEmpty()) {
     const AVOption* o = find_codec_option(codec, v.two_pass_stats_key);
@@ -348,6 +397,157 @@ bool two_pass_works(const EncoderInfo& info) {
   return it.value();
 }
 
+// CBA: VAAPI only, like the table
+AVPixelFormat hardware_frame_format(AVHWDeviceType type) {
+  return type == AV_HWDEVICE_TYPE_VAAPI ? AV_PIX_FMT_VAAPI : AV_PIX_FMT_NONE;
+}
+
+namespace {
+
+// codec opens on device_ref with a 256x256 hw_frames_ctx of sw_format and encodes one uploaded frame into a packet
+bool encode_test_on_device(AVBufferRef* device_ref, const AVCodec* codec, AVPixelFormat hw_format, int sw_format) {
+  constexpr int kSize = 256;
+  AVBufferRef* frames_ref = av_hwframe_ctx_alloc(device_ref);
+  AVCodecContext* ctx = nullptr;
+  AVFrame* sw_frame = av_frame_alloc();
+  AVFrame* hw_frame = av_frame_alloc();
+  AVPacket* packet = av_packet_alloc();
+  bool ok = frames_ref != nullptr && sw_frame != nullptr && hw_frame != nullptr && packet != nullptr;
+  if (ok) {
+    auto* frames = reinterpret_cast<AVHWFramesContext*>(frames_ref->data);
+    frames->format = hw_format;
+    frames->sw_format = static_cast<AVPixelFormat>(sw_format);
+    frames->width = kSize;
+    frames->height = kSize;
+    ok = av_hwframe_ctx_init(frames_ref) >= 0;
+  }
+  if (ok) {
+    ctx = avcodec_alloc_context3(codec);
+    ok = ctx != nullptr;
+  }
+  if (ok) {
+    ctx->width = kSize;
+    ctx->height = kSize;
+    ctx->pix_fmt = hw_format;
+    ctx->time_base = {1, 25};
+    ctx->framerate = {25, 1};
+    ctx->hw_frames_ctx = av_buffer_ref(frames_ref);
+    sw_frame->format = sw_format;
+    sw_frame->width = kSize;
+    sw_frame->height = kSize;
+    ok = ctx->hw_frames_ctx != nullptr && avcodec_open2(ctx, codec, nullptr) >= 0 &&
+         av_frame_get_buffer(sw_frame, 0) >= 0;
+  }
+  if (ok) {
+    // Mid grey in both 8-bit NV12 and P010 (0x8080, the top 10 bits used)
+    const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(static_cast<AVPixelFormat>(sw_format));
+    for (int plane = 0; plane < 4 && sw_frame->data[plane] != nullptr; plane++) {
+      const int rows = plane == 0 || desc == nullptr ? kSize : AV_CEIL_RSHIFT(kSize, desc->log2_chroma_h);
+      memset(sw_frame->data[plane], 128, size_t(sw_frame->linesize[plane]) * rows);
+    }
+    ok = av_hwframe_get_buffer(frames_ref, hw_frame, 0) >= 0 && av_hwframe_transfer_data(hw_frame, sw_frame, 0) >= 0;
+    hw_frame->pts = 0;
+  }
+  bool got_packet = false;
+  if (ok) {
+    // One frame, then the drain, until a packet comes out
+    for (AVFrame* in : {hw_frame, static_cast<AVFrame*>(nullptr)}) {
+      if (got_packet || avcodec_send_frame(ctx, in) < 0) break;
+      int ret = 0;
+      while (ret >= 0) {
+        ret = avcodec_receive_packet(ctx, packet);
+        if (ret >= 0 && packet->size > 0) got_packet = true;
+        av_packet_unref(packet);
+      }
+      if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) break;
+    }
+  }
+  av_packet_free(&packet);
+  av_frame_free(&hw_frame);
+  av_frame_free(&sw_frame);
+  avcodec_free_context(&ctx);
+  av_buffer_unref(&frames_ref);
+  return got_packet;
+}
+
+// info's hw_sw_formats that encode on device_ref (null: none), NV12 first: when the first fails nothing else is tried
+QVector<int> probe_formats(AVBufferRef* device_ref, const EncoderInfo& info) {
+  const AVCodec* codec = avcodec_find_encoder_by_name(info.name.toUtf8().constData());
+  const AVPixelFormat hw_format = hardware_frame_format(info.hw_device_type);
+  QVector<int> formats;
+  if (device_ref == nullptr || codec == nullptr || hw_format == AV_PIX_FMT_NONE) return formats;
+  for (int f : info.hw_sw_formats) {
+    if (encode_test_on_device(device_ref, codec, hw_format, f)) {
+      formats.append(f);
+    } else if (formats.isEmpty()) {
+      break;
+    }
+  }
+  return formats;
+}
+
+}  // namespace
+
+bool hardware_encode_test(const QString& name, AVHWDeviceType type, int sw_format, const char* device) {
+  const AVCodec* codec = avcodec_find_encoder_by_name(name.toUtf8().constData());
+  const AVPixelFormat hw_format = hardware_frame_format(type);
+  if (codec == nullptr || hw_format == AV_PIX_FMT_NONE) return false;
+  AVBufferRef* device_ref = nullptr;
+  if (av_hwdevice_ctx_create(&device_ref, type, device, nullptr, 0) < 0) return false;
+  const bool ok = encode_test_on_device(device_ref, codec, hw_format, sw_format);
+  av_buffer_unref(&device_ref);
+  return ok;
+}
+
+QVector<int> hardware_encoder_formats(const EncoderInfo& info) {
+  if (info.hw_device_type == AV_HWDEVICE_TYPE_NONE) return {};
+  // CBA: the export dialog runs the first probe on the GUI thread (see the qInfo below for its cost); a QtConcurrent
+  // run if that ever shows
+  static QMutex mutex;
+  static QHash<QString, QVector<int>> results;
+  QMutexLocker lock(&mutex);  // held during the probe: a second caller waits for its result
+  auto it = results.constFind(info.name);
+  if (it != results.constEnd()) return it.value();
+
+  // Creating the device is most of the cost (radeonsi: ~95 ms the first time in a process, ~20 ms after, against
+  // ~1 ms to open an encoder): one device for every installed encoder of this type, all cached at once
+  QElapsedTimer timer;
+  timer.start();
+  AVBufferRef* device_ref = nullptr;
+  if (av_hwdevice_ctx_create(&device_ref, info.hw_device_type, nullptr, nullptr, 0) < 0) device_ref = nullptr;
+  QVector<EncoderInfo> probed = {info};
+  for (const EncoderInfo& e : encoder_table()) {
+    if (e.hw_device_type == info.hw_device_type && e.name != info.name && !results.contains(e.name) &&
+        avcodec_find_encoder_by_name(e.name.toUtf8().constData()) != nullptr) {
+      probed.append(e);
+    }
+  }
+  QStringList summary;
+  for (const EncoderInfo& e : probed) {
+    const QVector<int> formats = probe_formats(device_ref, e);
+    results.insert(e.name, formats);
+    QStringList names;
+    for (int f : formats) names.append(QString::fromUtf8(av_get_pix_fmt_name(static_cast<AVPixelFormat>(f))));
+    summary.append(e.name + ": " + (formats.isEmpty() ? QStringLiteral("unavailable") : names.join(", ")));
+  }
+  av_buffer_unref(&device_ref);
+  qInfo().noquote() << "Hardware encoders:" << summary.join("; ") << QString("(probe %1 ms)").arg(timer.elapsed());
+  return results.value(info.name);
+}
+
+bool hardware_encoder_works(const EncoderInfo& info) { return !hardware_encoder_formats(info).isEmpty(); }
+
+QString hardware_format_label(int sw_format) {
+  switch (sw_format) {
+    case AV_PIX_FMT_NV12:
+      return tr("NV12 (8-bit)");
+    case AV_PIX_FMT_P010:
+      return tr("P010 (10-bit)");
+    default:
+      return QString::fromUtf8(av_get_pix_fmt_name(static_cast<AVPixelFormat>(sw_format)));
+  }
+}
+
 bool find_encoder_info(const QString& name, EncoderInfo* out) {
   for (const EncoderInfo& e : encoder_table()) {
     if (e.name != name) continue;
@@ -366,7 +566,9 @@ QStringList available_encoders(AVCodecID id) {
     if (e.codec_id != id) continue;
     in_table = true;
     const AVCodec* codec = avcodec_find_encoder_by_name(e.name.toUtf8().constData());
-    if (codec != nullptr && codec->id == id) names.append(e.name);
+    if (codec == nullptr || codec->id != id) continue;
+    if (e.hw_device_type != AV_HWDEVICE_TYPE_NONE && !hardware_encoder_works(e)) continue;
+    names.append(e.name);
   }
   if (!in_table) {
     const AVCodec* codec = avcodec_find_encoder(id);

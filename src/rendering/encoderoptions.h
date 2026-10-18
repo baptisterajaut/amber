@@ -8,13 +8,14 @@
 
 extern "C" {
 #include <libavcodec/avcodec.h>
+#include <libavutil/hwcontext.h>
 }
 
 struct AVOutputFormat;
 
 // Per-encoder export settings the export dialog shows as extra rows (ROADMAP "Per-codec options panel", #58). Pure
 // data plus FFmpeg lookups: no widgets, so the tests and ExportThread use it too.
-// CBA: no hardware encoders yet (ROADMAP #58)
+// CBA: VAAPI only (the one we can test); NVENC/QSV/AMF = a descriptor + the same probe when hardware is at hand
 namespace amber {
 
 // One encoder setting, shown as a combo (Choice) or a spin box (Int)
@@ -35,6 +36,9 @@ struct EncoderOption {
   // extra step below min showing this text, which passes nothing.
   QString unset_label;
 };
+
+// key -> value pairs for avcodec_open2()'s options dictionary
+using EncoderOptionValues = QVector<QPair<QString, QString>>;
 
 struct EncoderInfo {
   QString name;  // FFmpeg encoder name (avcodec_find_encoder_by_name)
@@ -59,10 +63,14 @@ struct EncoderInfo {
   // doesn't tell: two_pass_works() checks it with a test encode
   bool two_pass_probe = false;
   QVector<EncoderOption> options;
+  // Passed with the quality key in the quality-based mode (VAAPI: rc_mode=CQP)
+  EncoderOptionValues quality_mode_options;
+  // Hardware encoder: the device type it encodes on; AV_HWDEVICE_TYPE_NONE for a software one. ExportThread uploads
+  // each frame into a hw_frames_ctx of one of hw_sw_formats (in preference order), of which
+  // hardware_encoder_formats() keeps those the device encodes.
+  AVHWDeviceType hw_device_type = AV_HWDEVICE_TYPE_NONE;
+  QVector<int> hw_sw_formats;
 };
-
-// key -> value pairs for avcodec_open2()'s options dictionary
-using EncoderOptionValues = QVector<QPair<QString, QString>>;
 
 // The raw table, before validation against the installed FFmpeg
 const QVector<EncoderInfo>& encoder_table();
@@ -82,7 +90,26 @@ bool two_pass_works(const EncoderInfo& info);
 // for one frame and the drain
 bool pass1_writes_stats(const QString& name);
 
-// Installed encoders of id from the table, in preference order. A codec without table entries gets its default
+// A hardware descriptor's hw_sw_formats that encode on the default device, in the descriptor's order; empty for a
+// software encoder, an encoder that isn't installed, or without a usable device. Each format is a test encode (one
+// frame through a hw_frames_ctx), run at most once per process and encoder: the first call probes every installed
+// table encoder of the same device type on one device. Thread-safe.
+QVector<int> hardware_encoder_formats(const EncoderInfo& info);
+// A hardware descriptor whose encoder works here: hardware_encoder_formats() isn't empty
+bool hardware_encoder_works(const EncoderInfo& info);
+
+// The hardware frame format of a device type (AV_PIX_FMT_VAAPI); AV_PIX_FMT_NONE for one the table doesn't use
+AVPixelFormat hardware_frame_format(AVHWDeviceType type);
+
+// Uncached: the named encoder opens on a device of type (device: av_hwdevice_ctx_create()'s string, null for the
+// default one) with a 256x256 hw_frames_ctx of sw_format, and encodes one uploaded frame into a packet
+bool hardware_encode_test(const QString& name, AVHWDeviceType type, int sw_format, const char* device = nullptr);
+
+// What the export dialog's pixel format combo shows for a hardware encoder's software format: "NV12 (8-bit)"
+QString hardware_format_label(int sw_format);
+
+// Installed encoders of id from the table, in preference order: software ones first, then hardware ones that
+// hardware_encoder_works() (whose probe runs here the first time). A codec without table entries gets its default
 // encoder (avcodec_find_encoder), if any. A codec whose table encoders are all missing gets none.
 QStringList available_encoders(AVCodecID id);
 

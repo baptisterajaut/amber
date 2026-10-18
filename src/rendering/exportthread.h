@@ -42,11 +42,13 @@ struct SwsContext;
 struct SwrContext;
 struct AVFilterGraph;
 struct AVFilterContext;
+struct AVBufferRef;
 class Sequence;
 class RenderThread;
 
 extern "C" {
 #include <libavcodec/avcodec.h>
+#include <libavutil/hwcontext.h>
 }
 
 #define COMPRESSION_TYPE_CBR 0
@@ -118,6 +120,7 @@ class ExportThread : public QThread {
   bool Export();
   void Cleanup();
   bool SetupPaletteGraph();
+  bool SetupHardwareFrames(AVHWDeviceType type, const QVector<int>& sw_formats);
   bool EncodeVideoFrame(RenderThread* renderer, double timecode_secs);
   bool EncodePaletteFrames();
   bool FlushPaletteGraph();
@@ -158,6 +161,13 @@ class ExportThread : public QThread {
   AVFilterContext* palette_src{nullptr};
   AVFilterContext* palette_sink{nullptr};
   bool unpremultiply_{false};  // the encoder's pixel format has alpha: straighten the premultiplied composite
+  // What swscale writes: the encoder's pixel format, or for a hardware encoder the software format of its frames
+  AVPixelFormat sws_pix_fmt_{AV_PIX_FMT_NONE};
+  // Hardware encoder (amber::EncoderInfo::hw_device_type): the device, the pool frames are uploaded into, and the
+  // frame being uploaded (per frame, as sws_frame)
+  AVBufferRef* hw_device_ctx_{nullptr};
+  AVBufferRef* hw_frames_ctx_{nullptr};
+  AVFrame* hw_frame{nullptr};
   AVStream* audio_stream{nullptr};
   const AVCodec* acodec{nullptr};
   AVFrame* audio_frame{nullptr};

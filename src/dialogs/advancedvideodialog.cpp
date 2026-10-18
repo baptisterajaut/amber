@@ -46,8 +46,14 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
   // use variable for row to assist adding new fields to the grid layout
   int row = 0;
 
+  // A hardware encoder lists the software formats its frames can be uploaded from (amber::hardware_encoder_formats),
+  // not its own (AV_PIX_FMT_VAAPI)
+  amber::EncoderInfo info;
+  const bool hardware = !encoder.isEmpty() && amber::find_encoder_info(encoder, &info) &&
+                        info.hw_device_type != AV_HWDEVICE_TYPE_NONE;
+
   // get encoder information for this codec from FFmpeg
-  const AVCodec* codec_info = amber::find_encoder(encoder, encoding_codec);
+  const AVCodec* codec_info = hardware ? nullptr : amber::find_encoder(encoder, encoding_codec);
 
   // set up grid layout for dialog
   QGridLayout* layout = new QGridLayout(this);
@@ -55,6 +61,13 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
   // create row for codec pixel formats
   layout->addWidget(new QLabel(tr("Pixel Format:")), row, 0);
   pix_fmt_combo_ = new QComboBox();
+
+  if (hardware) {
+    for (int f : amber::hardware_encoder_formats(info)) {
+      pix_fmt_combo_->addItem(amber::hardware_format_label(f), f);
+      if (f == params_.pix_fmt) pix_fmt_combo_->setCurrentIndex(pix_fmt_combo_->count() - 1);
+    }
+  }
 
   // loop through available pixel formats for this codec
   const enum AVPixelFormat *pix_fmts = nullptr;
@@ -113,7 +126,8 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
 void AdvancedVideoDialog::accept() {
   // store settings back into struct
 
-  params_.pix_fmt = pix_fmt_combo_->currentData().toInt();
+  // An empty list (a hardware encoder whose probe failed) keeps the previous format: currentData() reads 0, yuv420p
+  if (pix_fmt_combo_->count() > 0) params_.pix_fmt = pix_fmt_combo_->currentData().toInt();
   params_.threads = thread_spinbox_->value();
 
   QDialog::accept();
