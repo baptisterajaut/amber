@@ -60,6 +60,7 @@ AudioMonitor::AudioMonitor(QWidget *parent) :
 void AudioMonitor::set_value(const QVector<double> &ivalues) {
   meter_mutex.lock();
   meter.push(ivalues, clock.elapsed());
+  bool moving = meter.animating();
   meter_mutex.unlock();
 
   // Called from audio thread — dispatch repaint to GUI thread.
@@ -67,10 +68,13 @@ void AudioMonitor::set_value(const QVector<double> &ivalues) {
   // may not flush this widget's region when a QRhiWidget is present.
   QMetaObject::invokeMethod(this, "repaint", Qt::QueuedConnection);
   QMetaObject::invokeMethod(&clear_timer, "start", Qt::QueuedConnection);
-  // Not a plain queued start(): pushes come faster than a frame and restarting the timer would keep it from firing
-  QMetaObject::invokeMethod(this, [this] {
-    if (!anim_timer.isActive()) anim_timer.start();
-  }, Qt::QueuedConnection);
+  // Not a plain queued start(): pushes come faster than a frame and restarting the timer would keep it from firing.
+  // Silence on the floor has nothing to animate: the queued repaint above is enough.
+  if (moving) {
+    QMetaObject::invokeMethod(this, [this] {
+      if (!anim_timer.isActive()) anim_timer.start();
+    }, Qt::QueuedConnection);
+  }
 }
 
 void AudioMonitor::clear() {
@@ -104,10 +108,13 @@ void AudioMonitor::mousePressEvent(QMouseEvent *e) {
 void AudioMonitor::paintEvent(QPaintEvent *) {
   if (amber::ActiveSequence == nullptr) return;
 
-  QMutexLocker locker(&meter_mutex);
+  // Paint from a copy: set_value() takes the same lock on the audio thread, which must not wait for a paint
+  meter_mutex.lock();
+  const amber::AudioMeterState state = meter;
+  meter_mutex.unlock();
 
   // CBA: before the first push the channel count is unknown; playback output is always stereo (rendering/audio.cpp)
-  int channel_count = meter.channel_count() > 0 ? meter.channel_count() : 2;
+  int channel_count = state.channel_count() > 0 ? state.channel_count() : 2;
 
   QPainter p(this);
 
@@ -160,7 +167,7 @@ void AudioMonitor::paintEvent(QPaintEvent *) {
 
   for (int i = 0; i < channel_count; i++) {
     QRect peak_rect(channel_x, 0, channel_width, AUDIO_MONITOR_PEAK_HEIGHT);
-    p.fillRect(peak_rect, meter.clipped(i) ? QColor(255, 0, 0) : QColor(64, 0, 0));
+    p.fillRect(peak_rect, state.clipped(i) ? QColor(255, 0, 0) : QColor(64, 0, 0));
 
     // Zones keyed to dB, not to the bar height, so a colour means the same level at any size
     p.fillRect(QRect(channel_x, bar_top, channel_width, red_y - bar_top), Qt::red);
@@ -168,9 +175,9 @@ void AudioMonitor::paintEvent(QPaintEvent *) {
     p.fillRect(QRect(channel_x, yellow_y, channel_width, bar_bottom - yellow_y), Qt::green);
 
     // Unlit part above the level
-    p.fillRect(QRect(channel_x, bar_top, channel_width, db_y(meter.level_db(i)) - bar_top), QColor(0, 0, 0, 160));
+    p.fillRect(QRect(channel_x, bar_top, channel_width, db_y(state.level_db(i)) - bar_top), QColor(0, 0, 0, 160));
 
-    double hold = meter.peak_hold_db(i);
+    double hold = state.peak_hold_db(i);
     if (hold > amber::kMeterFloorDb) {
       int y = qBound(bar_top + 1, db_y(hold), bar_bottom - 1);
       p.fillRect(QRect(channel_x, y - 1, channel_width, 2), zone_colour(hold));
