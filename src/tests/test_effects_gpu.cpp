@@ -52,6 +52,8 @@ class TestEffectsGpu : public QObject {
   void boundaryTimecodes();
   void textRenders();
   void textSizeZeroShowsNothing();
+  void textRevealKeepsAlignment_data();
+  void textRevealKeepsAlignment();
   void richTextRenders();
   void richTextShadowOpacity();
   void shakeChangesOutput();
@@ -856,6 +858,49 @@ void TestEffectsGpu::textSizeZeroShowsNothing() {
   h_->set_field_double(text_eff.get(), 6, 0, 0.0);
   QByteArray blank = h_->render_frame(seq.get(), 0);
   QCOMPARE(count_bright(blank), 0);
+}
+
+void TestEffectsGpu::textRevealKeepsAlignment_data() {
+  QTest::addColumn<int>("halign");  // the Alignment combo's item data, a Qt::Alignment flag
+  QTest::newRow("center") << int(Qt::AlignHCenter);
+  QTest::newRow("right") << int(Qt::AlignRight);
+  QTest::newRow("justify") << int(Qt::AlignJustify);
+}
+
+void TestEffectsGpu::textRevealKeepsAlignment() {
+  // A partly revealed line draws its first letters where the whole line puts them: anchors and justify spacing come
+  // from the full line, so revealing never slides centred/right text sideways or spreads justified words.
+  QFETCH(int, halign);
+  auto seq = h_->make_sequence(128, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(0, 0, 0, 0));
+  EffectPtr text_eff = h_->attach_internal(c, EFFECT_INTERNAL_TEXT, EFFECT_TYPE_EFFECT);
+  // Rows: 0=text, 2=reveal, 6=size, 7=colour, 8=alignment (halign, valign)
+  h_->set_field_string(text_eff.get(), 0, 0, "ABCD EFGH");  // distinct letters: no shift lands on a lookalike
+  h_->set_field_double(text_eff.get(), 6, 0, 12.0);
+  h_->set_field_color(text_eff.get(), 7, 0, QColor(Qt::white));
+  text_eff->row(8)->Field(0)->SetValueAt(0.0, halign);
+  const QByteArray whole = h_->render_frame(seq.get(), 0);
+  h_->set_field_double(text_eff.get(), 2, 0, 67.0);  // 6 of the 9 graphemes: "ABCD E"
+  const QByteArray part = h_->render_frame(seq.get(), 1);
+  QCOMPARE(part.size(), whole.size());
+
+  int ink_whole = 0;
+  int ink_part = 0;
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 128; x++) {
+      const int w = pixel_at(whole, 128, x, y).r;
+      const int p = pixel_at(part, 128, x, y).r;
+      if (w > 0) ink_whole++;
+      if (p == 0) continue;
+      ink_part++;
+      QVERIFY2(
+          qAbs(p - w) <= 2,
+          qPrintable(QString("revealed pixel (%1,%2) is %3, the whole line has %4 there").arg(x).arg(y).arg(p).arg(w)));
+    }
+  }
+  QVERIFY2(ink_part > 0 && ink_part < ink_whole,
+           qPrintable(QString("expected part of the text: %1 of %2 inked pixels").arg(ink_part).arg(ink_whole)));
 }
 
 void TestEffectsGpu::richTextRenders() {
