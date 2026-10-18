@@ -39,7 +39,8 @@ QString get_file_hash(const QString& filename);
 // paths otherwise; case-insensitive on Windows and macOS
 bool same_file_path(const QString& a, const QString& b);
 
-// Proxy file for the footage at `source` inside `folder`: "<name>.mov", or "<name>.proxy.mov" (then
+// Proxy file for the footage at `source` inside `folder`: "<name>.mov" (name = file name minus its last suffix, so
+// "2024.05.01_trip.mp4" and "2024.05.02_trip.mp4" don't both become "2024.mov"), or "<name>.proxy.mov" (then
 // "<name>.proxy2.mov"...) when that would be `source` itself or one of `avoid` (other sources or proxies of the same
 // batch), so a proxy is never written over a source file
 QString proxy_file_path(const QString& source, const QString& folder, const QStringList& avoid);

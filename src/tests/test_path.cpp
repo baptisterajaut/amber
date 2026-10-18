@@ -100,6 +100,17 @@ class TestPath : public QObject {
     QCOMPARE(proxy_file_path(other, tmp.path(), {source, other, dir.filePath("clip.proxy.mov")}),
              dir.filePath("clip.proxy2.mov"));
   }
+
+  // Only the last suffix is dropped: dotted names keep distinct proxies
+  void testProxyPathKeepsDottedName() {
+    QCOMPARE(proxy_file_path("/media/2024.05.01_trip.mp4", "/media/Proxy", {}),
+             QString("/media/Proxy/2024.05.01_trip.mov"));
+    QCOMPARE(proxy_file_path("/media/2024.05.02_trip.mp4", "/media/Proxy", {"/media/Proxy/2024.05.01_trip.mov"}),
+             QString("/media/Proxy/2024.05.02_trip.mov"));
+    // same name, different container: the second one is told apart
+    QCOMPARE(proxy_file_path("/media/clip.mov", "/media/Proxy", {"/media/clip.mp4", "/media/Proxy/clip.mov"}),
+             QString("/media/Proxy/clip.proxy.mov"));
+  }
 };
 
 QTEST_GUILESS_MAIN(TestPath)

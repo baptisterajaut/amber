@@ -117,6 +117,8 @@ void ProxyDialog::accept() {
     // TEMPORARILY hardcoded proxy format (.mov). Never one of the selected sources: a .mov proxied into its own
     // folder would be truncated by the proxy writer before being read
     info.path = proxy_file_path(footage->url, folder, sources);
+    // two sources with the same name (clip.mp4 + clip.mov) into one folder get distinct proxies
+    sources.append(info.path);
 
     // if the proposed proxy file already exists & user didn't select YesToAll box
     if (QFileInfo::exists(info.path) && !overwrite_all_existing){
