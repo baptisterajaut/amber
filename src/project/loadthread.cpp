@@ -225,6 +225,29 @@ Guide LoadThread::parse_guide(QXmlStreamReader& stream) {
   return g;
 }
 
+void LoadThread::parse_track_state(QXmlStreamReader& stream, Sequence* s) {
+  bool index_ok = false;
+  int index = 0;
+  TrackState t;
+  for (int j = 0; j < stream.attributes().size(); j++) {
+    const QXmlStreamAttribute& attr = stream.attributes().at(j);
+    const bool on = attr.value() == QLatin1String("1");
+    if (attr.name() == QLatin1String("index")) {
+      index = attr.value().toInt(&index_ok);
+    } else if (attr.name() == QLatin1String("hidden")) {
+      t.hidden = on;
+    } else if (attr.name() == QLatin1String("muted")) {
+      t.muted = on;
+    } else if (attr.name() == QLatin1String("solo")) {
+      t.solo = on;
+    } else if (attr.name() == QLatin1String("locked")) {
+      t.locked = on;
+    }
+  }
+  // a missing or malformed index is ignored rather than landing on V1/A1
+  if (index_ok) s->set_track_state(index, t);
+}
+
 QString LoadThread::resolve_footage_url(const QString& raw_url) {
   // Absolute paths only: a relative one would be tested against the process's working directory and pick up an
   // unrelated file of the same name there. Relative paths are resolved against the project folders below.
@@ -593,6 +616,8 @@ bool LoadThread::parse_sequence(QXmlStreamReader& stream, const QStringView& chi
       s->markers.append(parse_marker(stream));
     } else if (stream.name() == QLatin1String("guide") && stream.isStartElement()) {
       s->guides.append(parse_guide(stream));
+    } else if (stream.name() == QLatin1String("track") && stream.isStartElement()) {
+      parse_track_state(stream, s.get());
     } else if (stream.name() == QLatin1String("clip") && stream.isStartElement()) {
       if (!parse_clip(stream, s)) return false;
     }

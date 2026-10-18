@@ -23,6 +23,10 @@
 
 #include "undoactions.h"
 
+#include <QMap>
+
+#include "engine/trackstate.h"
+
 class RippleAction : public AmberAction {
 public:
   RippleAction(Sequence* is, long ipoint, long ilength, const QVector<int>& iignore);
@@ -35,6 +39,19 @@ private:
   long length;
   QVector<int> ignore;
   ComboAction* ca = nullptr;
+};
+
+// Swaps a sequence's whole track_states map: one entry covers a Shift+click applied to every track of a kind
+class SetTrackStateCommand : public AmberAction {
+public:
+  SetTrackStateCommand(Sequence* s, QMap<int, TrackState> old_states, QMap<int, TrackState> new_states);
+  void doUndo() override;
+  void doRedo() override;
+private:
+  void apply(const QMap<int, TrackState>& states);
+  Sequence* seq;
+  QMap<int, TrackState> old_states_;
+  QMap<int, TrackState> new_states_;
 };
 
 class ChangeSequenceAction : public AmberAction {

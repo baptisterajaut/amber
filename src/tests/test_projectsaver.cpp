@@ -211,6 +211,17 @@ class TestProjectSaver : public QObject {
     // GetValueAt takes seconds. It also caches the interpolated value in persistent_data_, which the saver writes as
     // the field's value="48" next to the keys
     QCOMPARE(posx->GetValueAt(1.0).toDouble(), 48.0);
+    // Track header toggles on Inner, set the way the header does; Outer keeps none
+    SequencePtr inner_seq = find_media("Inner")->to_sequence();
+    TrackState hidden, muted, solo, locked;
+    hidden.hidden = true;
+    muted.muted = true;
+    solo.solo = true;
+    locked.locked = true;
+    inner_seq->set_track_state(-2, hidden);
+    inner_seq->set_track_state(0, muted);
+    inner_seq->set_track_state(1, solo);
+    inner_seq->set_track_state(-1, locked);
 
     const QString a = dir_.filePath("a.ove");
     const QString b = dir_.filePath("b.ove");
@@ -239,6 +250,19 @@ class TestProjectSaver : public QObject {
     QVERIFY(ba.contains(R"(name="clip marker" duration="10")"));
     QVERIFY(ba.contains(R"(name="point marker"/>)"));
     QVERIFY(ba.contains(R"(name="footage marker"/>)"));
+    // One <track> per non-default track, in index order, only the true flags; none for Outer
+    QList<QByteArray> track_lines;
+    for (const QByteArray& line : ba.split('\n')) {
+      if (line.contains("<track ")) track_lines.append(line.trimmed());
+    }
+    QCOMPARE(track_lines.size(), 4);
+    QCOMPARE(track_lines.at(0), QByteArray(R"(<track index="-2" hidden="1"/>)"));
+    QCOMPARE(track_lines.at(1), QByteArray(R"(<track index="-1" locked="1"/>)"));
+    QCOMPARE(track_lines.at(2), QByteArray(R"(<track index="0" muted="1"/>)"));
+    QCOMPARE(track_lines.at(3), QByteArray(R"(<track index="1" solo="1"/>)"));
+    const int outer_at = ba.indexOf(R"(name="Outer")");
+    QVERIFY(outer_at > 0);
+    QVERIFY(!ba.mid(outer_at, ba.indexOf("</sequence>", outer_at) - outer_at).contains("<track"));
 
     // The reloaded model holds what was set
     title = title_clip();
@@ -265,6 +289,13 @@ class TestProjectSaver : public QObject {
     QCOMPARE(inner->markers.at(0).color_label, 3);
     QCOMPARE(inner->markers.at(0).duration, 45L);
     QCOMPARE(inner->markers.at(1).duration, 0L);
+    QCOMPARE(inner->track_states.size(), 4);
+    QVERIFY(inner->track_state(-2).hidden);
+    QVERIFY(inner->track_state(-1).locked);
+    QVERIFY(inner->track_state(0).muted);
+    QVERIFY(inner->track_state(1).solo);
+    QVERIFY(!inner->track_state(-2).locked);  // only the flags that were written
+    QVERIFY(find_media("Outer")->to_sequence()->track_states.isEmpty());
     SequencePtr outer2 = find_media("Outer")->to_sequence();
     QCOMPARE(outer2->clips.size(), 1);
     QVERIFY(outer2->clips.at(0)->media() != nullptr);

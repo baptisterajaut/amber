@@ -209,6 +209,18 @@ static void save_sequence_item(QXmlStreamWriter& stream, Media* m, int folder) {
   for (const auto& marker : s->markers) {
     save_marker(stream, marker);
   }
+
+  // Track header toggles, only the non-default tracks (QMap order), only the true flags. 1.x skips the element.
+  for (auto it = s->track_states.constBegin(); it != s->track_states.constEnd(); ++it) {
+    const TrackState& t = it.value();
+    stream.writeStartElement("track");
+    stream.writeAttribute("index", QString::number(it.key()));
+    if (t.hidden) stream.writeAttribute("hidden", "1");
+    if (t.muted) stream.writeAttribute("muted", "1");
+    if (t.solo) stream.writeAttribute("solo", "1");
+    if (t.locked) stream.writeAttribute("locked", "1");
+    stream.writeEndElement();
+  }
   stream.writeEndElement();  // sequence
 }
 

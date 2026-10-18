@@ -79,6 +79,7 @@ class LoadThread : public QThread {
   bool parse_clip_child_element(QXmlStreamReader& stream, ClipPtr c);
   Marker parse_marker(QXmlStreamReader& stream);
   Guide parse_guide(QXmlStreamReader& stream);
+  void parse_track_state(QXmlStreamReader& stream, Sequence* s);
   QString resolve_footage_url(const QString& raw_url);
   void parse_clip_links(QXmlStreamReader& stream, Clip* c);
   void parse_clip_attributes(QXmlStreamReader& stream, ClipPtr c, int& media_type, int& media_id, int& stream_id);

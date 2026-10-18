@@ -20,6 +20,7 @@
 
 #include "undo_timeline.h"
 
+#include "core/appcontext.h"
 #include "global/projectio.h"
 #include "project/footage.h"
 #include "project/media.h"
@@ -63,6 +64,28 @@ void RippleAction::doRedo() {
   }
   ca->redo();
 }
+
+SetTrackStateCommand::SetTrackStateCommand(Sequence* s, QMap<int, TrackState> old_states,
+                                           QMap<int, TrackState> new_states)
+    : seq(s), old_states_(std::move(old_states)), new_states_(std::move(new_states)) {}
+
+void SetTrackStateCommand::apply(const QMap<int, TrackState>& states) {
+  if (!seq) {
+    qWarning() << "SetTrackStateCommand: seq is null";
+    return;
+  }
+  seq->track_states = states;
+  // locking a track drops its selections (selections themselves aren't undone)
+  seq->remove_locked_selections();
+  if (amber::app_ctx) {
+    amber::app_ctx->refreshViewer();
+    amber::app_ctx->refreshTimeline();
+  }
+}
+
+void SetTrackStateCommand::doUndo() { apply(old_states_); }
+
+void SetTrackStateCommand::doRedo() { apply(new_states_); }
 
 ChangeSequenceAction::ChangeSequenceAction(SequencePtr s) {
   new_sequence = std::move(s);

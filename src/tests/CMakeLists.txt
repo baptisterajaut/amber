@@ -109,6 +109,11 @@ target_include_directories(amber-engine-tests PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-engine-tests PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-engine-tests COMMAND amber-engine-tests)
 
+add_executable(amber-test-track-states test_track_states.cpp)
+target_include_directories(amber-test-track-states PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-track-states PRIVATE amber-engine Qt6::Test)
+add_test(NAME amber-test-track-states COMMAND amber-test-track-states)
+
 add_executable(amber-test-srt test_srt.cpp)
 target_include_directories(amber-test-srt PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-srt PRIVATE amber-engine Qt6::Test)

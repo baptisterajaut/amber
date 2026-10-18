@@ -59,8 +59,58 @@ SequencePtr Sequence::copy() {
   // copy all of the sequence's markers and guides
   s->markers = markers;
   s->guides = guides;
+  s->track_states = track_states;
 
   return s;
+}
+
+TrackState Sequence::track_state(int track) const { return track_states.value(track); }
+
+void Sequence::set_track_state(int track, const TrackState& state) {
+  if (state.is_default()) {
+    track_states.remove(track);
+  } else {
+    track_states.insert(track, state);
+  }
+}
+
+bool Sequence::track_audible(int track) const {
+  if (track < 0) return false;
+  const TrackState state = track_state(track);
+  if (state.muted) return false;
+  if (state.solo) return true;
+  // silenced if another audio track is soloed
+  for (auto it = track_states.constBegin(); it != track_states.constEnd(); ++it) {
+    if (it.key() >= 0 && it.value().solo) return false;
+  }
+  return true;
+}
+
+bool Sequence::track_visible_in_render(int track) const { return track < 0 && !track_state(track).hidden; }
+
+bool Sequence::track_locked(int track) const { return track_state(track).locked; }
+
+std::optional<int> Sequence::first_locked_track(const QVector<int>& tracks) const {
+  for (int track : tracks) {
+    if (track_locked(track)) return track;
+  }
+  return std::nullopt;
+}
+
+QVector<int> Sequence::locked_clip_indexes() const {
+  QVector<int> indexes;
+  if (track_states.isEmpty()) return indexes;
+  for (int i = 0; i < clips.size(); i++) {
+    if (clips.at(i) != nullptr && track_locked(clips.at(i)->track())) indexes.append(i);
+  }
+  return indexes;
+}
+
+void Sequence::remove_locked_selections() {
+  if (track_states.isEmpty()) return;
+  for (int i = selections.size() - 1; i >= 0; i--) {
+    if (track_locked(selections.at(i).track)) selections.removeAt(i);
+  }
 }
 
 long Sequence::getEndFrame() {
