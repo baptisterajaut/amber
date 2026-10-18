@@ -447,6 +447,11 @@ void TimelineWidget::drawClips(QPainter& p) {
       continue;
     }
 
+    // a hidden video track, or an audio track muted or silenced by another track's solo, dims its clips
+    const bool track_off = (clip->track() < 0) ? !amber::ActiveSequence->track_visible_in_render(clip->track())
+                                               : !amber::ActiveSequence->track_audible(clip->track());
+    p.setOpacity(track_off ? 0.4 : 1.0);
+
     QRect text_rect(clip_rect.left() + amber::timeline::kClipTextPadding,
                     clip_rect.top() + amber::timeline::kClipTextPadding,
                     clip_rect.width() - amber::timeline::kClipTextPadding - 1,
@@ -473,6 +478,20 @@ void TimelineWidget::drawClips(QPainter& p) {
     if (panel_timeline->tool == TIMELINE_TOOL_TRANSITION) {
       drawTransitionToolOverlay(p, clip_rect, i, width());
     }
+  }
+  p.setOpacity(1.0);
+}
+
+void TimelineWidget::drawLockedTracks(QPainter& p, int video_track_limit, int audio_track_limit) {
+  if (amber::ActiveSequence->track_states.isEmpty()) return;
+  QColor hatch = palette().color(QPalette::WindowText);
+  hatch.setAlpha(48);
+  // the shown range: the sequence's tracks plus the empty one on each side
+  for (int t = video_track_limit - 1; t <= audio_track_limit + 1; t++) {
+    if (!amber::ActiveSequence->track_locked(t)) continue;
+    const QRect row = track_rect(t);
+    if (row.bottom() < 0 || row.top() >= height()) continue;
+    p.fillRect(row, QBrush(hatch, Qt::BDiagPattern));
   }
 }
 
@@ -655,6 +674,7 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
 
     drawClips(p);
     drawRecordingClip(p);
+    drawLockedTracks(p, video_track_limit, audio_track_limit);
     drawTrackLines(p, video_track_limit, audio_track_limit);
     drawSelections(p);
     drawGhosts(p);

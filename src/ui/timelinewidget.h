@@ -135,6 +135,8 @@ class TimelineWidget : public QWidget {
   // paintEvent sub-handlers
   void drawClips(QPainter& p);
   void drawRecordingClip(QPainter& p);
+  // diagonal hatch over the rows of locked tracks, after the clips and before the track lines
+  void drawLockedTracks(QPainter& p, int video_track_limit, int audio_track_limit);
   void drawTrackLines(QPainter& p, int video_track_limit, int audio_track_limit);
   void drawSelections(QPainter& p);
   void drawGhosts(QPainter& p);
