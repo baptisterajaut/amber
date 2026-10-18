@@ -794,14 +794,6 @@ class Cacher : public QThread {
   void cacheVideoEvictBeforeTimestamp(int64_t minimum_ts);
 
   /**
-   * @brief Handle a decoded frame with AV_NOPTS_VALUE pts (still-image or seek artifact).
-   *
-   * Assigns target_pts to the frame, and if EOF was also signalled, stores the frame and returns true
-   * (caller should break the decode loop).
-   */
-  bool cacheVideoHandleNoPtsFrame(AVFrame* decoded_frame, int64_t target_pts, int retrieve_code);
-
-  /**
    * @brief Cache a single still-image frame (infinite_length clips).
    */
   void cacheVideoStillImage();

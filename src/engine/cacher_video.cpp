@@ -37,6 +37,8 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
   int64_t zero = 0;
   bool have_existing = false;
 
+  // Seek further back while the landing frame is past the target, or while nothing is decodable from there to the
+  // end (EOF: a target past the media's last frame, e.g. a proxy a frame short of its original)
   do {
     if (have_existing) av_frame_free(&decoded_frame);
 
@@ -48,7 +50,8 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
 
     seek_ts = qMax(zero, seek_ts - second_pts);
     have_existing = true;
-  } while (retrieve_code >= 0 && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts) &&
+  } while ((retrieve_code == AVERROR_EOF ||
+            (retrieve_code >= 0 && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts))) &&
            !seeked_to_zero);
 
   queue_.lock();
@@ -109,23 +112,6 @@ void Cacher::cacheVideoEvictBeforeTimestamp(int64_t minimum_ts) {
 }
 
 // ---------------------------------------------------------------------------
-// cacheVideoHandleNoPtsFrame
-// ---------------------------------------------------------------------------
-bool Cacher::cacheVideoHandleNoPtsFrame(AVFrame* decoded_frame, int64_t target_pts, int retrieve_code) {
-  decoded_frame->pts = target_pts;
-  if (retrieve_code == AVERROR_EOF) {
-    if (retrieved_frame == nullptr) SetRetrievedFrame(decoded_frame);
-    queue_.lock();
-    queue_.append(decoded_frame);
-    queue_.unlock();
-    return true;  // break the decode loop
-  }
-  // Not stored anywhere — free it, the decode loop allocates a fresh frame on the next pass
-  av_frame_free(&decoded_frame);
-  return false;
-}
-
-// ---------------------------------------------------------------------------
 // cacheVideoStillImage — handle still-image clip caching
 // ---------------------------------------------------------------------------
 void Cacher::cacheVideoStillImage() {
@@ -177,8 +163,17 @@ bool Cacher::cacheVideoProcessDecodedFrame(AVFrame* decoded_frame, int retrieve_
     return true;
   }
 
+  // EOF hands back the frame RetrieveFrameAndProcess() allocated, which nothing filled: never queue or retrieve it. A
+  // target past the media's last frame then gets the last decoded one, CacheVideoWorker()'s closest-frame fallback.
+  if (retrieve_code == AVERROR_EOF) {
+    av_frame_free(&decoded_frame);
+    return true;
+  }
+
+  // No timestamp to place it in the queue: free it, the decode loop allocates a fresh frame on the next pass
   if (decoded_frame->pts == AV_NOPTS_VALUE) {
-    return cacheVideoHandleNoPtsFrame(decoded_frame, target_pts, retrieve_code);
+    av_frame_free(&decoded_frame);
+    return false;
   }
 
   // Discard frames before the minimum timestamp (seconds mode)
