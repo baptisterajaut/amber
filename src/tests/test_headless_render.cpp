@@ -625,7 +625,8 @@ void write_offset_mp4(const QString& path, int frames, int64_t start) {
 }
 
 // frames frames of a flat colour, luma 24 + 16 * i under a non-neutral chroma (a dropped or swapped chroma plane
-// shows), as interlaced (top field first) video in MP4: MBAFF H.264 from libx264 by default
+// shows), as interlaced (top field first) video in the container path's extension names: MBAFF H.264 from libx264 by
+// default (mpeg2video in .mpg: MPEG-PS, whose video starts at 0.5 s)
 void write_interlaced_video(const QString& path, int frames, const char* encoder = "libx264") {
   const AVRational rate{int(kFps), 1};
   const QByteArray p = path.toUtf8();
@@ -633,6 +634,9 @@ void write_interlaced_video(const QString& path, int frames, const char* encoder
   QVERIFY(codec != nullptr);
   AVFormatContext* fmt = nullptr;
   QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
+  // MPEG-PS packs these tiny frames several to a 2048-byte packet, which carries one pts: small packets give every
+  // frame its own, as a real recording's frames have
+  if (strcmp(fmt->oformat->name, "mpeg") == 0) fmt->packet_size = 64;
   AVStream* st = avformat_new_stream(fmt, nullptr);
   AVCodecContext* enc = avcodec_alloc_context3(codec);
   enc->width = kSize;
@@ -739,17 +743,18 @@ double video_start_seconds(const QString& path) {
   return start;
 }
 
-// Index of the frame in frames whose mean red is closest to the RGBA image's, -1 if there is none
+// Index of the frame in frames whose mean red, green and blue is closest to the RGBA image's, -1 if there is none. All
+// three: a coloured frame's red alone saturates.
 int closest_grey_frame(const QVector<QByteArray>& frames, const QByteArray& rgba) {
-  auto mean_red = [](const QByteArray& f) {
+  auto mean_rgb = [](const QByteArray& f) {
     double sum = 0;
-    for (int i = 0; i < f.size(); i += 4) sum += uchar(f[i]);
-    return f.isEmpty() ? 0.0 : sum / (f.size() / 4);
+    for (int i = 0; i < f.size(); i += 4) sum += uchar(f[i]) + uchar(f[i + 1]) + uchar(f[i + 2]);
+    return f.isEmpty() ? 0.0 : sum / (f.size() / 4 * 3);
   };
-  const double target = mean_red(rgba);
+  const double target = mean_rgb(rgba);
   int best = -1;
   for (int i = 0; i < frames.size(); i++) {
-    if (best < 0 || qAbs(mean_red(frames[i]) - target) < qAbs(mean_red(frames[best]) - target)) best = i;
+    if (best < 0 || qAbs(mean_rgb(frames[i]) - target) < qAbs(mean_rgb(frames[best]) - target)) best = i;
   }
   return best;
 }
@@ -1976,6 +1981,82 @@ class TestHeadlessRender : public QObject {
     }
     amber::ActiveSequence = nullptr;
     amber::project_model.clear();
+  }
+
+  // Interlaced footage exports a picture per source frame. yadif deinterlaces at field rate in half the stream's time
+  // base, and its timestamps were compared as the stream's: the export showed each frame twice (half speed), and a
+  // clip whose video starts after 0 (MPEG-PS, MPEG-TS) its first frames as whatever the repeated seeks found. The
+  // MPEG-PS clip's first seek lands past its first frame and seeks again: yadif kept the frames from before, and the
+  // export opened on one of them. The clip runs to the media's end: yadif lets a frame out once it has the next one,
+  // and held the last one back.
+  void interlacedExportKeepsFrames_data() {
+    QTest::addColumn<QString>("encoder");
+    QTest::addColumn<QString>("file");
+    QTest::newRow("h264-mp4") << "libx264" << "frames_interlaced.mp4";
+    QTest::newRow("mpeg2-ps") << "mpeg2video" << "frames_interlaced.mpg";
+  }
+
+  void interlacedExportKeepsFrames() {
+    QFETCH(QString, encoder);
+    QFETCH(QString, file);
+    if (avcodec_find_encoder_by_name(qPrintable(encoder)) == nullptr) QSKIP("encoder not in this FFmpeg build");
+    const QString video = dir_.filePath(file);
+    write_interlaced_video(video, kSourceFrames, qPrintable(encoder));
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath(file + "_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath(file + ".ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio, QString(), kSourceFrames).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    // Detected by the probe: without it the cacher adds no yadif and nothing here is tested
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kSourceFrames);
+
+    const ExportParams params = video_params(dir_.filePath(file + "_out.mp4"), seq.get(), AV_CODEC_ID_MPEG4, QString(),
+                                             COMPRESSION_TYPE_CBR, 2.0);
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded out = decode_file(params.filename, true);
+    QVERIFY(out.ok);
+    QCOMPARE(out.video_frames, kSourceFrames);
+    QVector<int> matched;
+    QVector<int> expected;
+    for (int k = 0; k < out.video_frames; k++) {
+      matched.append(closest_grey_frame(src.rgba, out.rgba[k]));
+      expected.append(k);
+    }
+    QString shown;
+    for (int m : matched) shown += QString::number(m) + ' ';
+    qInfo("export frames show source frames: %s", qPrintable(shown));
+    QCOMPARE(matched, expected);
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
