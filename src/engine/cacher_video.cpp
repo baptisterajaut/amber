@@ -60,9 +60,15 @@ void Cacher::cacheVideoResetDeinterlacer() {
 int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFrame*& decoded_frame,
                                    bool& seeked_to_zero) {
   int retrieve_code = 0;
-  int64_t seek_ts = target_pts;
   int64_t zero = 0;
   bool have_existing = false;
+
+  // A seek landing past its target pays another, a second earlier. MPEG-PS/TS (no keyframe index; PS indexes every
+  // packet as one) always land past it, on the keyframe after the packet the seek finds, DV a frame past. Start each
+  // seek as far before the target as this clip's seeks have overshot so far: after its first, they land at or before.
+  // CBA: an overshoot counts for at most a second, so one wild landing can't make every later seek decode far back; a
+  // format overshooting more keeps paying the step back.
+  int64_t seek_ts = qMax(zero, target_pts - seek_overshoot_);
 
   // Seek a second further back while the landing frame is past the target. EOF instead means nothing is decodable from
   // the landing point to the end: the target is past the media's real end (a proxy a frame short of its original, a
@@ -81,6 +87,10 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
     av_seek_frame(formatCtx, clip->media_stream_index(), seek_ts, AVSEEK_FLAG_BACKWARD);
 
     retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
+    if (retrieve_code >= 0 && decoded_frame->pts != AV_NOPTS_VALUE && decoded_frame->pts > target_pts &&
+        !seeked_to_zero) {
+      seek_overshoot_ = qMax(seek_overshoot_, qMin(second_pts, decoded_frame->pts - seek_ts));
+    }
 
     if (retrieve_code == AVERROR_EOF) {
       const int64_t known = jumped ? AV_NOPTS_VALUE : cacheVideoLastDecodable(seek_ts);
