@@ -346,12 +346,13 @@ class TestAudioDsp : public QObject {
   }
 
   void reverbNoiseStaysBounded() {
-    // 10 s of full-scale white noise (both channels alike, the loudest tank input) at 100 % wet: finite, and below 4
-    // at the default room. The largest, least damped room rings much louder, but still doesn't run away.
+    // 10 s of full-scale white noise (both channels alike, the loudest tank input) at 100 % wet: finite, peak below 3
+    // at the default room (measured 1.97). The largest, least damped room rings much louder, but still doesn't run away
+    // (measured 6.34). The rms floors (measured 0.381 and 1.335) catch a wrong wet gain or a dead comb.
     const int n = kRate * 10;
     const struct {
-      double room, damp, bound;
-    } cases[] = {{0.5, 0.5, 4.0}, {1.0, 0.0, 8.0}};
+      double room, damp, bound, rms_floor;
+    } cases[] = {{0.5, 0.5, 3.0, 0.25}, {1.0, 0.0, 8.0, 0.9}};
     for (const auto& tc : cases) {
       std::vector<float> v(size_t(n) * 2);
       std::mt19937 rng(1234);
@@ -370,6 +371,7 @@ class TestAudioDsp : public QObject {
           tc.room * 100, tc.damp * 100, p, rms);
       QVERIFY(finite);
       QVERIFY2(p < tc.bound, qPrintable(QString("peak %1").arg(p)));
+      QVERIFY2(rms > tc.rms_floor, qPrintable(QString("rms %1").arg(rms)));
     }
   }
 
