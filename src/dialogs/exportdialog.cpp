@@ -37,6 +37,7 @@ extern "C" {
 #include <QSet>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
@@ -654,6 +655,7 @@ void ExportDialog::vcodec_changed(int index) {
     compressionTypeCombobox->setVisible(rate_control);
     videoBitrateLabel->setVisible(rate_control);
     videobitrateSpinbox->setVisible(rate_control);
+    fit_height();
 
     // set default pix_fmt for this codec
     const AVCodec* codec_info = avcodec_find_encoder(static_cast<AVCodecID>(vcodecCombobox->itemData(index).toInt()));
@@ -720,6 +722,13 @@ void ExportDialog::comp_type_changed(int) {
 void ExportDialog::open_advanced_video_dialog() {
   AdvancedVideoDialog avd(this, static_cast<AVCodecID>(vcodecCombobox->currentData().toInt()), vcodec_params);
   avd.exec();
+}
+
+void ExportDialog::fit_height() {
+  QTimer::singleShot(0, this, [this]() {
+    layout()->activate();
+    resize(width(), sizeHint().height());
+  });
 }
 
 void ExportDialog::setup_ui() {

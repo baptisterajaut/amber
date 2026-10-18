@@ -4,13 +4,14 @@ layout(std140, binding = 1) uniform FragParams {
   vec2 resolution;
   float amount;
   float radius;
+  float render_scale;  // auto: radius is in sequence pixels, the render target may be smaller (preview divider)
 };
 layout(binding = 2) uniform sampler2D image;
 layout(location = 0) in vec2 vTexCoord;
 layout(location = 0) out vec4 fragColor;
 
 void main(void) {
-  vec2 texel = radius / resolution;
+  vec2 texel = radius * render_scale / resolution;
 
   vec4 original = texture(image, vTexCoord);
 

@@ -842,7 +842,8 @@ EffectPtr Effect::copy(Clip* c) {
   return copy;
 }
 
-void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData, QSize renderSize) {
+void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData, QSize renderSize,
+                            float renderScale) {
   if (uboData.size() < fragUboSize_) uboData.resize(fragUboSize_);
 
   // Use actual FBO/render size for resolution uniforms (shaders that use gl_FragCoord need this
@@ -868,6 +869,12 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QB
     } else if (entry.name == QLatin1String("lutSize")) {
       float v = float(lutSize_);
       memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("render_scale")) {
+      // CBA: only Gaussian Blur, Sharpen and Privacy Mask read it; the Olive ones (Box/Directional/Radial Blur,
+      // Chromatic Aberration, Emboss, Bulge, Swirl, Cross Stitch) still work in render pixels and look wider at a
+      // preview divider. Upgrade: declare `float render_scale;` in their FragParams and multiply their pixel
+      // distances by it
+      memcpy(uboData.data() + entry.offset, &renderScale, 4);
     }
   }
 

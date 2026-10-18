@@ -223,8 +223,10 @@ class Effect : public QObject {
 
   // CPU RGBA frame of width x height pixels, rows stride bytes apart (input and output alike)
   virtual void process_image(double timecode, uint8_t* input, uint8_t* output, int width, int height, int stride);
+  // renderScale: render pixels per sequence pixel, below 1 only at a preview divider (exactly 1 at export). Written
+  // to the `render_scale` auto uniform, which pixel-unit shaders multiply their pixel distances by.
   virtual void process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData,
-                              QSize renderSize = QSize());
+                              QSize renderSize = QSize(), float renderScale = 1.0f);
   virtual void process_coords(double timecode, GLTextureCoords& coords, int data);
   virtual QRhiTexture* process_superimpose(QRhi* rhi, QRhiResourceUpdateBatch* u, double timecode);
   virtual void process_audio(double timecode_start, double timecode_end, quint8* samples, int nb_bytes,
