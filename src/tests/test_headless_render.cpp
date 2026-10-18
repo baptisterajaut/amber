@@ -357,6 +357,7 @@ struct Decoded {
   double video_fps = 0;    // stream avg_frame_rate
   int width = 0;
   int height = 0;
+  int pix_fmt = -1;  // of the first decoded frame
   QByteArray first_rgba;
   QVector<QByteArray> rgba;  // every video frame, when decode_file() is asked to keep them
   int audio_rate = 0;
@@ -448,6 +449,7 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
         if (d.video_frames == 0) {
           d.width = frame->width;
           d.height = frame->height;
+          d.pix_fmt = frame->format;
           d.first_rgba = to_rgba(frame);
         }
         if (keep_frames) d.rgba.append(to_rgba(frame));
@@ -2051,6 +2053,144 @@ class TestHeadlessRender : public QObject {
     QVERIFY(crf == crf_two_pass);
     QVERIFY(!mpeg4.isEmpty());
     QVERIFY(mpeg4 == mpeg4_two_pass);
+  }
+
+  // Not slots: helpers of the VAAPI tests
+ private:
+  // A VAAPI encoder that works here (the probe passed): the tests below skip without one (CI has no GPU)
+  static bool vaapi_encoder(const QString& name, amber::EncoderInfo* info) {
+    return amber::find_encoder_info(name, info) && amber::hardware_encoder_works(*info);
+  }
+
+  // A VAAPI export of the noise project at kVaapiSize (scaled up: radeonsi encodes from 128x128, HEVC from 130
+  // wide). Returns the decoded file; log gets FFmpeg's log of the export.
+  static constexpr int kVaapiSize = 256;
+  Decoded vaapi_export(Sequence* seq, const QString& file, int codec, const QString& encoder, int compression_type,
+                       double value, AVPixelFormat sw_format, QString* log) {
+    ExportParams params = video_params(dir_.filePath(file), seq, codec, encoder, compression_type, value);
+    params.video_width = kVaapiSize;
+    params.video_height = kVaapiSize;
+    QString error;
+    {
+      AvLogCapture capture;
+      error = export_sequence(seq, params, sw_format);
+      *log = capture.text();
+    }
+    if (!error.isEmpty()) {
+      qWarning("%s: %s", qPrintable(file), qPrintable(error));
+      return Decoded();
+    }
+    return decode_file(params.filename);
+  }
+
+ private slots:
+  // H.264 through VAAPI, quality-based: constant QP (rc_mode=CQP), every frame at the export size, and QP 40 a much
+  // smaller file than QP 20
+  void vaapiQualityMode() {
+    amber::EncoderInfo info;
+    if (!vaapi_encoder("h264_vaapi", &info)) QSKIP("no working h264_vaapi here");
+    if (avcodec_find_decoder(AV_CODEC_ID_H264) == nullptr) QSKIP("no H.264 decoder");
+    constexpr long kFrames = 30;
+    SequencePtr seq;
+    load_noise_project("vaapi_qp", kFrames, &seq);
+    if (QTest::currentTestFailed()) return;
+    qint64 sizes[2] = {0, 0};
+    const int qps[2] = {20, 40};
+    for (int i = 0; i < 2; i++) {
+      const QString file = QString("vaapi_qp%1.mp4").arg(qps[i]);
+      QString log;
+      const Decoded d = vaapi_export(seq.get(), file, AV_CODEC_ID_H264, "h264_vaapi", COMPRESSION_TYPE_CFR, qps[i],
+                                     AV_PIX_FMT_NV12, &log);
+      QVERIFY(d.ok);
+      QVERIFY(d.has_video);
+      QCOMPARE(long(d.video_frames), kFrames);
+      QCOMPARE(d.width, kVaapiSize);
+      QCOMPARE(d.height, kVaapiSize);
+      QCOMPARE(d.pix_fmt, int(AV_PIX_FMT_YUV420P));
+      QVERIFY2(log.contains("RC mode: CQP"), qPrintable(log));
+      sizes[i] = QFileInfo(dir_.filePath(file)).size();
+    }
+    qInfo("h264_vaapi QP 20: %lld bytes, QP 40: %lld bytes", sizes[0], sizes[1]);
+    QVERIFY2(sizes[1] * 2 < sizes[0],
+             qPrintable(QString("QP 40 %1 bytes, QP 20 %2 bytes").arg(sizes[1]).arg(sizes[0])));
+    for (const auto& c : seq->clips) QVERIFY(!c->IsOpen());
+  }
+
+  // HEVC through VAAPI at an average bitrate: FFmpeg picks the rate control from bit_rate alone (VBR on radeonsi), and
+  // the stream lands within 30 % of the target
+  void vaapiAverageBitrate() {
+    amber::EncoderInfo info;
+    if (!vaapi_encoder("hevc_vaapi", &info)) QSKIP("no working hevc_vaapi here");
+    if (avcodec_find_decoder(AV_CODEC_ID_HEVC) == nullptr) QSKIP("no HEVC decoder");
+    constexpr long kFrames = 60;
+    constexpr double kMbps = 1.0;
+    SequencePtr seq;
+    load_noise_project("vaapi_abr", kFrames, &seq);
+    if (QTest::currentTestFailed()) return;
+    QString log;
+    const Decoded d = vaapi_export(seq.get(), "vaapi_abr.mp4", AV_CODEC_ID_HEVC, "hevc_vaapi",
+                                   COMPRESSION_TYPE_TARGETBR, kMbps, AV_PIX_FMT_NV12, &log);
+    QVERIFY(d.ok);
+    QVERIFY(d.has_video);
+    QCOMPARE(long(d.video_frames), kFrames);
+    const QRegularExpressionMatch rc = QRegularExpression("RC mode: (\\w+)").match(log);
+    const double target_kbps = kMbps * 1000;
+    const double kbps = d.video_bytes * 8.0 / (kFrames / kFps) / 1000.0;
+    qInfo("hevc_vaapi average bitrate (RC mode %s): %.1f kbps for a %.0f kbps target (%+.1f %%)",
+          qPrintable(rc.captured(1)), kbps, target_kbps, (kbps / target_kbps - 1) * 100);
+    QVERIFY(rc.hasMatch());
+    QVERIFY(rc.captured(1) != "CQP");
+    QVERIFY2(qAbs(kbps - target_kbps) <= 0.3 * target_kbps, qPrintable(QString("%1 kbps").arg(kbps)));
+  }
+
+  // HEVC through VAAPI from P010 frames, where the device encodes Main 10: the decoded stream is 10-bit
+  void vaapiP010() {
+    amber::EncoderInfo info;
+    if (!vaapi_encoder("hevc_vaapi", &info)) QSKIP("no working hevc_vaapi here");
+    if (!amber::hardware_encoder_formats(info).contains(AV_PIX_FMT_P010)) QSKIP("no HEVC Main 10 encode here");
+    if (avcodec_find_decoder(AV_CODEC_ID_HEVC) == nullptr) QSKIP("no HEVC decoder");
+    SequencePtr seq = solid_sequence(long(kFps));
+    QString log;
+    const Decoded d = vaapi_export(seq.get(), "vaapi_p010.mkv", AV_CODEC_ID_HEVC, "hevc_vaapi", COMPRESSION_TYPE_CFR,
+                                   25, AV_PIX_FMT_P010, &log);
+    QVERIFY(d.ok);
+    QCOMPARE(long(d.video_frames), long(kFps));
+    const AVPixFmtDescriptor* desc = av_pix_fmt_desc_get(AVPixelFormat(d.pix_fmt));
+    QVERIFY(desc != nullptr);
+    qInfo("hevc_vaapi P010: decoded as %s", desc->name);
+    QCOMPARE(int(desc->comp[0].depth), 10);
+    // Red where the solid is opaque, as the software encoders give it
+    const int off = ((kVaapiSize / 2) * kVaapiSize + kVaapiSize / 2) * 4;
+    const int r = uchar(d.first_rgba[off]), g = uchar(d.first_rgba[off + 1]), b = uchar(d.first_rgba[off + 2]);
+    qInfo("first frame centre (%d, %d, %d)", r, g, b);
+    QVERIFY(r > 180 && g < 80 && b < 80);
+  }
+
+  // Without a usable device (libva pointed at a driver that doesn't exist) the probe says no, and an export naming the
+  // encoder anyway (a preset, a batch) ends with the hardware error and leaves no file. Also runs without a GPU.
+  void vaapiWithoutDevice() {
+    amber::EncoderInfo info;
+    if (!amber::find_encoder_info("h264_vaapi", &info)) QSKIP("h264_vaapi not in this FFmpeg build");
+    const QByteArray saved = qgetenv("LIBVA_DRIVER_NAME");
+    const bool had = qEnvironmentVariableIsSet("LIBVA_DRIVER_NAME");
+    qputenv("LIBVA_DRIVER_NAME", "amber_no_such_driver");
+    const auto restore = qScopeGuard([&] {
+      if (had) {
+        qputenv("LIBVA_DRIVER_NAME", saved);
+      } else {
+        qunsetenv("LIBVA_DRIVER_NAME");
+      }
+    });
+    QVERIFY(!amber::hardware_encode_test("h264_vaapi", AV_HWDEVICE_TYPE_VAAPI, AV_PIX_FMT_NV12));
+    SequencePtr seq = solid_sequence(2);
+    ExportParams params = video_params(dir_.filePath("vaapi_nodevice.mp4"), seq.get(), AV_CODEC_ID_H264, "h264_vaapi",
+                                       COMPRESSION_TYPE_CFR, 20);
+    params.video_width = kVaapiSize;
+    params.video_height = kVaapiSize;
+    const QString error = export_sequence(seq.get(), params, AV_PIX_FMT_NV12);
+    qInfo("export error: %s", qPrintable(error));
+    QVERIFY2(error.startsWith("hardware encoder failed: could not open the VAAPI device"), qPrintable(error));
+    QVERIFY(!QFileInfo::exists(params.filename));
   }
 
   // FLAC at compression level 0 and 12: the same samples, bit for bit, and the higher level no larger
