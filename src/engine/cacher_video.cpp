@@ -588,5 +588,10 @@ int Cacher::RetrieveFrameAndProcess(AVFrame **f)
   if (read_code == AVERROR_EOF) {
     return AVERROR_EOF;
   }
+  // yadif at field rate (mode=3) outputs in half the stream's time base, pts doubled: back to the stream's, which
+  // every target, queue lookup and seek compares against. A no-op without yadif (same time base).
+  if (retrieve_code >= 0 && (*f)->pts != AV_NOPTS_VALUE) {
+    (*f)->pts = av_rescale_q((*f)->pts, av_buffersink_get_time_base(buffersink_ctx), stream->time_base);
+  }
   return retrieve_code;
 }
