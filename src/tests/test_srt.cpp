@@ -14,6 +14,9 @@ class TestSrt : public QObject {
   void testWindowsLineEndings();
   void testMissingBlankLines();
   void testBom();
+  void testUtf8Accents();
+  void testWindows1252Fallback();
+  void testUtf16Bom();
   void testOverlappingCues();
   void testTrailingWhitespace();
 };
@@ -132,6 +135,53 @@ void TestSrt::testBom() {
   auto result = parse_srt(f.fileName());
   QCOMPARE(result.cues.size(), 1);
   QCOMPARE(result.cues[0].text, QString("BOM text"));
+}
+
+void TestSrt::testUtf8Accents() {
+  QTemporaryFile f;
+  QVERIFY(f.open());
+  f.write("1\n00:00:01,000 --> 00:00:02,000\n\xC3\xA9t\xC3\xA9 \xE2\x82\xAC\n\n");  // "été €" in UTF-8
+  f.flush();
+
+  auto result = parse_srt(f.fileName());
+  QCOMPARE(result.cues.size(), 1);
+  QCOMPARE(result.cues[0].text, QString::fromUtf8("\xC3\xA9t\xC3\xA9 \xE2\x82\xAC"));
+}
+
+// Not valid UTF-8: decoded as Windows-1252 instead of turning every accented letter into U+FFFD
+void TestSrt::testWindows1252Fallback() {
+  QTemporaryFile f;
+  QVERIFY(f.open());
+  f.write("1\n00:00:01,000 --> 00:00:02,000\n\xE9t\xE9 \xE0 No\xEBl\n\n");  // "été à Noël" in Windows-1252
+  f.flush();
+
+  auto result = parse_srt(f.fileName());
+  QCOMPARE(result.cues.size(), 1);
+  QCOMPARE(result.cues[0].text, QString::fromUtf8("\xC3\xA9t\xC3\xA9 \xC3\xA0 No\xC3\xABl"));
+
+  // 0x80 is the euro sign in Windows-1252 (U+0080, a control char, in Latin-1)
+  if (QStringDecoder("Windows-1252").isValid()) {
+    QCOMPARE(decode_srt_bytes("\x80 \xE9"), QString::fromUtf8("\xE2\x82\xAC \xC3\xA9"));
+  } else {
+    QCOMPARE(decode_srt_bytes("\x80 \xE9"), QString::fromUtf8("\xC2\x80 \xC3\xA9"));
+  }
+
+  // The only non-UTF-8 byte is the file's last one (no final newline): a truncated UTF-8 sequence, not valid UTF-8
+  QCOMPARE(decode_srt_bytes("1\n00:00:01,000 --> 00:00:02,000\nCaf\xE9"),
+           QString::fromUtf8("1\n00:00:01,000 --> 00:00:02,000\nCaf\xC3\xA9"));
+}
+
+void TestSrt::testUtf16Bom() {
+  QString srt = QString::fromUtf8("1\n00:00:01,000 --> 00:00:02,000\n\xC3\xA9t\xC3\xA9\n\n");
+  QByteArray bytes = QStringEncoder(QStringConverter::Utf16LE, QStringConverter::Flag::WriteBom).encode(srt);
+  QTemporaryFile f;
+  QVERIFY(f.open());
+  f.write(bytes);
+  f.flush();
+
+  auto result = parse_srt(f.fileName());
+  QCOMPARE(result.cues.size(), 1);
+  QCOMPARE(result.cues[0].text, QString::fromUtf8("\xC3\xA9t\xC3\xA9"));
 }
 
 void TestSrt::testOverlappingCues() {
