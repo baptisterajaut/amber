@@ -42,6 +42,18 @@ int64_t Cacher::cacheVideoLastDecodable(int64_t seek_ts) {
   return AV_NOPTS_VALUE;
 }
 
+// yadif outputs a frame once it holds the next one and keeps the one before: after a seek it would hand out fields from
+// before it, with their old timestamps, ahead of the new position's. A fresh graph forgets them. Progressive graphs
+// hold no frame and are kept.
+void Cacher::cacheVideoResetDeinterlacer() {
+  if (filter_graph == nullptr || avfilter_graph_get_filter(filter_graph, "yadif") == nullptr) return;
+  avfilter_graph_free(&filter_graph);
+  buffersrc_ctx = nullptr;
+  buffersink_ctx = nullptr;
+  filter_graph = avfilter_graph_alloc();
+  if (filter_graph != nullptr) openWorkerVideoFilter(clip->media_stream());
+}
+
 // ---------------------------------------------------------------------------
 // cacheVideoSeekToTarget
 // ---------------------------------------------------------------------------
@@ -63,6 +75,7 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
 
     seeked_to_zero = (seek_ts == 0);
     avcodec_flush_buffers(codecCtx);
+    cacheVideoResetDeinterlacer();
     av_seek_frame(formatCtx, clip->media_stream_index(), seek_ts, AVSEEK_FLAG_BACKWARD);
 
     retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
@@ -489,6 +502,8 @@ int Cacher::RetrieveFrameAndProcess(AVFrame** f) {
 
   // frame for FFmpeg to decode into
   *f = av_frame_alloc();
+  // No graph: rebuilding it after a seek failed (cacheVideoResetDeinterlacer())
+  if (buffersink_ctx == nullptr) return AVERROR(EINVAL);
 
   // loop to pull frames from the AVFilter stack
   while ((retrieve_code = av_buffersink_get_frame(buffersink_ctx, *f)) == AVERROR(EAGAIN)) {

@@ -625,7 +625,8 @@ void write_offset_mp4(const QString& path, int frames, int64_t start) {
 }
 
 // frames frames of a flat colour, luma 24 + 16 * i under a non-neutral chroma (a dropped or swapped chroma plane
-// shows), as interlaced (top field first) video in MP4: MBAFF H.264 from libx264 by default
+// shows), as interlaced (top field first) video in the container path's extension names: MBAFF H.264 from libx264 by
+// default (mpeg2video in .mpg: MPEG-PS, whose video starts at 0.5 s)
 void write_interlaced_video(const QString& path, int frames, const char* encoder = "libx264") {
   const AVRational rate{int(kFps), 1};
   const QByteArray p = path.toUtf8();
@@ -633,6 +634,9 @@ void write_interlaced_video(const QString& path, int frames, const char* encoder
   QVERIFY(codec != nullptr);
   AVFormatContext* fmt = nullptr;
   QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
+  // MPEG-PS packs these tiny frames several to a 2048-byte packet, which carries one pts: small packets give every
+  // frame its own, as a real recording's frames have
+  if (strcmp(fmt->oformat->name, "mpeg") == 0) fmt->packet_size = 64;
   AVStream* st = avformat_new_stream(fmt, nullptr);
   AVCodecContext* enc = avcodec_alloc_context3(codec);
   enc->width = kSize;
@@ -1980,12 +1984,22 @@ class TestHeadlessRender : public QObject {
 
   // Interlaced footage exports a picture per source frame. yadif deinterlaces at field rate in half the stream's time
   // base, and its timestamps were compared as the stream's: the export showed each frame twice (half speed), and a
-  // clip whose video starts after 0 (MPEG-PS, MPEG-TS) its first frames as whatever the repeated seeks found.
+  // clip whose video starts after 0 (MPEG-PS, MPEG-TS) its first frames as whatever the repeated seeks found. The
+  // MPEG-PS clip's first seek lands past its first frame and seeks again: yadif kept the frames from before, and the
+  // export opened on one of them.
+  void interlacedExportKeepsFrames_data() {
+    QTest::addColumn<QString>("encoder");
+    QTest::addColumn<QString>("file");
+    QTest::newRow("h264-mp4") << "libx264" << "frames_interlaced.mp4";
+    QTest::newRow("mpeg2-ps") << "mpeg2video" << "frames_interlaced.mpg";
+  }
+
   void interlacedExportKeepsFrames() {
-    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
-    const QString file = "frames_interlaced.mp4";
+    QFETCH(QString, encoder);
+    QFETCH(QString, file);
+    if (avcodec_find_encoder_by_name(qPrintable(encoder)) == nullptr) QSKIP("encoder not in this FFmpeg build");
     const QString video = dir_.filePath(file);
-    write_interlaced_video(video, kSourceFrames);
+    write_interlaced_video(video, kSourceFrames, qPrintable(encoder));
     if (QTest::currentTestFailed()) return;
     const QString audio = dir_.filePath(file + "_tone.wav");
     {

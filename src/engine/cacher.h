@@ -786,6 +786,13 @@ class Cacher : public QThread {
   int cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFrame*& decoded_frame, bool& seeked_to_zero);
 
   /**
+   * @brief Rebuild a video filter graph that deinterlaces (yadif), dropping the frames it holds from before a seek.
+   *
+   * No-op on a graph without yadif. On failure the graph is gone and RetrieveFrameAndProcess() returns an error.
+   */
+  void cacheVideoResetDeinterlacer();
+
+  /**
    * @brief Update retrieved_frame from a newly decoded frame if not already set.
    *
    * Checks exact-match, ahead-of-target-with-queue, and seeked-to-zero fallback cases.
