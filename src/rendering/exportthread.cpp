@@ -516,11 +516,7 @@ bool ExportThread::Export()
           waitCond.wait(&mutex, 100);
         }
 
-        if (interrupt_) {
-          renderer->cancel();
-          delete renderer;
-          goto cleanup_state;
-        }
+        if (interrupt_) goto cleanup_renderer;
 
         // QRhi creation failed: ready() still fired, but there is no frame and there never will be
         if (renderer->rhi_failed()) {
@@ -544,11 +540,7 @@ bool ExportThread::Export()
         if (!renderer->did_texture_fail()) break;
       }
 
-      if (interrupt_) {
-        renderer->cancel();
-        delete renderer;
-        goto cleanup_state;
-      }
+      if (interrupt_) goto cleanup_renderer;
 
     }
 
@@ -674,16 +666,12 @@ bool ExportThread::Export()
   }
 
 cleanup_renderer:
-  // Clean up export render thread
-  renderer->cancel();
-  delete renderer;
-
-cleanup_state:
-  // Clean up clip state.  Rendering state (audio_rendering flag + autorecovery
-  // timer) is restored on the main thread in ExportDialog::export_thread_finished
-  // — starting a QTimer from this thread triggers "Timers cannot be started
+  // Clean up export render thread, and clip state first: the clips' textures belong to its QRhi. Rendering state
+  // (audio_rendering flag + autorecovery timer) is restored on the main thread in
+  // ExportDialog::export_thread_finished — starting a QTimer from this thread triggers "Timers cannot be started
   // from another thread".
-  close_active_clips(amber::ActiveSequence.get());
+  renderer->cancel(amber::ActiveSequence.get());
+  delete renderer;
 
   if (interrupt_ || !frames_ok) {
     return false;
