@@ -78,6 +78,7 @@ ViewerWindow::ViewerWindow(QWidget* parent) : QRhiWidget(parent) {
 }
 
 ViewerWindow::~ViewerWindow() {
+  releaseResources();  // see ~ViewerWidget: QRhiWidget doesn't call it at destruction
   // Null Vulkan instance to prevent surface double-free during teardown.
 #if AMBER_HAS_VULKAN
   if (windowHandle())
