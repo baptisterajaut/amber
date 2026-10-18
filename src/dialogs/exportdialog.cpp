@@ -82,14 +82,46 @@ constexpr int kVideoOptionRow = 8;
 constexpr int kLastRow = 50;
 constexpr int kAudioOptionRow = 4;
 
-ExportDialog::ExportDialog(QWidget* parent) : QDialog(parent) {
-  setWindowTitle(tr("Export \"%1\"").arg(amber::ActiveSequence->name));
+ExportDialog::ExportDialog(QWidget* parent, const QVector<SequencePtr>& batch)
+    : QDialog(parent), batch_(batch), ref_seq_(batch.isEmpty() ? amber::ActiveSequence.get() : batch.first().get()) {
+  if (batch_.isEmpty()) {
+    setWindowTitle(tr("Export \"%1\"").arg(amber::ActiveSequence->name));
+  } else {
+    setWindowTitle(tr("Export %1 Sequences").arg(batch_.size()));
+  }
   setup_ui();
 
   rangeCombobox->setCurrentIndex(0);
-  if (amber::ActiveSequence->using_workarea) {
-    rangeCombobox->setEnabled(true);
-    rangeCombobox->setCurrentIndex(1);
+  if (batch_.isEmpty()) {
+    if (amber::ActiveSequence->using_workarea) {
+      rangeCombobox->setEnabled(true);
+      rangeCombobox->setCurrentIndex(1);
+    }
+  } else {
+    // "In to Out" per sequence: offered when any has an in/out range
+    bool any_inout = false;
+    QStringList names;
+    for (const SequencePtr& s : batch_) {
+      any_inout = any_inout || s->using_workarea;
+      names.append(s->name);
+    }
+    rangeCombobox->setEnabled(any_inout);
+    rangeCombobox->setCurrentIndex(any_inout ? 1 : 0);
+    rangeCombobox->setToolTip(
+        tr("In to Out exports each sequence's in/out range; a sequence without one exports whole."));
+
+    QLabel* list_label = new QLabel(names.join(", "), this);
+    list_label->setWordWrap(true);
+    static_cast<QVBoxLayout*>(layout())->insertWidget(0, list_label);
+
+    // Each sequence's own size and frame rate (batch_export_params(), ExportThread::SetupVideo): the fields show so
+    const QString size_tip = tr("Each sequence exports at its own size. Change it in Sequence Settings.");
+    for (QSpinBox* spin : {widthSpinbox, heightSpinbox}) {
+      spin->setSpecialValueText(tr("Each sequence's own size"));
+      spin->setEnabled(false);
+      spin->setToolTip(size_tip);
+    }
+    framerateSpinbox->setSpecialValueText(tr("Each sequence's own rate"));
   }
 
   format_strings.resize(FORMAT_SIZE);
@@ -121,10 +153,17 @@ ExportDialog::ExportDialog(QWidget* parent) : QDialog(parent) {
   formatCombobox->setCurrentIndex(FORMAT_MPEG4);
 
   // default to sequence's native dimensions
-  widthSpinbox->setValue(amber::ActiveSequence->width);
-  heightSpinbox->setValue(amber::ActiveSequence->height);
-  samplingRateSpinbox->setValue(amber::ActiveSequence->audio_frequency);
-  framerateSpinbox->setValue(amber::ActiveSequence->frame_rate);
+  if (batch_.isEmpty()) {
+    widthSpinbox->setValue(amber::ActiveSequence->width);
+    heightSpinbox->setValue(amber::ActiveSequence->height);
+    framerateSpinbox->setValue(amber::ActiveSequence->frame_rate);
+  } else {
+    // The minimum, which shows the special value text
+    widthSpinbox->setValue(widthSpinbox->minimum());
+    heightSpinbox->setValue(heightSpinbox->minimum());
+    framerateSpinbox->setValue(framerateSpinbox->minimum());
+  }
+  samplingRateSpinbox->setValue(ref_seq_->audio_frequency);
 
   // set some advanced defaults
   vcodec_params.threads = 0;
@@ -322,6 +361,10 @@ void ExportDialog::reject() {
     if (export_thread_->isRunning()) export_thread_->Interrupt();
     return;
   }
+  if (batch_export_ != nullptr) {
+    batch_export_->Cancel();  // batch_export_finished() follows
+    return;
+  }
   QDialog::reject();
 }
 
@@ -420,6 +463,7 @@ ExportParams ExportDialog::build_export_params(const QString& filename) const {
   }
   params.faststart = !faststartCheckbox->isHidden() && faststartCheckbox->isChecked();
   params.start_frame = 0;
+  if (!batch_.isEmpty()) return params;  // size and range per sequence: batch_export_params()
   params.end_frame = amber::ActiveSequence->getEndFrame();
   if (rangeCombobox->currentIndex() == 1) {
     params.start_frame = qMax(amber::ActiveSequence->workarea_in, params.start_frame);
@@ -434,10 +478,7 @@ void ExportDialog::launch_export_thread(const ExportParams& params) {
   connect(export_thread_, &QThread::finished, this, &ExportDialog::export_thread_finished);
   connect(export_thread_, &ExportThread::ProgressChanged, this, &ExportDialog::update_progress_bar);
   export_pass_.clear();
-  connect(export_thread_, &ExportThread::PassChanged, this, [this](int pass, int passes) {
-    export_pass_ = tr("Pass %1 of %2").arg(pass).arg(passes);
-    progressBar->setFormat(export_pass_ + ": %p%");  // until the pass's first frame gives an ETA
-  });
+  connect(export_thread_, &ExportThread::PassChanged, this, &ExportDialog::pass_changed);
   connect(renderCancel, &QPushButton::clicked, export_thread_, &ExportThread::Interrupt);
 
   panel_effect_controls->Clear();
@@ -459,8 +500,83 @@ void ExportDialog::launch_export_thread(const ExportParams& params) {
   export_thread_->start();
 }
 
+void ExportDialog::start_batch_export(const QString& ext) {
+  const QString folder = QFileDialog::getExistingDirectory(this, tr("Export Sequences To"));
+  if (folder.isEmpty()) return;
+  const bool image_sequence = formatCombobox->currentIndex() == FORMAT_IMG;
+
+  // Names in use: the folder's (an image sequence's frames as the name they were exported under), then those given to
+  // the sequences before
+  QStringList taken = amber::batch_export_taken_names(
+      QDir(folder).entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden), image_sequence);
+
+  const ExportParams base = build_export_params(QString());
+  const bool use_inout = rangeCombobox->isEnabled() && rangeCombobox->currentIndex() == 1;
+  QVector<BatchExport::Job> jobs;
+  for (const SequencePtr& s : batch_) {
+    const QString name = amber::batch_export_filename(s->name, ext, taken);
+    taken.append(name);
+    const QString filename = amber::batch_export_path(folder, name, ext, image_sequence);
+    jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename)});
+  }
+
+  batch_folder_ = QDir::toNativeSeparators(folder);
+  batch_export_ = new BatchExport(jobs, vcodec_params, this);
+  connect(batch_export_, &BatchExport::SequenceStarted, this, [this](int index, int count, const QString& name) {
+    batch_label_ = tr("Sequence %1 of %2 — %3").arg(QString::number(index + 1), QString::number(count), name);
+    export_pass_.clear();
+    total_export_time_start = QDateTime::currentMSecsSinceEpoch();
+    // The format first: setValue() repaints at once, which would show the last sequence's total at 0 %
+    progressBar->setFormat(batch_label_ + ": %p%");
+    progressBar->setValue(0);
+  });
+  connect(batch_export_, &BatchExport::ProgressChanged, this, &ExportDialog::update_progress_bar);
+  connect(batch_export_, &BatchExport::PassChanged, this, &ExportDialog::pass_changed);
+  connect(batch_export_, &BatchExport::Finished, this, &ExportDialog::batch_export_finished);
+  connect(renderCancel, &QPushButton::clicked, batch_export_, &BatchExport::Cancel);
+
+  panel_effect_controls->Clear();
+  if (panel_sequence_viewer != nullptr) panel_sequence_viewer->pause();
+
+  prep_ui_for_render(true);
+  batch_export_->Start();
+}
+
+void ExportDialog::batch_export_finished() {
+  BatchExport* batch = batch_export_;
+  batch_export_ = nullptr;
+  disconnect(renderCancel, &QPushButton::clicked, batch, &BatchExport::Cancel);
+  batch_label_.clear();
+  export_pass_.clear();
+
+  prep_ui_for_render(false);
+
+  // BatchExport has restored the active sequence and the playheads: the viewer shows that frame again
+  if (panel_sequence_viewer != nullptr && amber::ActiveSequence) {
+    panel_sequence_viewer->seek(amber::ActiveSequence->playhead);
+  }
+  update_ui(false);
+
+  const bool cancelled = batch->WasCancelled();
+  const int exported = batch->ExportedCount();
+  const bool all = exported == batch->Outcomes().size();
+  const QString summary = batch->Summary(batch_folder_);
+  batch->deleteLater();
+
+  // As a cancelled single export when nothing was written: no message, the dialog stays open
+  if (cancelled && exported == 0) return;
+  if (all) {
+    QMessageBox::information(this, tr("Export Complete"), summary);
+  } else {
+    QMessageBox::warning(this, cancelled ? tr("Export Cancelled") : tr("Export Incomplete"), summary);
+  }
+  // As a single export: closes once something was exported, stays open (to change the settings) otherwise
+  if (exported > 0 && !cancelled) accept();
+}
+
 void ExportDialog::StartExport() {
-  if (widthSpinbox->value() % 2 == 1 || heightSpinbox->value() % 2 == 1) {
+  // Batch mode checks size and range per sequence (BatchExport skips a sequence that fails them)
+  if (batch_.isEmpty() && (widthSpinbox->value() % 2 == 1 || heightSpinbox->value() % 2 == 1)) {
     QMessageBox::critical(this, tr("Invalid dimensions"),
                           tr("Export width and height must both be even numbers/divisible by 2."), QMessageBox::Ok);
     return;
@@ -468,7 +584,7 @@ void ExportDialog::StartExport() {
 
   // end_frame is exclusive: an empty range would write a file with no frames
   const ExportParams range = build_export_params(QString());
-  if (range.end_frame <= range.start_frame) {
+  if (batch_.isEmpty() && range.end_frame <= range.start_frame) {
     QMessageBox::critical(this, tr("Nothing to export"), tr("Nothing to export: the sequence or work area is empty."),
                           QMessageBox::Ok);
     return;
@@ -483,6 +599,10 @@ void ExportDialog::StartExport() {
                           QMessageBox::Ok);
     return;
   }
+  if (!batch_.isEmpty()) {
+    start_batch_export(ext);
+    return;
+  }
   QString filename = QFileDialog::getSaveFileName(this, tr("Export Media"), "",
                                                   format_strings[formatCombobox->currentIndex()] + " (*." + ext + ")");
   if (filename.isEmpty()) return;
@@ -494,6 +614,7 @@ void ExportDialog::StartExport() {
   if (formatCombobox->currentIndex() == FORMAT_IMG) {
     int ext_location = filename.lastIndexOf('.');
     if (ext_location > filename.lastIndexOf('/')) {
+      // "%05d": amber::kImageSequenceDigits wide (rendering/batchexport.h)
       filename.insert(ext_location, 'd');
       filename.insert(ext_location, '5');
       filename.insert(ext_location, '0');
@@ -526,11 +647,24 @@ void ExportDialog::update_progress_bar(int value, qint64 remaining_ms) {
     progressBar->setFormat(tr("%p% (ETA: %1:%2:%3)")
                                .arg(QString::number(hours), QString::number(minutes).rightJustified(2, '0'),
                                     QString::number(seconds).rightJustified(2, '0')));
-    // Two-pass: "Pass 1 of 2: 23% (ETA: ...)"
-    if (!export_pass_.isEmpty()) progressBar->setFormat(export_pass_ + ": " + progressBar->format());
   }
+  // Two-pass: "Pass 1 of 2: 23% (ETA: ...)"; batch: "Sequence 2 of 3 — Interview — Pass 1 of 2: 23% (ETA: ...)"
+  const QString prefix = progress_prefix(value == 100);
+  if (!prefix.isEmpty()) progressBar->setFormat(prefix + ": " + progressBar->format());
 
   progressBar->setValue(value);
+}
+
+void ExportDialog::pass_changed(int pass, int passes) {
+  export_pass_ = tr("Pass %1 of %2").arg(pass).arg(passes);
+  progressBar->setFormat(progress_prefix(false) + ": %p%");  // until the pass's first frame gives an ETA
+}
+
+QString ExportDialog::progress_prefix(bool done) const {
+  QStringList parts;
+  if (!batch_label_.isEmpty()) parts.append(batch_label_);
+  if (!done && !export_pass_.isEmpty()) parts.append(export_pass_);  // a single export's total shows no pass either
+  return parts.join(QStringLiteral(" — "));
 }
 
 void ExportDialog::vcodec_changed(int index) {
@@ -710,7 +844,8 @@ void ExportDialog::comp_type_changed(int) {
     case COMPRESSION_TYPE_CBR:
     case COMPRESSION_TYPE_TARGETBR:
       videoBitrateLabel->setText(tr("Bitrate (Mbps):"));
-      videobitrateSpinbox->setValue(qMax(0.5, (double)qRound((0.01528 * amber::ActiveSequence->height) - 4.5)));
+      // CBA: batch mode takes the first sequence's default, as its sample rate; the same settings for every sequence
+      videobitrateSpinbox->setValue(qMax(0.5, (double)qRound((0.01528 * ref_seq_->height) - 4.5)));
       break;
     case COMPRESSION_TYPE_CFR:
       // Whole steps: the encoder's quality option gets an integer (ExportThread::SetupVideo)
@@ -1008,10 +1143,12 @@ void ExportDialog::preset_selected(int index) {
     } else {
       formatCombobox->setCurrentIndex(FORMAT_MPEG4);
     }
-    widthSpinbox->setValue(amber::ActiveSequence->width);
-    heightSpinbox->setValue(amber::ActiveSequence->height);
-    framerateSpinbox->setValue(amber::ActiveSequence->frame_rate);
-    samplingRateSpinbox->setValue(amber::ActiveSequence->audio_frequency);
+    if (batch_.isEmpty()) {  // batch mode: each sequence's own size and rate, nothing to reset
+      widthSpinbox->setValue(amber::ActiveSequence->width);
+      heightSpinbox->setValue(amber::ActiveSequence->height);
+      framerateSpinbox->setValue(amber::ActiveSequence->frame_rate);
+    }
+    samplingRateSpinbox->setValue(ref_seq_->audio_frequency);
     audiobitrateSpinbox->setValue(256);
     faststartCheckbox->setChecked(true);
     return;
@@ -1055,8 +1192,11 @@ void ExportDialog::SavePreset(const QString& name) {
   // Video settings
   stream.writeTextElement("video_enabled", QString::number(videoGroupbox->isChecked() ? 1 : 0));
   stream.writeTextElement("video_codec_index", QString::number(vcodecCombobox->currentIndex()));
-  stream.writeTextElement("width", QString::number(widthSpinbox->value()));
-  stream.writeTextElement("height", QString::number(heightSpinbox->value()));
+  // Not in batch mode, where the fields show no size: loading the preset then keeps the sequence's
+  if (batch_.isEmpty()) {
+    stream.writeTextElement("width", QString::number(widthSpinbox->value()));
+    stream.writeTextElement("height", QString::number(heightSpinbox->value()));
+  }
   stream.writeTextElement("compression_type_index", QString::number(compressionTypeCombobox->currentIndex()));
   // The COMPRESSION_TYPE_* value: the index alone changed meaning when VP9 got a quality mode (2.0; 1.x ignores it)
   stream.writeTextElement("compression_type", QString::number(compressionTypeCombobox->currentData().toInt()));
@@ -1201,8 +1341,9 @@ void ExportDialog::LoadPreset(const QString& name) {
   vencoder_changed(vencoderCombobox->currentIndex());
 
   // 3. Video settings (after codec is set so compression type combo is populated)
-  if (width >= 0) widthSpinbox->setValue(width);
-  if (height >= 0) heightSpinbox->setValue(height);
+  // Batch mode keeps "Each sequence's own size"
+  if (width >= 0 && batch_.isEmpty()) widthSpinbox->setValue(width);
+  if (height >= 0 && batch_.isEmpty()) heightSpinbox->setValue(height);
   // An older preset's frame_rate is skipped: the export always uses the sequence frame rate
   if (compression_type >= 0) {
     // By value; a mode this encoder doesn't have leaves the default

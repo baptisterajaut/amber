@@ -185,6 +185,7 @@ add_library(amber-engine OBJECT
   effects/internal/internalshaders.qrc
   # rendering/ (not audio_ui)
   rendering/audio.cpp rendering/audio.h
+  rendering/batchexport.cpp rendering/batchexport.h
   rendering/clipqueue.cpp rendering/clipqueue.h
   rendering/encoderoptions.cpp rendering/encoderoptions.h
   rendering/exportthread.cpp rendering/exportthread.h

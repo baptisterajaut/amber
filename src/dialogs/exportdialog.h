@@ -32,15 +32,16 @@
 #include <QGroupBox>
 
 #include "engine/sequence.h"
+#include "rendering/batchexport.h"
 #include "rendering/encoderoptions.h"
 #include "rendering/exportthread.h"
 
 /**
  * @brief The ExportDialog class
  *
- * The dialog to initiate an export. Requires a valid Sequence to be set in amber::ActiveSequence or the result is
- * defined (most likely a crash), so you should always do a `nullptr` check on amber::ActiveSequence before constructing
- * this dialog.
+ * The dialog to initiate an export. Without batch sequences, requires a valid Sequence to be set in
+ * amber::ActiveSequence or the result is defined (most likely a crash), so you should always do a `nullptr` check on
+ * amber::ActiveSequence before constructing this dialog.
  */
 class ExportDialog : public QDialog
 {
@@ -52,8 +53,13 @@ public:
    * @param parent
    *
    * QWidget parent. Usually MainWindow.
+   *
+   * @param batch
+   *
+   * Empty: export amber::ActiveSequence. Otherwise batch mode: the same settings for each of these sequences, at its
+   * own size and frame rate, one file each in a folder (BatchExport).
    */
-  explicit ExportDialog(QWidget *parent);
+  explicit ExportDialog(QWidget *parent, const QVector<SequencePtr>& batch = {});
 
   /**
    * @brief Esc / title-bar close while exporting interrupts the export instead of closing
@@ -188,6 +194,31 @@ private:
   void launch_export_thread(const ExportParams& params);
 
   /**
+   * @brief Batch mode's Export: asks for a folder, then runs a BatchExport of every batch sequence into it
+   *
+   * @param ext
+   *
+   * The format's file extension.
+   */
+  void start_batch_export(const QString& ext);
+
+  /**
+   * @brief Slot for the BatchExport finishing: restores the UI, shows the outcome, closes unless nothing was exported
+   * or the batch was cancelled
+   */
+  void batch_export_finished();
+
+  /**
+   * @brief The progress bar's text before the percentage: the batch sequence, then the two-pass pass (not at 100%)
+   */
+  QString progress_prefix(bool done) const;
+
+  /**
+   * @brief Slot for ExportThread::PassChanged (a BatchExport forwards its threads'): "Pass 1 of 2" in the progress bar
+   */
+  void pass_changed(int pass, int passes);
+
+  /**
    * @brief Retrieves the human-readable name of an AVCodecID and adds it to a QComboBox
    *
    * Also sets that item's data to the AVCodecID so it can be retrieved directly from the QComboBox.
@@ -271,6 +302,27 @@ private:
   QOffscreenSurface* export_gl_surface_{nullptr};
 
   long pre_export_playhead_{0};
+
+  /**
+   * @brief Batch mode's sequences, empty for a single export
+   */
+  QVector<SequencePtr> batch_;
+
+  /**
+   * @brief The sequence the defaults come from: amber::ActiveSequence, or in batch mode the first batch sequence
+   */
+  Sequence* ref_seq_;
+
+  /**
+   * @brief The running batch export (batch mode), deleted by batch_export_finished()
+   */
+  BatchExport* batch_export_{nullptr};
+  QString batch_folder_;
+
+  /**
+   * @brief "Sequence 2 of 3 - Interview" (an em dash) while a batch export runs
+   */
+  QString batch_label_;
 
   /**
    * @brief Struct for advanced video codec parameters.

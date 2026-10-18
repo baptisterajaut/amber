@@ -21,13 +21,16 @@
 #include "sourcescommon.h"
 
 #include <QAbstractItemView>
+#include <QCollator>
 #include <QDebug>
 #include <QDesktopServices>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPainter>
 #include <QProcess>
+#include <algorithm>
 
+#include "dialogs/exportdialog.h"
 #include "dialogs/proxydialog.h"
 #include "engine/sequence.h"
 #include "engine/undo/undo.h"
@@ -187,6 +190,27 @@ void SourcesCommon::show_context_menu(QWidget* parent, const QModelIndexList& it
   if (all_sequences) {
     QAction* duplicate_action = menu.addAction(tr("Duplicate"));
     QObject::connect(duplicate_action, &QAction::triggered, project_parent, &Project::duplicate_selected);
+  }
+
+  // Two or more sequences among the selection: the export dialog in batch mode, one file per sequence
+  QVector<SequencePtr> sequences;
+  for (const auto& item : items) {
+    Media* m = project_parent->item_to_media(item);
+    if (m->get_type() == MEDIA_TYPE_SEQUENCE) sequences.append(m->to_sequence());
+  }
+  if (sequences.size() >= 2) {
+    QAction* export_action = menu.addAction(tr("Export Sequences..."));
+    connect(export_action, &QAction::triggered, this, [sequences]() mutable {
+      // In name order, numbers by value ("Sequence 2" before "Sequence 10"), whatever order they were selected in
+      QCollator collator;
+      collator.setNumericMode(true);
+      collator.setCaseSensitivity(Qt::CaseInsensitive);
+      std::stable_sort(sequences.begin(), sequences.end(), [&collator](const SequencePtr& a, const SequencePtr& b) {
+        return collator.compare(a->name, b->name) < 0;
+      });
+      ExportDialog e(amber::MainWindow, sequences);
+      e.exec();
+    });
   }
 
   if (all_footage) {

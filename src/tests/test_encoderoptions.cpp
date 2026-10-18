@@ -1,5 +1,6 @@
 // Encoder descriptors (rendering/encoderoptions): validation against the installed FFmpeg's AVOptions, encoder
-// availability and order, muxer fast start detection. Encoders missing from this FFmpeg build are skipped.
+// availability and order, muxer fast start detection. Encoders missing from this FFmpeg build are skipped. Also the
+// file names of a batch export (rendering/batchexport).
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -9,6 +10,7 @@ extern "C" {
 
 #include <QTest>
 
+#include "rendering/batchexport.h"
 #include "rendering/encoderoptions.h"
 
 using amber::EncoderInfo;
@@ -299,6 +301,61 @@ class TestEncoderOptions : public QObject {
     QVERIFY(!amber::filename_supports_faststart("x.webm"));
     QVERIFY(!amber::filename_supports_faststart("x.avi"));
     QVERIFY(!amber::filename_supports_faststart("x.nosuchextension"));
+  }
+
+  void batchFilenameKeepsName() {
+    QCOMPARE(amber::batch_export_filename("Interview", "mp4", {}), QString("Interview.mp4"));
+    QCOMPARE(amber::batch_export_filename("Sequence 01", "mkv", {}), QString("Sequence 01.mkv"));
+    QCOMPARE(amber::batch_export_filename(QString::fromUtf8("Été – plan 2"), "mov", {}),
+             QString::fromUtf8("Été – plan 2.mov"));
+  }
+
+  // What Windows refuses (and '/' everywhere) becomes '_'; so do control characters
+  void batchFilenameReplacesInvalidCharacters() {
+    QCOMPARE(amber::batch_export_filename("a/b\\c:d*e?f\"g<h>i|j", "mp4", {}), QString("a_b_c_d_e_f_g_h_i_j.mp4"));
+    QCOMPARE(amber::batch_export_filename("tab\there\nnewline", "mp4", {}), QString("tab_here_newline.mp4"));
+    QCOMPARE(amber::batch_export_filename("50% cut", "mp4", {}), QString("50% cut.mp4"));
+  }
+
+  // Surrounding spaces and trailing dots go (Windows drops trailing dots); nothing left gives "Sequence"
+  void batchFilenameEmptyName() {
+    QCOMPARE(amber::batch_export_filename("", "mp4", {}), QString("Sequence.mp4"));
+    QCOMPARE(amber::batch_export_filename("   ", "mp4", {}), QString("Sequence.mp4"));
+    QCOMPARE(amber::batch_export_filename("...", "mp4", {}), QString("Sequence.mp4"));
+    QCOMPARE(amber::batch_export_filename("  Teaser  ", "mp4", {}), QString("Teaser.mp4"));
+    QCOMPARE(amber::batch_export_filename("Final. ", "mp4", {}), QString("Final.mp4"));
+    QCOMPARE(amber::batch_export_filename("v1.2", "mp4", {}), QString("v1.2.mp4"));
+  }
+
+  // A taken name gets " (2)", " (3)"... before the extension, taken names compared case-insensitively
+  void batchFilenameCollisions() {
+    QCOMPARE(amber::batch_export_filename("Interview", "mp4", {"Interview.mp4"}), QString("Interview (2).mp4"));
+    QCOMPARE(amber::batch_export_filename("Interview", "mp4", {"interview.MP4", "Interview (2).mp4"}),
+             QString("Interview (3).mp4"));
+    // Another extension, or a longer name, isn't a collision
+    QCOMPARE(amber::batch_export_filename("Interview", "mp4", {"Interview.mov", "Interview 2.mp4"}),
+             QString("Interview.mp4"));
+    QCOMPARE(amber::batch_export_filename("", "mp4", {"Sequence.mp4"}), QString("Sequence (2).mp4"));
+    QCOMPARE(amber::batch_export_filename("a/b", "mp4", {"a_b.mp4"}), QString("a_b (2).mp4"));
+  }
+
+  // An image sequence's frame files take the name they were exported under, read with exactly the pattern's digits:
+  // the frames of "Sequence 01" are "Sequence 0100001.png"..., not frames of "Sequence "
+  void batchImageSequenceNames() {
+    const QStringList entries{"Sequence 0100001.png", "Sequence 0100002.png", "Take 7.png", "notes.txt"};
+    const QStringList taken = amber::batch_export_taken_names(entries, true);
+    QVERIFY(taken.contains("Sequence 01.png"));
+    QVERIFY(!taken.contains("Sequence .png"));
+    QVERIFY(taken.contains("Take 7.png"));
+    QCOMPARE(amber::batch_export_filename("Sequence 01", "png", taken), QString("Sequence 01 (2).png"));
+    QCOMPARE(amber::batch_export_filename("Sequence", "png", taken), QString("Sequence.png"));
+    QCOMPARE(amber::batch_export_filename("Sequence 0", "png", taken), QString("Sequence 0.png"));
+    // Not an image sequence: the entries as they are
+    QCOMPARE(amber::batch_export_taken_names(entries, false), entries);
+
+    QCOMPARE(amber::batch_export_path("/out", "Sequence 01.png", "png", true), QString("/out/Sequence 01%05d.png"));
+    QCOMPARE(amber::batch_export_path("/out", "50% cut.png", "png", true), QString("/out/50%% cut%05d.png"));
+    QCOMPARE(amber::batch_export_path("/out", "50% cut.mp4", "mp4", false), QString("/out/50% cut.mp4"));
   }
 };
 
