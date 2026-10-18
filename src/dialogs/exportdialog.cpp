@@ -1058,7 +1058,8 @@ void ExportDialog::SavePreset(const QString& name) {
   stream.writeTextElement("compression_type_index", QString::number(compressionTypeCombobox->currentIndex()));
   // The COMPRESSION_TYPE_* value: the index alone changed meaning when VP9 got a quality mode (2.0; 1.x ignores it)
   stream.writeTextElement("compression_type", QString::number(compressionTypeCombobox->currentData().toInt()));
-  stream.writeTextElement("two_pass", QString::number(twoPassCheckbox->isChecked() ? 1 : 0));
+  bool two_pass = !twoPassCheckbox->isHidden() && twoPassCheckbox->isChecked();  // hidden: does not apply
+  stream.writeTextElement("two_pass", QString::number(two_pass ? 1 : 0));
   stream.writeTextElement("video_bitrate", QString::number(videobitrateSpinbox->value(), 'f', 6));
   // Encoder and its non-default options (2.0; 1.x ignores these tags)
   if (!current_video_encoder().isEmpty()) stream.writeTextElement("video_encoder", current_video_encoder());
