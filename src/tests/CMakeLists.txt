@@ -108,6 +108,16 @@ target_include_directories(amber-test-pixel-sampler PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-pixel-sampler PRIVATE Qt6::Test Qt6::Core)
 add_test(NAME amber-test-pixel-sampler COMMAND amber-test-pixel-sampler)
 
+# Graph Editor pure math (core/graphmath)
+add_executable(amber-test-graph-view-math
+  test_graphviewmath.cpp
+  ${CMAKE_SOURCE_DIR}/core/graphmath.cpp
+  ${CMAKE_SOURCE_DIR}/core/graphmath.h
+)
+target_include_directories(amber-test-graph-view-math PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-graph-view-math PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME amber-test-graph-view-math COMMAND amber-test-graph-view-math)
+
 # Footage::decode_url(). footage.cpp needs only PreviewGenerator::cancel(), stubbed in the test; Clip-side export
 # mode (OpenedForExport, NeedsCacherReconfigure) needs the engine and is not covered here.
 add_executable(amber-test-footage
