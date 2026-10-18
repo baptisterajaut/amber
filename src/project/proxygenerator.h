@@ -54,6 +54,8 @@ public:
   void queue(const ProxyInfo& info);
   void cancel();
   double get_proxy_progress(Media *f);
+  // The files of the proxies queued or in progress, but those of the footage in skip
+  QStringList queued_paths(const QVector<Media*>& skip);
 private:
   // queue of footage to process proxies for
   QVector<ProxyInfo> proxy_queue;

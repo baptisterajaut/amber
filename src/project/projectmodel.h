@@ -64,6 +64,11 @@ private:
 
 namespace amber {
 extern ProjectModel project_model;
+
+/**
+ * @brief The proxy file of every footage in project_model, in any folder, but the footage in skip
+ */
+QStringList project_proxy_paths(const QVector<Media *> &skip);
 }
 
 #endif // PROJECTMODEL_H

@@ -24,9 +24,28 @@
 #include "panels/viewer.h"
 #include "ui/viewerwidget.h"
 #include "project/media.h"
+#include "project/footage.h"
 #include "global/debug.h"
 
 ProjectModel amber::project_model;
+
+static void collect_proxy_paths(Media *parent, const QVector<Media *> &skip, QStringList &paths) {
+  for (int i = 0; i < amber::project_model.childCount(parent); i++) {
+    Media *item = amber::project_model.child(i, parent);
+    if (item->get_type() == MEDIA_TYPE_FOLDER) {
+      collect_proxy_paths(item, skip, paths);
+    } else if (item->get_type() == MEDIA_TYPE_FOOTAGE && !skip.contains(item)) {
+      const Footage *f = item->to_footage();
+      if (f != nullptr && !f->proxy_path.isEmpty()) paths.append(f->proxy_path);
+    }
+  }
+}
+
+QStringList amber::project_proxy_paths(const QVector<Media *> &skip) {
+  QStringList paths;
+  collect_proxy_paths(nullptr, skip, paths);
+  return paths;
+}
 
 ProjectModel::ProjectModel(QObject *parent) : QAbstractItemModel(parent), root_item_(nullptr) {
   make_root();
