@@ -69,6 +69,7 @@ class TestEffectsGpu : public QObject {
   void dropShadowPreviewDivider();
   void subtitleActiveEntry();
   void subtitleOutlineSurroundsText();
+  void subtitleRedrawsAfterCueEdit();
   void gradientRendersTwoStops();
 
   // F-5 — Timer and Progress Bar generators.
@@ -1280,6 +1281,38 @@ void TestEffectsGpu::subtitleOutlineSurroundsText() {
   QVERIFY2(n_white > 20, qPrintable(QString("expected subtitle text pixels, got %1").arg(n_white)));
   QVERIFY2(n_red_by_text > 20,
            qPrintable(QString("expected red outline pixels beside the text, got %1").arg(n_red_by_text)));
+}
+
+void TestEffectsGpu::subtitleRedrawsAfterCueEdit() {
+  // The Subtitle Editor swaps the cue list while the playhead stays put. The overlay used to redraw only when the
+  // index of the active cue changed, so a new text for the same cue, or deleting the cue, left the old text on screen.
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 60, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(0, 0, 0, 0));
+  EffectPtr sub_eff = h_->attach_internal(c, EFFECT_INTERNAL_SUBTITLE, EFFECT_TYPE_EFFECT);
+  auto* subtitle = static_cast<SubtitleEffect*>(sub_eff.get());
+  h_->set_field_double(sub_eff.get(), 1, 0, 16.0);
+
+  auto count_white_pixels = [](const QByteArray& buf) {
+    int n = 0;
+    for (int i = 0; i + 3 < buf.size(); i += 4) {
+      if (uchar(buf[i]) > 200 && uchar(buf[i + 1]) > 200 && uchar(buf[i + 2]) > 200) ++n;
+    }
+    return n;
+  };
+
+  subtitle->SetCues({SubtitleCue{0, 500, "i"}});
+  const int n_short = count_white_pixels(h_->render_frame(seq.get(), 7));
+  QVERIFY2(n_short > 0, qPrintable(QString("expected text pixels, got %1").arg(n_short)));
+
+  subtitle->SetCues({SubtitleCue{0, 500, "WWW"}});
+  const int n_long = count_white_pixels(h_->render_frame(seq.get(), 7));
+  QVERIFY2(n_long > n_short * 2,
+           qPrintable(QString("edited text not redrawn: before=%1 after=%2").arg(n_short).arg(n_long)));
+
+  subtitle->SetCues({});
+  const int n_none = count_white_pixels(h_->render_frame(seq.get(), 7));
+  QVERIFY2(n_none * 20 < n_long, qPrintable(QString("deleted cue still drawn: %1 white pixels").arg(n_none)));
 }
 
 void TestEffectsGpu::gradientRendersTwoStops() {

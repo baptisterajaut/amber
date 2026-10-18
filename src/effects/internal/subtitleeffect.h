@@ -1,6 +1,8 @@
 #ifndef SUBTITLEEFFECT_H
 #define SUBTITLEEFFECT_H
 
+#include <QMutex>
+
 #include "effects/effect.h"
 #include "srtparser.h"
 
@@ -25,21 +27,30 @@ class SubtitleEffect : public Effect {
   // past an entry boundary, leaving the previous overlay on screen.
   bool AlwaysUpdate() override { return true; }
 
+  // Main thread. The render thread reads the cues while drawing: they are swapped under a lock and the next frame
+  // redraws even when the same cue stays active (its text or times may have changed)
   void SetCues(const QVector<SubtitleCue>& cues);
+  QVector<SubtitleCue> cues() const;
+
+  // Bumped by every SetCues()/load, for views that mirror the cues (the Subtitle Editor)
+  int cues_revision() const;
 
  private slots:
   void outline_enable(bool e);
   void shadow_enable(bool e);
 
  private:
-  int find_active_cue(qint64 time_ms) const;
-  QString CollectActiveCues(qint64 time_ms) const;
+  static int find_active_cue(const QVector<SubtitleCue>& cues, qint64 time_ms);
+  static QString CollectActiveCues(const QVector<SubtitleCue>& cues, qint64 time_ms);
   void DrawSubtitleShadow(QPainter& p, QTextDocument& td, const QRect& clip_rect, int translate_x, int translate_y,
                           double timecode);
   void DrawSubtitleOutline(QPainter& p, QTextDocument& td, const QRect& clip_rect, int translate_x, int translate_y,
                            double timecode);
 
-  QVector<SubtitleCue> cues_;
+  mutable QMutex cues_mutex_;
+  QVector<SubtitleCue> cues_;  // written under cues_mutex_
+  int cues_revision_{0};
+  bool cues_dirty_{false};  // under cues_mutex_: set by SetCues(), cleared by the render thread when it redraws
   int active_cue_index_{-1};
 
   // Style fields
