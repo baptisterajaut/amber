@@ -210,8 +210,11 @@ void AmberGlobal::load_translation_from_config() {
       // language folders: the language list shows every .qm found there.
       const QString base_name = QFileInfo(language_file).baseName();
       const QLocale locale(base_name.mid(base_name.lastIndexOf('_') + 1));
-      for (const QString& dir :
-           {QDir(get_app_path()).filePath("translations"), QLibraryInfo::path(QLibraryInfo::TranslationsPath)}) {
+      // <appdir>/translations: Windows packages; Contents/Resources/translations: macOS bundle (data files don't
+      // belong in Contents/MacOS, which code signing treats as code); Qt's own path: AppImage (qt.conf) and system Qt.
+      const QDir app_dir(get_app_path());
+      for (const QString& dir : {app_dir.filePath("translations"), app_dir.filePath("../Resources/translations"),
+                                 QLibraryInfo::path(QLibraryInfo::TranslationsPath)}) {
         if (qt_translator->load(locale, "qtbase", "_", dir)) {
           QApplication::installTranslator(qt_translator.get());
           break;
