@@ -474,6 +474,7 @@ class Cacher : public QThread {
     return (video_end_pts_ != AV_NOPTS_VALUE && target_pts > video_end_pts_) ? video_end_pts_ : target_pts;
   }
   int64_t cacheVideoLastDecodable(int64_t seek_ts);
+  int64_t videoTargetPts() const;
 
   /**
    * @brief FFmpeg buffer sink
