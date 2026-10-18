@@ -392,7 +392,7 @@ bool TrackHeaderWidget::event(QEvent* event) {
       QString text;
       switch (t) {
         case kToggleEye:
-          text = tr("Toggle Track Output");
+          text = tr("Toggle Track Visibility");
           break;
         case kToggleMute:
           text = tr("Mute Track");

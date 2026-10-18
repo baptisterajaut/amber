@@ -1021,7 +1021,8 @@ void Project::delete_clips_using_selected_media() {
     QModelIndexList items = get_current_selected();
     for (int i = 0; i < amber::ActiveSequence->clips.size(); i++) {
       const ClipPtr& c = amber::ActiveSequence->clips.at(i);
-      if (c != nullptr) {
+      // clips on locked tracks stay
+      if (c != nullptr && !amber::ActiveSequence->track_locked(c->track())) {
         for (const auto& item : items) {
           Media* m = item_to_media(item);
           if (c->media() == m) {

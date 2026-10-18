@@ -33,6 +33,12 @@ RippleAction::RippleAction(Sequence *is, long ipoint, long ilength, const QVecto
   length(ilength),
   ignore(iignore)
 {
+  // Clips on locked tracks stay in place. Taken now, not at redo, so undo/redo stay consistent if the lock changes.
+  if (s != nullptr) {
+    for (int i : s->locked_clip_indexes()) {
+      if (!ignore.contains(i)) ignore.append(i);
+    }
+  }
 }
 
 // ca is only alive while the ripple is redone; delete it if the stack drops us in that state

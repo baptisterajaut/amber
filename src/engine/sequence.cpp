@@ -213,6 +213,8 @@ bool Sequence::IsClipSelected(Clip* clip, bool containing) {
     qWarning() << "Sequence::IsClipSelected: clip is null";
     return false;
   }
+  // a clip on a locked track is never selected, even under a selection an undo restored
+  if (track_locked(clip->track())) return false;
   for (const auto& s : selections) {
     if (clip->track() == s.track &&
         ((clip->timeline_in() >= s.in && clip->timeline_out() <= s.out) ||
@@ -235,6 +237,7 @@ bool Sequence::IsTransitionSelected(Transition* t) {
   }
 
   int transition_track = c->track();
+  if (track_locked(transition_track)) return false;
   long transition_in_point;
   long transition_out_point;
 

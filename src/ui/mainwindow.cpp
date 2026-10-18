@@ -1583,10 +1583,10 @@ void MainWindow::import_subtitle() {
   }
   long duration_frames = qRound64(last_end_ms * seq->frame_rate / 1000.0);
 
-  // Find first free video track at playhead (start at -1, go down)
+  // Find first free video track at playhead (start at -1, go down), skipping locked tracks
   int track = -1;
   while (track > -100) {
-    bool collision = false;
+    bool collision = seq->track_locked(track);
     long check_in = playhead;
     long check_out = playhead + duration_frames;
     for (const ClipPtr& c : seq->clips) {

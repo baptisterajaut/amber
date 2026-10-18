@@ -552,7 +552,7 @@ void TimelineWidget::drawTrackLines(QPainter& p, int video_track_limit, int audi
 
 void TimelineWidget::drawSelections(QPainter& p) {
   for (const auto& s : amber::ActiveSequence->selections) {
-    if (is_track_visible(s.track)) {
+    if (is_track_visible(s.track) && !amber::ActiveSequence->track_locked(s.track)) {
       int selection_y = getScreenPointFromTrack(s.track);
       int selection_x = panel_timeline->getTimelineScreenPointFromFrame(s.in);
       p.setPen(Qt::NoPen);
@@ -584,7 +584,8 @@ void TimelineWidget::drawGhosts(QPainter& p) {
 
         insert_points.append(ghost_y + (ghost_height >> 1));
 
-        p.setPen(QColor(255, 255, 0));
+        // red over a locked track: releasing there cancels the edit
+        p.setPen(amber::ActiveSequence->track_locked(g.track) ? QColor(255, 64, 64) : QColor(255, 255, 0));
         for (int j = 0; j < amber::timeline::kGhostThickness; j++) {
           p.drawRect(ghost_x + j, ghost_y + j, ghost_width - j - j, ghost_height - j - j);
         }

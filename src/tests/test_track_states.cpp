@@ -128,6 +128,43 @@ class TestTrackStates : public QObject {
     QCOMPARE(s.locked_clip_indexes(), (QVector<int>{1, 3}));
   }
 
+  // Premiere leaves locked tracks in place on a ripple; the ignore list is taken when the action is built, so a lock
+  // change before undo/redo doesn't break the round trip
+  void rippleLeavesLockedTracksInPlace() {
+    Sequence s;
+    ClipPtr v1 = add_clip(s, -1, 20, 30);
+    ClipPtr a1 = add_clip(s, 0, 20, 30);
+    ClipPtr a2 = add_clip(s, 1, 20, 30);
+    ClipPtr before = add_clip(s, 1, 0, 10);  // before the ripple point: never moves
+    s.set_track_state(0, make_state(false, false, false, true));
+
+    RippleAction ripple(&s, 15, 5, {});
+    s.set_track_state(0, TrackState());  // unlocking after the build changes nothing
+    ripple.redo();
+    QCOMPARE(v1->timeline_in(), 25L);
+    QCOMPARE(a2->timeline_in(), 25L);
+    QCOMPARE(a2->timeline_out(), 35L);
+    QCOMPARE(a1->timeline_in(), 20L);
+    QCOMPARE(a1->timeline_out(), 30L);
+    QCOMPARE(before->timeline_in(), 0L);
+
+    ripple.undo();
+    QCOMPARE(v1->timeline_in(), 20L);
+    QCOMPARE(a2->timeline_in(), 20L);
+    QCOMPARE(a2->timeline_out(), 30L);
+    QCOMPARE(a1->timeline_in(), 20L);
+
+    // a caller's own ignore list is kept
+    s.set_track_state(0, make_state(false, false, false, true));
+    RippleAction ripple2(&s, 15, 5, {2});
+    ripple2.redo();
+    QCOMPARE(v1->timeline_in(), 25L);
+    QCOMPARE(a1->timeline_in(), 20L);
+    QCOMPARE(a2->timeline_in(), 20L);
+    ripple2.undo();
+    QCOMPARE(v1->timeline_in(), 20L);
+  }
+
   void undoCommandSwapsMapAndDropsLockedSelections() {
     Sequence s;
     Selection sel;
