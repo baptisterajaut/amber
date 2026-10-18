@@ -170,6 +170,7 @@ add_executable(amber-test-fieldwidgets
   ${CMAKE_SOURCE_DIR}/rendering/clipqueue.cpp
   ${CMAKE_SOURCE_DIR}/ui/comboboxex.cpp
   ${CMAKE_SOURCE_DIR}/ui/labelslider.cpp
+  ${CMAKE_SOURCE_DIR}/core/decimalinput.cpp
   ${CMAKE_SOURCE_DIR}/ui/menu.cpp
   ${CMAKE_SOURCE_DIR}/ui/styling.cpp
   ${AMBER_CORE_SOURCES}
