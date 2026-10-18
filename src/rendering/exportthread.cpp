@@ -492,7 +492,8 @@ bool ExportThread::Export()
 
     // If we're exporting video, trigger a render on the RenderThread
     if (params_.video_enabled) {
-      do {
+      // Renders again while a clip's texture wasn't ready (did_texture_fail())
+      for (int failed_renders = 0;;) {
         // TODO optimize by rendering the next frame while encoding the last
         render_complete_ = false;
         renderer->start_render(amber::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0);
@@ -515,8 +516,20 @@ bool ExportThread::Export()
           goto cleanup_renderer;
         }
 
+        // The GPU frame failed (device lost, out of memory): video_frame still holds the previous frame, or
+        // uninitialized memory on the first one, so it must not be encoded. One retry in case it was transient, then
+        // the export fails.
+        if (renderer->frame_failed()) {
+          if (++failed_renders < 2) continue;
+          qCritical() << "Rendering frame" << amber::ActiveSequence->playhead << "failed";
+          export_error = tr("rendering frame %1 failed").arg(amber::ActiveSequence->playhead);
+          frames_ok = false;
+          goto cleanup_renderer;
+        }
+
         // If the RenderThread failed, do another render
-      } while (renderer->did_texture_fail());
+        if (!renderer->did_texture_fail()) break;
+      }
 
       if (interrupt_) {
         renderer->cancel();

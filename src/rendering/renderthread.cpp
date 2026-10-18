@@ -293,6 +293,7 @@ void RenderThread::paint() {
     qWarning() << "beginOffscreenFrame failed, skipping frame";
     active_mutex.unlock();
     texture_failed = true;
+    frame_failed_ = true;
     return;
   }
 
@@ -347,7 +348,7 @@ void RenderThread::paint() {
     cb->beginPass(front_rt_[active_idx], clearColor, {1.0f, 0});
     cb->endPass(u);
 
-    rhi_->endOffscreenFrame();
+    const bool frame_ok = rhi_->endOffscreenFrame() == QRhi::FrameOpSuccess;
 
     qDeleteAll(params.transientResources);
     params.transientResources.clear();
@@ -359,6 +360,7 @@ void RenderThread::paint() {
     dst = readback.data;
     cpu_frame_w_[active_idx] = readback.pixelSize.width();
     cpu_frame_h_[active_idx] = readback.pixelSize.height();
+    frame_failed_ = !frame_ok || dst.isEmpty();
   }
 
   active_mutex.unlock();
@@ -479,6 +481,8 @@ void RenderThread::start_render(Sequence* s,
 bool RenderThread::did_texture_fail() { return texture_failed; }
 
 bool RenderThread::rhi_failed() const { return rhi_failed_.load(); }
+
+bool RenderThread::frame_failed() const { return frame_failed_.load(); }
 
 void RenderThread::cancel() {
   // Same lost-wakeup guard as start_render()'s export path: run() holds wait_lock_ from its `running` check until

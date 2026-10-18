@@ -12,6 +12,7 @@ class TestShortcutFile : public QObject {
   void midLineOccurrenceIsSkipped();
   void missingAction();
   void crlfValueIsTrimmed();
+  void clearedShortcutRoundTrip();
 };
 
 void TestShortcutFile::exactMatch() {
@@ -66,6 +67,26 @@ void TestShortcutFile::crlfValueIsTrimmed() {
   QCOMPARE(amber::find_shortcut_in_file(file, "undo", &found), QString("Ctrl+Z"));
   QVERIFY(found);
   QCOMPARE(amber::find_shortcut_in_file(file, "redo", &found), QString("Ctrl+Y"));
+  QVERIFY(found);
+}
+
+// What MainWindow saves at exit and loads at start: a cleared shortcut comes back cleared, not as its default
+void TestShortcutFile::clearedShortcutRoundTrip() {
+  QByteArray file;
+  amber::append_shortcut_line(file, "razortool", "");
+  amber::append_shortcut_line(file, "copy", "Ctrl+K");
+  QCOMPARE(file, QByteArray("razortool\t\ncopy\tCtrl+K"));
+
+  // Loading applies what is found, an empty shortcut included; only a missing line leaves the default
+  bool found = false;
+  QCOMPARE(amber::find_shortcut_in_file(file, "razortool", &found), QString());
+  QVERIFY(found);
+  QCOMPARE(amber::find_shortcut_in_file(file, "copy", &found), QString("Ctrl+K"));
+  QVERIFY(found);
+  amber::find_shortcut_in_file(file, "paste", &found);
+  QVERIFY(!found);
+  // a cleared shortcut on the last line of a CRLF file
+  QCOMPARE(amber::find_shortcut_in_file("copy\tCtrl+K\r\nrazortool\t\r\n", "razortool", &found), QString());
   QVERIFY(found);
 }
 

@@ -72,6 +72,9 @@ public:
   bool did_texture_fail();
   // True once QRhi creation has failed. ready() is still emitted then, so a waiting ExportThread wakes up.
   bool rhi_failed() const;
+  // True when the last paint() produced no pixels: the GPU frame could not begin or end (device lost, out of memory)
+  // or its readback came back empty. Set before ready() is emitted.
+  bool frame_failed() const;
   void cancel();
   void wait_until_paused();
 
@@ -139,6 +142,7 @@ private:
   bool scrubbing_{false};
   bool running{true};
   std::atomic<bool> rhi_failed_{false};
+  std::atomic<bool> frame_failed_{false};
   std::atomic<Effect*> gizmo_selection_{nullptr};  // written by paint(), read by the viewer on the GUI thread
   QString save_fn;
   void* pixel_buffer{nullptr};

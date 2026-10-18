@@ -204,7 +204,7 @@ void SubtitleEffect::redraw(double timecode) {
   for (int i = 0; i < cues_.size(); i++) {
     if (cues_[i].start_ms <= time_ms && time_ms < cues_[i].end_ms) {
       if (!active_text.isEmpty()) active_text += QLatin1String("<br>");
-      active_text += cues_[i].text;
+      active_text += cue_text_to_html(cues_[i].text);
     }
   }
 

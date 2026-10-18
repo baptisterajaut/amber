@@ -113,6 +113,13 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   // set progress to 0
   current_progress = 0.0;
 
+  // Last guard (ProxyDialog already avoids it): opening the output for writing truncates it, never let it be the source
+  if (same_file_path(info.path, footage->url)) {
+    qCritical() << "Proxy: refusing to write the proxy over its source" << footage->url;
+    footage->proxy = false;
+    return;
+  }
+
   // for image sequences that don't start at 0, set the index where it does start
   AVDictionary* format_opts = nullptr;
   if (footage->start_number > 0) {
