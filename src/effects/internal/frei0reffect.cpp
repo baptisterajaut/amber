@@ -35,6 +35,7 @@ using f0rUpdateFunc = void (*) (f0r_instance_t instance,
             double time, const uint32_t* inframe, uint32_t* outframe);
 using f0rDestructFunc = void (*)(f0r_instance_t instance);
 using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
+using f0rGetParamValue = void (*)(f0r_instance_t instance, f0r_param_t param, int param_index);
 using f0rSetParamValue = void (*) (f0r_instance_t instance,
         f0r_param_t param, int param_index);
 
@@ -43,6 +44,77 @@ using f0rSetParamValue = void (*) (f0r_instance_t instance,
 // Heap-allocated and never freed to survive static destruction order during app exit.
 static QMutex& frei0r_refcount_mutex() { static auto* m = new QMutex(); return *m; }
 static QHash<QString, int>& frei0r_refcount() { static auto* h = new QHash<QString, int>(); return *h; }
+
+// Per parameter, the default of each of its fields (two for a position) in the fields' units
+using Frei0rDefaults = QVector<QVariantList>;
+
+// A fresh instance's parameter values, which are the plugin's defaults: doubles and positions scaled to the fields'
+// 0-100 (ApplyFrei0rParam sends them x0.01). Empty lists when the plugin can't build an instance.
+// CBA: read at 640x480, the frame size not being known yet: a default the plugin derives from the size (pixeliz0r's
+// block size) is that of 640x480, still the same share of the frame.
+static Frei0rDefaults read_frei0r_defaults(QLibrary& handle, int param_count, f0rGetParamInfo get_param_info) {
+  Frei0rDefaults defaults(param_count);
+  auto construct = reinterpret_cast<f0rConstructFunc>(handle.resolve("f0r_construct"));
+  auto destruct = reinterpret_cast<f0rDestructFunc>(handle.resolve("f0r_destruct"));
+  auto get_value = reinterpret_cast<f0rGetParamValue>(handle.resolve("f0r_get_param_value"));
+  if (construct == nullptr || destruct == nullptr || get_value == nullptr) return defaults;
+  f0r_instance_t instance = construct(640, 480);
+  if (instance == nullptr) return defaults;
+  for (int i = 0; i < param_count; i++) {
+    f0r_param_info_t param_info;
+    get_param_info(&param_info, i);
+    switch (param_info.type) {
+      case F0R_PARAM_BOOL: {
+        double b = 0;
+        get_value(instance, &b, i);
+        defaults[i] = {b >= 0.5};
+      } break;
+      case F0R_PARAM_DOUBLE: {
+        double d = 0;
+        get_value(instance, &d, i);
+        defaults[i] = {d * 100.0};
+      } break;
+      case F0R_PARAM_COLOR: {
+        f0r_param_color c{0, 0, 0};
+        get_value(instance, &c, i);
+        defaults[i] = {QColor::fromRgbF(qBound(0.f, c.r, 1.f), qBound(0.f, c.g, 1.f), qBound(0.f, c.b, 1.f))};
+      } break;
+      case F0R_PARAM_POSITION: {
+        f0r_param_position pos{0, 0};
+        get_value(instance, &pos, i);
+        defaults[i] = {pos.x * 100.0, pos.y * 100.0};
+      } break;
+      case F0R_PARAM_STRING: {
+        f0r_param_string str = nullptr;  // the plugin points it at its own copy
+        get_value(instance, &str, i);
+        defaults[i] = {QString::fromUtf8(str != nullptr ? str : "")};
+      } break;
+    }
+  }
+  destruct(instance);
+  return defaults;
+}
+
+// The plugin's defaults, read once per plugin: building an instance can be slow (a face detector loads its model)
+static Frei0rDefaults frei0r_defaults(const QString& dll_fn, QLibrary& handle, int param_count,
+                                      f0rGetParamInfo get_param_info) {
+  static auto* mutex = new QMutex();
+  static auto* cache = new QHash<QString, Frei0rDefaults>();
+  QMutexLocker lock(mutex);
+  auto it = cache->constFind(dll_fn);
+  if (it == cache->constEnd()) it = cache->insert(dll_fn, read_frei0r_defaults(handle, param_count, get_param_info));
+  return it.value();
+}
+
+// Start field k of a parameter at the plugin's default for it, which Reset to Defaults then restores
+static void seed_default(EffectField* field, const QVariantList& defaults, int k) {
+  if (k >= defaults.size()) return;
+  if (field->type() == EffectField::EFFECT_FIELD_DOUBLE) {
+    static_cast<DoubleField*>(field)->SetDefault(defaults.at(k).toDouble());  // the slider's default too
+  }
+  field->SetValueAt(0, defaults.at(k));
+  field->SetDefaultData(defaults.at(k));
+}
 
 Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
   Effect(c, em)
@@ -88,9 +160,10 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
   }
   info_func(&info);
 
-  param_count = info.num_params;
-
   get_param_info = reinterpret_cast<f0rGetParamInfo>(handle.resolve("f0r_get_param_info"));
+  // f0r_get_param_info is mandatory, but a plugin lacking it would be called through null: no parameters then
+  param_count = get_param_info != nullptr ? info.num_params : 0;
+  const Frei0rDefaults defaults = frei0r_defaults(dll_fn, handle, param_count, get_param_info);
   for (int i=0;i<param_count;i++) {
     f0r_param_info_t param_info;
     get_param_info(&param_info, i);
@@ -99,17 +172,18 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
       EffectRow* row = new EffectRow(this, param_info.name);
       switch (param_info.type) {
       case F0R_PARAM_BOOL:
-        new BoolField(row, QString::number(i));
+        seed_default(new BoolField(row, QString::number(i)), defaults.at(i), 0);
         break;
       case F0R_PARAM_DOUBLE:
       {
         DoubleField* f = new DoubleField(row, QString::number(i));
         f->SetMinimum(0);
         f->SetMaximum(100);
+        seed_default(f, defaults.at(i), 0);
       }
         break;
       case F0R_PARAM_COLOR:
-        new ColorField(row, QString::number(i));
+        seed_default(new ColorField(row, QString::number(i)), defaults.at(i), 0);
         break;
       case F0R_PARAM_POSITION:
       {
@@ -119,10 +193,12 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
         DoubleField* fy = new DoubleField(row, QString("%1Y").arg(QString::number(i)));
         fy->SetMinimum(0);
         fy->SetMaximum(100);
+        seed_default(fx, defaults.at(i), 0);
+        seed_default(fy, defaults.at(i), 1);
       }
         break;
       case F0R_PARAM_STRING:
-        new StringField(row, QString::number(i), false);
+        seed_default(new StringField(row, QString::number(i), false), defaults.at(i), 0);
         break;
       }
     }
