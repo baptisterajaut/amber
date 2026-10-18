@@ -109,6 +109,8 @@ class ViewerWidget : public QRhiWidget {
   void draw_guides(QPainter& p);
   void draw_gizmos(QPainter& p);
   EffectGizmo* get_gizmo_from_mouse(int x, int y);
+  // True over a gizmo handle (dot/target), which takes the mouse before a guide under it
+  bool gizmo_handle_at(const QPoint& widget_pos);
   void move_gizmos(QMouseEvent* event, bool done);
   int find_guide_at(int video_x, int video_y, bool* hit_mirror = nullptr) const;
   void show_guide_context_menu(int guide_index, const QPoint& global_pos, bool on_mirror = false);
@@ -135,6 +137,9 @@ class ViewerWidget : public QRhiWidget {
   int drag_start_y;
   int gizmo_x_mvmt;
   int gizmo_y_mvmt;
+  // Sub-pixel gizmo drag movement not yet applied, carried between mouse events
+  double gizmo_x_rem_{0};
+  double gizmo_y_rem_{0};
   EffectGizmo* selected_gizmo{nullptr};
   RenderThread* renderer;
   QOffscreenSurface* gl_fallback_surface_{nullptr};  // owned by us, created on GUI thread
