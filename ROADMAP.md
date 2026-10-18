@@ -73,7 +73,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - Color correction tool (scopes — waveform, vectorscope, histogram) — done in 2.0: see the Scopes panel under Scopes & monitoring
 - Subtitle editor — dedicated floating window for bulk subtitle editing (import is shipped in 1.5.0, this is the full editing UI)
 - ~~Text stroke — outline color + width on the Rich Text effect~~ (shipped in v1.7.0, #12)
-- **Built-in audio effects** — EQ (parametric), compressor, reverb, delay, chorus, limiter. Incremental — each effect is independent DSP. (#12)
+- Built-in audio effects — EQ, compressor, limiter and delay done in 2.0: Parametric EQ (low shelf, peaking mid with Q, high shelf; RBJ biquads, a 0 dB band is skipped), Compressor (feed-forward, hard knee, stereo-linked peak detector, attack/release/makeup), Limiter (instant attack, no lookahead) and Delay (up to 2 s, feedback, mix). Parameters keyframeable, read once per audio chunk (about 85 ms). State is kept per audio stream (`effects/internal/audiostreamstate.h`) and starts over on a seek or scrub; on a nested sequence each inner clip is processed separately (no bus processing of the nest's mix). DSP in `core/audiodsp`. Remaining: reverb, chorus (#12)
 - **LUT loader** — done: LUT effect (Color) loads a `.cube` 3D LUT with a Strength blend (#77), on 2.0.x and on main for the next 1.7 release
 
 ### Scopes & monitoring
