@@ -1014,6 +1014,7 @@ void ExportDialog::LoadPreset(const QString& name) {
   int width = -1;
   int height = -1;
   int compression_type_index = -1;
+  int compression_type = -1;  // COMPRESSION_TYPE_* value, written by 2.0
   double video_bitrate = -1;
   int audio_enabled = -1;
   int audio_codec_index = -1;
@@ -1036,6 +1037,8 @@ void ExportDialog::LoadPreset(const QString& name) {
         height = stream.readElementText().toInt();
       } else if (tag == "compression_type_index") {
         compression_type_index = stream.readElementText().toInt();
+      } else if (tag == "compression_type") {
+        compression_type = stream.readElementText().toInt();
       } else if (tag == "video_bitrate") {
         video_bitrate = stream.readElementText().toDouble();
       } else if (tag == "audio_enabled") {
@@ -1072,10 +1075,24 @@ void ExportDialog::LoadPreset(const QString& name) {
   if (width >= 0) widthSpinbox->setValue(width);
   if (height >= 0) heightSpinbox->setValue(height);
   // An older preset's frame_rate is skipped: the export always uses the sequence frame rate
-  if (compression_type_index >= 0 && compression_type_index < compressionTypeCombobox->count()) {
+  // A 2.0 preset also saves the mode by value, and its index means something else there (VP9's first entry is
+  // quality-based, a CRF): the value wins. Average bitrate becomes this codec's Constant Bitrate, both in Mbps. A mode
+  // with no counterpart here keeps the codec's default and its default value, rather than reading a CRF as Mbps.
+  bool apply_bitrate = true;
+  if (compression_type >= 0) {
+    int i = compressionTypeCombobox->findData(compression_type);
+    if (i < 0 && compression_type == COMPRESSION_TYPE_TARGETBR) {
+      i = compressionTypeCombobox->findData(COMPRESSION_TYPE_CBR);
+    }
+    if (i >= 0) {
+      compressionTypeCombobox->setCurrentIndex(i);
+    } else {
+      apply_bitrate = false;
+    }
+  } else if (compression_type_index >= 0 && compression_type_index < compressionTypeCombobox->count()) {
     compressionTypeCombobox->setCurrentIndex(compression_type_index);
   }
-  if (video_bitrate >= 0) videobitrateSpinbox->setValue(video_bitrate);
+  if (video_bitrate >= 0 && apply_bitrate) videobitrateSpinbox->setValue(video_bitrate);
 
   // 4. Video/audio group enable (after codecs are set)
   if (video_enabled >= 0) {
