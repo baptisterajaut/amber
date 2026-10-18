@@ -272,6 +272,23 @@ void Cacher::openWorkerVideoFilter(const FootageStream* ms) {
 
   AVFilterContext* last_filter = buffersrc_ctx;
 
+  // Hardware-decoded frames reach buffersrc in the transfer's layout (NV12, P010) on a link negotiated from codecpar
+  // (yuv420p...): yadif has no NV12 support and read the missing third plane (crash on open). scale reconfigures to
+  // each frame's real format and hands yadif the negotiated one.
+  // CBA: one CPU format conversion per frame for hw-decoded interlaced clips; build the graph from the first decoded
+  // frame's real format if that cost matters
+  if (ok && hw_device_ctx != nullptr && ms->video_interlacing != VIDEO_PROGRESSIVE) {
+    AVFilterContext* hw_conv;
+    if (avfilter_graph_create_filter(&hw_conv, avfilter_get_by_name("scale"), "hwconv", nullptr, nullptr,
+                                     filter_graph) < 0) {
+      qCritical() << "Could not create hardware frame format filter";
+      ok = false;
+    } else {
+      avfilter_link(last_filter, 0, hw_conv, 0);
+      last_filter = hw_conv;
+    }
+  }
+
   char yadif_args[100];
   if (ok && ms->video_interlacing != VIDEO_PROGRESSIVE) {
     AVFilterContext* yadif_filter;
