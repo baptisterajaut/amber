@@ -76,11 +76,14 @@ void AudioMonitor::resizeEvent(QResizeEvent *e) {
 
 void AudioMonitor::paintEvent(QPaintEvent *) {
   if (amber::ActiveSequence != nullptr) {
-    QMutexLocker locker(&values_mutex);
-    if (values.size() > 0) {
+    // Paint from a copy: set_value() takes the same lock on the audio thread, which must not wait for a paint
+    values_mutex.lock();
+    const QVector<double> snapshot = values;  // implicitly shared: a refcount bump, no allocation
+    values_mutex.unlock();
+    if (snapshot.size() > 0) {
       QPainter p(this);
       int channel_x = AUDIO_MONITOR_GAP;
-      int channel_count = values.size();
+      int channel_count = snapshot.size();
       int channel_width = (width()/channel_count) - AUDIO_MONITOR_GAP;
       // Bar must not extend past the widget bottom: it used to be created with the
       // full widget height but offset below the peak header, so the bottom 18px of
@@ -94,7 +97,7 @@ void AudioMonitor::paintEvent(QPaintEvent *) {
         // values are linear peaks (0..1); display on a dB scale with a -60dB floor
         // so attenuated signals stay visible (-30dB = half bar). The old pseudo-linear
         // mapping crushed anything below ~-12dB into the bottom few pixels.
-        double peak_linear = values.at(i);
+        double peak_linear = snapshot.at(i);
         double filled = 0.0;
         if (peak_linear > 0.0) {
           double db = 20.0 * std::log10(peak_linear);
