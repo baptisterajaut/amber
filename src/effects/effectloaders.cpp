@@ -39,6 +39,12 @@ QMutex effects_loaded_mutex;
 using f0rGetPluginInfo = void (*)(f0r_plugin_info_t* info);
 #endif
 
+#ifndef NOLADSPA
+#include <QElapsedTimer>
+
+#include "effects/internal/ladspaeffect.h"
+#endif
+
 void load_internal_effects() {
   if (!amber::CurrentRuntimeConfig.shaders_are_enabled) {
     qWarning() << "Shaders are disabled, some effects may be nonfunctional";
@@ -345,6 +351,17 @@ void load_frei0r_effects() {
 }
 #endif
 
+#ifndef NOLADSPA
+void load_ladspa_effects() {
+  QElapsedTimer timer;
+  timer.start();
+  const QStringList dirs = amber::ladspa::search_paths();
+  const std::vector<EffectMeta> found = amber::ladspa::scan(dirs);
+  for (const EffectMeta& em : found) effects.push_back(em);
+  qInfo() << "LADSPA:" << found.size() << "plugins in" << timer.elapsed() << "ms from" << dirs;
+}
+#endif
+
 EffectInit::EffectInit() {
   effects_loaded_mutex.lock();
 }
@@ -355,6 +372,9 @@ void EffectInit::run() {
   load_shader_effects();
 #ifndef NOFREI0R
   load_frei0r_effects();
+#endif
+#ifndef NOLADSPA
+  load_ladspa_effects();
 #endif
   effects_loaded_mutex.unlock();
   qInfo() << "Finished initializing effects";

@@ -65,6 +65,7 @@
 #include "effects/internal/fillleftrighteffect.h"
 #include "effects/internal/frei0reffect.h"
 #include "effects/internal/gradienteffect.h"
+#include "effects/internal/ladspaeffect.h"
 #include "effects/internal/limitereffect.h"
 #include "effects/internal/paneffect.h"
 #include "effects/internal/parametriceqeffect.h"
@@ -366,6 +367,10 @@ static EffectPtr CreateInternalEffect(Clip* c, const EffectMeta* em) {
       return std::make_shared<ReverbEffect>(c, em);
     case EFFECT_INTERNAL_CHORUS:
       return std::make_shared<ChorusEffect>(c, em);
+#ifndef NOLADSPA
+    case EFFECT_INTERNAL_LADSPA:
+      return std::make_shared<LadspaEffect>(c, em);
+#endif
     default:
       return nullptr;
   }

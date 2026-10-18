@@ -53,6 +53,9 @@ struct EffectMeta {
   int internal;
   int type;
   int subtype;
+  // LADSPA: the descriptor's index in its library (path/filename) and its UniqueID
+  int plugin_index = -1;
+  unsigned long plugin_id = 0;
 };
 extern std::deque<EffectMeta> effects;  // deque: push_back keeps EffectMeta* (Effect::meta, menu data) valid
 
@@ -93,6 +96,7 @@ enum EffectInternal : uint8_t {
   EFFECT_INTERNAL_DELAY,
   EFFECT_INTERNAL_REVERB,
   EFFECT_INTERNAL_CHORUS,
+  EFFECT_INTERNAL_LADSPA,
   EFFECT_INTERNAL_COUNT
 };
 
