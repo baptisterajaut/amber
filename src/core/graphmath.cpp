@@ -11,6 +11,14 @@ double ClampToRange(double value, double minimum, double maximum) {
   return value;
 }
 
+double ClampDragValue(double value, double start, double minimum, double maximum) {
+  if (!std::isnan(start)) {
+    if (!std::isnan(minimum) && start < minimum) minimum = start;
+    if (!std::isnan(maximum) && start > maximum) maximum = start;
+  }
+  return ClampToRange(value, minimum, maximum);
+}
+
 static void pad_span(double& lo, double& hi, double min_span, bool widen_only_empty) {
   double span = hi - lo;
   if (widen_only_empty ? span <= 0 : span < min_span) {

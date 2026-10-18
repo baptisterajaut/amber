@@ -28,6 +28,18 @@ class TestGraphViewMath : public QObject {
     QCOMPARE(ClampToRange(-1.0, 0.0, qSNaN()), 0.0);
   }
 
+  void dragFromOutsideTheRangeIsNotPulledIn() {
+    // Transform scale (min 0) at -50 from a viewer gizmo: a time-only drag keeps -50, moving further out is refused
+    QCOMPARE(ClampDragValue(-50.0, -50.0, 0.0, qSNaN()), -50.0);
+    QCOMPARE(ClampDragValue(-40.0, -50.0, 0.0, qSNaN()), -40.0);
+    QCOMPARE(ClampDragValue(-60.0, -50.0, 0.0, qSNaN()), -50.0);
+    QCOMPARE(ClampDragValue(130.0, 120.0, 0.0, 100.0), 120.0);
+    // Started inside: the plain range; no start: plain clamp; NaN bounds stay unbounded
+    QCOMPARE(ClampDragValue(-5.0, 10.0, 0.0, 100.0), 0.0);
+    QCOMPARE(ClampDragValue(-5.0, qQNaN(), 0.0, 100.0), 0.0);
+    QCOMPARE(ClampDragValue(-500.0, -50.0, qSNaN(), qSNaN()), -500.0);
+  }
+
   void fitNegativeOnlyCurve() {
     // All values below zero: the range is the keys' own, not stretched up to 0 (the old DBL_MIN start)
     const FitRect r = FitRange(0, 100, -50.0, -10.0);

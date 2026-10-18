@@ -13,6 +13,11 @@ namespace amber::graph {
 // DoubleField.
 double ClampToRange(double value, double minimum, double maximum);
 
+// ClampToRange() for a key dragged from `start`: a key already outside the range (a viewer gizmo writes unclamped, e.g.
+// a negative Transform scale, and an old project can hold anything) is not pulled into it, only kept from going
+// further out. A NaN start is a plain ClampToRange().
+double ClampDragValue(double value, double start, double minimum, double maximum);
+
 // Range shown by "Zoom to Show All" / "Zoom to Selection": the keys' bounding box padded by kFitPadding of its span
 // on each side. A zero value span (flat curve, single key) is widened to kFitMinValueSpan, a time span under
 // kFitMinTimeSpan frames to that many frames, both around their centre.

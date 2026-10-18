@@ -81,11 +81,11 @@ static void drop_stale_selection(EffectRow* row, QVector<int>& keys, QVector<int
 
 // CBA: one row at a time; multi-property overlay, speed graph and auto-bezier handles if asked
 
-// A value set from the mouse stays inside the field's range
-static double clamp_to_field(EffectField* field, double value) {
+// A value set from the mouse stays inside the field's range (a dragged key that started outside it stays where it is)
+static double clamp_to_field(EffectField* field, double value, double start = qQNaN()) {
   if (field->type() != EffectField::EFFECT_FIELD_DOUBLE) return value;
   DoubleField* df = static_cast<DoubleField*>(field);
-  return amber::graph::ClampToRange(value, df->GetMinimum(), df->GetMaximum());
+  return amber::graph::ClampDragValue(value, start, df->GetMinimum(), df->GetMaximum());
 }
 
 GraphView::GraphView(QWidget* parent) : QWidget(parent) {
@@ -705,7 +705,8 @@ void GraphView::handle_mouse_keyframe_drag(QMouseEvent* event) {
     } else {
       // Unrounded: a 0-1 field (opacity) must not jump between whole numbers
       field->keyframes[selected_keys.at(i)].data = clamp_to_field(
-          field, selected_keys_old_doubles.at(i) + (double(start_y - event->position().toPoint().y()) / y_zoom));
+          field, selected_keys_old_doubles.at(i) + (double(start_y - event->position().toPoint().y()) / y_zoom),
+          selected_keys_old_doubles.at(i));
     }
   }
   moved_keys = true;
