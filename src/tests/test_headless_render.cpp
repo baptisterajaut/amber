@@ -1978,6 +1978,71 @@ class TestHeadlessRender : public QObject {
     amber::project_model.clear();
   }
 
+  // Interlaced footage exports a picture per source frame. yadif deinterlaces at field rate in half the stream's time
+  // base, and its timestamps were compared as the stream's: the export showed each frame twice (half speed), and a
+  // clip whose video starts after 0 (MPEG-PS, MPEG-TS) its first frames as whatever the repeated seeks found.
+  void interlacedExportKeepsFrames() {
+    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    const QString file = "frames_interlaced.mp4";
+    const QString video = dir_.filePath(file);
+    write_interlaced_video(video, kSourceFrames);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath(file + "_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath(file + ".ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    // Detected by the probe: without it the cacher adds no yadif and nothing here is tested
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kSourceFrames);
+
+    const ExportParams params = video_params(dir_.filePath(file + "_out.mp4"), seq.get(), AV_CODEC_ID_MPEG4, QString(),
+                                             COMPRESSION_TYPE_CBR, 2.0);
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded out = decode_file(params.filename, true);
+    QVERIFY(out.ok);
+    QCOMPARE(long(out.video_frames), kClipOut);
+    QVector<int> matched;
+    QVector<int> expected;
+    for (int k = 0; k < out.video_frames; k++) {
+      matched.append(closest_grey_frame(src.rgba, out.rgba[k]));
+      expected.append(k);
+    }
+    QString shown;
+    for (int m : matched) shown += QString::number(m) + ' ';
+    qInfo("export frames show source frames: %s", qPrintable(shown));
+    QCOMPARE(matched, expected);
+  }
+
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
   // mix pulls the nested clip's inner streams at the same timecode
   void nestedAudioMatchesFlat() {
