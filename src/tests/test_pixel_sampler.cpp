@@ -130,6 +130,21 @@ class TestPixelSampler : public QObject {
     g.sequence = QSize();
     QVERIFY(!amber::viewer_point_near(g, QPointF(), QPointF(), 5));  // no frame: nothing to grab
   }
+  void guideBandIsInWidgetPixels() {
+    // The guide grab band was max(3, 5 / zoom) sequence pixels: 12 screen pixels each side at 400 %, 30 at 1000 %
+    for (double zoom : {0.5, 1.0, 4.0, 10.0}) {
+      ViewerFrameGeometry g = fitted();
+      g.zoom = zoom;
+      g.x_scroll = 0.5;
+      g.y_scroll = 0.5;
+      const QPointF row = amber::sequence_to_viewer(g, QPointF(960, 540));
+      QCOMPARE(amber::viewer_line_distance(g, true, 540, row + QPointF(300, 4)), 4.0);
+      QCOMPARE(amber::viewer_line_distance(g, false, 960, row + QPointF(-6, 200)), 6.0);
+    }
+    ViewerFrameGeometry g = fitted();
+    g.widget = QSizeF();
+    QVERIFY(qIsInf(amber::viewer_line_distance(g, true, 0, QPointF())));
+  }
   void formatPadsToFixedWidth() {
     QString expected = QStringLiteral("X _812  Y _403   R 210  G 180  B _96  A 255");
     expected.replace('_', QChar(0x2007));  // figure space

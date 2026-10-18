@@ -130,7 +130,7 @@ class ViewerWidget : public QRhiWidget {
   void move_gizmos(QMouseEvent* event, bool done);
   // Body of frame_update(); with_audio = false skips the audio scrub grain
   void request_render(bool with_audio);
-  int find_guide_at(int video_x, int video_y, bool* hit_mirror = nullptr) const;
+  int find_guide_at(const QPointF& widget_pos, bool* hit_mirror = nullptr) const;
   void show_guide_context_menu(int guide_index, const QPoint& global_pos, bool on_mirror = false);
   bool dragging{false};
   int dragging_guide_index_{-1};
@@ -146,7 +146,7 @@ class ViewerWidget : public QRhiWidget {
   // Returns true if the event was fully handled by color-pick mode (caller should return).
   bool press_handle_color_pick(QMouseEvent* event);
   // Returns true if a guide was hit (right-click context menu or left-click drag started).
-  bool press_handle_guide(int video_x, int image_y, QMouseEvent* event);
+  bool press_handle_guide(QMouseEvent* event);
   void press_set_gizmo_drag(QMouseEvent* event);
   // True over a gizmo handle (dot/target), which takes the mouse before a guide under it
   bool gizmo_handle_at(const QPoint& widget_pos);
