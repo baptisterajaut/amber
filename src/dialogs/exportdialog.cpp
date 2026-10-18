@@ -829,7 +829,7 @@ void ExportDialog::setup_ui() {
 
   QHBoxLayout* progressLayout = new QHBoxLayout();
   progressBar = new QProgressBar(this);
-  progressBar->setFormat("%p% (ETA: 0:00:00)");
+  progressBar->setFormat(tr("%p% (ETA: %1:%2:%3)").arg("0", "00", "00"));
   progressBar->setEnabled(false);
   progressBar->setValue(0);
   progressLayout->addWidget(progressBar);
@@ -845,13 +845,13 @@ void ExportDialog::setup_ui() {
   buttonLayout->addStretch();
 
   export_button = new QPushButton(this);
-  export_button->setText("Export");
+  export_button->setText(tr("Export"));
   connect(export_button, &QPushButton::clicked, this, &ExportDialog::StartExport);
 
   buttonLayout->addWidget(export_button);
 
   cancel_button = new QPushButton(this);
-  cancel_button->setText("Cancel");
+  cancel_button->setText(tr("Cancel"));
   connect(cancel_button, &QPushButton::clicked, this, &QDialog::reject);
 
   buttonLayout->addWidget(cancel_button);
