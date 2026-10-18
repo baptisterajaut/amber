@@ -37,6 +37,45 @@ class TestGraphViewMath : public QObject {
     QCOMPARE(ClampDragValue(-5.0, qQNaN(), 0.0, 100.0), 0.0);
     QCOMPARE(ClampDragValue(-500.0, -50.0, qSNaN(), qSNaN()), -500.0);
   }
+
+  void fitNegativeOnlyCurve() {
+    // All values below zero: the range is the keys' own, not stretched up to 0 (the old DBL_MIN start)
+    const FitRect r = FitRange(0, 100, -50.0, -10.0);
+    QCOMPARE(r.min_value, -54.0);
+    QCOMPARE(r.max_value, -6.0);
+    QCOMPARE(r.min_time, -10.0);
+    QCOMPARE(r.max_time, 110.0);
+  }
+
+  void fitMixedSigns() {
+    const FitRect r = FitRange(10, 30, -1.0, 1.0);
+    QCOMPARE(r.min_value, -1.2);
+    QCOMPARE(r.max_value, 1.2);
+    QCOMPARE(r.min_time, 8.0);
+    QCOMPARE(r.max_time, 32.0);
+  }
+
+  void fitSmallRangeIsNotADot() {
+    // A 0-1 curve fills the view: 10 % padding, not +10 units
+    const FitRect r = FitRange(0, 60, 0.0, 1.0);
+    QVERIFY(qAbs(r.min_value - -0.1) < 1e-12);
+    QVERIFY(qAbs(r.max_value - 1.1) < 1e-12);
+  }
+
+  void fitFlatCurve() {
+    const FitRect r = FitRange(0, 60, 0.5, 0.5);
+    QCOMPARE(r.min_value, -0.1);  // span widened to 1 around 0.5, then padded
+    QCOMPARE(r.max_value, 1.1);
+  }
+
+  void fitSingleKey() {
+    const FitRect r = FitRange(40, 40, 100.0, 100.0);
+    QCOMPARE(r.min_value, 99.4);
+    QCOMPARE(r.max_value, 100.6);
+    QCOMPARE(r.min_time, 34.0);  // 10 frames around the key, then padded
+    QCOMPARE(r.max_time, 46.0);
+    QVERIFY(r.max_time > r.min_time && r.max_value > r.min_value);
+  }
 };
 
 QTEST_GUILESS_MAIN(TestGraphViewMath)
