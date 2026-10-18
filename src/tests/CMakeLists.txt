@@ -181,3 +181,19 @@ target_link_libraries(amber-test-fieldwidgets PRIVATE Qt6::Test Qt6::Widgets Qt6
 set_target_properties(amber-test-fieldwidgets PROPERTIES AUTOMOC ON)
 add_test(NAME amber-test-fieldwidgets COMMAND amber-test-fieldwidgets)
 set_tests_properties(amber-test-fieldwidgets PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Marker undo commands. undo_timeline.cpp also holds the ripple/sequence commands; test_undo_markers_stubs.cpp stands
+# in for the engine and app symbols they reference.
+add_executable(amber-test-undo-markers
+  test_undo_markers.cpp
+  test_undo_markers_stubs.cpp
+  ${CMAKE_SOURCE_DIR}/engine/undo/undo_timeline.cpp
+  ${CMAKE_SOURCE_DIR}/engine/undo/undo_generic.cpp
+  ${CMAKE_SOURCE_DIR}/engine/undo/comboaction.cpp
+  ${AMBER_CORE_SOURCES}
+)
+target_include_directories(amber-test-undo-markers PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-undo-markers PRIVATE Qt6::Test Qt6::Widgets Qt6::GuiPrivate FFMPEG::avutil
+  FFMPEG::avcodec FFMPEG::avformat FFMPEG::avfilter FFMPEG::swscale FFMPEG::swresample)
+set_target_properties(amber-test-undo-markers PROPERTIES AUTOMOC ON)
+add_test(NAME amber-test-undo-markers COMMAND amber-test-undo-markers)
