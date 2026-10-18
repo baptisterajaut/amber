@@ -70,25 +70,35 @@ QString one_line(const QString& cue_text) {
 // the undo step and rebuilds the table from the effect (a refused edit simply leaves the old value showing).
 class SubtitleCellDelegate : public QStyledItemDelegate {
  public:
-  SubtitleCellDelegate(QObject* parent, std::function<void(int, int, const QString&)> on_edit)
-      : QStyledItemDelegate(parent), on_edit_(std::move(on_edit)) {}
+  // on_edit gets the value with the target epoch of when the editor opened, so the dialog can drop an edit begun on
+  // another clip
+  SubtitleCellDelegate(QObject* parent, std::function<int()> epoch,
+                       std::function<void(int, int, const QString&, int)> on_edit)
+      : QStyledItemDelegate(parent), epoch_(std::move(epoch)), on_edit_(std::move(on_edit)) {}
 
-  // QAbstractItemView::state() is protected: the editors this delegate has open tell whether a cell is being edited
-  bool editing() const { return open_editors_ > 0; }
+  // QAbstractItemView::state() is protected: the editor this delegate has open tells whether a cell is being edited
+  bool editing() const { return open_editor_ != nullptr; }
+
+  // Closes the open editor without committing it
+  void cancel_edit() {
+    if (open_editor_ != nullptr) emit closeEditor(open_editor_, QAbstractItemDelegate::RevertModelCache);
+  }
 
   void destroyEditor(QWidget* editor, const QModelIndex& index) const override {
-    open_editors_--;
+    if (editor == open_editor_) open_editor_ = nullptr;
     QStyledItemDelegate::destroyEditor(editor, index);
   }
 
   QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
-    open_editors_++;
+    open_epoch_ = epoch_();
     if (index.column() == kColText) {
       auto* editor = new QPlainTextEdit(parent);
       editor->setTabChangesFocus(true);
+      open_editor_ = editor;
       return editor;
     }
-    return QStyledItemDelegate::createEditor(parent, option, index);
+    open_editor_ = QStyledItemDelegate::createEditor(parent, option, index);
+    return open_editor_;
   }
 
   void setEditorData(QWidget* editor, const QModelIndex& index) const override {
@@ -111,7 +121,7 @@ class SubtitleCellDelegate : public QStyledItemDelegate {
     } else {
       return;
     }
-    on_edit_(index.row(), index.column(), value);
+    on_edit_(index.row(), index.column(), value, open_epoch_);
   }
 
   void updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
@@ -146,8 +156,10 @@ class SubtitleCellDelegate : public QStyledItemDelegate {
   }
 
  private:
-  std::function<void(int, int, const QString&)> on_edit_;
-  mutable int open_editors_{0};
+  std::function<int()> epoch_;
+  std::function<void(int, int, const QString&, int)> on_edit_;
+  mutable QPointer<QWidget> open_editor_;
+  mutable int open_epoch_{0};
 };
 
 namespace {
@@ -185,10 +197,9 @@ SubtitleEditor::SubtitleEditor(QWidget* parent) : QDialog(parent) {
   table_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
   table_->horizontalHeader()->setSectionResizeMode(kColText, QHeaderView::Stretch);
   table_->horizontalHeader()->setHighlightSections(false);
-  delegate_ = new SubtitleCellDelegate(table_, [this](int row, int column, const QString& value) {
-    // After the view has closed the editor: applying rebuilds every item
-    QTimer::singleShot(0, this, [this, row, column, value]() { apply_edit(row, column, value); });
-  });
+  delegate_ = new SubtitleCellDelegate(
+      table_, [this]() { return target_epoch_; },
+      [this](int row, int column, const QString& value, int epoch) { apply_edit(row, column, value, epoch); });
   table_->setItemDelegate(delegate_);
   stack_->addWidget(table_);
 
@@ -339,6 +350,16 @@ void SubtitleEditor::refresh() {
   const bool target_changed = target != clip_.lock() || effect != effect_;
   clip_ = target;
   effect_ = effect;
+  if (target_changed) {
+    // An edit begun on the previous clip must not land, by row, on this one: drop the open editor, and should a commit
+    // still come through, apply_edit() refuses it by epoch. The table is rebuilt whatever the revision numbers say.
+    target_epoch_++;
+    if (delegate_->editing()) {
+      delegate_->cancel_edit();
+      show_message(tr("Edit cancelled: the subtitle clip changed."));
+    }
+    revision_ = -1;
+  }
 
   if (effect_ == nullptr) {
     header_label_->setText(tr("Subtitles"));
@@ -572,7 +593,17 @@ bool SubtitleEditor::parse_timecode(const QString& text, bool allow_negative, lo
 }
 
 void SubtitleEditor::commit(QVector<SubtitleCue> cues, const QString& name, int select_index) {
-  if (effect_ == nullptr) return;
+  commit_to(clip_, effect_, std::move(cues), name, select_index);
+}
+
+void SubtitleEditor::commit_to(const std::weak_ptr<Clip>& clip, SubtitleEffect* effect, QVector<SubtitleCue> cues,
+                               const QString& name, int select_index) {
+  // The clip and its effect must still be in the sequence (a queued edit can outlive them)
+  ClipPtr c = clip.lock();
+  if (c == nullptr || effect == nullptr || amber::ActiveSequence == nullptr ||
+      find_clip(amber::ActiveSequence.get(), c.get()) == nullptr || subtitle_effect_of(c.get()) != effect) {
+    return;
+  }
 
   // Rows stay in start order: find where the cue to select lands
   SubtitleCue selected;
@@ -589,13 +620,22 @@ void SubtitleEditor::commit(QVector<SubtitleCue> cues, const QString& name, int 
     }
   }
 
-  amber::UndoStack.push(new SetSubtitleCues(effect_, cues, name));
+  amber::UndoStack.push(new SetSubtitleCues(effect, cues, name));
   refresh();
 
-  if (new_row >= 0 && new_row < table_->rowCount()) {
+  if (effect == effect_ && new_row >= 0 && new_row < table_->rowCount()) {
     table_->setCurrentCell(new_row, kColText, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
     table_->scrollToItem(table_->item(new_row, kColText));
   }
+}
+
+void SubtitleEditor::queue_commit(const QVector<SubtitleCue>& cues, const QString& name, int select_index) {
+  // After the view has closed the editor: committing rebuilds every item. Bound to this clip, whatever the target is by
+  // then (focus leaving the editor for the timeline commits it, then the click selects another clip)
+  std::weak_ptr<Clip> clip = clip_;
+  SubtitleEffect* effect = effect_;
+  QTimer::singleShot(
+      0, this, [this, clip, effect, cues, name, select_index]() { commit_to(clip, effect, cues, name, select_index); });
 }
 
 void SubtitleEditor::row_clicked(int row) {
@@ -606,9 +646,15 @@ void SubtitleEditor::row_clicked(int row) {
   panel_sequence_viewer->seek(cue_ms_to_frame(cues_.at(row).start_ms), false);
 }
 
-void SubtitleEditor::apply_edit(int row, int column, const QString& value) {
-  refresh();
-  if (effect_ == nullptr || row < 0 || row >= cues_.size()) return;
+void SubtitleEditor::apply_edit(int row, int column, const QString& value, int epoch) {
+  // Called from the delegate's setModelData(), while the editor is still open: the table was not rebuilt since it
+  // opened (refresh() defers that), so cues_ and the row are the edited clip's, unless the target or its cues changed
+  // meanwhile, in which case the edit is refused rather than applied to the wrong cue
+  if (epoch != target_epoch_ || effect_ == nullptr || effect_->cues_revision() != revision_) {
+    show_message(tr("Edit dropped: the subtitles changed while it was open."));
+    return;
+  }
+  if (row < 0 || row >= cues_.size()) return;
 
   QVector<SubtitleCue> cues = cues_;
   SubtitleCue& cue = cues[row];
@@ -623,13 +669,22 @@ void SubtitleEditor::apply_edit(int row, int column, const QString& value) {
     const QString text = cue_lines_to_text(lines);
     if (text == cue.text) return;
     cue.text = text;
-    commit(cues, tr("Edit Subtitle"), row);
+    queue_commit(cues, tr("Edit Subtitle"), row);
     return;
   }
 
   long frames;
   if (!parse_timecode(value, false, &frames)) {
     show_message(tr("\"%1\" is not a timecode.").arg(value.trimmed()));
+    return;
+  }
+
+  // The frames the cell showed: retyping them leaves a cue that starts between frames where it is (no snap, no undo
+  // step)
+  const long shown_start = cue_ms_to_frame(cue.start_ms);
+  const long shown_end = cue_ms_to_frame(cue.end_ms);
+  if ((column == kColStart && frames == shown_start) || (column == kColEnd && frames == shown_end) ||
+      (column == kColDuration && frames == shown_end - shown_start)) {
     return;
   }
 
@@ -657,7 +712,7 @@ void SubtitleEditor::apply_edit(int row, int column, const QString& value) {
 
   cue.start_ms = start;
   cue.end_ms = end;
-  commit(cues, tr("Edit Subtitle"), row);
+  queue_commit(cues, tr("Edit Subtitle"), row);
 }
 
 void SubtitleEditor::add_cue() {
@@ -679,6 +734,9 @@ void SubtitleEditor::add_cue() {
     if (c.start_ms > start) end = qMin(end, c.start_ms);
   }
   end = qMax(end, cue_ms_at_frame(local + 1, frame_rate_));
+
+  // The new row must be visible for its text to open for editing, whatever the filter
+  filter_edit_->clear();
 
   QVector<SubtitleCue> cues = cues_;
   cues.append({start, end, tr("Subtitle")});

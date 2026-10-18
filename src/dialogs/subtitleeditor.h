@@ -59,10 +59,15 @@ class SubtitleEditor : public QDialog {
   void import_srt();
   void export_srt();
   void row_clicked(int row);
-  void apply_edit(int row, int column, const QString& value);
+  // epoch: target_epoch_ when the cell editor opened. Runs inside the delegate's setModelData()
+  void apply_edit(int row, int column, const QString& value, int epoch);
 
   // Pushes the new cue list as one undo step and selects the cue at select_index (after the sort) when >= 0
   void commit(QVector<SubtitleCue> cues, const QString& name, int select_index = -1);
+  void commit_to(const std::weak_ptr<Clip>& clip, SubtitleEffect* effect, QVector<SubtitleCue> cues,
+                 const QString& name, int select_index);
+  // commit() on the next event loop pass, for edits made from inside the delegate
+  void queue_commit(const QVector<SubtitleCue>& cues, const QString& name, int select_index);
 
   QVector<int> selected_rows() const;
 
@@ -97,6 +102,9 @@ class SubtitleEditor : public QDialog {
   // What the table was built from
   QVector<SubtitleCue> cues_;
   int revision_{-1};
+
+  // Bumped whenever the target clip changes
+  int target_epoch_{0};
   long timeline_in_{0};
   long timeline_out_{0};
   long clip_in_{0};
