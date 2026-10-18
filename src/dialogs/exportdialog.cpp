@@ -169,13 +169,20 @@ ExportDialog::ExportDialog(QWidget* parent, const QVector<SequencePtr>& batch)
   vcodec_params.threads = 0;
 }
 
-// The encoders the dialog offers for codec: the table's installed ones, or else FFmpeg's default encoder of the codec
-// (what the export used before the table, e.g. H.264 without libx264). AV1 is only listed with a table encoder
-// (format_changed).
+// The encoders the dialog offers for codec: the table's installed ones (working hardware ones last), with FFmpeg's
+// default encoder of the codec first when none of them is a software one (what the export used before the table, e.g.
+// H.264 without libx264). AV1 is only listed with a table encoder (format_changed).
 static QStringList dialog_encoders(AVCodecID codec) {
   QStringList encoders = amber::available_encoders(codec);
-  const AVCodec* fallback = encoders.isEmpty() ? avcodec_find_encoder(codec) : nullptr;
-  if (fallback != nullptr) encoders.append(QString::fromUtf8(fallback->name));
+  bool software = false;
+  for (const QString& name : encoders) {
+    amber::EncoderInfo info;
+    if (!amber::find_encoder_info(name, &info) || info.hw_device_type == AV_HWDEVICE_TYPE_NONE) software = true;
+  }
+  const AVCodec* fallback = software ? nullptr : avcodec_find_encoder(codec);
+  if (fallback != nullptr && !encoders.contains(QString::fromUtf8(fallback->name))) {
+    encoders.prepend(QString::fromUtf8(fallback->name));
+  }
   return encoders;
 }
 
@@ -714,6 +721,17 @@ void ExportDialog::vencoder_changed(int) {
     compressionTypeCombobox->addItem(tr("Constant Bitrate"), COMPRESSION_TYPE_CBR);
     compressionTypeCombobox->setCurrentIndex(0);
     compressionTypeCombobox->setEnabled(false);
+  }
+
+  // A hardware encoder's pixel format is the software format its frames are uploaded from: NV12 first
+  if (has_vencoder_info_ && vencoder_info_.hw_device_type != AV_HWDEVICE_TYPE_NONE) {
+    const QVector<int> formats = amber::hardware_encoder_formats(vencoder_info_);
+    vcodec_params.pix_fmt = formats.isEmpty() ? -1 : formats.first();
+    if (vcodec_params.pix_fmt == -1) {
+      QMessageBox::critical(this, tr("Invalid Codec"),
+                            tr("Failed to find pixel format for this encoder. Export will likely fail."));
+    }
+    return;
   }
 
   // set default pix_fmt for this encoder: its first one the export can write
