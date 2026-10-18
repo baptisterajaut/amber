@@ -12,6 +12,9 @@ constexpr double kMeterFloorDb = -60.0;
 constexpr double kMeterFallDbPerSec = 20.0;
 // How long the peak hold stays put before falling
 constexpr qint64 kMeterHoldMs = 1500;
+// Linear peak that latches the clip indicator. Playback peaks are |s|/32768 of int16 samples, so a full-scale
+// positive sample (+32767) reads 32767/32768, just under 1.0: it must count as 0 dBFS too.
+constexpr double kMeterClipLinear = 32767.0 / 32768.0;
 
 // Linear peak (0..1) to dBFS, kMeterFloorDb for 0 and anything below the floor
 double meter_db(double linear);
@@ -22,7 +25,8 @@ double meter_db(double linear);
 class AudioMeterState {
  public:
   // New linear peaks (0..1), one per channel. A level rises instantly to a higher peak, otherwise keeps falling toward
-  // it; a peak >= 1.0 (0 dBFS) latches the channel's clip. A channel count change starts over from the floor.
+  // it; a peak >= kMeterClipLinear (0 dBFS) latches the channel's clip. A channel count change starts over from the
+  // floor.
   void push(const QVector<double>& linear_peaks, qint64 now_ms);
 
   // Lets the levels and holds fall up to now_ms

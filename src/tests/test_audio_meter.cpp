@@ -72,10 +72,11 @@ class TestAudioMeter : public QObject {
   }
   void clipLatch() {
     AudioMeterState m;
-    m.push({0.999, 1.0}, 0);
+    m.push({0.999, 32767.0 / 32768.0, 1.0}, 0);
     QVERIFY(!m.clipped(0));
-    QVERIFY(m.clipped(1));
-    m.push({0.0, 0.0}, 100);
+    QVERIFY(m.clipped(1));  // a full-scale +32767 sample is 0.99997
+    QVERIFY(m.clipped(2));
+    m.push({0.0, 0.0, 0.0}, 100);
     m.advance(10000);
     QVERIFY(m.clipped(1));
     m.clear(10000);

@@ -24,7 +24,7 @@ void AudioMeterState::push(const QVector<double>& linear_peaks, qint64 now_ms) {
       c.hold = c.level;
       c.hold_ms = now_ms;
     }
-    if (linear_peaks.at(i) >= 1.0) c.clip = true;
+    if (linear_peaks.at(i) >= kMeterClipLinear) c.clip = true;
   }
 }
 
