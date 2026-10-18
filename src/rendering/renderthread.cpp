@@ -291,6 +291,7 @@ void RenderThread::paint() {
     qWarning() << "beginOffscreenFrame failed, skipping frame";
     active_mutex.unlock();
     texture_failed = true;
+    frame_failed_ = true;
     return;
   }
 
@@ -367,6 +368,7 @@ void RenderThread::paint() {
     cpu_frame_w_[active_idx] = readback.pixelSize.width();
     cpu_frame_h_[active_idx] = readback.pixelSize.height();
     gpu_ns = gpu_timer.nsecsElapsed();
+    frame_failed_ = !frame_ok || dst.isEmpty();
   }
 
   active_mutex.unlock();
@@ -497,6 +499,8 @@ RenderThread::FrameTiming RenderThread::last_frame_timing() const {
 }
 
 bool RenderThread::rhi_failed() const { return rhi_failed_.load(); }
+
+bool RenderThread::frame_failed() const { return frame_failed_.load(); }
 
 void RenderThread::cancel() {
   // Same lost-wakeup guard as start_render()'s export path: run() holds wait_lock_ from its `running` check until

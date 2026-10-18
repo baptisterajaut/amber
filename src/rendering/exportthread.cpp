@@ -566,7 +566,8 @@ bool ExportThread::SetupContainer() {
 
 // Render one video frame and encode it. Returns false on unrecoverable error (caller should goto cleanup_renderer).
 bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs) {
-  do {
+  // Renders again while a clip's texture wasn't ready (did_texture_fail())
+  for (int failed_renders = 0;;) {
     render_complete_ = false;
     renderer->start_render(seq_, 1, nullptr, video_frame->data[0], video_frame->linesize[0] / 4, 0);
     while (!render_complete_ && !interrupt_) {
@@ -577,7 +578,16 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
       export_error = tr("Could not initialize the GPU renderer.");
       return false;
     }
-  } while (renderer->did_texture_fail());
+    // The GPU frame failed (device lost, out of memory): video_frame still holds the previous frame, or uninitialized
+    // memory on the first one, so it must not be encoded. One retry in case it was transient, then the export fails.
+    if (renderer->frame_failed()) {
+      if (++failed_renders < 2) continue;
+      qCritical() << "Rendering frame" << seq_->playhead << "failed";
+      export_error = tr("rendering frame %1 failed").arg(seq_->playhead);
+      return false;
+    }
+    if (!renderer->did_texture_fail()) break;
+  }
 
   if (interrupt_) return false;
 
