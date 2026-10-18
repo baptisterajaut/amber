@@ -322,7 +322,8 @@ void AmberGlobal::new_project() {
 }
 
 bool AmberGlobal::start_new_project() {
-  if (amber::project_model.childCount() == 0 && !is_modified()) return true;
+  // An empty saved project still gets cleared, so the new work doesn't save over its file
+  if (amber::project_model.childCount() == 0 && !is_modified() && amber::ActiveProjectFilename.isEmpty()) return true;
   if (!can_close_project()) return false;
   ClearProject();
   return true;
