@@ -245,6 +245,15 @@ target_compile_definitions(amber-test-effects-gpu PRIVATE SOURCE_DIR="${CMAKE_SO
 target_link_libraries(amber-test-effects-gpu PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-effects-gpu COMMAND amber-test-effects-gpu)
 
+# LADSPA hosting: port hints, discovery from $LADSPA_PATH, processing through the SDK's amp.so / delay.so (skipped
+# when they aren't installed)
+if(NOT NOLADSPA)
+  add_executable(amber-test-ladspa test_ladspa.cpp)
+  target_include_directories(amber-test-ladspa PRIVATE ${CMAKE_SOURCE_DIR})
+  target_link_libraries(amber-test-ladspa PRIVATE amber-engine Qt6::Test)
+  add_test(NAME amber-test-ladspa COMMAND amber-test-ladspa)
+endif()
+
 # Headless project loading — LoadThread on a hand-written .ove, no UI code linked
 add_executable(amber-test-loadthread test_loadthread.cpp)
 target_include_directories(amber-test-loadthread PRIVATE ${CMAKE_SOURCE_DIR})

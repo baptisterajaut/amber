@@ -38,6 +38,7 @@ extern "C" {
 #include "core/audio.h"
 #include "core/headlessappcontext.h"
 #include "effects/effect.h"
+#include "effects/internal/ladspaeffect.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "global/config.h"
@@ -1489,6 +1490,60 @@ class TestHeadlessRender : public QObject {
           tail_db);
     QVERIFY2(qAbs(tail_db - -15.0) < 0.5, qPrintable(QString("%1 dBFS").arg(tail_db)));
   }
+
+#ifndef NOLADSPA
+  // A Tone clip through LADSPA amp_mono at -6 dB exports at half the RMS of the same clip without it
+  void ladspaAmpHalvesExport() {
+    const EffectMeta* amp = nullptr;
+    for (const EffectMeta& em : effects) {
+      if (em.internal == EFFECT_INTERNAL_LADSPA && em.plugin_id == 1048) amp = &em;
+    }
+    if (amp == nullptr) {
+      for (const EffectMeta& em : amber::ladspa::scan(amber::ladspa::search_paths())) {
+        if (em.plugin_id == 1048) {
+          effects.push_back(em);
+          amp = &effects.back();
+        }
+      }
+    }
+    if (amp == nullptr) QSKIP("amp_mono (1048, LADSPA SDK amp.so) not installed");
+    const EffectMeta* tone_meta = get_meta_from_name("Tone");
+    QVERIFY(tone_meta != nullptr);
+
+    double rms[2] = {0, 0};
+    for (int pass = 0; pass < 2; pass++) {
+      SequencePtr seq;
+      load_ramp_project(dir_.filePath(QString("ladspa_%1.ove").arg(pass)), QString(), 0, 30, 1.0, false, &seq);
+      if (QTest::currentTestFailed()) return;
+      Clip* clip = seq->clips.at(0).get();
+      EffectPtr gen = Effect::Create(clip, tone_meta);  // 1000 Hz at 25 % amount
+      QVERIFY(gen != nullptr);
+      clip->effects.append(gen);
+      if (pass == 1) {
+        EffectPtr e = Effect::Create(clip, amp);
+        QVERIFY(e != nullptr);
+        QCOMPARE(e->row_count(), 1);
+        e->row(0)->Field(0)->SetValueAt(0, qPow(10.0, -6.0 / 20.0));
+        clip->effects.append(e);
+      }
+      const QString out = dir_.filePath(QString("ladspa_%1.wav").arg(pass));
+      const QString error = export_audio(seq.get(), out, AV_CODEC_ID_PCM_S16LE, 0);
+      QVERIFY2(error.isEmpty(), qPrintable(error));
+      const Decoded d = decode_file(out);
+      QVERIFY(d.ok);
+      QVERIFY(d.has_audio);
+      const int span = int(qRound64(30 / kFps * kAudioRate));
+      QVERIFY(d.audio_left.size() >= span);
+      double sum = 0;
+      for (int i = 0; i < span; i++) sum += double(d.audio_left[i]) * d.audio_left[i];
+      rms[pass] = qSqrt(sum / span);
+    }
+    const double ratio = rms[1] / rms[0];
+    qInfo("LADSPA amp_mono -6 dB export: RMS %.5f -> %.5f, ratio %.5f", rms[0], rms[1], ratio);
+    QVERIFY(rms[0] > 0.05);
+    QVERIFY2(qAbs(ratio - 0.5) < 0.005, qPrintable(QString::number(ratio)));
+  }
+#endif
 
   void volumeRampFollowsTimeline_data() {
     QTest::addColumn<double>("speed");
