@@ -46,6 +46,7 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 - **Frei0r effects on proxied footage**: a Frei0r effect silently did nothing on a clip whose footage had a proxy. It now processes the frame it is given, whatever its size, and no longer shears the picture of footage of some widths, such as 1366 pixels or a 270-pixel-wide proxy of portrait video.
 - **GIF export with an adaptive palette**: choosing pal8 for a GIF in the advanced video settings crashed the export on its first frame. It now works and gives each frame its own palette of up to 256 colours taken from the picture, with transparency kept, instead of the fixed 256-colour grid of the default rgb8. On 1.x the pal8 option is removed instead, and a pixel format the converter can't produce stops the export with an error rather than a crash.
 - **Text effect's Shadow Opacity** no longer shows a reset arrow on a new effect, and resetting it gives back the 100 % a new effect starts with instead of 80 %.
+- **Viewer handles and guides**: a guide running through a gizmo handle (Transform's scale corners or anchor point, Corner Pin's corners) used to grab the click, so the handle couldn't be dragged; the handle now wins, and the guide can still be dragged anywhere else, including over the clip. Slow handle drags at high zoom no longer stay stuck (at 400 % they didn't move at all), and slow drags at the fit zoom no longer overshoot.
 
 ## Under the hood
 
