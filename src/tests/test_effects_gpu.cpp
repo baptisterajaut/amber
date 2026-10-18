@@ -47,6 +47,7 @@ class TestEffectsGpu : public QObject {
   void transformTranslate();
   void transformScale();
   void transformRotate180();
+  void gradientRampStops();
   void keyframedTransform();
   void boundaryTimecodes();
   void textRenders();
@@ -675,10 +676,10 @@ void TestEffectsGpu::transformRotate180() {
   auto seq = h_->make_sequence(64, 64, 30.0);
   Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
   Effect* gradient = c->effects[1].get();
-  // Gradient row 0 = type (combo, default LINEAR), 1 = start_color, 2 = end_color, 3 = angle.
+  // Gradient row 0 = type (combo, default LINEAR), 1 = start_color, 2 = end_color, 3 = ramp, 4 = angle.
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);  // top→bottom
+  h_->set_field_double(gradient, 4, 0, 90.0);  // top→bottom
 
   Effect* transform = c->effects[0].get();
   h_->set_field_double(transform, 3, 0, 180.0);  // rotation row=3 field=0
@@ -694,6 +695,40 @@ void TestEffectsGpu::transformRotate180() {
       top.r > bot.r + 50,
       qPrintable(
           QString("expected top brighter than bottom after 180 rotation, top.r=%1 bot.r=%2").arg(top.r).arg(bot.r)));
+}
+
+void TestEffectsGpu::gradientRampStops() {
+  // Linear 0°, black -> white with one intermediate stop 0.5 red. A linear gradient spans the frame's diagonal,
+  // centred: on 256 px, ramp position t is at x + 0.5 = 128 + (t - 0.5) * 362.04, so column 128 is t = 0.5014 and
+  // column 37 t = 0.2500 (the black/red midpoint)
+  auto seq = h_->make_sequence(256, 256, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 4, 0, 0.0);
+  QCOMPARE(gradient->row(3)->Field(0)->id(), QStringLiteral("ramp"));
+  QCOMPARE(gradient->row(3)->Field(0)->GetValueAt(0).toString(), QString());
+
+  // Today's gradient: no stop, mid-grey in the middle
+  QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  auto report = [&](const char* what, int x) {
+    const Rgba p = pixel_at(pixels, 256, x, 128);
+    qInfo("%s column %d: %d %d %d", what, x, p.r, p.g, p.b);
+  };
+  report("no stop", 128);
+  h_->assert_pixel(pixels, 256, 128, 128, QColor(128, 128, 128), 2);
+
+  h_->set_field_string(gradient, 3, 0, QStringLiteral("0.5 #ff0000ff"));
+  pixels = h_->render_frame(seq.get(), 0);
+  QVERIFY(!pixels.isEmpty());
+  report("red stop", 128);
+  report("red stop", 37);
+  report("red stop", 219);
+  h_->assert_pixel(pixels, 256, 128, 128, QColor(255, 0, 0), 2);
+  h_->assert_pixel(pixels, 256, 37, 128, QColor(128, 0, 0), 3);
+  h_->assert_pixel(pixels, 256, 219, 128, QColor(255, 128, 128), 3);  // t = 0.75, red/white midpoint
 }
 
 void TestEffectsGpu::keyframedTransform() {
@@ -902,7 +937,7 @@ void TestEffectsGpu::shakeChangesOutput() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
 
   // Shake defaults: intensity=25, rotation=10, frequency=5. Plenty to move
   // pixels between two adjacent timecodes.
@@ -966,7 +1001,7 @@ void TestEffectsGpu::cornerpinDistorts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
 
   EffectPtr corner = h_->attach_internal(c, EFFECT_INTERNAL_CORNERPIN, EFFECT_TYPE_EFFECT);
   // Rows 0..3: TL, TR, BL, BR. Each row has two doubles (x, y). Row 4 is the
@@ -1256,7 +1291,7 @@ void TestEffectsGpu::gradientRendersTwoStops() {
   // Rows: 0=type (combo LINEAR default), 1=start, 2=end, 3=angle.
   h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
-  h_->set_field_double(gradient, 3, 0, 90.0);  // top→bottom
+  h_->set_field_double(gradient, 4, 0, 90.0);  // top→bottom
 
   QByteArray pixels = h_->render_frame(seq.get(), 0);
   QVERIFY(!pixels.isEmpty());
@@ -1626,7 +1661,7 @@ void TestEffectsGpu::boxblurRadiusZero() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Box Blur");
@@ -1699,7 +1734,7 @@ void TestEffectsGpu::gaussianblurRadiusZero() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Gaussian Blur");
@@ -1766,7 +1801,7 @@ void TestEffectsGpu::directionalblurRadiusZero() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Directional Blur");
@@ -1847,7 +1882,7 @@ void TestEffectsGpu::radialblurRadiusZero() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Radial Blur");
@@ -1944,7 +1979,7 @@ void TestEffectsGpu::bulgeDistorts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Bulge");
@@ -1963,7 +1998,7 @@ void TestEffectsGpu::bulgePreservesCenter() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Bulge");
@@ -1999,7 +2034,7 @@ void TestEffectsGpu::fisheyeDistorts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Fisheye");
@@ -2017,7 +2052,7 @@ void TestEffectsGpu::fisheyePreservesCenter() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Fisheye");
@@ -2053,7 +2088,7 @@ void TestEffectsGpu::sphereDistorts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Sphere");
@@ -2071,7 +2106,7 @@ void TestEffectsGpu::spherePreservesCenter() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Sphere");
@@ -2110,7 +2145,7 @@ void TestEffectsGpu::swirlDistorts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Swirl");
@@ -2128,7 +2163,7 @@ void TestEffectsGpu::rippleDistorts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Ripple");
@@ -2145,7 +2180,7 @@ void TestEffectsGpu::waveDistorts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Wave");
@@ -2165,7 +2200,7 @@ void TestEffectsGpu::chromaticAberrationShifts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Chromatic Aberration");
@@ -2198,7 +2233,7 @@ void TestEffectsGpu::tileRepeats() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::red));
-  h_->set_field_double(gradient, 3, 0, 0.0);  // left→right
+  h_->set_field_double(gradient, 4, 0, 0.0);  // left→right
 
   EffectPtr fx = h_->attach_xml_shader(c, "Tile");
   h_->set_field_double(fx.get(), 0, 0, 25.0);  // Scale=25 → 16-px tiles
@@ -2227,7 +2262,7 @@ void TestEffectsGpu::turbulentDisplaces() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Turbulent Displacement");
@@ -2332,7 +2367,7 @@ void TestEffectsGpu::lutNoFilePassthrough() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);  // top→bottom
+  h_->set_field_double(gradient, 4, 0, 90.0);  // top→bottom
   QByteArray before = h_->render_frame(seq.get(), 0);
   h_->attach_xml_shader(c, "LUT");
   QByteArray after = h_->render_frame(seq.get(), 0);
@@ -2373,7 +2408,7 @@ void TestEffectsGpu::huesatbriContrast() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Hue/Saturation/Brightness");
   h_->set_field_double(fx.get(), 3, 0, 200.0);  // contrast=200 (row 3)
@@ -2566,7 +2601,7 @@ void TestEffectsGpu::posterizeReducesLevels() {
     Effect* gradient = c->effects[1].get();
     h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
     h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-    h_->set_field_double(gradient, 3, 0, 90.0);
+    h_->set_field_double(gradient, 4, 0, 90.0);
 
     EffectPtr fx = h_->attach_xml_shader(c, "Posterize");
     h_->set_field_double(fx.get(), 0, 0, double(N));  // numColors
@@ -2685,7 +2720,7 @@ void TestEffectsGpu::lumakeyBands() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Luma Key");
   h_->set_field_double(fx.get(), 0, 0, 25.0);  // loc
@@ -2743,7 +2778,7 @@ void TestEffectsGpu::flipHorizontal() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
-  h_->set_field_double(gradient, 3, 0, 0.0);  // left→right
+  h_->set_field_double(gradient, 4, 0, 0.0);  // left→right
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Flip");
@@ -2770,7 +2805,7 @@ void TestEffectsGpu::flipVertical() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
-  h_->set_field_double(gradient, 3, 0, 90.0);  // top→bottom
+  h_->set_field_double(gradient, 4, 0, 90.0);  // top→bottom
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Flip");
@@ -2840,7 +2875,7 @@ void TestEffectsGpu::embossOutputDiffers() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Emboss");
@@ -2856,7 +2891,7 @@ void TestEffectsGpu::toonifyOutputDiffers() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Toonify");
@@ -2910,7 +2945,7 @@ void TestEffectsGpu::pixelateBlocks() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 0.0);  // left→right
+  h_->set_field_double(gradient, 4, 0, 0.0);  // left→right
 
   EffectPtr fx = h_->attach_xml_shader(c, "Pixelate");
   h_->set_field_double(fx.get(), 0, 0, 8.0);  // Horizontal Pixels (blocks across)
@@ -2935,7 +2970,7 @@ void TestEffectsGpu::crossstitchOutputDiffers() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
-  h_->set_field_double(gradient, 3, 0, 0.0);
+  h_->set_field_double(gradient, 4, 0, 0.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Cross Stitch");
@@ -2951,7 +2986,7 @@ void TestEffectsGpu::volumetricLightOutputDiffers() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Volumetric Light");
@@ -2972,7 +3007,7 @@ void TestEffectsGpu::levelsNeutralIdentity() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Levels");
@@ -3029,7 +3064,7 @@ void TestEffectsGpu::liftGammaGainNeutralIdentity() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Lift/Gamma/Gain");
@@ -3073,7 +3108,7 @@ void TestEffectsGpu::tintAmountZero() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Tint");
@@ -3156,7 +3191,7 @@ void TestEffectsGpu::lensCorrectionNeutralIdentity() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Lens Correction");
@@ -3175,7 +3210,7 @@ void TestEffectsGpu::lensCorrectionK1Distorts() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   EffectPtr fx = h_->attach_xml_shader(c, "Lens Correction");
@@ -3239,7 +3274,7 @@ void TestEffectsGpu::lensCorrectionNonSquareAspect() {
     Effect* gradient = c->effects[1].get();
     h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
     h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-    h_->set_field_double(gradient, 3, 0, k.angle);
+    h_->set_field_double(gradient, 4, 0, k.angle);
     QByteArray baseline = h_->render_frame(seq.get(), 0);
 
     EffectPtr fx = h_->attach_xml_shader(c, "Lens Correction");
@@ -3605,7 +3640,7 @@ void TestEffectsGpu::glowIntensityZeroIdentity() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
   attach_glow(h_.get(), c, 0.0, 20.0, 0.0, 0);
   QByteArray with_fx = h_->render_frame(seq.get(), 0);
@@ -3620,7 +3655,7 @@ void TestEffectsGpu::glowThresholdFullIdentity() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
   attach_glow(h_.get(), c, 100.0, 20.0, 400.0, 0);
   QByteArray with_fx = h_->render_frame(seq.get(), 0);
@@ -3713,7 +3748,7 @@ void TestEffectsGpu::denoiseStrengthZeroIdentity() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
   attach_denoise(h_.get(), c, 6.0, 0.0, 0.0);
   QByteArray with_fx = h_->render_frame(seq.get(), 0);
@@ -3883,7 +3918,7 @@ void TestEffectsGpu::curvesIdentityPassthrough() {
   Effect* gradient = c->effects[1].get();
   h_->set_field_color(gradient, 1, 0, QColor(Qt::red));
   h_->set_field_color(gradient, 2, 0, QColor(Qt::blue));
-  h_->set_field_double(gradient, 3, 0, 90.0);
+  h_->set_field_double(gradient, 4, 0, 90.0);
   QByteArray baseline = h_->render_frame(seq.get(), 0);
 
   h_->attach_xml_shader(c, "Curves");

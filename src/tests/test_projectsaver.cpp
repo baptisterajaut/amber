@@ -62,6 +62,16 @@ QString fixture(const QString& url, const QString& footage) {
                 <effect name="Distort/Transform" enabled="1"></effect>
                 <effect name="Render/Text" enabled="1"></effect>
             </clip>
+            <clip id="2" enabled="1" name="gradient" clipin="0" in="0" out="30" track="-3" r="128" g="128" b="128"
+                  autoscale="1" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+                <effect name="Render/Gradient" enabled="1">
+                    <row><field id="type" value="0"/></row>
+                    <row><field id="start_color" value="#102030"/></row>
+                    <row><field id="end_color" value="#ffffff"/></row>
+                    <row><field id="angle" value="45"/></row>
+                </effect>
+            </clip>
             <marker frame="5" name="sequence marker" label="3" duration="45"/>
             <marker frame="60" name="point marker"/>
             <track index="2" volume="40" pan="-500"/>
@@ -154,13 +164,14 @@ class TestProjectSaver : public QObject {
     amber::project_model.clear();
   }
 
-  ClipPtr title_clip() {
+  ClipPtr inner_clip(const QString& name) {
     SequencePtr inner = find_media("Inner")->to_sequence();
     for (const ClipPtr& c : inner->clips) {
-      if (c != nullptr && c->name() == "title") return c;
+      if (c != nullptr && c->name() == name) return c;
     }
     return nullptr;
   }
+  ClipPtr title_clip() { return inner_clip("title"); }
 
  private slots:
   void initTestCase() {
@@ -219,6 +230,17 @@ class TestProjectSaver : public QObject {
     // GetValueAt takes seconds. It also caches the interpolated value in persistent_data_, which the saver writes as
     // the field's value="48" next to the keys
     QCOMPARE(posx->GetValueAt(1.0).toDouble(), 48.0);
+    // A gradient saved before the colour ramp existed (no "ramp" field): no stop, the rest as saved
+    ClipPtr gradient = inner_clip("gradient");
+    QVERIFY(gradient != nullptr);
+    QCOMPARE(gradient->effects.size(), 1);
+    EffectField* ramp = field_by_id(gradient->effects.at(0).get(), "ramp");
+    QVERIFY(ramp != nullptr);
+    QCOMPARE(ramp->GetValueAt(0).toString(), QString());
+    QCOMPARE(field_by_id(gradient->effects.at(0).get(), "start_color")->GetValueAt(0).value<QColor>(),
+             QColor(0x10, 0x20, 0x30));
+    QCOMPARE(field_by_id(gradient->effects.at(0).get(), "angle")->GetValueAt(0).toDouble(), 45.0);
+    ramp->SetValueAt(0, ramp->ConvertStringToValue("0.6 #0044cc80;0.25 #ff8800ff"));
     // Track header toggles on Inner, set the way the header does; Outer keeps none
     SequencePtr inner_seq = find_media("Inner")->to_sequence();
     TrackState hidden, muted, solo, locked;
@@ -268,6 +290,7 @@ class TestProjectSaver : public QObject {
     QVERIFY(ba.contains(R"(name="clip marker" duration="10")"));
     QVERIFY(ba.contains(R"(name="point marker"/>)"));
     QVERIFY(ba.contains(R"(name="footage marker"/>)"));
+    QVERIFY(ba.contains(R"(<field id="ramp" value="0.25 #ff8800ff;0.6 #0044cc80"/>)"));
     // One <track> per non-default track, in index order, only the true flags; none for Outer
     QList<QByteArray> track_lines;
     for (const QByteArray& line : ba.split('\n')) {
@@ -297,6 +320,10 @@ class TestProjectSaver : public QObject {
     posx = field_by_id(transform, "posx");
     QCOMPARE(posx->keyframes.size(), 2);
     QCOMPARE(posx->GetValueAt(1.0).toDouble(), 48.0);
+    gradient = inner_clip("gradient");
+    QVERIFY(gradient != nullptr);
+    QCOMPARE(field_by_id(gradient->effects.at(0).get(), "ramp")->GetValueAt(0).toString(),
+             QStringLiteral("0.25 #ff8800ff;0.6 #0044cc80"));
     QVERIFY(title->opening_transition != nullptr);
     QCOMPARE(title->opening_transition->get_true_length(), 10);
     QCOMPARE(title->get_markers().size(), 1);

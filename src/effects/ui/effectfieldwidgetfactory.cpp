@@ -11,6 +11,7 @@
 #include "effects/ui/doublefieldwidget.h"
 #include "effects/ui/filefieldwidget.h"
 #include "effects/ui/fontfieldwidget.h"
+#include "effects/ui/gradientrampfieldwidget.h"
 #include "effects/ui/labelfieldwidget.h"
 #include "effects/ui/stringfieldwidget.h"
 
@@ -37,6 +38,8 @@ EffectFieldWidget* EffectFieldWidget::Create(EffectField* field, QObject* parent
       return new FileFieldWidget(field, parent);
     case EffectField::EFFECT_FIELD_CURVE:
       return new CurveFieldWidget(field, parent);
+    case EffectField::EFFECT_FIELD_GRADIENT_RAMP:
+      return new GradientRampFieldWidget(field, parent);
     case EffectField::EFFECT_FIELD_UI:
       // ButtonField and LabelField both use EFFECT_FIELD_UI.
       // Distinguish via dynamic_cast.
