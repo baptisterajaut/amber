@@ -975,8 +975,13 @@ void ExportDialog::PopulatePresetCombo() {
 
 void ExportDialog::preset_selected(int index) {
   if (index <= 0) {
-    // "Default" selected - reset to built-in defaults
-    formatCombobox->setCurrentIndex(FORMAT_MPEG4);
+    // "Default" selected - reset to built-in defaults. Already on MP4, the index doesn't change: refill the codecs
+    // anyway so the encoder, its option rows and the compression type are reset too
+    if (formatCombobox->currentIndex() == FORMAT_MPEG4) {
+      format_changed(FORMAT_MPEG4);
+    } else {
+      formatCombobox->setCurrentIndex(FORMAT_MPEG4);
+    }
     widthSpinbox->setValue(amber::ActiveSequence->width);
     heightSpinbox->setValue(amber::ActiveSequence->height);
     framerateSpinbox->setValue(amber::ActiveSequence->frame_rate);

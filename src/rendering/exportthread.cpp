@@ -201,7 +201,7 @@ bool ExportThread::SetupVideo() {
 
   // Open video encoder
   ret = avcodec_open2(vcodec_ctx, vcodec, &opts);
-  warn_unused_options(opts, "video encoder");
+  if (ret >= 0) warn_unused_options(opts, "video encoder");  // a failed open evaluated nothing
   av_dict_free(&opts);
   if (ret < 0) {
     qCritical() << "Could not open output video encoder." << ret;
@@ -375,7 +375,7 @@ bool ExportThread::SetupAudio() {
   AVDictionary* aopts = nullptr;
   add_options(&aopts, params_.audio_options);
   ret = avcodec_open2(acodec_ctx, acodec, &aopts);
-  warn_unused_options(aopts, "audio encoder");
+  if (ret >= 0) warn_unused_options(aopts, "audio encoder");
   av_dict_free(&aopts);
   if (ret < 0) {
     qCritical() << "Could not open output audio encoder." << ret;
@@ -692,7 +692,7 @@ bool ExportThread::Export() {
     av_dict_set(&mux_opts, "movflags", "+faststart", 0);
   }
   ret = avformat_write_header(fmt_ctx, &mux_opts);
-  warn_unused_options(mux_opts, "muxer");
+  if (ret >= 0) warn_unused_options(mux_opts, "muxer");
   av_dict_free(&mux_opts);
   if (ret < 0) {
     qCritical() << "Could not write output file header." << ret;
