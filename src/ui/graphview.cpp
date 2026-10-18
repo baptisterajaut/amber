@@ -78,6 +78,8 @@ static void drop_stale_selection(EffectRow* row, QVector<int>& keys, QVector<int
   }
 }
 
+// CBA: one row at a time; multi-property overlay, speed graph and auto-bezier handles if asked
+
 // A value set from the mouse stays inside the field's range
 static double clamp_to_field(EffectField* field, double value) {
   if (field->type() != EffectField::EFFECT_FIELD_DOUBLE) return value;
@@ -942,6 +944,84 @@ void GraphView::select_all() {
     }
     selection_update();
   }
+}
+
+int GraphView::selected_key_info(EffectField** field, long* sequence_time, double* value) {
+  if (row == nullptr) return 0;
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
+  if (selected_keys.isEmpty()) return 0;
+  EffectField* f = row->Field(selected_keys_fields.at(0));
+  const EffectKeyframe& key = f->keyframes.at(selected_keys.at(0));
+  Clip* c = row->GetParentEffect()->parent_clip;
+  if (field) *field = f;
+  if (sequence_time) *sequence_time = key.time - c->clip_in() + c->timeline_in();
+  if (value) *value = key.data.toDouble();
+  return selected_keys.size();
+}
+
+// Snapshot of the selected keys when a Value/Time entry starts: the undo step's old values
+void GraphView::begin_entry() {
+  if (entry_active) return;
+  entry_old_times.clear();
+  entry_old_values.clear();
+  for (int i = 0; i < selected_keys.size(); i++) {
+    const EffectKeyframe& key = row->Field(selected_keys_fields.at(i))->keyframes.at(selected_keys.at(i));
+    entry_old_times.append(key.time);
+    entry_old_values.append(key.data);
+  }
+  entry_active = true;
+}
+
+void GraphView::set_selected_value(double value, bool final) {
+  if (row == nullptr) return;
+  if (!entry_active) drop_stale_selection(row, selected_keys, selected_keys_fields);
+  if (selected_keys.isEmpty()) return;
+  begin_entry();
+
+  QVector<EffectField*> fields;
+  for (int i = 0; i < selected_keys.size(); i++) {
+    EffectField* f = row->Field(selected_keys_fields.at(i));
+    fields.append(f);
+    f->keyframes[selected_keys.at(i)].data = clamp_to_field(f, value);
+  }
+  if (final) {
+    ComboAction* ca = keyframe_value_entry(fields, selected_keys, entry_old_values, value);
+    if (ca != nullptr) amber::UndoStack.push(ca);
+    entry_active = false;
+    selection_update();
+  }
+  update_ui(false);
+}
+
+void GraphView::set_selected_time(long sequence_time, bool final) {
+  if (row == nullptr) return;
+  if (!entry_active) drop_stale_selection(row, selected_keys, selected_keys_fields);
+  if (selected_keys.size() != 1) return;
+  begin_entry();
+
+  EffectField* f = row->Field(selected_keys_fields.at(0));
+  const int k = selected_keys.at(0);
+  Clip* c = row->GetParentEffect()->parent_clip;
+  const long old_time = entry_old_times.at(0);
+  QVector<long> fixed;
+  for (int j = 0; j < f->keyframes.size(); j++) {
+    if (j != k) fixed.append(f->keyframes.at(j).time);
+  }
+  // A time already taken by another key of the field steps back toward the key's old time
+  const long diff = amber::graph::AvoidKeyCollisions(sequence_time - c->timeline_in() + c->clip_in() - old_time, 0,
+                                                     {old_time}, {fixed});
+  f->keyframes[k].time = old_time + diff;
+  if (final) {
+    if (diff != 0) {
+      auto* cmd =
+          new KeyframeMemberChange(f, k, KeyframeMemberChange::kTime, qlonglong(old_time), qlonglong(old_time + diff));
+      cmd->setText(tr("Move Keyframe(s)"));
+      amber::UndoStack.push(cmd);
+    }
+    entry_active = false;
+    selection_update();
+  }
+  update_ui(false);
 }
 
 void GraphView::set_scroll_x(int s) {

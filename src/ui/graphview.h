@@ -48,6 +48,13 @@ class GraphView : public QWidget {
 
   void delete_selected_keys();
   void select_all();
+
+  // Number of selected keys; the first one's field, time (sequence frames, as the timeline shows it) and value
+  int selected_key_info(EffectField** field, long* sequence_time, double* value);
+  // Value / Time entry of the toolbar: applied live while a slider drags (final false), one undo step when final.
+  // Value goes to every selected key, Time only with a single key selected.
+  void set_selected_value(double value, bool final);
+  void set_selected_time(long sequence_time, bool final);
  signals:
   void x_scroll_changed(int);
   void y_scroll_changed(int);
@@ -74,6 +81,11 @@ class GraphView : public QWidget {
   double get_value_y(int);
 
   void selection_update();
+
+  void begin_entry();
+  bool entry_active{false};
+  QVector<long> entry_old_times;
+  QVector<QVariant> entry_old_values;
 
   void handle_mouse_pan(QMouseEvent* event);
   void handle_mouse_click_add_drag(QMouseEvent* event);

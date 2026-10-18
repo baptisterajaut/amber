@@ -24,12 +24,14 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QVariant>
+#include <climits>
 
 #include "effects/effect.h"
 #include "effects/effectfields.h"
 #include "effects/effectrow.h"
 #include "effects/ui/effectfieldwidget.h"
 #include "engine/clip.h"
+#include "engine/sequence.h"
 #include "global/debug.h"
 #include "panels.h"
 #include "rendering/renderfunctions.h"
@@ -88,6 +90,21 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   center_tool_layout->addWidget(bezier_button);
   center_tool_layout->addWidget(hold_button);
 
+  // Value and time of the selected key(s), typed or dragged
+  time_label_ = new QLabel();
+  time_slider_ = new LabelSlider();
+  time_slider_->SetDisplayType(LabelSlider::FrameNumber);
+  value_label_ = new QLabel();
+  value_slider_ = new LabelSlider();
+  right_tool_layout->addStretch();
+  right_tool_layout->addWidget(time_label_);
+  right_tool_layout->addSpacing(4);
+  right_tool_layout->addWidget(time_slider_);
+  right_tool_layout->addSpacing(12);
+  right_tool_layout->addWidget(value_label_);
+  right_tool_layout->addSpacing(4);
+  right_tool_layout->addWidget(value_slider_);
+
   layout->addWidget(tool_widget);
 
   QWidget* central_widget = new QWidget();
@@ -124,12 +141,19 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   connect(view, &GraphView::zoom_changed, header, [this](double z, double) { header->update_zoom(z); });
   connect(view, &GraphView::x_scroll_changed, header, &TimelineHeader::set_scroll);
   connect(view, &GraphView::selection_changed, this, &GraphEditor::set_key_button_enabled);
+  connect(view, &GraphView::selection_changed, this, [this]() { refresh_key_entry(); });
+  // The slider is still dragging until its last valueChanged: that one is the undo step
+  connect(time_slider_, &LabelSlider::valueChanged, this,
+          [this](double d) { view->set_selected_time(qRound64(d), !time_slider_->IsDragging()); });
+  connect(value_slider_, &LabelSlider::valueChanged, this,
+          [this](double d) { view->set_selected_value(d, !value_slider_->IsDragging()); });
 
   connect(linear_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
   connect(bezier_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
   connect(hold_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
 
   Retranslate();
+  refresh_key_entry();
 }
 
 EffectRow* GraphEditor::get_row() { return row; }
@@ -139,6 +163,8 @@ void GraphEditor::Retranslate() {
   linear_button->setText(tr("Linear"));
   bezier_button->setText(tr("Bezier"));
   hold_button->setText(tr("Hold"));
+  time_label_->setText(tr("Time:"));
+  value_label_->setText(tr("Value:"));
 }
 
 void GraphEditor::update_panel() {
@@ -161,6 +187,7 @@ void GraphEditor::update_panel() {
         }
       }
     }
+    refresh_key_entry();
 
     header->update();
     view->update();
@@ -263,6 +290,39 @@ void GraphEditor::set_key_button_enabled(bool e, int type) {
   bezier_button->setChecked(type == EFFECT_KEYFRAME_BEZIER);
   hold_button->setEnabled(e);
   hold_button->setChecked(type == EFFECT_KEYFRAME_HOLD);
+}
+
+void GraphEditor::refresh_key_entry() {
+  EffectField* field = nullptr;
+  long time = 0;
+  double value = 0;
+  const int count = view->selected_key_info(&field, &time, &value);
+
+  time_slider_->setEnabled(count == 1);
+  value_slider_->setEnabled(count > 0);
+
+  if (count == 1) {
+    time_slider_->SetFrameRate(row->GetParentEffect()->parent_clip->sequence->frame_rate);
+    time_slider_->SetValue(time);
+  } else {
+    time_slider_->SetValue(qSNaN());
+    time_slider_->setText(QString());
+  }
+
+  if (count > 0 && field->type() == EffectField::EFFECT_FIELD_DOUBLE) {
+    // Shown like the field's own slider (percent, dB...); several keys show the first one's value
+    DoubleField* df = static_cast<DoubleField*>(field);
+    const auto type = static_cast<amber::DisplayType>(df->GetDisplayType());
+    value_slider_->SetMinimum(qIsNaN(df->GetMinimum()) ? INT_MIN : df->GetMinimum());
+    value_slider_->SetMaximum(qIsNaN(df->GetMaximum()) ? INT_MAX : df->GetMaximum());
+    value_slider_->SetFrameRate(df->GetFrameRate());
+    value_slider_->SetDecimalPlaces(type == LabelSlider::Normal ? 3 : 1);
+    value_slider_->SetDisplayType(type);
+    value_slider_->SetValue(value);
+  } else {
+    value_slider_->SetValue(qSNaN());
+    value_slider_->setText(QString());
+  }
 }
 
 void GraphEditor::set_keyframe_type() {

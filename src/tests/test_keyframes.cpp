@@ -4,9 +4,12 @@
 #include "effects/effect.h"
 #include "effects/effectrow.h"
 #include "effects/fields/doublefield.h"
+#include "effects/keyframe.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
+#include "engine/undo/comboaction.h"
 #include "engine/undo/undo_effect.h"
+#include "engine/undo/undostack.h"
 #include "tests/test_appcontext_stub.h"
 
 // Hosts one DoubleField in a real Sequence -> Clip -> Effect -> EffectRow chain, headless.
@@ -27,6 +30,7 @@ class TestKeyframes : public QObject {
   void memberChangeUndoSurvivesReallocation();
   void memberChangeIgnoresStaleIndex();
   void keyDraggedPastNeighbourInterpolatesByTime();
+  void valueEntryOnThreeKeysIsOneUndoStep();
 
  private:
   static EffectKeyframe key(long time, double value, int type);
@@ -214,6 +218,41 @@ void TestKeyframes::keyDraggedPastNeighbourInterpolatesByTime() {
   move.undo();
   QCOMPARE(field_->keyframes.at(0).time, 0L);
   QCOMPARE(value_at_frame(15), 50.0);
+}
+
+// Graph Editor Value entry with three keys selected, after a live slider drag already wrote the value: one undo step
+// that restores all three
+void TestKeyframes::valueEntryOnThreeKeysIsOneUndoStep() {
+  field_->keyframes.append(key(0, 0.0, EFFECT_KEYFRAME_LINEAR));
+  field_->keyframes.append(key(10, 10.0, EFFECT_KEYFRAME_LINEAR));
+  field_->keyframes.append(key(20, 20.0, EFFECT_KEYFRAME_LINEAR));
+  const QVector<QVariant> old_values = {0.0, 10.0, 20.0};
+  for (auto& k : field_->keyframes) k.data = 5.0;
+
+  amber::UndoStack.clear();
+  ComboAction* ca = keyframe_value_entry({field_, field_, field_}, {0, 1, 2}, old_values, 5.0);
+  QVERIFY(ca != nullptr);
+  amber::UndoStack.push(ca);
+  QCOMPARE(amber::UndoStack.count(), 1);
+  for (const auto& k : field_->keyframes) QCOMPARE(k.data.toDouble(), 5.0);
+
+  amber::UndoStack.undo();
+  QCOMPARE(field_->keyframes.at(0).data.toDouble(), 0.0);
+  QCOMPARE(field_->keyframes.at(1).data.toDouble(), 10.0);
+  QCOMPARE(field_->keyframes.at(2).data.toDouble(), 20.0);
+  amber::UndoStack.redo();
+  for (const auto& k : field_->keyframes) QCOMPARE(k.data.toDouble(), 5.0);
+  amber::UndoStack.clear();
+
+  // The field's range applies, and a value no key changes for makes no undo step
+  field_->SetMaximum(8.0);
+  ComboAction* clamped = keyframe_value_entry({field_}, {0}, {QVariant(5.0)}, 50.0);
+  QVERIFY(clamped != nullptr);
+  clamped->redo();
+  QCOMPARE(field_->keyframes.at(0).data.toDouble(), 8.0);
+  delete clamped;
+  field_->SetMaximum(qSNaN());
+  QVERIFY(keyframe_value_entry({field_}, {1}, {QVariant(5.0)}, 5.0) == nullptr);
 }
 
 QTEST_GUILESS_MAIN(TestKeyframes)

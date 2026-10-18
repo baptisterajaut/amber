@@ -65,6 +65,12 @@ class GraphEditor : public Panel {
   QPushButton* linear_button;
   QPushButton* bezier_button;
   QPushButton* hold_button;
+  QLabel* time_label_;
+  LabelSlider* time_slider_;
+  QLabel* value_label_;
+  LabelSlider* value_slider_;
+  // Shows the selected key's time and value in the toolbar entries (or clears and disables them)
+  void refresh_key_entry();
  private slots:
   void set_key_button_enabled(bool e, int type);
   void set_keyframe_type();

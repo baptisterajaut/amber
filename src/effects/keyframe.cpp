@@ -23,6 +23,7 @@
 #include <QVector>
 
 #include "core/appcontext.h"
+#include "core/graphmath.h"
 #include "effect.h"
 #include "effectfields.h"
 #include "engine/undo/undo.h"
@@ -61,3 +62,19 @@ void delete_keyframes(QVector<EffectField*>& selected_key_fields, QVector<int>& 
 }
 
 bool keyframe_shows_handles(int type) { return type == EFFECT_KEYFRAME_BEZIER; }
+
+ComboAction* keyframe_value_entry(const QVector<EffectField*>& fields, const QVector<int>& keys,
+                                  const QVector<QVariant>& old_values, double value) {
+  ComboAction* ca = nullptr;
+  const int n = qMin(fields.size(), qMin(keys.size(), old_values.size()));
+  for (int i = 0; i < n; i++) {
+    EffectField* f = fields.at(i);
+    if (f->type() != EffectField::EFFECT_FIELD_DOUBLE) continue;
+    DoubleField* df = static_cast<DoubleField*>(f);
+    const double v = amber::graph::ClampToRange(value, df->GetMinimum(), df->GetMaximum());
+    if (old_values.at(i).toDouble() == v) continue;
+    if (ca == nullptr) ca = new ComboAction(QObject::tr("Change Keyframe Value"));
+    ca->append(new KeyframeMemberChange(f, keys.at(i), KeyframeMemberChange::kData, old_values.at(i), v));
+  }
+  return ca;
+}
