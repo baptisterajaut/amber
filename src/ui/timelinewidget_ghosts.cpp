@@ -223,11 +223,16 @@ static bool snapGhostMarkers(const Ghost& g, long& frame_diff) {
   if (g.clip < 0) return false;
   ClipPtr c = amber::ActiveSequence->clips.at(g.clip);
   for (int j = 0; j < c->get_markers().size(); j++) {
-    long marker_real_time = c->get_markers().at(j).frame + c->timeline_in() - c->clip_in();
-    long fm = marker_real_time + frame_diff;
-    if (panel_timeline->snap_to_timeline(&fm, true, true, true)) {
-      frame_diff = fm - marker_real_time;
-      return true;
+    const Marker& m = c->get_markers().at(j);
+    long marker_real_time = m.frame + c->timeline_in() - c->clip_in();
+    // a range marker snaps by its start and by its end
+    for (long point : {marker_real_time, marker_real_time + m.duration}) {
+      long fm = point + frame_diff;
+      if (panel_timeline->snap_to_timeline(&fm, true, true, true)) {
+        frame_diff = fm - point;
+        return true;
+      }
+      if (m.duration <= 0) break;
     }
   }
   return false;

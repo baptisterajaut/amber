@@ -340,8 +340,17 @@ static void drawClipMarkers(QPainter& p, ClipPtr clip, const QRect& clip_rect) {
     const Marker& m = clip->get_markers().at(j);
     long marker_time = m.frame + clip->timeline_in() - clip->clip_in();
     int marker_x = panel_timeline->getTimelineScreenPointFromFrame(marker_time);
+    int marker_y = clip_rect.bottom() - p.fontMetrics().height();
+    if (m.duration > 0) {
+      // the range may start or end outside a trimmed clip: show only the part on the clip
+      int end_x = panel_timeline->getTimelineScreenPointFromFrame(marker_time + m.duration);
+      p.save();
+      p.setClipRect(clip_rect, Qt::IntersectClip);
+      draw_marker_range(p, marker_x, end_x, marker_y, clip_rect.bottom(), false, m.color_label);
+      p.restore();
+    }
     if (marker_x > clip_rect.x() && marker_x < clip_rect.right()) {
-      draw_marker(p, marker_x, clip_rect.bottom() - p.fontMetrics().height(), clip_rect.bottom(), false, m.color_label);
+      draw_marker(p, marker_x, marker_y, clip_rect.bottom(), false, m.color_label);
     }
   }
 }

@@ -33,19 +33,27 @@
 #include <QInputDialog>
 #include <QCoreApplication>
 
+static QColor marker_color(bool selected, int color_label) {
+  if (selected) return QColor(208, 255, 208);
+  if (amber::CurrentConfig.show_color_labels && color_label > 0) return amber::GetColorLabel(color_label);
+  return QColor(128, 224, 128);
+}
+
 void draw_marker(QPainter& p, int x, int y, int bottom, bool selected, int color_label) {
   const QPoint points[5] = {QPoint(x, bottom), QPoint(x + MARKER_SIZE, bottom - MARKER_SIZE),
                              QPoint(x + MARKER_SIZE, y), QPoint(x - MARKER_SIZE, y),
                              QPoint(x - MARKER_SIZE, bottom - MARKER_SIZE)};
   p.setPen(Qt::black);
-  if (selected) {
-    p.setBrush(QColor(208, 255, 208));
-  } else if (amber::CurrentConfig.show_color_labels && color_label > 0) {
-    p.setBrush(amber::GetColorLabel(color_label));
-  } else {
-    p.setBrush(QColor(128, 224, 128));
-  }
+  p.setBrush(marker_color(selected, color_label));
   p.drawPolygon(points, 5);
+}
+
+void draw_marker_range(QPainter& p, int x, int end_x, int y, int bottom, bool selected, int color_label) {
+  QColor c = marker_color(selected, color_label);
+  p.setPen(c);
+  p.drawLine(end_x, y, end_x, bottom);
+  c.setAlpha(90);  // ~35 %
+  p.fillRect(QRect(QPoint(x, y), QPoint(end_x - 1, bottom)), c);
 }
 
 void set_marker_internal(Sequence* seq, const QVector<int>& clips) {

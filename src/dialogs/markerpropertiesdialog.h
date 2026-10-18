@@ -22,15 +22,18 @@ class MarkerPropertiesDialog : public QDialog {
   QVector<Marker*> markers_;
   QLineEdit* name_edit_;
   LabelSlider* frame_slider_;
+  LabelSlider* duration_slider_;
   QComboBox* color_combo_;
   bool name_modified_{false};
   bool frame_modified_{false};
+  bool duration_modified_{false};
   bool color_modified_{false};
 
   struct OriginalValues {
     QString name;
     long frame;
     int color_label;
+    long duration;
   };
   QVector<OriginalValues> originals_;
 };

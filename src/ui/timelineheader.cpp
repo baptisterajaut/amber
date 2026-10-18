@@ -41,6 +41,7 @@
 #include "panels/timeline.h"
 #include "panels/viewer.h"
 #include "project/media.h"
+#include "timeline/marker_range.h"
 #include "ui/colorlabel.h"
 #include "ui/menu.h"
 #include "ui/menuhelper.h"
@@ -193,13 +194,33 @@ void TimelineHeader::mousePressEvent(QMouseEvent* event) {
   int playhead_x = getHeaderScreenPointFromFrame(viewer->seq->playhead);
   QPoint pos = event->position().toPoint();
 
+  auto to_screen = [this](long f) { return getHeaderScreenPointFromFrame(f); };
   int hit_marker = -1;
+  // a range marker's end tick wins over heads; its band is no hit target, so long ranges don't eat the ruler
+  int hit_end = -1;
   if (viewer->marker_ref != nullptr) {
-    hit_marker = press_find_marker(selected_markers, *viewer->marker_ref, pos.x(), pos.y(), get_marker_offset(),
-                                   playhead_x, shift, [this](long f) { return getHeaderScreenPointFromFrame(f); });
+    if (pos.y() > get_marker_offset()) {
+      hit_end = amber::marker_range::end_tick_at(*viewer->marker_ref, pos.x(), to_screen);
+    }
+    if (hit_end < 0) {
+      hit_marker = press_find_marker(selected_markers, *viewer->marker_ref, pos.x(), pos.y(), get_marker_offset(),
+                                     playhead_x, shift, to_screen);
+    }
+    // Alt-drag on a point marker's head drags out a duration (a point marker has no end tick to grab)
+    if (hit_marker >= 0 && (event->modifiers() & Qt::AltModifier) &&
+        viewer->marker_ref->at(hit_marker).duration == 0) {
+      hit_end = hit_marker;
+    }
   }
 
-  if (hit_marker >= 0) {
+  if (hit_end >= 0) {
+    selected_markers = {hit_end};
+    resize_marker_index_ = hit_end;
+    resize_marker_original_duration_ = viewer->marker_ref->at(hit_end).duration;
+    drag_start_frame = getHeaderFrameFromScreenPoint(pos.x());
+    resizing_marker_ = true;
+    update();
+  } else if (hit_marker >= 0) {
     update();
     selected_marker_original_times.resize(selected_markers.size());
     for (int i = 0; i < selected_markers.size(); i++) {
@@ -247,6 +268,25 @@ void TimelineHeader::move_drag_markers(int mouse_x) {
   update_parents();
 }
 
+void TimelineHeader::move_drag_marker_end(int mouse_x) {
+  if (viewer->marker_ref == nullptr || resize_marker_index_ < 0 || resize_marker_index_ >= viewer->marker_ref->size())
+    return;
+  Marker& m = (*viewer->marker_ref)[resize_marker_index_];
+  long end_frame =
+      m.frame + resize_marker_original_duration_ + getHeaderFrameFromScreenPoint(mouse_x) - drag_start_frame;
+  if (snapping) panel_timeline->snap_to_timeline(&end_frame, true, false, true);
+  m.duration = amber::marker_range::duration_to(m.frame, end_frame);
+  update_parents();
+}
+
+void TimelineHeader::hover_check_marker_end(const QPoint& pos) {
+  if (viewer->marker_ref == nullptr || pos.y() <= get_marker_offset()) return;
+  if (amber::marker_range::end_tick_at(*viewer->marker_ref, pos.x(),
+                                       [this](long f) { return getHeaderScreenPointFromFrame(f); }) >= 0) {
+    setCursor(Qt::SizeHorCursor);
+  }
+}
+
 void TimelineHeader::hover_check_workarea(int mouse_x) {
   resizing_workarea = false;
   unsetCursor();
@@ -273,7 +313,7 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
   last_mouse_x_ = mouse_x;
 
   // while dragging a marker, auto-scroll when the cursor nears the ruler edges
-  if (dragging && dragging_markers && !resizing_workarea) {
+  if (dragging && (dragging_markers || resizing_marker_) && !resizing_workarea) {
     if (mouse_x < 25 || mouse_x > width() - 25) {
       if (scroll_bar_ != nullptr && scroll_timer_id_ == -1) scroll_timer_id_ = startTimer(16);  // ~60fps
     } else if (scroll_timer_id_ != -1) {
@@ -285,6 +325,8 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
   if (dragging) {
     if (resizing_workarea) {
       move_drag_workarea(mouse_x);
+    } else if (resizing_marker_) {
+      move_drag_marker_end(mouse_x);
     } else if (dragging_markers) {
       move_drag_markers(mouse_x);
     } else {
@@ -292,6 +334,7 @@ void TimelineHeader::mouseMoveEvent(QMouseEvent* event) {
     }
   } else {
     hover_check_workarea(mouse_x);
+    if (!resizing_workarea) hover_check_marker_end(event->position().toPoint());
   }
 }
 
@@ -303,12 +346,25 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
 
   if (viewer->seq != nullptr) {
     // a playhead drag ends the scrub gesture; update_parents() below requests its refresh
-    if (dragging && !resizing_workarea && !dragging_markers) viewer->viewer_widget->scrub_released();
+    if (dragging && !resizing_workarea && !dragging_markers && !resizing_marker_) {
+      viewer->viewer_widget->scrub_released();
+    }
     dragging = false;
     if (resizing_workarea) {
       auto* cmd = new SetTimelineInOutCommand(viewer->seq.get(), true, temp_workarea_in, temp_workarea_out);
       cmd->setText(tr("Resize Work Area"));
       amber::UndoStack.push(cmd);
+    } else if (resizing_marker_) {
+      if (viewer->marker_ref != nullptr && resize_marker_index_ >= 0 &&
+          resize_marker_index_ < viewer->marker_ref->size()) {
+        long new_duration = viewer->marker_ref->at(resize_marker_index_).duration;
+        if (new_duration != resize_marker_original_duration_) {
+          auto* rma = new ResizeMarkerAction(viewer->marker_ref, resize_marker_index_,
+                                             resize_marker_original_duration_, new_duration);
+          rma->setText(tr("Resize Marker"));
+          amber::UndoStack.push(rma);
+        }
+      }
     } else if (dragging_markers && selected_markers.size() > 0) {
       bool moved = false;
       ComboAction* ca = new ComboAction(tr("Move Marker(s)"));
@@ -330,6 +386,7 @@ void TimelineHeader::mouseReleaseEvent(QMouseEvent*) {
     resizing_workarea = false;
     dragging = false;
     dragging_markers = false;
+    resizing_marker_ = false;
     panel_timeline->snapped = false;
     update_parents();
   }
@@ -342,7 +399,8 @@ void TimelineHeader::timerEvent(QTimerEvent* event) {
   }
 
   // stop if the drag state is no longer valid
-  if (!dragging || !dragging_markers || resizing_workarea || viewer == nullptr || viewer->seq == nullptr) {
+  if (!dragging || !(dragging_markers || resizing_marker_) || resizing_workarea || viewer == nullptr ||
+      viewer->seq == nullptr) {
     killTimer(scroll_timer_id_);
     scroll_timer_id_ = -1;
     return;
@@ -375,7 +433,11 @@ void TimelineHeader::timerEvent(QTimerEvent* event) {
   if (new_val != bar->value()) {
     bar->setValue(new_val);
     // re-apply the marker movement so the dragged marker tracks the revealed frames
-    move_drag_markers(mouse_x);
+    if (resizing_marker_) {
+      move_drag_marker_end(mouse_x);
+    } else {
+      move_drag_markers(mouse_x);
+    }
   }
 }
 
@@ -513,6 +575,10 @@ void TimelineHeader::paint_markers(QPainter& p, int yoff, int h) {
         selected = true;
         break;
       }
+    }
+    if (m.duration > 0) {
+      draw_marker_range(p, marker_x, getHeaderScreenPointFromFrame(m.frame + m.duration), yoff, h - 1, selected,
+                        m.color_label);
     }
     draw_marker(p, marker_x, yoff, h - 1, selected, m.color_label);
   }
