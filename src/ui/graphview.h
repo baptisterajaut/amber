@@ -127,6 +127,9 @@ class GraphView : public QWidget {
 
   bool moved_keys;
   long last_frame_diff;  // frame offset of the previous key drag move, to step away from collisions
+  bool snapped;          // the key drag snapped, to the playhead or to snap_time (key time)
+  bool snap_is_playhead;
+  long snap_time;
 
   int current_handle;
 

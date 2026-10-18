@@ -97,6 +97,9 @@ GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   row = nullptr;
   moved_keys = false;
   last_frame_diff = 0;
+  snapped = false;
+  snap_is_playhead = false;
+  snap_time = 0;
   current_handle = kBezierHandleNone;
   rect_select = false;
   visible_in = 0;
@@ -438,8 +441,15 @@ void GraphView::paintEvent(QPaintEvent*) {
         paint_field_curves(p, i);
       }
 
+      // a key snapped to another curve's key: white line there (snapped to the playhead: the playhead turns white)
+      const bool dragging_snapped = (snapped && mousedown && moved_keys);
+      if (dragging_snapped && !snap_is_playhead) {
+        p.setPen(Qt::white);
+        p.drawLine(get_screen_x(snap_time), 0, get_screen_x(snap_time), height());
+      }
+
       // draw playhead (only meaningful when a row is selected; visible_in is row-dependent)
-      p.setPen(Qt::red);
+      p.setPen((dragging_snapped && snap_is_playhead) ? Qt::white : Qt::red);
       int playhead_x = qRound((double(panel_sequence_viewer->seq->playhead - visible_in) * x_zoom) - x_scroll);
       p.drawLine(playhead_x, 0, playhead_x, height());
     }
@@ -648,7 +658,35 @@ void GraphView::handle_mouse_keyframe_drag(QMouseEvent* event) {
     }
   }
   long frame_diff = qRound(double(event->position().toPoint().x() - start_x) / x_zoom);
+
+  // Snapping (timeline toggle): to the playhead and to the other curves' keys. Not to the keys of the key's own field:
+  // landing on one is a collision, refused below.
+  snapped = false;
+  if (panel_timeline->snapping && panel_sequence_viewer->seq != nullptr) {
+    Clip* c = row->GetParentEffect()->parent_clip;
+    const long playhead = panel_sequence_viewer->seq->playhead - visible_in + c->clip_in();
+    QVector<QVector<long>> targets(selected_keys.size());
+    for (int i = 0; i < selected_keys.size(); i++) {
+      targets[i].append(playhead);
+      for (int f = 0; f < row->FieldCount(); f++) {
+        if (f == selected_keys_fields.at(i) || !field_is_shown(f)) continue;
+        for (int j = 0; j < row->Field(f)->keyframes.size(); j++) {
+          bool moving = false;
+          for (int k = 0; k < selected_keys.size() && !moving; k++) {
+            moving = (selected_keys.at(k) == j && selected_keys_fields.at(k) == f);
+          }
+          if (!moving) targets[i].append(row->Field(f)->keyframes.at(j).time);
+        }
+      }
+    }
+    snapped = amber::graph::SnapKeyDrag(frame_diff, selected_keys_old_vals, targets,
+                                        amber::graph::kSnapRangePx / x_zoom, &snap_time);
+    snap_is_playhead = (snapped && snap_time == playhead);
+  }
+
+  const long wanted_diff = frame_diff;
   frame_diff = amber::graph::AvoidKeyCollisions(frame_diff, last_frame_diff, selected_keys_old_vals, fixed_times);
+  if (frame_diff != wanted_diff) snapped = false;
   last_frame_diff = frame_diff;
 
   for (int i = 0; i < selected_keys.size(); i++) {
@@ -878,6 +916,7 @@ void GraphView::mouseReleaseEvent(QMouseEvent*) {
   }
   moved_keys = false;
   mousedown = false;
+  snapped = false;
   click_add = false;
   click_add_proc = false;
   if (rect_select) {

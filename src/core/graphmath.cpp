@@ -1,6 +1,7 @@
 #include "graphmath.h"
 
 #include <cmath>
+#include <cstdlib>
 
 namespace amber::graph {
 
@@ -36,6 +37,30 @@ long AvoidKeyCollisions(long diff, long previous_diff, const QVector<long>& old_
     diff += step;
   }
   return diff;
+}
+
+bool SnapKeyDrag(long& diff, const QVector<long>& old_times, const QVector<QVector<long>>& targets, double range,
+                 long* target) {
+  bool found = false;
+  long best_shift = 0;
+  long best_target = 0;
+  const int n = qMin(old_times.size(), targets.size());
+  for (int i = 0; i < n; i++) {
+    const long t = old_times.at(i) + diff;
+    for (long candidate : targets.at(i)) {
+      const long shift = candidate - t;
+      if (std::abs(double(shift)) <= range && (!found || std::abs(shift) < std::abs(best_shift))) {
+        found = true;
+        best_shift = shift;
+        best_target = candidate;
+      }
+    }
+  }
+  if (found) {
+    diff += best_shift;
+    if (target) *target = best_target;
+  }
+  return found;
 }
 
 FitRect FitRange(double min_time, double max_time, double min_value, double max_value) {

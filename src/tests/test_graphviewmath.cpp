@@ -88,6 +88,35 @@ class TestGraphViewMath : public QObject {
     QCOMPARE(AvoidKeyCollisions(30, 29, {0, 10}, {{}, {50}}), 30L);
   }
 
+  void snapToNearestTargetInRange() {
+    long target = -1;
+    long diff = 8;  // key at 0 dragged to 8, playhead at 10, range 3 frames
+    QVERIFY(SnapKeyDrag(diff, {0}, {{10}}, 3.0, &target));
+    QCOMPARE(diff, 10L);
+    QCOMPARE(target, 10L);
+
+    diff = 5;  // 5 frames away: out of range
+    QVERIFY(!SnapKeyDrag(diff, {0}, {{10}}, 3.0, &target));
+    QCOMPARE(diff, 5L);
+  }
+
+  void snapPicksTheClosestMovingKey() {
+    // Keys at 0 and 20 moved by 8: 8 is 2 from 10, 28 is 1 from 29 -> the drag goes to 9
+    long target = -1;
+    long diff = 8;
+    QVERIFY(SnapKeyDrag(diff, {0, 20}, {{10}, {29}}, 3.0, &target));
+    QCOMPARE(diff, 9L);
+    QCOMPARE(target, 29L);
+  }
+
+  void snapRangeFollowsZoom() {
+    // 10 px: 1 frame at 10 px/frame, 5 frames at 2 px/frame
+    long diff = 7;
+    QVERIFY(!SnapKeyDrag(diff, {0}, {{10}}, kSnapRangePx / 10.0, nullptr));
+    QVERIFY(SnapKeyDrag(diff, {0}, {{10}}, kSnapRangePx / 2.0, nullptr));
+    QCOMPARE(diff, 10L);
+  }
+
   void easyEaseThirdOfTheWay() {
     // Key at 30 between keys at 0 and 90: handles flat, a third of the way to each neighbour
     const Handles h = EasyEase({-40, 12, 40, -7}, 30, 0L, 90L, EaseSide::kBoth);

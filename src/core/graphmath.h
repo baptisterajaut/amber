@@ -35,6 +35,13 @@ FitRect FitRange(double min_time, double max_time, double min_value, double max_
 long AvoidKeyCollisions(long diff, long previous_diff, const QVector<long>& old_times,
                         const QVector<QVector<long>>& fixed_times);
 
+// Time snapping of keys dragged in the Graph Editor: of all moving keys (old_times[i] + diff), the one closest to one
+// of its targets (targets[i]) within range frames brings the whole drag onto that target. Returns true and adjusts
+// diff when it snapped, *target being the frame snapped to.
+constexpr int kSnapRangePx = 10;  // as Timeline::get_snap_range(), in the Graph Editor's own zoom
+bool SnapKeyDrag(long& diff, const QVector<long>& old_times, const QVector<QVector<long>>& targets, double range,
+                 long* target);
+
 // Bezier handles of a key, relative to it (as in core/keyframe.h)
 struct Handles {
   double pre_x;
