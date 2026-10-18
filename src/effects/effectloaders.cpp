@@ -76,6 +76,22 @@ void load_internal_effects() {
   em.internal = EFFECT_INTERNAL_FILLLEFTRIGHT;
   effects.push_back(em);
 
+  em.name = "Parametric EQ";
+  em.internal = EFFECT_INTERNAL_PARAMETRICEQ;
+  effects.push_back(em);
+
+  em.name = "Compressor";
+  em.internal = EFFECT_INTERNAL_COMPRESSOR;
+  effects.push_back(em);
+
+  em.name = "Limiter";
+  em.internal = EFFECT_INTERNAL_LIMITER;
+  effects.push_back(em);
+
+  em.name = "Delay";
+  em.internal = EFFECT_INTERNAL_DELAY;
+  effects.push_back(em);
+
   em.subtype = EFFECT_TYPE_VIDEO;
 
   em.name = "Transform";

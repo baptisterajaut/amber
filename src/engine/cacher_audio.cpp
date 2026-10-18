@@ -23,6 +23,7 @@
 #include <QtMath>
 
 #include "core/audio.h"
+#include "effects/internal/audiostreamstate.h"
 #include "global/debug.h"
 #include "project/projectelements.h"
 #include "rendering/audio.h"
@@ -94,6 +95,12 @@ void apply_audio_effects(Clip* clip, double timecode_start, AVFrame* frame, int 
   }
 
   double timecode_end = timecode_start + bytes_to_seconds(nb_bytes, frame->ch_layout.nb_channels, frame->sample_rate);
+
+  // The first call (the leaf clip) names the stream for every effect up the nest chain. The rate is the one the
+  // samples play at: frame->sample_rate is the source rate before a speed change (24000 at 2x) and 0 for a reversed
+  // clip's buffer.
+  const amber::AudioProcessContext context{clip, current_audio_freq()};
+  amber::AudioProcessScope scope(&context);
 
   // Apply per-clip effects
   for (const auto& effect : clip->effects) {
