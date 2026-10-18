@@ -2,6 +2,7 @@
 
 #include "core/math.h"
 #include "effects/effect.h"
+#include "effects/fields/doublefield.h"
 #include "effects/internal/subtitleeffect.h"
 #include "effects/internal/voideffect.h"
 #include "engine/clip.h"
@@ -184,6 +185,109 @@ class TestEffects : public QObject {
     for (int y = 0; y < ph; y++) {
       for (int x = 0; x < pw; x++) QCOMPARE(int(uchar(pout[y * stride + x * 4])), 255 - (10 + 20 * y));
       QCOMPARE(int(uchar(pout[y * stride + pw * 4])), 0);  // padding untouched
+    }
+  }
+
+  // A fresh Frei0r effect starts at the plugin's own defaults, in the fields' units, and Reset to Defaults goes back
+  // there: a new Perspective keeps the image whole (its corners at the frame corners, not all at 0,0). A project
+  // saves every field, so one saved with the old all-zero values still loads them.
+  void frei0rFreshEffectsStartAtPluginDefaults() {
+    const QString dir = "/usr/lib/frei0r-1";
+    for (const char* so : {"perspective.so", "tint0r.so", "vignette.so", "medians.so"}) {
+      if (!QFileInfo::exists(dir + "/" + so)) QSKIP(qPrintable(QString("%1 Frei0r plugin not installed").arg(so)));
+    }
+    ScopedAppContext app_ctx;
+    Sequence seq;
+    seq.width = 64;
+    seq.height = 64;
+    Clip clip(&seq);
+    auto meta_for = [&](const char* so) {
+      EffectMeta m;
+      m.name = so;
+      m.category = "Frei0r";
+      m.path = dir;
+      m.filename = so;
+      m.internal = EFFECT_INTERNAL_FREI0R;
+      return m;
+    };
+    auto value = [](Effect& e, QStringView id) { return e.FindFieldById(id)->GetValueAt(0); };
+    auto is_default = [](Effect& e, QStringView id) {
+      EffectField* f = e.FindFieldById(id);
+      return f->HasDefault() && f->GetValueAt(0) == f->GetDefaultData();
+    };
+
+    const EffectMeta perspective = meta_for("perspective.so");
+    Frei0rEffect fresh(&clip, &perspective);
+    QCOMPARE(value(fresh, u"0X").toDouble(), 0.0);
+    QCOMPARE(value(fresh, u"0Y").toDouble(), 0.0);
+    QCOMPARE(value(fresh, u"1X").toDouble(), 100.0);
+    QCOMPARE(value(fresh, u"1Y").toDouble(), 0.0);
+    QCOMPARE(value(fresh, u"2X").toDouble(), 0.0);
+    QCOMPARE(value(fresh, u"2Y").toDouble(), 100.0);
+    QCOMPARE(value(fresh, u"3X").toDouble(), 100.0);
+    QCOMPARE(value(fresh, u"3Y").toDouble(), 100.0);
+    QVERIFY(is_default(fresh, u"3X"));
+    QCOMPARE(static_cast<DoubleField*>(fresh.FindFieldById(u"3X"))->GetDefault(), 100.0);  // what its slider resets to
+    // and renders the frame untouched in the middle, where all-zero corners left nothing
+    QByteArray in(64 * 64 * 4, char(200));
+    QByteArray out(64 * 64 * 4, char(0));
+    fresh.process_image(0.0, reinterpret_cast<uint8_t*>(in.data()), reinterpret_cast<uint8_t*>(out.data()), 64, 64,
+                        64 * 4);
+    QCOMPARE(int(uchar(out[(32 * 64 + 32) * 4])), 200);
+
+    const EffectMeta tint = meta_for("tint0r.so");  // colours and a double
+    Frei0rEffect tint0r(&clip, &tint);
+    QCOMPARE(value(tint0r, u"0").value<QColor>(), QColor::fromRgbF(0, 0, 0));
+    QCOMPARE(value(tint0r, u"1").value<QColor>(), QColor::fromRgbF(0.5f, 1, 0.5f));
+    QCOMPARE(value(tint0r, u"2").toDouble(), 25.0);
+    QVERIFY(is_default(tint0r, u"1"));
+    const EffectMeta vig = meta_for("vignette.so");
+    Frei0rEffect vignette(&clip, &vig);
+    QCOMPARE(value(vignette, u"2").toDouble(), 60.0);
+    const EffectMeta med = meta_for("medians.so");  // a string
+    Frei0rEffect medians(&clip, &med);
+    QCOMPARE(value(medians, u"0").toString(), QString("Square3x3"));
+    QVERIFY(is_default(medians, u"0"));
+
+    auto save = [](Effect& e) {
+      QByteArray xml;
+      QXmlStreamWriter writer(&xml);
+      writer.writeStartElement("effect");
+      e.save(writer);
+      writer.writeEndElement();
+      return xml;
+    };
+    auto load = [](Frei0rEffect& e, const QByteArray& xml) {
+      QXmlStreamReader reader(xml);
+      while (reader.readNextStartElement() && reader.name() != QLatin1String("effect")) {
+      }
+      e.load(reader);
+    };
+    // Saved by an older build: every field written, at the old all-zero default, with or without the unit marker
+    for (const QByteArray& marker : {QByteArray("<positionunit value=\"percent\"/>"), QByteArray()}) {
+      Frei0rEffect old_project(&clip, &perspective);
+      load(old_project,
+           "<effect name=\"Frei0r/Perspective\" enabled=\"1\">"
+           "<row><field id=\"0X\" value=\"0\"/><field id=\"0Y\" value=\"0\"/></row>"
+           "<row><field id=\"1X\" value=\"0\"/><field id=\"1Y\" value=\"0\"/></row>"
+           "<row><field id=\"2X\" value=\"0\"/><field id=\"2Y\" value=\"0\"/></row>"
+           "<row><field id=\"3X\" value=\"0\"/><field id=\"3Y\" value=\"0\"/></row>" +
+               marker + "</effect>");
+      for (const char16_t* id : {u"1X", u"2Y", u"3X", u"3Y"}) QCOMPARE(value(old_project, id).toDouble(), 0.0);
+    }
+    // A fresh effect saved and reopened, also through a Missing Effect, keeps the defaults (not scaled again)
+    const QByteArray saved = save(fresh);
+    VoidEffect missing(&clip, "Frei0r/Perspective");
+    {
+      QXmlStreamReader reader(saved);
+      reader.readNextStartElement();
+      missing.load(reader);
+    }
+    for (const QByteArray& xml : {saved, save(missing)}) {
+      Frei0rEffect reopened(&clip, &perspective);
+      load(reopened, xml);
+      QCOMPARE(value(reopened, u"1X").toDouble(), 100.0);
+      QCOMPARE(value(reopened, u"3Y").toDouble(), 100.0);
     }
   }
 
