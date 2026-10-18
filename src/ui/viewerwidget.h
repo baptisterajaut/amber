@@ -112,7 +112,7 @@ class ViewerWidget : public QRhiWidget {
   // True over a gizmo handle (dot/target), which takes the mouse before a guide under it
   bool gizmo_handle_at(const QPoint& widget_pos);
   void move_gizmos(QMouseEvent* event, bool done);
-  int find_guide_at(int video_x, int video_y, bool* hit_mirror = nullptr) const;
+  int find_guide_at(const QPointF& widget_pos, bool* hit_mirror = nullptr) const;
   void show_guide_context_menu(int guide_index, const QPoint& global_pos, bool on_mirror = false);
   bool dragging{false};
   int dragging_guide_index_{-1};

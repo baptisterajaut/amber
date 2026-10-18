@@ -31,9 +31,10 @@ void main(void) {
   float dist = distance(aspectCoord, aspectCenter);
   float size = maskRadius * 0.01;
 
-  // Smooth falloff at the mask's edge, controlled by maskSoftness
+  // Smooth falloff at the mask's edge, controlled by maskSoftness: 1 inside, 0 outside. smoothstep is undefined
+  // for edge0 >= edge1 (Softness 0 made them equal and Mesa inverted the mask), so the edges stay ordered and apart
   float innerEdge = size * (1.0 - maskSoftness * 0.01);
-  float maskFactor = smoothstep(size, innerEdge, dist);
+  float maskFactor = 1.0 - smoothstep(innerEdge, size + 1e-5, dist);
 
   vec4 sourceColor = texture(sceneTex, vTexCoord);
   vec4 censoredColor = vec4(0.0);

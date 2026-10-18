@@ -126,6 +126,20 @@ private:
   long new_time;
 };
 
+// Marker Properties: replaces every field of one marker. Index-addressed like MoveMarkerAction, so it
+// survives the array reallocating between redo and undo (an appended marker, later undone).
+class EditMarkerAction : public OliveAction {
+public:
+  EditMarkerAction(QVector<Marker>* m, int i, const Marker& old_marker, const Marker& new_marker);
+  void doUndo() override;
+  void doRedo() override;
+private:
+  QVector<Marker>* active_array;
+  int index;
+  Marker old_marker;
+  Marker new_marker;
+};
+
 class DeleteMarkerAction : public OliveAction {
 public:
   explicit DeleteMarkerAction(QVector<Marker>* m);

@@ -498,9 +498,11 @@ bool ExportThread::Export()
         render_complete_ = false;
         renderer->start_render(amber::ActiveSequence.get(), 1, nullptr, video_frame->data[0], video_frame->linesize[0]/4, 0);
 
-        // Wait for RenderThread to return (predicate guards against lost wakeup)
+        // Wait for RenderThread to return (predicate guards against lost wakeup). Bounded: Interrupt() wakes without
+        // the mutex, so its wake can land between this check and the wait; the timeout re-checks interrupt_ (a lost
+        // wake costs at most 100 ms of cancel latency)
         while (!render_complete_ && !interrupt_) {
-          waitCond.wait(&mutex);
+          waitCond.wait(&mutex, 100);
         }
 
         if (interrupt_) {
@@ -707,6 +709,8 @@ cleanup_state:
   if (!export_error.isEmpty()) {
     return false;
   }
+  // Interrupt() no longer waits for the drain: a cancel during it lands here, and run() removes the file
+  if (interrupt_) return false;
 
   // Write container trailer
   ret = av_write_trailer(fmt_ctx);
@@ -823,10 +827,12 @@ bool ExportThread::WasInterrupted()
 
 void ExportThread::Interrupt()
 {
-  mutex.lock();
+  // Never takes `mutex`: run() holds it across all of Export() but the waits, an encoder call or the final drain
+  // included, which take seconds with lookahead encoders (libx264/x265 rc-lookahead, libvpx lag-in-frames) at high
+  // resolutions and froze the GUI thread calling this.
+  // interrupt_ is atomic and every loop of the export checks it; the wake only shortens the render wait.
   interrupt_ = true;
   waitCond.wakeAll();
-  mutex.unlock();
 }
 
 void ExportThread::wake() {

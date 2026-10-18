@@ -43,6 +43,9 @@ Clip::~Clip() = default;
 
 Cacher::Cacher(Clip* c) : clip(c) {}
 
+// VoidEffect::copy (copied fields are UI labels, nothing to keyframe)
+void Effect::copy_field_keyframes(EffectPtr) {}
+
 // Never called
 
 void Effect::refresh() {}

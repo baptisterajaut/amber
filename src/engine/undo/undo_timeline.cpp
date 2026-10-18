@@ -279,6 +279,29 @@ void MoveMarkerAction::doRedo() {
   (*active_array)[index].frame = new_time;
 }
 
+EditMarkerAction::EditMarkerAction(QVector<Marker>* m, int i, const Marker& o, const Marker& n) {
+  active_array = m;
+  index = i;
+  old_marker = o;
+  new_marker = n;
+}
+
+void EditMarkerAction::doUndo() {
+  if (!active_array || index < 0 || index >= active_array->size()) {
+    qWarning() << "EditMarkerAction::doUndo: marker index out of range";
+    return;
+  }
+  (*active_array)[index] = old_marker;
+}
+
+void EditMarkerAction::doRedo() {
+  if (!active_array || index < 0 || index >= active_array->size()) {
+    qWarning() << "EditMarkerAction::doRedo: marker index out of range";
+    return;
+  }
+  (*active_array)[index] = new_marker;
+}
+
 DeleteMarkerAction::DeleteMarkerAction(QVector<Marker> *m) {
   active_array = m;
   sorted = false;
