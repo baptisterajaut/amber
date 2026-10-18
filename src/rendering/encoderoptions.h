@@ -49,9 +49,15 @@ struct EncoderInfo {
   int quality_default = 0;
   bool supports_average_bitrate = false;  // bit_rate alone gives an average-bitrate (ABR/VBR) encode
   // FFmpeg's wrapper implements AV_CODEC_FLAG_PASS1/PASS2: an average-bitrate export can analyse first
-  // (ExportThread). The stats go through stats_out/stats_in, or with a file option through a file.
+  // (ExportThread). The stats go through stats_out/stats_in, or with a file option through a file. With
+  // two_pass_probe, two_pass_works() has the last word.
   bool supports_two_pass = false;
   QString two_pass_stats_key;  // AVOption naming the stats file (libx264, libx265); empty: stats_out/stats_in
+  // The first libavcodec (AV_VERSION_INT, compared with avcodec_version()) whose wrapper has two-pass; 0: all
+  unsigned two_pass_min_avcodec = 0;
+  // Whether pass 1 writes statistics also depends on the encoder library FFmpeg was built against, which libavcodec
+  // doesn't tell: two_pass_works() checks it with a test encode
+  bool two_pass_probe = false;
   QVector<EncoderOption> options;
 };
 
@@ -67,6 +73,14 @@ EncoderInfo validate_encoder_info(const EncoderInfo& raw, const AVCodec* codec);
 
 // The validated descriptor of name. False when name isn't in the table or isn't installed.
 bool find_encoder_info(const QString& name, EncoderInfo* out);
+
+// info.supports_two_pass, checked with pass1_writes_stats() for an encoder with two_pass_probe. The test encode runs
+// at most once per process and encoder (SVT-AV1 4.2: about 250 ms, mostly opening the encoder). Thread-safe.
+bool two_pass_works(const EncoderInfo& info);
+
+// Uncached: name, opened with AV_CODEC_FLAG_PASS1 for a 64x64 average-bitrate encode, puts statistics in stats_out
+// for one frame and the drain
+bool pass1_writes_stats(const QString& name);
 
 // Installed encoders of id from the table, in preference order. A codec without table entries gets its default
 // encoder (avcodec_find_encoder), if any. A codec whose table encoders are all missing gets none.

@@ -80,7 +80,7 @@ struct ExportParams {
   // movflags=+faststart when the muxer has it (MOV family): the index goes before the media data
   bool faststart = false;
   // Analyse the whole range first, then encode (AV_CODEC_FLAG_PASS1/PASS2). Only for COMPRESSION_TYPE_TARGETBR video
-  // with an encoder whose descriptor has supports_two_pass (rendering/encoderoptions.h); ignored otherwise.
+  // with an encoder that passes amber::two_pass_works() (rendering/encoderoptions.h); ignored otherwise.
   // CBA: two-pass only in Average bitrate mode; libvpx/libaom also gain from it in quality mode
   bool two_pass = false;
 };

@@ -737,7 +737,7 @@ bool ExportThread::TwoPassApplies() {
                              : nullptr;
   amber::EncoderInfo info;
   if (params_.video_compression_type != COMPRESSION_TYPE_TARGETBR || codec == nullptr ||
-      !amber::find_encoder_info(QString::fromUtf8(codec->name), &info) || !info.supports_two_pass) {
+      !amber::find_encoder_info(QString::fromUtf8(codec->name), &info) || !amber::two_pass_works(info)) {
     qInfo() << "Export: two-pass ignored, it needs Average bitrate video through an encoder that supports it";
     return false;
   }

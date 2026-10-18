@@ -743,8 +743,10 @@ void ExportDialog::comp_type_changed(int) {
 }
 
 void ExportDialog::update_two_pass() {
-  twoPassCheckbox->setVisible(has_vencoder_info_ && vencoder_info_.supports_two_pass &&
-                              compressionTypeCombobox->currentData().toInt() == COMPRESSION_TYPE_TARGETBR);
+  // Average bitrate first: two_pass_works() may run a test encode
+  twoPassCheckbox->setVisible(has_vencoder_info_ &&
+                              compressionTypeCombobox->currentData().toInt() == COMPRESSION_TYPE_TARGETBR &&
+                              amber::two_pass_works(vencoder_info_));
   fit_height();
 }
 

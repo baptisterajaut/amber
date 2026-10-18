@@ -23,6 +23,18 @@ const EncoderOption* find_option(const EncoderInfo& info, const QString& key) {
   return nullptr;
 }
 
+bool has_string_option(const AVCodec* codec, const char* key) {
+  if (codec->priv_class == nullptr) return false;
+  const AVClass* cls = codec->priv_class;
+  const AVOption* o = av_opt_find(&cls, key, nullptr, 0, AV_OPT_SEARCH_FAKE_OBJ);
+  return o != nullptr && o->type == AV_OPT_TYPE_STRING;
+}
+
+QString avcodec_version_string() {
+  const unsigned v = avcodec_version();
+  return QString("%1.%2.%3").arg(v >> 16).arg((v >> 8) & 0xff).arg(v & 0xff);
+}
+
 }  // namespace
 
 class TestEncoderOptions : public QObject {
@@ -174,20 +186,29 @@ class TestEncoderOptions : public QObject {
     QVERIFY(!amber::find_encoder_info("libvpx", &info));
   }
 
-  // Two-pass where FFmpeg n9.0's wrapper implements AV_CODEC_FLAG_PASS1/PASS2 (sources cited in encoderoptions.cpp),
-  // libx264 and libx265 through a stats file option
+  // Two-pass where the installed FFmpeg's wrapper implements AV_CODEC_FLAG_PASS1/PASS2 (sources cited in
+  // encoderoptions.cpp): libx264, libvpx-vp9 and libaom-av1 in every FFmpeg that has them, libx265 where it has its
+  // x265-stats option, libsvtav1 from libavcodec 62.23.104 (both FFmpeg 8.1). libx264 and libx265 use a stats file.
   void twoPassFlags() {
     // Not librav1e: its wrapper never gets pass data out of rav1e (encoderoptions.cpp)
     const QStringList two_pass = {"libx264", "libx265", "libvpx-vp9", "libaom-av1", "libsvtav1"};
     for (const EncoderInfo& raw : amber::encoder_table()) {
       QCOMPARE(raw.supports_two_pass, two_pass.contains(raw.name));
+      // Only libsvtav1's statistics depend on the SVT-AV1 FFmpeg was built against
+      QCOMPARE(raw.two_pass_probe, raw.name == "libsvtav1");
       EncoderInfo info;
       if (!amber::find_encoder_info(raw.name, &info)) continue;  // not installed
-      qInfo("%s: two-pass %d, stats file option \"%s\"", qPrintable(info.name), int(info.supports_two_pass),
-            qPrintable(info.two_pass_stats_key));
-      QCOMPARE(info.supports_two_pass, raw.supports_two_pass);
+      const AVCodec* codec = avcodec_find_encoder_by_name(raw.name.toUtf8().constData());
+      bool expected = raw.supports_two_pass;
+      if (raw.name == "libx265") expected = has_string_option(codec, "x265-stats");
+      if (raw.name == "libsvtav1") expected = avcodec_version() >= AV_VERSION_INT(62, 23, 104);
+      qInfo("%s: two-pass %d (libavcodec %s), stats file option \"%s\"", qPrintable(info.name),
+            int(info.supports_two_pass), qPrintable(avcodec_version_string()), qPrintable(info.two_pass_stats_key));
+      QCOMPARE(info.supports_two_pass, expected);
       // Only for average bitrate, which every two-pass encoder has
       if (info.supports_two_pass) QVERIFY(info.supports_average_bitrate);
+      // No test encode without two_pass_probe
+      if (!info.two_pass_probe) QCOMPARE(amber::two_pass_works(info), info.supports_two_pass);
     }
     EncoderInfo x264;
     if (amber::find_encoder_info("libx264", &x264)) QCOMPARE(x264.two_pass_stats_key, QString("stats"));
@@ -207,6 +228,39 @@ class TestEncoderOptions : public QObject {
     QVERIFY(amber::validate_encoder_info(raw, x264).supports_two_pass);
     raw.two_pass_stats_key = "amber_no_such_stats_option";
     QVERIFY(!amber::validate_encoder_info(raw, x264).supports_two_pass);
+  }
+
+  // A libavcodec older than two_pass_min_avcodec turns two-pass off
+  void twoPassNeedsItsAvcodec() {
+    const AVCodec* flac = avcodec_find_encoder_by_name("flac");
+    if (flac == nullptr) QSKIP("flac encoder not in this FFmpeg build");
+    EncoderInfo raw;
+    raw.name = "flac";
+    raw.codec_id = AV_CODEC_ID_FLAC;
+    raw.supports_two_pass = true;
+    raw.two_pass_min_avcodec = avcodec_version();
+    QVERIFY(amber::validate_encoder_info(raw, flac).supports_two_pass);
+    raw.two_pass_min_avcodec = avcodec_version() + 1;
+    QVERIFY(!amber::validate_encoder_info(raw, flac).supports_two_pass);
+  }
+
+  // The pass-1 test encode tells an encoder that writes statistics from one that doesn't, and two_pass_works() follows
+  // it for libsvtav1
+  void pass1Probe() {
+    QVERIFY(!amber::pass1_writes_stats("amber_no_such_encoder"));
+    if (avcodec_find_encoder_by_name("libvpx-vp9") != nullptr) QVERIFY(amber::pass1_writes_stats("libvpx-vp9"));
+    // librav1e takes PASS1 but never gets pass data out of rav1e (encoderoptions.cpp)
+    if (avcodec_find_encoder_by_name("librav1e") != nullptr) QVERIFY(!amber::pass1_writes_stats("librav1e"));
+
+    EncoderInfo svt;
+    if (!amber::find_encoder_info("libsvtav1", &svt)) QSKIP("libsvtav1 not in this FFmpeg build");
+    const bool writes = amber::pass1_writes_stats("libsvtav1");
+    qInfo("libsvtav1, libavcodec %s: two-pass %d, pass 1 writes statistics %d", qPrintable(avcodec_version_string()),
+          int(svt.supports_two_pass), int(writes));
+    // Before FFmpeg 8.1 the wrapper ignores PASS1 (FFmpeg 6.1 with SVT-AV1 1.7: a plain encode, no statistics)
+    if (!svt.supports_two_pass) QVERIFY(!writes);
+    QCOMPARE(amber::two_pass_works(svt), svt.supports_two_pass && writes);
+    QCOMPARE(amber::two_pass_works(svt), svt.supports_two_pass && writes);  // the cached answer
   }
 
   void unknownEncoderNotFound() {
