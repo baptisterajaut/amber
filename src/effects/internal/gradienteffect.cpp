@@ -19,6 +19,7 @@
 ***/
 
 #include "gradienteffect.h"
+#include "core/gradientramp.h"
 #include "engine/clip.h"
 
 #include <QImage>
@@ -43,6 +44,12 @@ GradientEffect::GradientEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   EffectRow* end_row = new EffectRow(this, tr("End Color"));
   end_color_field = new ColorField(end_row, "end_color");
   end_color_field->SetValueAt(0, QColor(Qt::white));
+
+  // Intermediate stops between Start Color (0) and End Color (1). Not keyframeable, like Curves; a project saved
+  // before it loads "" (no stop), the plain two-colour gradient
+  EffectRow* ramp_row = new EffectRow(this, tr("Color Ramp"), true, false);
+  ramp_field = new GradientRampField(ramp_row, "ramp");
+  ramp_field->SetEndFields(start_color_field, end_color_field);
 
   EffectRow* angle_row = new EffectRow(this, tr("Angle"));
   angle_field = new DoubleField(angle_row, "angle");
@@ -95,6 +102,7 @@ void GradientEffect::redraw(double timecode) {
 
   const QColor c0 = start_color_field->GetColorAt(timecode);
   const QColor c1 = end_color_field->GetColorAt(timecode);
+  const QGradientStops stops = amber::gradientramp::stops(c0, c1, ramp_field->GetRampAt(timecode));
 
   if (type_field->GetValueAt(timecode).toInt() == GRADIENT_TYPE_LINEAR) {
     const double angle_deg = angle_field->GetDoubleAt(timecode);
@@ -104,16 +112,14 @@ void GradientEffect::redraw(double timecode) {
     const QPointF center(w / 2.0, h / 2.0);
     const double half_diag = 0.5 * qSqrt(double(w) * w + double(h) * h);
     QLinearGradient g(center - QPointF(dx, dy) * half_diag, center + QPointF(dx, dy) * half_diag);
-    g.setColorAt(0.0, c0);
-    g.setColorAt(1.0, c1);
+    g.setStops(stops);
     p.fillRect(0, 0, w, h, g);
   } else {
     const double cx = center_x_field->GetDoubleAt(timecode) / 100.0 * w;
     const double cy = center_y_field->GetDoubleAt(timecode) / 100.0 * h;
     const double r = radius_field->GetDoubleAt(timecode) / 100.0 * qMax(w, h);
     QRadialGradient g(QPointF(cx, cy), r);
-    g.setColorAt(0.0, c0);
-    g.setColorAt(1.0, c1);
+    g.setStops(stops);
     p.fillRect(0, 0, w, h, g);
   }
   p.end();

@@ -42,6 +42,7 @@ class GradientEffect : public Effect {
   ComboField* type_field;
   ColorField* start_color_field;
   ColorField* end_color_field;
+  GradientRampField* ramp_field;
   DoubleField* angle_field;
   DoubleField* center_x_field;
   DoubleField* center_y_field;

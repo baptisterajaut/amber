@@ -15,6 +15,7 @@
 #include "fields/doublefield.h"
 #include "fields/filefield.h"
 #include "fields/fontfield.h"
+#include "fields/gradientrampfield.h"
 #include "fields/labelfield.h"
 #include "fields/stringfield.h"
 

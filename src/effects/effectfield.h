@@ -86,7 +86,11 @@ class EffectField : public QObject {
     EFFECT_FIELD_UI,
 
     /** Values are tone curves (canonical string, see core/curves.h). Also corresponds to CurveField. */
-    EFFECT_FIELD_CURVE
+    EFFECT_FIELD_CURVE,
+
+    /** Values are colour ramp stops (canonical string, see core/gradientramp.h). Also corresponds to
+     * GradientRampField. */
+    EFFECT_FIELD_GRADIENT_RAMP
   };
 
   /**

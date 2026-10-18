@@ -145,6 +145,7 @@ add_library(amber-engine OBJECT
   effects/fields/doublefield.cpp effects/fields/doublefield.h
   effects/fields/filefield.cpp effects/fields/filefield.h
   effects/fields/fontfield.cpp effects/fields/fontfield.h
+  effects/fields/gradientrampfield.cpp effects/fields/gradientrampfield.h
   effects/fields/labelfield.cpp effects/fields/labelfield.h
   effects/fields/stringfield.cpp effects/fields/stringfield.h
   # effects/internal/
@@ -259,6 +260,7 @@ set(UI_SOURCES
   effects/ui/effectfieldwidgetfactory.cpp
   effects/ui/filefieldwidget.cpp effects/ui/filefieldwidget.h
   effects/ui/fontfieldwidget.cpp effects/ui/fontfieldwidget.h
+  effects/ui/gradientrampfieldwidget.cpp effects/ui/gradientrampfieldwidget.h
   effects/ui/labelfieldwidget.cpp effects/ui/labelfieldwidget.h
   effects/ui/stringfieldwidget.cpp effects/ui/stringfieldwidget.h
   global/global.cpp global/global.h
@@ -292,6 +294,7 @@ set(UI_SOURCES
   ui/flowlayout.cpp ui/flowlayout.h
   ui/focusfilter.cpp ui/focusfilter.h
   ui/fontcombobox.cpp ui/fontcombobox.h
+  ui/gradientrampeditor.cpp ui/gradientrampeditor.h
   ui/graphview.cpp ui/graphview.h
   ui/icons.cpp ui/icons.h
   ui/keyframedrawing.cpp ui/keyframedrawing.h
