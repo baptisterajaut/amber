@@ -20,6 +20,7 @@ extern "C" {
 #include <QFile>
 #include <QGuiApplication>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QScopeGuard>
 #include <QSurfaceFormat>
 #include <QTemporaryDir>
@@ -262,8 +263,13 @@ QString reversed_fixture(const QString& url, const QString& wav) {
            QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(kClipOut));
 }
 
-// One WAV clip on A1 over timeline [0, out), at a speed (no pitch correction), optionally reversed
-QString speed_fixture(const QString& url, const QString& wav, long out, double speed, bool reversed) {
+// One clip on A1 over timeline [0, out), trimmed by clip_in, at a speed (no pitch correction), optionally reversed: a
+// WAV clip, or with no wav a null-media clip (what a Tone or Noise generator sits on)
+QString ramp_fixture(const QString& url, const QString& wav, long clip_in, long out, double speed, bool reversed) {
+  const QString footage = wav.isEmpty()
+                              ? QString()
+                              : QString(R"(<footage id="1" folder="1" name="dc" url="%1"/>)").arg(wav.toHtmlEscaped());
+  const QString media = wav.isEmpty() ? QString() : QString(R"( media="1" stream="0")");
   return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <version>%1</version>
@@ -272,22 +278,23 @@ QString speed_fixture(const QString& url, const QString& wav, long out, double s
         <folder id="1" name="Bin" parent="0"/>
     </folders>
     <media>
-        <footage id="1" folder="1" name="dc" url="%3"/>
+        %3
     </media>
     <sequences>
-        <sequence id="1" folder="0" name="Speed" width="%4" height="%4" framerate="%5" afreq="%6" alayout="3"
+        <sequence id="1" folder="0" name="Ramp" width="%4" height="%4" framerate="%5" afreq="%6" alayout="3"
                   open="1">
-            <clip id="0" enabled="1" name="dc" clipin="0" in="0" out="%7" track="0" r="128" g="192" b="128"
-                  autoscale="1" type="0" media="1" stream="0" speed="%8" maintainpitch="0" reverse="%9">
+            <clip id="0" enabled="1" name="dc" clipin="%7" in="0" out="%8" track="0" r="128" g="192" b="128"
+                  autoscale="1" type="0"%9 speed="%10" maintainpitch="0" reverse="%11">
                 <linked></linked>
             </clip>
         </sequence>
     </sequences>
 </project>
 )")
-      .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), wav.toHtmlEscaped(), QString::number(kSize),
-           QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(out),
-           QString::number(speed, 'f', 3), reversed ? "1" : "0");
+      .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), footage, QString::number(kSize),
+           QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(clip_in), QString::number(out),
+           media)
+      .arg(QString::number(speed, 'f', 3), reversed ? "1" : "0");
 }
 
 // RGBA8 copy of a decoded video frame (BT.601 through swscale's defaults, same for source and output)
@@ -571,6 +578,48 @@ class TestHeadlessRender : public QObject {
     QVERIFY(vf != nullptr);
     QVERIFY(vf->proxy);
     QCOMPARE(vf->proxy_path, proxy);
+  }
+
+  // Load, as the active sequence, ramp_fixture() over media (empty: a null-media clip) and wait for its probe. Callers
+  // return on QTest::currentTestFailed().
+  void load_ramp_project(const QString& project, const QString& media, long clip_in, long out, double speed,
+                         bool reversed, SequencePtr* seq) {
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(ramp_fixture(project, media, clip_in, out, speed, reversed).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    *seq = amber::ActiveSequence;
+    QVERIFY(*seq != nullptr);
+    QCOMPARE((*seq)->clips.size(), 1);
+    Clip* clip = (*seq)->clips.at(0).get();
+    QCOMPARE(clip->media() == nullptr, media.isEmpty());
+    if (clip->media() != nullptr) {
+      QPointer<PreviewGenerator> gen(clip->media()->to_footage()->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(clip->media()->to_footage()->ready);
+    }
+  }
+
+  // Audio-only export of a whole sequence from start_frame to its end
+  QString export_audio(Sequence* seq, const QString& file, AVCodecID codec, long start_frame) {
+    ExportParams params{};
+    params.filename = file;
+    params.video_enabled = false;
+    params.audio_enabled = true;
+    params.audio_codec = codec;
+    params.audio_sampling_rate = kAudioRate;
+    params.audio_bitrate = 1536;  // ignored by PCM and FLAC
+    params.start_frame = start_frame;
+    params.end_frame = seq->getEndFrame();
+    return export_sequence(seq, params);
   }
 
  private slots:
@@ -1170,50 +1219,69 @@ class TestHeadlessRender : public QObject {
   void volumeRampFollowsTimeline_data() {
     QTest::addColumn<double>("speed");
     QTest::addColumn<bool>("reversed");
-    QTest::newRow("speed 1") << 1.0 << false;
-    QTest::newRow("speed 2") << 2.0 << false;
-    QTest::newRow("reversed") << 1.0 << true;
+    QTest::addColumn<int>("clip_in");      // frames trimmed off the clip's head
+    QTest::addColumn<int>("start_frame");  // export range start
+    // wav, flac (a FLAC seek stops at a block boundary short of its target, a WAV seek is sample-exact) or tone (a
+    // null-media clip with a Tone)
+    QTest::addColumn<QString>("source");
+    QTest::newRow("speed 1") << 1.0 << false << 0 << 0 << "wav";
+    QTest::newRow("speed 2") << 2.0 << false << 0 << 0 << "wav";
+    QTest::newRow("reversed") << 1.0 << true << 0 << 0 << "wav";
+    QTest::newRow("trimmed") << 1.0 << false << 10 << 0 << "wav";
+    QTest::newRow("flac, export from frame 10") << 1.0 << false << 0 << 10 << "flac";
+    QTest::newRow("flac, trimmed, export from frame 10") << 1.0 << false << 10 << 10 << "flac";
+    QTest::newRow("flac, reversed, export from frame 10") << 1.0 << true << 0 << 10 << "flac";
+    QTest::newRow("tone") << 1.0 << false << 0 << 0 << "tone";
+    QTest::newRow("tone, trimmed") << 1.0 << false << 10 << 0 << "tone";
+    QTest::newRow("tone, trimmed, export from frame 10") << 1.0 << false << 10 << 10 << "tone";
   }
 
-  // A Volume keyframed linearly from 0 at the clip's start to 1 at its end, on a constant level, exports as one
-  // straight ramp over the clip's timeline span whatever the clip's speed or direction: keyframes live in clip-local
-  // timeline time (as for video effects), so each chunk handed to the effect must span its real playback duration
+  // A Volume keyframed linearly from 0 at the clip's start to 1 at its end exports as one straight ramp over the
+  // clip's timeline span whatever the clip's speed, direction, trim or the export's start: keyframes live in
+  // clip-local timeline time (as for video effects, get_timecode()), so each chunk handed to the effect must start at
+  // its sample 0's clip-local time and span its real playback duration
   void volumeRampFollowsTimeline() {
     QFETCH(double, speed);
     QFETCH(bool, reversed);
+    QFETCH(int, clip_in);
+    QFETCH(int, start_frame);
+    QFETCH(QString, source);
+    const bool tone = source == "tone";
     constexpr long kOut = 30;  // 1 s
     constexpr double kLevel = 0.5;
-    const QString tag = QString("ramp_%1_%2").arg(speed).arg(reversed);
-    const QString wav = dir_.filePath(tag + ".wav");
-    {
-      QFile f(wav);
+    const QString tag = QString("ramp_%1").arg(QTest::currentDataTag()).replace(QRegularExpression("[^a-z0-9]+"), "_");
+    QString media;
+    if (!tone) {
+      media = dir_.filePath(tag + ".wav");
+      QFile f(media);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
       f.write(dc_wav(3.0, kLevel));  // enough source for 2x
     }
-    const QString project = dir_.filePath(tag + ".ove");
-    {
-      QFile f(project);
-      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(speed_fixture(project, wav, kOut, speed, reversed).toUtf8());
+    if (source == "flac") {
+      if (avcodec_find_encoder(AV_CODEC_ID_FLAC) == nullptr) QSKIP("FLAC encoder not in this FFmpeg build");
+      SequencePtr src;
+      load_ramp_project(dir_.filePath(tag + "_src.ove"), media, 0, 60, 1.0, false, &src);
+      if (QTest::currentTestFailed()) return;
+      const QString flac = dir_.filePath(tag + ".flac");
+      const QString error = export_audio(src.get(), flac, AV_CODEC_ID_FLAC, 0);
+      QVERIFY2(error.isEmpty(), qPrintable(error));
+      media = flac;
     }
-
-    bool succeeded = false;
-    auto* lt = new LoadThread(project, false);
-    QPointer<LoadThread> lt_guard(lt);
-    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
-    lt->start();
-    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
-    QVERIFY(succeeded);
-    SequencePtr seq = amber::ActiveSequence;
-    QVERIFY(seq != nullptr);
-    QCOMPARE(seq->clips.size(), 1);
+    SequencePtr seq;
+    load_ramp_project(dir_.filePath(tag + ".ove"), media, clip_in, kOut, speed, reversed, &seq);
+    if (QTest::currentTestFailed()) return;
     Clip* clip = seq->clips.at(0).get();
-    QVERIFY(clip->media() != nullptr);
-    QPointer<PreviewGenerator> gen(clip->media()->to_footage()->preview_gen.load());
-    QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
     QCOMPARE(clip->reversed(), reversed);
     QCOMPARE(clip->speed().value, speed);
+    QCOMPARE(clip->clip_in(), long(clip_in));
 
+    if (tone) {
+      const EffectMeta* tone_meta = get_meta_from_name("Tone");
+      QVERIFY(tone_meta != nullptr);
+      EffectPtr gen = Effect::Create(clip, tone_meta);  // 1000 Hz at 25 % amount
+      QVERIFY(gen != nullptr);
+      clip->effects.append(gen);
+    }
     const EffectMeta* meta = get_meta_from_name("Volume");
     QVERIFY(meta != nullptr);
     EffectPtr vol = Effect::Create(clip, meta);
@@ -1222,7 +1290,7 @@ class TestHeadlessRender : public QObject {
     EffectRow* row = vol->row(0);
     row->SetKeyframingInternal(true);
     EffectField* field = row->Field(0);
-    for (const auto& [time, value] : {std::pair<long, double>{0, 0.0}, {kOut, 1.0}}) {
+    for (const auto& [time, value] : {std::pair<long, double>{clip_in, 0.0}, {clip_in + kOut, 1.0}}) {
       EffectKeyframe k;
       k.time = time;
       k.data = value;
@@ -1231,39 +1299,53 @@ class TestHeadlessRender : public QObject {
     }
     clip->effects.append(vol);
 
-    ExportParams params{};
-    params.filename = dir_.filePath(tag + "_out.wav");
-    params.video_enabled = false;
-    params.audio_enabled = true;
-    params.audio_codec = AV_CODEC_ID_PCM_S16LE;
-    params.audio_sampling_rate = kAudioRate;
-    params.audio_bitrate = 1536;  // ignored by PCM
-    params.start_frame = 0;
-    params.end_frame = seq->getEndFrame();
-    const QString error = export_sequence(seq.get(), params);
+    const QString out = dir_.filePath(tag + "_out.wav");
+    const QString error = export_audio(seq.get(), out, AV_CODEC_ID_PCM_S16LE, start_frame);
     QVERIFY2(error.isEmpty(), qPrintable(error));
-    const Decoded d = decode_file(params.filename);
+    const Decoded d = decode_file(out);
     QVERIFY(d.ok);
     QVERIFY(d.has_audio);
 
-    // Sample i plays at i / kAudioRate s into the clip: expected kLevel * i / span. A chunk spanning twice its duration
-    // runs the ramp ahead and drops back at the next chunk (a sawtooth). Within half a frame of a keyframe the field
-    // returns the keyframe's own value (GetKeyframeData() rounds the time to a frame), so those plateaus are skipped.
+    // Timeline sample t plays at t / kAudioRate s into the clip: expected gain t / span. A chunk spanning twice its
+    // duration runs the ramp ahead and drops back at the next chunk (a sawtooth). Within half a frame of a keyframe the
+    // field returns the keyframe's own value (GetKeyframeData() rounds the time to a frame), so those plateaus are
+    // skipped. A tone's gain is its amplitude over a whole 48-sample period, against the Tone's own level.
     const int span = int(qRound64(kOut / kFps * kAudioRate));
     const int half_frame = int(qRound64(0.5 / kFps * kAudioRate));
-    QVERIFY(d.audio_left.size() >= span);
+    const int offset = int(qRound64(start_frame / kFps * kAudioRate));  // timeline sample of the export's sample 0
+    QVERIFY(d.audio_left.size() >= span - offset);
+    constexpr int kPeriod = 48;  // 1000 Hz at 48 kHz
+    const double tone_level = log_volume(0.25) * INT16_MAX / 32768.0;
+    const int step = tone ? kPeriod : 1;
     double max_dev = 0;
-    int worst = half_frame;
-    for (int i = half_frame; i < span - half_frame; i++) {
-      const double dev = qAbs(double(d.audio_left[i]) - kLevel * i / span);
+    int worst = 0;
+    double worst_got = 0, worst_want = 0;
+    for (int t = qMax(half_frame, offset); t + step <= span - half_frame; t += step) {
+      double got = 0, want = 0;
+      if (tone) {
+        double s = 0, c = 0;
+        for (int k = 0; k < kPeriod; k++) {
+          const double v = d.audio_left[t - offset + k];
+          s += v * qSin(2.0 * M_PI * k / kPeriod);
+          c += v * qCos(2.0 * M_PI * k / kPeriod);
+        }
+        got = 2.0 / kPeriod * qSqrt(s * s + c * c) / tone_level;
+        want = (t + (kPeriod - 1) / 2.0) / span;
+      } else {
+        got = d.audio_left[t - offset] / kLevel;
+        want = double(t) / span;
+      }
+      const double dev = qAbs(got - want);
       if (!(dev <= max_dev)) {  // NaN-safe
         max_dev = dev;
-        worst = i;
+        worst = t;
+        worst_got = got;
+        worst_want = want;
       }
     }
-    qInfo("volume ramp, speed %.1f%s: max |deviation| %.5f at sample %d (got %.5f, want %.5f)", speed,
-          reversed ? " reversed" : "", max_dev, worst, d.audio_left[worst], kLevel * worst / span);
-    QVERIFY2(max_dev < 0.001, qPrintable(QString("max deviation %1 at sample %2").arg(max_dev).arg(worst)));
+    qInfo("volume ramp: max |gain deviation| %.5f at timeline sample %d (gain %.5f, want %.5f)", max_dev, worst,
+          worst_got, worst_want);
+    QVERIFY2(max_dev < 0.002, qPrintable(QString("max deviation %1 at sample %2").arg(max_dev).arg(worst)));
   }
 
   // A viewer request (start_render() without pixels or file name, published without the thread's lock) must be rendered
