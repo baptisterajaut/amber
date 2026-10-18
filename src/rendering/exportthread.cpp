@@ -485,6 +485,10 @@ bool ExportThread::SetupContainer() {
   // The analysis pass only needs the context, to set the encoder up exactly as for the file (global header)
   if (pass_ == 1) return true;
 
+  // image2 (an image sequence) opens each frame's file itself: opening the pattern would leave an empty file under the
+  // pattern's own name, "name%05d.png"
+  if (fmt_ctx->oformat->flags & AVFMT_NOFILE) return true;
+
   ret = avio_open(&fmt_ctx->pb, c_filename, AVIO_FLAG_WRITE);
   if (ret < 0) {
     // Failed to get a valid write handle for the exported file. Exit the export and throw an error.
