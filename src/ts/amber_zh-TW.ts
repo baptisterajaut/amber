@@ -4,6 +4,11 @@
 <context>
     <name>AboutDialog</name>
     <message>
+        <location filename="../dialogs/aboutdialog.cpp" line="36"/>
+        <source>About Amber</source>
+        <translation>關於 Amber</translation>
+    </message>
+    <message>
         <location filename="../dialogs/aboutdialog.cpp" line="73"/>
         <source>A fork of Olive 0.1 ported to Qt 6 and modern FFmpeg, with many bugs from the original codebase fixed along the way.</source>
         <translation>基於 Olive 0.1 的分支，已移植至 Qt 6 和現代 FFmpeg，並在過程中修復了原始程式碼中的許多錯誤。</translation>
@@ -49,91 +54,96 @@
         <source>Threads:</source>
         <translation>綫程數量:</translation>
     </message>
+    <message>
+        <location filename="../dialogs/advancedvideodialog.cpp" line="109"/>
+        <source>Auto</source>
+        <translation>自動</translation>
+    </message>
 </context>
 <context>
     <name>AmberGlobal</name>
     <message>
-        <location filename="../global/global.cpp" line="75"/>
+        <location filename="../global/global.cpp" line="76"/>
         <source>Amber Project %1</source>
         <translation>Amber 項目 %1</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="138"/>
+        <location filename="../global/global.cpp" line="140"/>
         <source>Auto-recovery</source>
         <translation>自動恢復</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="139"/>
+        <location filename="../global/global.cpp" line="141"/>
         <source>Amber didn&apos;t close properly and an autorecovery file was detected. Would you like to open it?</source>
         <translation>Amber 未正常關閉，已偵測到自動恢復檔案。您要開啟它嗎？</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="316"/>
+        <location filename="../global/global.cpp" line="344"/>
         <source>Project Already Empty</source>
         <translation>項目已經為空</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="317"/>
+        <location filename="../global/global.cpp" line="345"/>
         <source>You already have a bare project. If you&apos;re trying to activate the timeline, you need to create a new sequence (File &gt; New &gt; Sequence, or %1).</source>
         <translation>您已經有一個空項目。要啟動時間線，請建立新序列（檔案 &gt; 新建 &gt; 片段，或 %1）。</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="334"/>
+        <location filename="../global/global.cpp" line="362"/>
         <source>Open Project...</source>
         <translation>打開項目...</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="346"/>
+        <location filename="../global/global.cpp" line="374"/>
         <source>Missing recent project</source>
         <translation>缺少最近的項目</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="347"/>
+        <location filename="../global/global.cpp" line="375"/>
         <source>The project &apos;%1&apos; no longer exists. Would you like to remove it from the recent projects list?</source>
         <translation>這個項目 &apos;%1&apos; 已經不存在了。您想把它從最近的項目列表中刪除嗎?</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="367"/>
+        <location filename="../global/global.cpp" line="395"/>
         <source>Save Project As...</source>
         <translation>保存項目為...</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="393"/>
+        <location filename="../global/global.cpp" line="421"/>
         <source>Unsaved Project</source>
         <translation>未保存的項目</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="394"/>
+        <location filename="../global/global.cpp" line="422"/>
         <source>This project has changed since it was last saved. Would you like to save it before closing?</source>
         <translation>此項目自上次保存後已有變更，是否要在關閉前保存？</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="444"/>
+        <location filename="../global/global.cpp" line="472"/>
         <source>Missing Project File</source>
         <translation>缺少項目檔案</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="445"/>
+        <location filename="../global/global.cpp" line="473"/>
         <source>Specified project &apos;%1&apos; does not exist.</source>
         <translation>指定的項目 &apos;%1&apos; 不存在。</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="517"/>
+        <location filename="../global/global.cpp" line="545"/>
         <source>No active sequence</source>
         <translation>沒有已激活的序列</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="518"/>
+        <location filename="../global/global.cpp" line="546"/>
         <source>Please open the sequence to perform this action.</source>
         <translation>請先開啟序列以執行此操作。</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="585"/>
+        <location filename="../global/global.cpp" line="613"/>
         <source>No clips selected</source>
         <translation>未選擇任何剪輯</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="585"/>
+        <location filename="../global/global.cpp" line="613"/>
         <source>Select the clips you wish to auto-cut</source>
         <translation>請選擇要自動剪切靜音的剪輯</translation>
     </message>
@@ -369,6 +379,89 @@
         <location filename="../effects/ui/colorfieldwidget.cpp" line="50"/>
         <source>Pick color from viewer</source>
         <translation>從查看器中擷取顏色</translation>
+    </message>
+</context>
+<context>
+    <name>ColorLabel</name>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="13"/>
+        <source>Red</source>
+        <translation>紅色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="13"/>
+        <source>Maroon</source>
+        <translation>栗色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="14"/>
+        <source>Orange</source>
+        <translation>橙色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="14"/>
+        <source>Brown</source>
+        <translation>棕色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="15"/>
+        <source>Yellow</source>
+        <translation>黃色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="15"/>
+        <source>Olive</source>
+        <translation>橄欖色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="16"/>
+        <source>Lime</source>
+        <translation>萊姆色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="16"/>
+        <source>Green</source>
+        <translation>綠色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="17"/>
+        <source>Cyan</source>
+        <translation>青色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="17"/>
+        <source>Teal</source>
+        <translation>藍綠色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="18"/>
+        <source>Blue</source>
+        <translation>藍色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="18"/>
+        <source>Navy</source>
+        <translation>藏青色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="19"/>
+        <source>Pink</source>
+        <translation>粉紅色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="19"/>
+        <source>Purple</source>
+        <translation>紫色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="20"/>
+        <source>Silver</source>
+        <translation>銀色</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="20"/>
+        <source>Gray</source>
+        <translation>灰色</translation>
     </message>
 </context>
 <context>
@@ -1204,6 +1297,7 @@ Default lets rav1e choose (6)</source>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="722"/>
+        <location filename="../dialogs/exportdialog.cpp" line="1135"/>
         <source>%p% (ETA: %1:%2:%3)</source>
         <translation>%p% (估計所需時間: %1:%2:%3)</translation>
     </message>
@@ -1472,6 +1566,16 @@ Default lets rav1e choose (6)</source>
         <location filename="../dialogs/exportdialog.cpp" line="1151"/>
         <source>Add this export to the render queue (File &gt; Render Queue)</source>
         <translation>將此匯出加入算繪佇列（檔案 &gt; 算繪佇列）</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/exportdialog.cpp" line="1156"/>
+        <source>Export</source>
+        <translation>匯出</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/exportdialog.cpp" line="1162"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="1219"/>
@@ -2242,6 +2346,11 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
         <translation>保留</translation>
     </message>
     <message>
+        <location filename="../ui/keyframeview.cpp" line="85"/>
+        <source>Graph Editor</source>
+        <translation>圖形編輯器</translation>
+    </message>
+    <message>
         <location filename="../ui/keyframeview.cpp" line="87"/>
         <source>Properties...</source>
         <translation>屬性...</translation>
@@ -2414,582 +2523,582 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
         <translation>歡迎來到 %1</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1146"/>
+        <location filename="../ui/mainwindow.cpp" line="1149"/>
         <source>&amp;File</source>
         <translation>檔案(&amp;F)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1147"/>
+        <location filename="../ui/mainwindow.cpp" line="1150"/>
         <source>&amp;New</source>
         <translation>新建(&amp;N)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1148"/>
+        <location filename="../ui/mainwindow.cpp" line="1151"/>
         <source>&amp;Open Project</source>
         <translation>打開項目(&amp;O)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1149"/>
+        <location filename="../ui/mainwindow.cpp" line="1152"/>
         <source>Open an existing project file</source>
         <translation>打開現有的項目檔案</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1150"/>
+        <location filename="../ui/mainwindow.cpp" line="1153"/>
         <source>Clear Recent List</source>
         <translation>清除最近的列表</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1151"/>
+        <location filename="../ui/mainwindow.cpp" line="1154"/>
         <source>Open Recent</source>
         <translation>打開最近的列表</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1152"/>
+        <location filename="../ui/mainwindow.cpp" line="1155"/>
         <source>&amp;Save Project</source>
         <translation>保存項目(&amp;S)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1153"/>
+        <location filename="../ui/mainwindow.cpp" line="1156"/>
         <source>Save the current project</source>
         <translation>保存目前的項目</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1154"/>
+        <location filename="../ui/mainwindow.cpp" line="1157"/>
         <source>Save Project &amp;As</source>
         <translation>保存項目為(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1155"/>
+        <location filename="../ui/mainwindow.cpp" line="1158"/>
         <source>Save the current project to a new file</source>
         <translation>將目前的項目保存為新檔案</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1156"/>
+        <location filename="../ui/mainwindow.cpp" line="1159"/>
         <source>&amp;Import...</source>
         <translation>匯入(&amp;I)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1157"/>
+        <location filename="../ui/mainwindow.cpp" line="1160"/>
         <source>Import media files into the project</source>
         <translation>將媒體檔案匯入項目</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1158"/>
+        <location filename="../ui/mainwindow.cpp" line="1161"/>
         <source>Import Subtitle (.srt)...</source>
         <translation>匯入字幕 (.srt)...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1159"/>
+        <location filename="../ui/mainwindow.cpp" line="1162"/>
         <source>Relink Media...</source>
         <translation>重新連結媒體...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1160"/>
+        <location filename="../ui/mainwindow.cpp" line="1163"/>
         <source>Reconnect media files that have moved or are missing</source>
         <translation>重新連結已移動或缺少的媒體檔案</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1161"/>
+        <location filename="../ui/mainwindow.cpp" line="1164"/>
         <source>&amp;Export...</source>
         <translation>匯出(&amp;E)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1162"/>
+        <location filename="../ui/mainwindow.cpp" line="1165"/>
         <source>Render and export the active sequence to a video file</source>
         <translation>算繪並將目前序列匯出為視頻檔案</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1164"/>
+        <location filename="../ui/mainwindow.cpp" line="1167"/>
         <source>Render the exports queued from the Export dialog</source>
         <translation>算繪從匯出對話方塊加入佇列的匯出工作</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1165"/>
+        <location filename="../ui/mainwindow.cpp" line="1168"/>
         <source>Export &amp;Frame...</source>
         <translation>匯出影格(&amp;F)...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1166"/>
+        <location filename="../ui/mainwindow.cpp" line="1169"/>
         <source>Export the current frame as an image</source>
         <translation>將目前影格匯出為圖像</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1167"/>
+        <location filename="../ui/mainwindow.cpp" line="1170"/>
         <source>E&amp;xit</source>
         <translation>退出(&amp;I)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1168"/>
+        <location filename="../ui/mainwindow.cpp" line="1171"/>
         <source>Close the application</source>
         <translation>關閉應用程式</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1170"/>
+        <location filename="../ui/mainwindow.cpp" line="1173"/>
         <source>&amp;Edit</source>
         <translation>編輯(&amp;E)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1171"/>
+        <location filename="../ui/mainwindow.cpp" line="1174"/>
         <source>&amp;Undo</source>
         <translation>撤銷(&amp;U)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1172"/>
+        <location filename="../ui/mainwindow.cpp" line="1175"/>
         <source>Redo</source>
         <translation>重做</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1173"/>
+        <location filename="../ui/mainwindow.cpp" line="1176"/>
         <source>Select &amp;All</source>
         <translation>選擇全部(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1174"/>
+        <location filename="../ui/mainwindow.cpp" line="1177"/>
         <source>Deselect All</source>
         <translation>取消選擇所有</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1175"/>
+        <location filename="../ui/mainwindow.cpp" line="1178"/>
         <source>Ripple to In Point</source>
         <translation>波紋修剪至入點</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1176"/>
+        <location filename="../ui/mainwindow.cpp" line="1179"/>
         <source>Ripple to Out Point</source>
         <translation>波紋修剪至出點</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1177"/>
+        <location filename="../ui/mainwindow.cpp" line="1180"/>
         <source>Edit to In Point</source>
         <translation>編輯至入點</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1178"/>
+        <location filename="../ui/mainwindow.cpp" line="1181"/>
         <source>Edit to Out Point</source>
         <translation>編輯至出點</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1179"/>
+        <location filename="../ui/mainwindow.cpp" line="1182"/>
         <source>Delete In/Out Point</source>
         <translation>刪除標記的區域</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1180"/>
+        <location filename="../ui/mainwindow.cpp" line="1183"/>
         <source>Ripple Delete In/Out Point</source>
         <translation>波紋刪除入/出點</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1181"/>
+        <location filename="../ui/mainwindow.cpp" line="1184"/>
         <source>Set/Edit Marker</source>
         <translation>設置/編輯標記</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1183"/>
+        <location filename="../ui/mainwindow.cpp" line="1186"/>
         <source>&amp;View</source>
         <translation>視圖(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1184"/>
+        <location filename="../ui/mainwindow.cpp" line="1187"/>
         <source>Zoom In</source>
         <translation>放大</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1185"/>
+        <location filename="../ui/mainwindow.cpp" line="1188"/>
         <source>Zoom Out</source>
         <translation>縮小</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1186"/>
+        <location filename="../ui/mainwindow.cpp" line="1189"/>
         <source>Increase Track Height</source>
         <translation>增加軌道高度</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1187"/>
+        <location filename="../ui/mainwindow.cpp" line="1190"/>
         <source>Decrease Track Height</source>
         <translation>降低軌道高度</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1188"/>
+        <location filename="../ui/mainwindow.cpp" line="1191"/>
         <source>Toggle Show All</source>
         <translation>軌道全部顯示</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1189"/>
+        <location filename="../ui/mainwindow.cpp" line="1192"/>
         <source>Track Lines</source>
         <translation>軌道綫</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1190"/>
+        <location filename="../ui/mainwindow.cpp" line="1193"/>
         <source>Rectified Waveforms</source>
         <translation>整流波形</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1191"/>
+        <location filename="../ui/mainwindow.cpp" line="1194"/>
         <source>Frames</source>
         <translation>幀</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1192"/>
+        <location filename="../ui/mainwindow.cpp" line="1195"/>
         <source>Drop Frame</source>
         <translatorcomment>丟失的幀</translatorcomment>
         <translation>跳格</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1193"/>
+        <location filename="../ui/mainwindow.cpp" line="1196"/>
         <source>Non-Drop Frame</source>
         <translatorcomment>保留的幀</translatorcomment>
         <translation>不跳格</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1194"/>
+        <location filename="../ui/mainwindow.cpp" line="1197"/>
         <source>Milliseconds</source>
         <translation>毫秒</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1196"/>
+        <location filename="../ui/mainwindow.cpp" line="1199"/>
         <source>Preview Resolution</source>
         <translation>預覽解析度</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1197"/>
+        <location filename="../ui/mainwindow.cpp" line="1200"/>
         <source>Full</source>
         <translation>完整</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1198"/>
+        <location filename="../ui/mainwindow.cpp" line="1201"/>
         <source>1/2 (Half)</source>
         <translation>1/2（半）</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1199"/>
+        <location filename="../ui/mainwindow.cpp" line="1202"/>
         <source>1/4 (Quarter)</source>
         <translation>1/4（四分之一）</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1201"/>
+        <location filename="../ui/mainwindow.cpp" line="1204"/>
         <source>Title/Action Safe Area</source>
         <translation>字幕/行動安全區域</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1202"/>
+        <location filename="../ui/mainwindow.cpp" line="1205"/>
         <source>Off</source>
         <translation>關閉</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1203"/>
-        <location filename="../ui/mainwindow.cpp" line="1257"/>
+        <location filename="../ui/mainwindow.cpp" line="1206"/>
+        <location filename="../ui/mainwindow.cpp" line="1260"/>
         <source>Default</source>
         <translation>預設</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1204"/>
+        <location filename="../ui/mainwindow.cpp" line="1207"/>
         <source>4:3</source>
         <translation>4:3</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1205"/>
+        <location filename="../ui/mainwindow.cpp" line="1208"/>
         <source>16:9</source>
         <translation>16:9</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1206"/>
+        <location filename="../ui/mainwindow.cpp" line="1209"/>
         <source>Custom</source>
         <translation>自定義</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1208"/>
+        <location filename="../ui/mainwindow.cpp" line="1211"/>
         <source>Show Guides</source>
         <translation>顯示參考線</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1209"/>
+        <location filename="../ui/mainwindow.cpp" line="1212"/>
         <source>Guides</source>
         <translation>參考線</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1210"/>
+        <location filename="../ui/mainwindow.cpp" line="1213"/>
         <source>Lock Guides</source>
         <translation>鎖定參考線</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1211"/>
+        <location filename="../ui/mainwindow.cpp" line="1214"/>
         <source>Show Frame Rate</source>
         <translation>顯示影格速率</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1212"/>
+        <location filename="../ui/mainwindow.cpp" line="1215"/>
         <source>Show Pixel Sampler</source>
         <translation>顯示像素取樣器</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1213"/>
+        <location filename="../ui/mainwindow.cpp" line="1216"/>
         <source>Use Proxies</source>
         <translation>使用代理</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1214"/>
+        <location filename="../ui/mainwindow.cpp" line="1217"/>
         <source>Delete Guide</source>
         <translation>刪除參考線</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1215"/>
+        <location filename="../ui/mainwindow.cpp" line="1218"/>
         <source>Toggle Mirror</source>
         <translation>切換鏡像</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1217"/>
+        <location filename="../ui/mainwindow.cpp" line="1220"/>
         <source>Full Screen</source>
         <translation>全屏</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1218"/>
+        <location filename="../ui/mainwindow.cpp" line="1221"/>
         <source>Full Screen Viewer</source>
         <translation>全屏預覽</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1220"/>
+        <location filename="../ui/mainwindow.cpp" line="1223"/>
         <source>&amp;Playback</source>
         <translation>回放(&amp;P)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1221"/>
+        <location filename="../ui/mainwindow.cpp" line="1224"/>
         <source>Go to Start</source>
         <translation>回到起始幀</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1222"/>
+        <location filename="../ui/mainwindow.cpp" line="1225"/>
         <source>Previous Frame</source>
         <translation>前一幀</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1223"/>
+        <location filename="../ui/mainwindow.cpp" line="1226"/>
         <source>Play/Pause</source>
         <translation>播放/暫停</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1224"/>
+        <location filename="../ui/mainwindow.cpp" line="1227"/>
         <source>Play In to Out</source>
         <translation>播放已標記的區域</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1225"/>
+        <location filename="../ui/mainwindow.cpp" line="1228"/>
         <source>Next Frame</source>
         <translation>下一幀</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1226"/>
+        <location filename="../ui/mainwindow.cpp" line="1229"/>
         <source>Go to End</source>
         <translation>轉到結束幀</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1228"/>
+        <location filename="../ui/mainwindow.cpp" line="1231"/>
         <source>Jump Backward</source>
         <translation>向後跳躍</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1229"/>
+        <location filename="../ui/mainwindow.cpp" line="1232"/>
         <source>Jump Forward</source>
         <translation>向前跳躍</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1251"/>
+        <location filename="../ui/mainwindow.cpp" line="1254"/>
         <source>Scopes</source>
         <translation>示波器</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1252"/>
+        <location filename="../ui/mainwindow.cpp" line="1255"/>
         <source>Subtitle Editor</source>
         <translation>字幕編輯器</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1258"/>
+        <location filename="../ui/mainwindow.cpp" line="1261"/>
         <source>3-Point Editing</source>
         <translation>三點剪輯</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1259"/>
+        <location filename="../ui/mainwindow.cpp" line="1262"/>
         <source>Color</source>
         <translation>調色</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1260"/>
+        <location filename="../ui/mainwindow.cpp" line="1263"/>
         <source>Save Layout As...</source>
         <translation>另存版面配置...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1266"/>
+        <location filename="../ui/mainwindow.cpp" line="1269"/>
         <source>Pointer Tool: Select and move clips</source>
         <translation>指標工具：選擇並移動剪輯</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1268"/>
+        <location filename="../ui/mainwindow.cpp" line="1271"/>
         <source>Edit Tool: Trim and resize clips</source>
         <translation>編輯工具：修剪並調整剪輯大小</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1270"/>
+        <location filename="../ui/mainwindow.cpp" line="1273"/>
         <source>Ripple Tool: Trim clips and ripple subsequent clips</source>
         <translation>波紋工具：修剪剪輯，並對後續剪輯進行波紋連動</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1272"/>
+        <location filename="../ui/mainwindow.cpp" line="1275"/>
         <source>Razor Tool: Split clips in the timeline</source>
         <translation>剃刀工具：在時間軸上分割剪輯</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1274"/>
+        <location filename="../ui/mainwindow.cpp" line="1277"/>
         <source>Slip Tool: Slip clip&apos;s contents</source>
         <translation>滑動工具：滑動剪輯的內容</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1276"/>
+        <location filename="../ui/mainwindow.cpp" line="1279"/>
         <source>Slide Tool: Slide clip without changing its duration</source>
         <translation>滑移工具：滑移剪輯而不改變其時長</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1277"/>
+        <location filename="../ui/mainwindow.cpp" line="1280"/>
         <source>Track Select Tool</source>
         <translation>軌道選擇工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1278"/>
+        <location filename="../ui/mainwindow.cpp" line="1281"/>
         <source>Track Select Tool: Select all clips forward or backward</source>
         <translation>軌道選擇工具：向前或向後選擇所有剪輯</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1280"/>
+        <location filename="../ui/mainwindow.cpp" line="1283"/>
         <source>Hand Tool: Navigate the timeline</source>
         <translation>抓手工具：瀏覽時間軸</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1282"/>
+        <location filename="../ui/mainwindow.cpp" line="1285"/>
         <source>Transition Tool: Create or edit transitions</source>
         <translation>轉場工具：建立或編輯轉場</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1284"/>
+        <location filename="../ui/mainwindow.cpp" line="1287"/>
         <source>Enable Snapping: Toggle snapping</source>
         <translation>啟用吸附：切換吸附功能</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1286"/>
+        <location filename="../ui/mainwindow.cpp" line="1289"/>
         <source>Color Labels: Toggle color coding for clips</source>
         <translation>顏色標籤：切換剪輯的顏色編碼</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1288"/>
+        <location filename="../ui/mainwindow.cpp" line="1291"/>
         <source>Auto-Cut Silence: Detect and split silent sections of audio</source>
         <translation>自動剪切靜音：檢測並分割音頻中的靜音片段</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1291"/>
+        <location filename="../ui/mainwindow.cpp" line="1294"/>
         <source>Disable playhead automatic scrolling</source>
         <translation>停用播放頭自動捲動</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1293"/>
+        <location filename="../ui/mainwindow.cpp" line="1296"/>
         <source>Enable page-by-page playhead autoscrolling</source>
         <translation>啟用播放頭逐頁自動捲動</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1295"/>
+        <location filename="../ui/mainwindow.cpp" line="1298"/>
         <source>Enable smooth playhead autoscrolling</source>
         <translation>啟用播放頭平滑自動捲動</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1298"/>
+        <location filename="../ui/mainwindow.cpp" line="1301"/>
         <source>Open the preferences dialog</source>
         <translation>開啟首選項對話框</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1301"/>
+        <location filename="../ui/mainwindow.cpp" line="1304"/>
         <source>Clear Undo History</source>
         <translation>清除復原歷程</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1307"/>
+        <location filename="../ui/mainwindow.cpp" line="1310"/>
         <source>Search for any menu command by name</source>
         <translation>按名稱搜索任何菜單命令</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1309"/>
+        <location filename="../ui/mainwindow.cpp" line="1312"/>
         <source>Open the debug log window</source>
         <translation>開啟調試日誌視窗</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1310"/>
+        <location filename="../ui/mainwindow.cpp" line="1313"/>
         <source>Welcome Screen...</source>
         <translation>歡迎畫面...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1311"/>
+        <location filename="../ui/mainwindow.cpp" line="1314"/>
         <source>Start a project from a template or open a recent one</source>
         <translation>從範本開始新專案，或開啟最近使用的專案</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1313"/>
+        <location filename="../ui/mainwindow.cpp" line="1316"/>
         <source>Show information about the application</source>
         <translation>顯示應用程式相關信息</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1563"/>
+        <location filename="../ui/mainwindow.cpp" line="1566"/>
         <source>Relink Media</source>
         <translation>重新連結媒體</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1563"/>
+        <location filename="../ui/mainwindow.cpp" line="1566"/>
         <source>All media is linked.</source>
         <translation>所有媒體均已連結。</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1574"/>
+        <location filename="../ui/mainwindow.cpp" line="1577"/>
         <source>No Sequence</source>
         <translation>沒有序列</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1574"/>
+        <location filename="../ui/mainwindow.cpp" line="1577"/>
         <source>Please open a sequence before importing subtitles.</source>
         <translation>請先開啟序列再匯入字幕。</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1578"/>
-        <location filename="../ui/mainwindow.cpp" line="1592"/>
-        <location filename="../ui/mainwindow.cpp" line="1645"/>
+        <location filename="../ui/mainwindow.cpp" line="1581"/>
+        <location filename="../ui/mainwindow.cpp" line="1595"/>
+        <location filename="../ui/mainwindow.cpp" line="1648"/>
         <source>Import Subtitle</source>
         <translation>匯入字幕</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1579"/>
+        <location filename="../ui/mainwindow.cpp" line="1582"/>
         <source>SRT Subtitle Files (*.srt);;All Files (*)</source>
         <translation>SRT 字幕檔案 (*.srt);;所有檔案 (*)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1586"/>
+        <location filename="../ui/mainwindow.cpp" line="1589"/>
         <source>Import Failed</source>
         <translation>匯入失敗</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1586"/>
+        <location filename="../ui/mainwindow.cpp" line="1589"/>
         <source>No valid subtitle cues found in the file.</source>
         <translation>未找到有效的字幕。</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1593"/>
+        <location filename="../ui/mainwindow.cpp" line="1596"/>
         <source>Imported %1 cues, %2 skipped (malformed).</source>
         <translation>已匯入 %1 條，跳過 %2 條。</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1692"/>
+        <location filename="../ui/mainwindow.cpp" line="1695"/>
         <source>Render Queue (%1)...</source>
         <translation>算繪佇列 (%1)...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1692"/>
+        <location filename="../ui/mainwindow.cpp" line="1695"/>
         <source>Render Queue...</source>
         <translation>算繪佇列...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1231"/>
+        <location filename="../ui/mainwindow.cpp" line="1234"/>
         <source>Go to Previous Cut</source>
         <translation>切換到之前的位置</translation>
     </message>
@@ -3017,7 +3126,7 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="317"/>
-        <location filename="../ui/mainwindow.cpp" line="1256"/>
+        <location filename="../ui/mainwindow.cpp" line="1259"/>
         <source>Layouts</source>
         <translation>版面配置</translation>
     </message>
@@ -3029,7 +3138,7 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
     <message>
         <location filename="../ui/mainwindow.cpp" line="326"/>
         <location filename="../ui/mainwindow.cpp" line="332"/>
-        <location filename="../ui/mainwindow.cpp" line="1261"/>
+        <location filename="../ui/mainwindow.cpp" line="1264"/>
         <source>Delete Layout</source>
         <translation>刪除版面配置</translation>
     </message>
@@ -3044,87 +3153,87 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
         <translation>無法刪除「%1」。</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1232"/>
+        <location filename="../ui/mainwindow.cpp" line="1235"/>
         <source>Go to Next Cut</source>
         <translation>轉到下一個位置</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1233"/>
+        <location filename="../ui/mainwindow.cpp" line="1236"/>
         <source>Go to In Point</source>
         <translation>轉到時間的起始標記處</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1234"/>
+        <location filename="../ui/mainwindow.cpp" line="1237"/>
         <source>Go to Out Point</source>
         <translation>轉到時間的結束標記處</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1236"/>
+        <location filename="../ui/mainwindow.cpp" line="1239"/>
         <source>Shuttle Left</source>
         <translation>向左播放</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1237"/>
+        <location filename="../ui/mainwindow.cpp" line="1240"/>
         <source>Shuttle Stop</source>
         <translation>停止播放</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1238"/>
+        <location filename="../ui/mainwindow.cpp" line="1241"/>
         <source>Shuttle Right</source>
         <translation>向右播放</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1240"/>
+        <location filename="../ui/mainwindow.cpp" line="1243"/>
         <source>Loop</source>
         <translation>循環播放</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1242"/>
+        <location filename="../ui/mainwindow.cpp" line="1245"/>
         <source>&amp;Window</source>
         <translation>窗口(&amp;W)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1244"/>
+        <location filename="../ui/mainwindow.cpp" line="1247"/>
         <source>Project</source>
         <translation>項目</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1245"/>
+        <location filename="../ui/mainwindow.cpp" line="1248"/>
         <source>Effect Controls</source>
         <translation>效果控制</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1246"/>
+        <location filename="../ui/mainwindow.cpp" line="1249"/>
         <source>Timeline</source>
         <translation>時間軸</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1247"/>
+        <location filename="../ui/mainwindow.cpp" line="1250"/>
         <source>Graph Editor</source>
         <translation>圖形編輯器</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1248"/>
+        <location filename="../ui/mainwindow.cpp" line="1251"/>
         <source>Media Viewer</source>
         <translation>媒體查看器</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1249"/>
+        <location filename="../ui/mainwindow.cpp" line="1252"/>
         <source>Sequence Viewer</source>
         <translation>序列查看器</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1250"/>
+        <location filename="../ui/mainwindow.cpp" line="1253"/>
         <source>Undo History</source>
         <translation>復原歷程</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1254"/>
+        <location filename="../ui/mainwindow.cpp" line="1257"/>
         <source>Maximize Panel</source>
         <translation>最大化面板</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1255"/>
+        <location filename="../ui/mainwindow.cpp" line="1258"/>
         <source>Lock Panels</source>
         <translation>鎖定面板</translation>
     </message>
@@ -3133,112 +3242,112 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
         <translation type="vanished">重置為預設佈局</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1263"/>
+        <location filename="../ui/mainwindow.cpp" line="1266"/>
         <source>&amp;Tools</source>
         <translation>工具(&amp;T)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1265"/>
+        <location filename="../ui/mainwindow.cpp" line="1268"/>
         <source>Pointer Tool</source>
         <translation>指標工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1267"/>
+        <location filename="../ui/mainwindow.cpp" line="1270"/>
         <source>Edit Tool</source>
         <translation>編輯工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1269"/>
+        <location filename="../ui/mainwindow.cpp" line="1272"/>
         <source>Ripple Tool</source>
         <translation>波紋工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1271"/>
+        <location filename="../ui/mainwindow.cpp" line="1274"/>
         <source>Razor Tool</source>
         <translation>剃刀工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1273"/>
+        <location filename="../ui/mainwindow.cpp" line="1276"/>
         <source>Slip Tool</source>
         <translation>滑動工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1275"/>
+        <location filename="../ui/mainwindow.cpp" line="1278"/>
         <source>Slide Tool</source>
         <translation>滑移工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1279"/>
+        <location filename="../ui/mainwindow.cpp" line="1282"/>
         <source>Hand Tool</source>
         <translation>抓手工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1281"/>
+        <location filename="../ui/mainwindow.cpp" line="1284"/>
         <source>Transition Tool</source>
         <translation>轉場工具</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1283"/>
+        <location filename="../ui/mainwindow.cpp" line="1286"/>
         <source>Enable Snapping</source>
         <translation>啟用吸附</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1285"/>
+        <location filename="../ui/mainwindow.cpp" line="1288"/>
         <source>Color Labels</source>
         <translation>顏色標籤</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1287"/>
+        <location filename="../ui/mainwindow.cpp" line="1290"/>
         <source>Auto-Cut Silence</source>
         <translation>自動剪切靜音</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1290"/>
+        <location filename="../ui/mainwindow.cpp" line="1293"/>
         <source>No Auto-Scroll</source>
         <translation>關閉時間軸自動滾動</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1292"/>
+        <location filename="../ui/mainwindow.cpp" line="1295"/>
         <source>Page Auto-Scroll</source>
         <translation>頁面時間軸自動滾動</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1294"/>
+        <location filename="../ui/mainwindow.cpp" line="1297"/>
         <source>Smooth Auto-Scroll</source>
         <translation>時間軸自動平滑滾動</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1297"/>
+        <location filename="../ui/mainwindow.cpp" line="1300"/>
         <source>Preferences</source>
         <translation>首選項</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1300"/>
+        <location filename="../ui/mainwindow.cpp" line="1303"/>
         <source>Clear Undo</source>
         <translation>清除撤銷</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1304"/>
+        <location filename="../ui/mainwindow.cpp" line="1307"/>
         <source>&amp;Help</source>
         <translation>幫助(&amp;H)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1306"/>
+        <location filename="../ui/mainwindow.cpp" line="1309"/>
         <source>A&amp;ction Search</source>
         <translation>功能查找(&amp;C)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1308"/>
+        <location filename="../ui/mainwindow.cpp" line="1311"/>
         <source>Debug Log</source>
         <translation>調試日誌</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1312"/>
+        <location filename="../ui/mainwindow.cpp" line="1315"/>
         <source>&amp;About...</source>
         <translation>關於(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1331"/>
+        <location filename="../ui/mainwindow.cpp" line="1334"/>
         <source>&lt;untitled&gt;</source>
         <translation>&lt;無標題&gt;</translation>
     </message>
@@ -4326,6 +4435,16 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
         <translation>拖放檔案以代替媒體</translation>
     </message>
     <message>
+        <location filename="../dialogs/preferencesdialog.cpp" line="260"/>
+        <source>Restart Required</source>
+        <translation>需要重新啟動</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/preferencesdialog.cpp" line="261"/>
+        <source>Some of the changed settings will require a restart of Amber. Would you like to restart now?</source>
+        <translation>部分已變更的設定需要重新啟動 Amber 才能生效。要立即重新啟動嗎？</translation>
+    </message>
+    <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="672"/>
         <source>The mouse wheel zooms the timeline instead of scrolling it.
 
@@ -5080,6 +5199,15 @@ More makes playback smoother and uses more memory.</source>
         <location filename="../project/proxygenerator.cpp" line="348"/>
         <source>Finished generating proxy for &quot;%1&quot;</source>
         <translation>完成生成代理 &quot;%1&quot;</translation>
+    </message>
+</context>
+<context>
+    <name>QGuiApplication</name>
+    <message>
+        <location filename="../global/global.cpp" line="187"/>
+        <source>QT_LAYOUT_DIRECTION</source>
+        <extracomment>Translate this string to &quot;RTL&quot; for right-to-left languages (Arabic, Hebrew...), &quot;LTR&quot; for all others.</extracomment>
+        <translation>LTR</translation>
     </message>
 </context>
 <context>
@@ -7609,12 +7737,12 @@ Load it?</source>
         <translation>只拖放音頻</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1315"/>
+        <location filename="../ui/mainwindow.cpp" line="1318"/>
         <source>Sequence Viewer</source>
         <translation>序列預覽</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1316"/>
+        <location filename="../ui/mainwindow.cpp" line="1319"/>
         <source>Media Viewer</source>
         <translation>媒體預覽</translation>
     </message>

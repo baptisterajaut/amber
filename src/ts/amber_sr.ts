@@ -4,6 +4,11 @@
 <context>
     <name>AboutDialog</name>
     <message>
+        <location filename="../dialogs/aboutdialog.cpp" line="36"/>
+        <source>About Amber</source>
+        <translation>О програму Amber</translation>
+    </message>
+    <message>
         <location filename="../dialogs/aboutdialog.cpp" line="73"/>
         <source>A fork of Olive 0.1 ported to Qt 6 and modern FFmpeg, with many bugs from the original codebase fixed along the way.</source>
         <translation>Форк Olive 0.1 портиран на Qt 6 и модерни FFmpeg, уз поправку многих грешака из оригиналног кода.</translation>
@@ -49,91 +54,96 @@
         <source>Threads:</source>
         <translation>Нити:</translation>
     </message>
+    <message>
+        <location filename="../dialogs/advancedvideodialog.cpp" line="109"/>
+        <source>Auto</source>
+        <translation>Аутоматски</translation>
+    </message>
 </context>
 <context>
     <name>AmberGlobal</name>
     <message>
-        <location filename="../global/global.cpp" line="75"/>
+        <location filename="../global/global.cpp" line="76"/>
         <source>Amber Project %1</source>
         <translation>Amber пројекат %1</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="138"/>
+        <location filename="../global/global.cpp" line="140"/>
         <source>Auto-recovery</source>
         <translation>Аутоматски опоравак</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="139"/>
+        <location filename="../global/global.cpp" line="141"/>
         <source>Amber didn&apos;t close properly and an autorecovery file was detected. Would you like to open it?</source>
         <translation>Amber се није правилно затворио и пронађена је датотека аутоматског опоравка. Желите ли је отворити?</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="316"/>
+        <location filename="../global/global.cpp" line="344"/>
         <source>Project Already Empty</source>
         <translation>Пројекат је већ празан</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="317"/>
+        <location filename="../global/global.cpp" line="345"/>
         <source>You already have a bare project. If you&apos;re trying to activate the timeline, you need to create a new sequence (File &gt; New &gt; Sequence, or %1).</source>
         <translation>Већ имате празан пројекат. Да активирате временску линију, морате креирати нову секвенцу (Датотека &gt; Ново &gt; Секвенца, или %1).</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="334"/>
+        <location filename="../global/global.cpp" line="362"/>
         <source>Open Project...</source>
         <translation>Отвори пројекат...</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="346"/>
+        <location filename="../global/global.cpp" line="374"/>
         <source>Missing recent project</source>
         <translation>Недостаје недавни пројекат</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="347"/>
+        <location filename="../global/global.cpp" line="375"/>
         <source>The project &apos;%1&apos; no longer exists. Would you like to remove it from the recent projects list?</source>
         <translation>Пројекат &apos;%1&apos; више не постоји. Желите ли га уклонити са листе недавних пројеката?</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="367"/>
+        <location filename="../global/global.cpp" line="395"/>
         <source>Save Project As...</source>
         <translation>Сачувај пројекат као...</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="393"/>
+        <location filename="../global/global.cpp" line="421"/>
         <source>Unsaved Project</source>
         <translation>Несачувани пројекат</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="394"/>
+        <location filename="../global/global.cpp" line="422"/>
         <source>This project has changed since it was last saved. Would you like to save it before closing?</source>
         <translation>Овај пројекат је измењен од последњег чувања. Желите ли га сачувати пре затварања?</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="444"/>
+        <location filename="../global/global.cpp" line="472"/>
         <source>Missing Project File</source>
         <translation>Недостаје датотека пројекта</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="445"/>
+        <location filename="../global/global.cpp" line="473"/>
         <source>Specified project &apos;%1&apos; does not exist.</source>
         <translation>Наведени пројекат &apos;%1&apos; не постоји.</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="517"/>
+        <location filename="../global/global.cpp" line="545"/>
         <source>No active sequence</source>
         <translation>Нема активне секвенце</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="518"/>
+        <location filename="../global/global.cpp" line="546"/>
         <source>Please open the sequence to perform this action.</source>
         <translation>Молимо отворите секвенцу за извођење ове радње.</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="585"/>
+        <location filename="../global/global.cpp" line="613"/>
         <source>No clips selected</source>
         <translation>Нема одабраних клипова</translation>
     </message>
     <message>
-        <location filename="../global/global.cpp" line="585"/>
+        <location filename="../global/global.cpp" line="613"/>
         <source>Select the clips you wish to auto-cut</source>
         <translation>Одаберите клипове које желите аутоматски изрезати</translation>
     </message>
@@ -366,6 +376,89 @@
         <location filename="../effects/ui/colorfieldwidget.cpp" line="50"/>
         <source>Pick color from viewer</source>
         <translation>Изабери боју из прегледача</translation>
+    </message>
+</context>
+<context>
+    <name>ColorLabel</name>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="13"/>
+        <source>Red</source>
+        <translation>Црвена</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="13"/>
+        <source>Maroon</source>
+        <translation>Бордо</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="14"/>
+        <source>Orange</source>
+        <translation>Наранџаста</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="14"/>
+        <source>Brown</source>
+        <translation>Браон</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="15"/>
+        <source>Yellow</source>
+        <translation>Жута</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="15"/>
+        <source>Olive</source>
+        <translation>Маслинаста</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="16"/>
+        <source>Lime</source>
+        <translation>Светлозелена</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="16"/>
+        <source>Green</source>
+        <translation>Зелена</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="17"/>
+        <source>Cyan</source>
+        <translation>Цијан</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="17"/>
+        <source>Teal</source>
+        <translation>Плавозелена</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="18"/>
+        <source>Blue</source>
+        <translation>Плава</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="18"/>
+        <source>Navy</source>
+        <translation>Тамноплава</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="19"/>
+        <source>Pink</source>
+        <translation>Ружичаста</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="19"/>
+        <source>Purple</source>
+        <translation>Љубичаста</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="20"/>
+        <source>Silver</source>
+        <translation>Сребрна</translation>
+    </message>
+    <message>
+        <location filename="../core/colorlabel.cpp" line="20"/>
+        <source>Gray</source>
+        <translation>Сива</translation>
     </message>
 </context>
 <context>
@@ -1197,6 +1290,7 @@ Default lets rav1e choose (6)</source>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="722"/>
+        <location filename="../dialogs/exportdialog.cpp" line="1135"/>
         <source>%p% (ETA: %1:%2:%3)</source>
         <translation>%p% (Преостало: %1:%2:%3)</translation>
     </message>
@@ -1464,6 +1558,16 @@ Default lets rav1e choose (6)</source>
         <location filename="../dialogs/exportdialog.cpp" line="1151"/>
         <source>Add this export to the render queue (File &gt; Render Queue)</source>
         <translation>Додај овај извоз у ред за рендеровање (Датотека &gt; Ред за рендеровање)</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/exportdialog.cpp" line="1156"/>
+        <source>Export</source>
+        <translation>Извоз</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/exportdialog.cpp" line="1162"/>
+        <source>Cancel</source>
+        <translation>Прекини</translation>
     </message>
     <message>
         <location filename="../dialogs/exportdialog.cpp" line="1219"/>
@@ -2233,6 +2337,11 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
         <translation>Држи</translation>
     </message>
     <message>
+        <location filename="../ui/keyframeview.cpp" line="85"/>
+        <source>Graph Editor</source>
+        <translation>Уређивач графикона</translation>
+    </message>
+    <message>
         <location filename="../ui/keyframeview.cpp" line="87"/>
         <source>Properties...</source>
         <translation>Својства...</translation>
@@ -2405,580 +2514,580 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
         <translation>Добродошли у %1</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1146"/>
+        <location filename="../ui/mainwindow.cpp" line="1149"/>
         <source>&amp;File</source>
         <translation>&amp;Датотека</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1147"/>
+        <location filename="../ui/mainwindow.cpp" line="1150"/>
         <source>&amp;New</source>
         <translation>&amp;Ново</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1148"/>
+        <location filename="../ui/mainwindow.cpp" line="1151"/>
         <source>&amp;Open Project</source>
         <translation>&amp;Отвори пројекат</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1149"/>
+        <location filename="../ui/mainwindow.cpp" line="1152"/>
         <source>Open an existing project file</source>
         <translation>Отвори постојећу датотеку пројекта</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1150"/>
+        <location filename="../ui/mainwindow.cpp" line="1153"/>
         <source>Clear Recent List</source>
         <translation>Обриши листу недавних</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1151"/>
+        <location filename="../ui/mainwindow.cpp" line="1154"/>
         <source>Open Recent</source>
         <translation>Отвори недавне</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1152"/>
+        <location filename="../ui/mainwindow.cpp" line="1155"/>
         <source>&amp;Save Project</source>
         <translation>&amp;Сачувај пројекат</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1153"/>
+        <location filename="../ui/mainwindow.cpp" line="1156"/>
         <source>Save the current project</source>
         <translation>Сачувај тренутни пројекат</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1154"/>
+        <location filename="../ui/mainwindow.cpp" line="1157"/>
         <source>Save Project &amp;As</source>
         <translation>Сачувај пројекат &amp;као</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1155"/>
+        <location filename="../ui/mainwindow.cpp" line="1158"/>
         <source>Save the current project to a new file</source>
         <translation>Сачувај тренутни пројекат у нову датотеку</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1156"/>
+        <location filename="../ui/mainwindow.cpp" line="1159"/>
         <source>&amp;Import...</source>
         <translation>&amp;Увоз...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1157"/>
+        <location filename="../ui/mainwindow.cpp" line="1160"/>
         <source>Import media files into the project</source>
         <translation>Увези медијске датотеке у пројекат</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1158"/>
+        <location filename="../ui/mainwindow.cpp" line="1161"/>
         <source>Import Subtitle (.srt)...</source>
         <translation>Увези титлове (.srt)...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1159"/>
+        <location filename="../ui/mainwindow.cpp" line="1162"/>
         <source>Relink Media...</source>
         <translation>Поново повежи медије...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1160"/>
+        <location filename="../ui/mainwindow.cpp" line="1163"/>
         <source>Reconnect media files that have moved or are missing</source>
         <translation>Поново повежи медијске датотеке које су премештене или недостају</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1161"/>
+        <location filename="../ui/mainwindow.cpp" line="1164"/>
         <source>&amp;Export...</source>
         <translation>&amp;Извоз...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1162"/>
+        <location filename="../ui/mainwindow.cpp" line="1165"/>
         <source>Render and export the active sequence to a video file</source>
         <translation>Рендеруј и извези активну секвенцу у видео датотеку</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1164"/>
+        <location filename="../ui/mainwindow.cpp" line="1167"/>
         <source>Render the exports queued from the Export dialog</source>
         <translation>Рендеруј извозе стављене у ред из дијалога за извоз</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1165"/>
+        <location filename="../ui/mainwindow.cpp" line="1168"/>
         <source>Export &amp;Frame...</source>
         <translation>Извези &amp;кадар...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1166"/>
+        <location filename="../ui/mainwindow.cpp" line="1169"/>
         <source>Export the current frame as an image</source>
         <translation>Извези тренутни кадар као слику</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1167"/>
+        <location filename="../ui/mainwindow.cpp" line="1170"/>
         <source>E&amp;xit</source>
         <translation>&amp;Излаз</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1168"/>
+        <location filename="../ui/mainwindow.cpp" line="1171"/>
         <source>Close the application</source>
         <translation>Затвори апликацију</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1170"/>
+        <location filename="../ui/mainwindow.cpp" line="1173"/>
         <source>&amp;Edit</source>
         <translation>&amp;Уреди</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1171"/>
+        <location filename="../ui/mainwindow.cpp" line="1174"/>
         <source>&amp;Undo</source>
         <translation>&amp;Поништи</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1172"/>
+        <location filename="../ui/mainwindow.cpp" line="1175"/>
         <source>Redo</source>
         <translation>Понови</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1173"/>
+        <location filename="../ui/mainwindow.cpp" line="1176"/>
         <source>Select &amp;All</source>
         <translation>Одабери &amp;све</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1174"/>
+        <location filename="../ui/mainwindow.cpp" line="1177"/>
         <source>Deselect All</source>
         <translation>Поништи избор</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1175"/>
+        <location filename="../ui/mainwindow.cpp" line="1178"/>
         <source>Ripple to In Point</source>
         <translation>Ripple до улазне тачке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1176"/>
+        <location filename="../ui/mainwindow.cpp" line="1179"/>
         <source>Ripple to Out Point</source>
         <translation>Ripple до излазне тачке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1177"/>
+        <location filename="../ui/mainwindow.cpp" line="1180"/>
         <source>Edit to In Point</source>
         <translation>Уреди до улазне тачке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1178"/>
+        <location filename="../ui/mainwindow.cpp" line="1181"/>
         <source>Edit to Out Point</source>
         <translation>Уреди до излазне тачке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1179"/>
+        <location filename="../ui/mainwindow.cpp" line="1182"/>
         <source>Delete In/Out Point</source>
         <translation>Обриши улазну/излазну тачку</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1180"/>
+        <location filename="../ui/mainwindow.cpp" line="1183"/>
         <source>Ripple Delete In/Out Point</source>
         <translation>Ripple брисање улазне/излазне тачке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1181"/>
+        <location filename="../ui/mainwindow.cpp" line="1184"/>
         <source>Set/Edit Marker</source>
         <translation>Постави/уреди маркер</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1183"/>
+        <location filename="../ui/mainwindow.cpp" line="1186"/>
         <source>&amp;View</source>
         <translation>&amp;Приказ</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1184"/>
+        <location filename="../ui/mainwindow.cpp" line="1187"/>
         <source>Zoom In</source>
         <translation>Увећај</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1185"/>
+        <location filename="../ui/mainwindow.cpp" line="1188"/>
         <source>Zoom Out</source>
         <translation>Умањи</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1186"/>
+        <location filename="../ui/mainwindow.cpp" line="1189"/>
         <source>Increase Track Height</source>
         <translation>Повећај висину траке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1187"/>
+        <location filename="../ui/mainwindow.cpp" line="1190"/>
         <source>Decrease Track Height</source>
         <translation>Смањи висину траке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1188"/>
+        <location filename="../ui/mainwindow.cpp" line="1191"/>
         <source>Toggle Show All</source>
         <translation>Укључи/искључи прикажи све</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1189"/>
+        <location filename="../ui/mainwindow.cpp" line="1192"/>
         <source>Track Lines</source>
         <translation>Линије траке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1190"/>
+        <location filename="../ui/mainwindow.cpp" line="1193"/>
         <source>Rectified Waveforms</source>
         <translation>Исправљени таласни облици</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1191"/>
+        <location filename="../ui/mainwindow.cpp" line="1194"/>
         <source>Frames</source>
         <translation>Кадрови</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1192"/>
+        <location filename="../ui/mainwindow.cpp" line="1195"/>
         <source>Drop Frame</source>
         <translation>Испуштени кадар</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1193"/>
+        <location filename="../ui/mainwindow.cpp" line="1196"/>
         <source>Non-Drop Frame</source>
         <translation>Без испуштених кадрова</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1194"/>
+        <location filename="../ui/mainwindow.cpp" line="1197"/>
         <source>Milliseconds</source>
         <translation>Милисекунде</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1196"/>
+        <location filename="../ui/mainwindow.cpp" line="1199"/>
         <source>Preview Resolution</source>
         <translation>Резолуција прегледа</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1197"/>
+        <location filename="../ui/mainwindow.cpp" line="1200"/>
         <source>Full</source>
         <translation>Пуно</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1198"/>
+        <location filename="../ui/mainwindow.cpp" line="1201"/>
         <source>1/2 (Half)</source>
         <translation>1/2 (пола)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1199"/>
+        <location filename="../ui/mainwindow.cpp" line="1202"/>
         <source>1/4 (Quarter)</source>
         <translation>1/4 (четвртина)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1201"/>
+        <location filename="../ui/mainwindow.cpp" line="1204"/>
         <source>Title/Action Safe Area</source>
         <translation>Сигурна зона за наслов/радњу</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1202"/>
+        <location filename="../ui/mainwindow.cpp" line="1205"/>
         <source>Off</source>
         <translation>Искључено</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1203"/>
-        <location filename="../ui/mainwindow.cpp" line="1257"/>
+        <location filename="../ui/mainwindow.cpp" line="1206"/>
+        <location filename="../ui/mainwindow.cpp" line="1260"/>
         <source>Default</source>
         <translation>Подразумевано</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1204"/>
+        <location filename="../ui/mainwindow.cpp" line="1207"/>
         <source>4:3</source>
         <translation>4:3</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1205"/>
+        <location filename="../ui/mainwindow.cpp" line="1208"/>
         <source>16:9</source>
         <translation>16:9</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1206"/>
+        <location filename="../ui/mainwindow.cpp" line="1209"/>
         <source>Custom</source>
         <translation>Прилагођено</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1208"/>
+        <location filename="../ui/mainwindow.cpp" line="1211"/>
         <source>Show Guides</source>
         <translation>Прикажи водиче</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1209"/>
+        <location filename="../ui/mainwindow.cpp" line="1212"/>
         <source>Guides</source>
         <translation>Водичи</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1210"/>
+        <location filename="../ui/mainwindow.cpp" line="1213"/>
         <source>Lock Guides</source>
         <translation>Закључај вођице</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1211"/>
+        <location filename="../ui/mainwindow.cpp" line="1214"/>
         <source>Show Frame Rate</source>
         <translation>Прикажи оквирну стопу</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1212"/>
+        <location filename="../ui/mainwindow.cpp" line="1215"/>
         <source>Show Pixel Sampler</source>
         <translation>Прикажи узорковач пиксела</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1213"/>
+        <location filename="../ui/mainwindow.cpp" line="1216"/>
         <source>Use Proxies</source>
         <translation>Користи прокси</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1214"/>
+        <location filename="../ui/mainwindow.cpp" line="1217"/>
         <source>Delete Guide</source>
         <translation>Избриши водич</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1215"/>
+        <location filename="../ui/mainwindow.cpp" line="1218"/>
         <source>Toggle Mirror</source>
         <translation>Укључи огледало</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1217"/>
+        <location filename="../ui/mainwindow.cpp" line="1220"/>
         <source>Full Screen</source>
         <translation>Цео екран</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1218"/>
+        <location filename="../ui/mainwindow.cpp" line="1221"/>
         <source>Full Screen Viewer</source>
         <translation>Прегледач преко целог екрана</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1220"/>
+        <location filename="../ui/mainwindow.cpp" line="1223"/>
         <source>&amp;Playback</source>
         <translation>&amp;Репродукција</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1221"/>
+        <location filename="../ui/mainwindow.cpp" line="1224"/>
         <source>Go to Start</source>
         <translation>Иди на почетак</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1222"/>
+        <location filename="../ui/mainwindow.cpp" line="1225"/>
         <source>Previous Frame</source>
         <translation>Претходни кадар</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1223"/>
+        <location filename="../ui/mainwindow.cpp" line="1226"/>
         <source>Play/Pause</source>
         <translation>Пусти/паузирај</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1224"/>
+        <location filename="../ui/mainwindow.cpp" line="1227"/>
         <source>Play In to Out</source>
         <translation>Пусти од улаза до излаза</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1225"/>
+        <location filename="../ui/mainwindow.cpp" line="1228"/>
         <source>Next Frame</source>
         <translation>Следећи кадар</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1226"/>
+        <location filename="../ui/mainwindow.cpp" line="1229"/>
         <source>Go to End</source>
         <translation>Иди на крај</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1228"/>
+        <location filename="../ui/mainwindow.cpp" line="1231"/>
         <source>Jump Backward</source>
         <translation>Скочи уназад</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1229"/>
+        <location filename="../ui/mainwindow.cpp" line="1232"/>
         <source>Jump Forward</source>
         <translation>Скочи унапред</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1251"/>
+        <location filename="../ui/mainwindow.cpp" line="1254"/>
         <source>Scopes</source>
         <translation>Мерни инструменти</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1252"/>
+        <location filename="../ui/mainwindow.cpp" line="1255"/>
         <source>Subtitle Editor</source>
         <translation>Уређивач титлова</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1258"/>
+        <location filename="../ui/mainwindow.cpp" line="1261"/>
         <source>3-Point Editing</source>
         <translation>Монтажа у три тачке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1259"/>
+        <location filename="../ui/mainwindow.cpp" line="1262"/>
         <source>Color</source>
         <translation>Боја</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1260"/>
+        <location filename="../ui/mainwindow.cpp" line="1263"/>
         <source>Save Layout As...</source>
         <translation>Сачувај распоред као...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1266"/>
+        <location filename="../ui/mainwindow.cpp" line="1269"/>
         <source>Pointer Tool: Select and move clips</source>
         <translation>Алат показивача: Одабери и помери клипове</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1268"/>
+        <location filename="../ui/mainwindow.cpp" line="1271"/>
         <source>Edit Tool: Trim and resize clips</source>
         <translation>Алат за уређивање: Обрежи и промени величину клипова</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1270"/>
+        <location filename="../ui/mainwindow.cpp" line="1273"/>
         <source>Ripple Tool: Trim clips and ripple subsequent clips</source>
         <translation>Ripple алат: Обрежи клипове и помери наредне клипове</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1272"/>
+        <location filename="../ui/mainwindow.cpp" line="1275"/>
         <source>Razor Tool: Split clips in the timeline</source>
         <translation>Алат жилет: Подели клипове у временској линији</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1274"/>
+        <location filename="../ui/mainwindow.cpp" line="1277"/>
         <source>Slip Tool: Slip clip&apos;s contents</source>
         <translation>Алат за клизање: Помери садржај клипа</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1276"/>
+        <location filename="../ui/mainwindow.cpp" line="1279"/>
         <source>Slide Tool: Slide clip without changing its duration</source>
         <translation>Алат за помицање: Помери клип без промене трајања</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1277"/>
+        <location filename="../ui/mainwindow.cpp" line="1280"/>
         <source>Track Select Tool</source>
         <translation>Алат за одабир трака</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1278"/>
+        <location filename="../ui/mainwindow.cpp" line="1281"/>
         <source>Track Select Tool: Select all clips forward or backward</source>
         <translation>Алат за одабир трака: Одабери све клипове унапред или уназад</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1280"/>
+        <location filename="../ui/mainwindow.cpp" line="1283"/>
         <source>Hand Tool: Navigate the timeline</source>
         <translation>Алат руке: Крећи се кроз временску линију</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1282"/>
+        <location filename="../ui/mainwindow.cpp" line="1285"/>
         <source>Transition Tool: Create or edit transitions</source>
         <translation>Алат за прелазе: Направи или уреди прелазе</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1284"/>
+        <location filename="../ui/mainwindow.cpp" line="1287"/>
         <source>Enable Snapping: Toggle snapping</source>
         <translation>Омогући хватање: Укључи/искључи хватање</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1286"/>
+        <location filename="../ui/mainwindow.cpp" line="1289"/>
         <source>Color Labels: Toggle color coding for clips</source>
         <translation>Ознаке боја: Укључи/искључи бојно означавање клипова</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1288"/>
+        <location filename="../ui/mainwindow.cpp" line="1291"/>
         <source>Auto-Cut Silence: Detect and split silent sections of audio</source>
         <translation>Аутоматско резање тишине: Откриј и подели тихе делове аудија</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1291"/>
+        <location filename="../ui/mainwindow.cpp" line="1294"/>
         <source>Disable playhead automatic scrolling</source>
         <translation>Онемогући аутоматско померање главе репродукције</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1293"/>
+        <location filename="../ui/mainwindow.cpp" line="1296"/>
         <source>Enable page-by-page playhead autoscrolling</source>
         <translation>Омогући аутоматско померање главе репродукције по страницама</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1295"/>
+        <location filename="../ui/mainwindow.cpp" line="1298"/>
         <source>Enable smooth playhead autoscrolling</source>
         <translation>Омогући глатко аутоматско померање главе репродукције</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1298"/>
+        <location filename="../ui/mainwindow.cpp" line="1301"/>
         <source>Open the preferences dialog</source>
         <translation>Отвори дијалог поставки</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1301"/>
+        <location filename="../ui/mainwindow.cpp" line="1304"/>
         <source>Clear Undo History</source>
         <translation>Обриши историју поништавања</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1307"/>
+        <location filename="../ui/mainwindow.cpp" line="1310"/>
         <source>Search for any menu command by name</source>
         <translation>Претражи било коју команду изборника по имену</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1309"/>
+        <location filename="../ui/mainwindow.cpp" line="1312"/>
         <source>Open the debug log window</source>
         <translation>Отвори прозор записа за дебугирање</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1310"/>
+        <location filename="../ui/mainwindow.cpp" line="1313"/>
         <source>Welcome Screen...</source>
         <translation>Екран добродошлице...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1311"/>
+        <location filename="../ui/mainwindow.cpp" line="1314"/>
         <source>Start a project from a template or open a recent one</source>
         <translation>Започни пројекат из шаблона или отвори недавни</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1313"/>
+        <location filename="../ui/mainwindow.cpp" line="1316"/>
         <source>Show information about the application</source>
         <translation>Прикажи информације о апликацији</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1563"/>
+        <location filename="../ui/mainwindow.cpp" line="1566"/>
         <source>Relink Media</source>
         <translation>Поново повежи медије</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1563"/>
+        <location filename="../ui/mainwindow.cpp" line="1566"/>
         <source>All media is linked.</source>
         <translation>Сви медији су повезани.</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1574"/>
+        <location filename="../ui/mainwindow.cpp" line="1577"/>
         <source>No Sequence</source>
         <translation>Нема секвенце</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1574"/>
+        <location filename="../ui/mainwindow.cpp" line="1577"/>
         <source>Please open a sequence before importing subtitles.</source>
         <translation>Отворите секвенцу пре увоза титлова.</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1578"/>
-        <location filename="../ui/mainwindow.cpp" line="1592"/>
-        <location filename="../ui/mainwindow.cpp" line="1645"/>
+        <location filename="../ui/mainwindow.cpp" line="1581"/>
+        <location filename="../ui/mainwindow.cpp" line="1595"/>
+        <location filename="../ui/mainwindow.cpp" line="1648"/>
         <source>Import Subtitle</source>
         <translation>Увези титлове</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1579"/>
+        <location filename="../ui/mainwindow.cpp" line="1582"/>
         <source>SRT Subtitle Files (*.srt);;All Files (*)</source>
         <translation>SRT датотеке титлова (*.srt);;Све датотеке (*)</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1586"/>
+        <location filename="../ui/mainwindow.cpp" line="1589"/>
         <source>Import Failed</source>
         <translation>Увоз неуспешан</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1586"/>
+        <location filename="../ui/mainwindow.cpp" line="1589"/>
         <source>No valid subtitle cues found in the file.</source>
         <translation>Нису пронађени важећи титлови.</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1593"/>
+        <location filename="../ui/mainwindow.cpp" line="1596"/>
         <source>Imported %1 cues, %2 skipped (malformed).</source>
         <translation>Увезено %1 титлова, %2 прескочено.</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1692"/>
+        <location filename="../ui/mainwindow.cpp" line="1695"/>
         <source>Render Queue (%1)...</source>
         <translation>Ред за рендеровање (%1)...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1692"/>
+        <location filename="../ui/mainwindow.cpp" line="1695"/>
         <source>Render Queue...</source>
         <translation>Ред за рендеровање...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1231"/>
+        <location filename="../ui/mainwindow.cpp" line="1234"/>
         <source>Go to Previous Cut</source>
         <translation>Иди на претходни рез</translation>
     </message>
@@ -3006,7 +3115,7 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
     </message>
     <message>
         <location filename="../ui/mainwindow.cpp" line="317"/>
-        <location filename="../ui/mainwindow.cpp" line="1256"/>
+        <location filename="../ui/mainwindow.cpp" line="1259"/>
         <source>Layouts</source>
         <translation>Распореди</translation>
     </message>
@@ -3018,7 +3127,7 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
     <message>
         <location filename="../ui/mainwindow.cpp" line="326"/>
         <location filename="../ui/mainwindow.cpp" line="332"/>
-        <location filename="../ui/mainwindow.cpp" line="1261"/>
+        <location filename="../ui/mainwindow.cpp" line="1264"/>
         <source>Delete Layout</source>
         <translation>Обриши распоред</translation>
     </message>
@@ -3033,87 +3142,87 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
         <translation>Брисање &apos;%1&apos; није успело.</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1232"/>
+        <location filename="../ui/mainwindow.cpp" line="1235"/>
         <source>Go to Next Cut</source>
         <translation>Иди на следећи рез</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1233"/>
+        <location filename="../ui/mainwindow.cpp" line="1236"/>
         <source>Go to In Point</source>
         <translation>Иди на улазну тачку</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1234"/>
+        <location filename="../ui/mainwindow.cpp" line="1237"/>
         <source>Go to Out Point</source>
         <translation>Иди на излазну тачку</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1236"/>
+        <location filename="../ui/mainwindow.cpp" line="1239"/>
         <source>Shuttle Left</source>
         <translation>Shuttle лево</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1237"/>
+        <location filename="../ui/mainwindow.cpp" line="1240"/>
         <source>Shuttle Stop</source>
         <translation>Shuttle стоп</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1238"/>
+        <location filename="../ui/mainwindow.cpp" line="1241"/>
         <source>Shuttle Right</source>
         <translation>Shuttle десно</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1240"/>
+        <location filename="../ui/mainwindow.cpp" line="1243"/>
         <source>Loop</source>
         <translation>Петља</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1242"/>
+        <location filename="../ui/mainwindow.cpp" line="1245"/>
         <source>&amp;Window</source>
         <translation>&amp;Прозор</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1244"/>
+        <location filename="../ui/mainwindow.cpp" line="1247"/>
         <source>Project</source>
         <translation>Пројекат</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1245"/>
+        <location filename="../ui/mainwindow.cpp" line="1248"/>
         <source>Effect Controls</source>
         <translation>Контроле ефеката</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1246"/>
+        <location filename="../ui/mainwindow.cpp" line="1249"/>
         <source>Timeline</source>
         <translation>Временска линија</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1247"/>
+        <location filename="../ui/mainwindow.cpp" line="1250"/>
         <source>Graph Editor</source>
         <translation>Уређивач графикона</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1248"/>
+        <location filename="../ui/mainwindow.cpp" line="1251"/>
         <source>Media Viewer</source>
         <translation>Прегледач медија</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1249"/>
+        <location filename="../ui/mainwindow.cpp" line="1252"/>
         <source>Sequence Viewer</source>
         <translation>Прегледач секвенце</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1250"/>
+        <location filename="../ui/mainwindow.cpp" line="1253"/>
         <source>Undo History</source>
         <translation>Историја поништавања</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1254"/>
+        <location filename="../ui/mainwindow.cpp" line="1257"/>
         <source>Maximize Panel</source>
         <translation>Увећај панел</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1255"/>
+        <location filename="../ui/mainwindow.cpp" line="1258"/>
         <source>Lock Panels</source>
         <translation>Закључај панеле</translation>
     </message>
@@ -3122,112 +3231,112 @@ Easy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9</source>
         <translation type="vanished">Врати на подразумевани распоред</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1263"/>
+        <location filename="../ui/mainwindow.cpp" line="1266"/>
         <source>&amp;Tools</source>
         <translation>&amp;Алати</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1265"/>
+        <location filename="../ui/mainwindow.cpp" line="1268"/>
         <source>Pointer Tool</source>
         <translation>Алат показивача</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1267"/>
+        <location filename="../ui/mainwindow.cpp" line="1270"/>
         <source>Edit Tool</source>
         <translation>Алат за уређивање</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1269"/>
+        <location filename="../ui/mainwindow.cpp" line="1272"/>
         <source>Ripple Tool</source>
         <translation>Ripple алат</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1271"/>
+        <location filename="../ui/mainwindow.cpp" line="1274"/>
         <source>Razor Tool</source>
         <translation>Алат жилет</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1273"/>
+        <location filename="../ui/mainwindow.cpp" line="1276"/>
         <source>Slip Tool</source>
         <translation>Алат за клизање</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1275"/>
+        <location filename="../ui/mainwindow.cpp" line="1278"/>
         <source>Slide Tool</source>
         <translation>Алат за помицање</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1279"/>
+        <location filename="../ui/mainwindow.cpp" line="1282"/>
         <source>Hand Tool</source>
         <translation>Алат руке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1281"/>
+        <location filename="../ui/mainwindow.cpp" line="1284"/>
         <source>Transition Tool</source>
         <translation>Алат за прелазе</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1283"/>
+        <location filename="../ui/mainwindow.cpp" line="1286"/>
         <source>Enable Snapping</source>
         <translation>Омогући хватање</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1285"/>
+        <location filename="../ui/mainwindow.cpp" line="1288"/>
         <source>Color Labels</source>
         <translation>Ознаке боја</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1287"/>
+        <location filename="../ui/mainwindow.cpp" line="1290"/>
         <source>Auto-Cut Silence</source>
         <translation>Аутоматски изрежи тишину</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1290"/>
+        <location filename="../ui/mainwindow.cpp" line="1293"/>
         <source>No Auto-Scroll</source>
         <translation>Без аутоматског померања</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1292"/>
+        <location filename="../ui/mainwindow.cpp" line="1295"/>
         <source>Page Auto-Scroll</source>
         <translation>Аутоматско померање по страници</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1294"/>
+        <location filename="../ui/mainwindow.cpp" line="1297"/>
         <source>Smooth Auto-Scroll</source>
         <translation>Глатко аутоматско померање</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1297"/>
+        <location filename="../ui/mainwindow.cpp" line="1300"/>
         <source>Preferences</source>
         <translation>Поставке</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1300"/>
+        <location filename="../ui/mainwindow.cpp" line="1303"/>
         <source>Clear Undo</source>
         <translation>Обриши поништавања</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1304"/>
+        <location filename="../ui/mainwindow.cpp" line="1307"/>
         <source>&amp;Help</source>
         <translation>&amp;Помоћ</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1306"/>
+        <location filename="../ui/mainwindow.cpp" line="1309"/>
         <source>A&amp;ction Search</source>
         <translation>Претрага &amp;радњи</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1308"/>
+        <location filename="../ui/mainwindow.cpp" line="1311"/>
         <source>Debug Log</source>
         <translation>Запис за дебугирање</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1312"/>
+        <location filename="../ui/mainwindow.cpp" line="1315"/>
         <source>&amp;About...</source>
         <translation>&amp;О програму...</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1331"/>
+        <location filename="../ui/mainwindow.cpp" line="1334"/>
         <source>&lt;untitled&gt;</source>
         <translation>&lt;неименовано&gt;</translation>
     </message>
@@ -4295,6 +4404,16 @@ Higher values draw more detailed waveforms but use more memory and disk space.</
         <translation>Редови текстуалног поља ефекта:</translation>
     </message>
     <message>
+        <location filename="../dialogs/preferencesdialog.cpp" line="260"/>
+        <source>Restart Required</source>
+        <translation>Потребно поновно покретање</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/preferencesdialog.cpp" line="261"/>
+        <source>Some of the changed settings will require a restart of Amber. Would you like to restart now?</source>
+        <translation>Неке од измењених поставки захтевају поновно покретање програма Amber. Желите ли да га поново покренете сада?</translation>
+    </message>
+    <message>
         <location filename="../dialogs/preferencesdialog.cpp" line="409"/>
         <source>All previews deleted successfully. You may have to re-open your current project for changes to take effect.</source>
         <translation>Сви прегледи су успешно обрисани. Можда ћете морати поново отворити тренутни пројекат да би промјене ступиле на снагу.</translation>
@@ -5039,6 +5158,15 @@ More makes playback smoother and uses more memory.</source>
         <location filename="../project/proxygenerator.cpp" line="348"/>
         <source>Finished generating proxy for &quot;%1&quot;</source>
         <translation>Завршено генерисање прокси датотеке за „%1&quot;</translation>
+    </message>
+</context>
+<context>
+    <name>QGuiApplication</name>
+    <message>
+        <location filename="../global/global.cpp" line="187"/>
+        <source>QT_LAYOUT_DIRECTION</source>
+        <extracomment>Translate this string to &quot;RTL&quot; for right-to-left languages (Arabic, Hebrew...), &quot;LTR&quot; for all others.</extracomment>
+        <translation>LTR</translation>
     </message>
 </context>
 <context>
@@ -7485,12 +7613,12 @@ Load it?</source>
 <context>
     <name>Viewer</name>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1315"/>
+        <location filename="../ui/mainwindow.cpp" line="1318"/>
         <source>Sequence Viewer</source>
         <translation>Прегледач секвенце</translation>
     </message>
     <message>
-        <location filename="../ui/mainwindow.cpp" line="1316"/>
+        <location filename="../ui/mainwindow.cpp" line="1319"/>
         <source>Media Viewer</source>
         <translation>Прегледач медија</translation>
     </message>
