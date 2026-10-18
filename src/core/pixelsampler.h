@@ -27,6 +27,10 @@ QRectF viewer_frame_rect(const ViewerFrameGeometry& g);
 QPointF sequence_to_viewer(const ViewerFrameGeometry& g, const QPointF& seq);
 QPointF viewer_to_sequence(const ViewerFrameGeometry& g, const QPointF& pos);
 
+// True when the widget position `pos` lies within `half_px` widget pixels (on both axes) of where the sequence point
+// `seq` (origin top-left) is drawn. Gizmo handles are grabbed with this fixed on-screen tolerance at any zoom.
+bool viewer_point_near(const ViewerFrameGeometry& g, const QPointF& seq, const QPointF& pos, double half_px);
+
 // A viewer point on the frame: the sequence pixel under it (origin top-left) and the readback buffer pixel holding its
 // colour (sequence size / preview divider)
 struct FramePoint {

@@ -414,20 +414,20 @@ EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
   const QRectF fr = frame_rect();
   if (gizmos != nullptr && !fr.isEmpty()) {
     // Gizmo screen_pos is in sequence pixels with Y=0 at the bottom
-    QPointF sp = amber::viewer_to_sequence(frame_geometry(), QPointF(x, y));
+    const amber::ViewerFrameGeometry fg = frame_geometry();
+    QPointF sp = amber::viewer_to_sequence(fg, QPointF(x, y));
     QPoint mouse_pos(qRound(sp.x()), qRound(viewer->seq->height - sp.y()));
-    double multiplier_x = double(viewer->seq->width) / fr.width();
-    int dot_size = 2 * qRound(GIZMO_DOT_SIZE * multiplier_x);
-    int target_size = 2 * qRound(GIZMO_TARGET_SIZE * multiplier_x);
+    auto handle_hit = [&](const QPoint& handle, double half_px) {
+      return amber::viewer_point_near(fg, QPointF(handle.x(), viewer->seq->height - handle.y()), QPointF(x, y),
+                                      half_px);
+    };
+    // Hit boxes twice the drawn handle (draw_gizmos), in widget pixels: the same grab area at any viewer zoom
     for (int i = 0; i < gizmos->gizmo_count(); i++) {
       EffectGizmo* g = gizmos->gizmo(i);
 
       switch (g->get_type()) {
         case GIZMO_TYPE_DOT:
-          if (mouse_pos.x() > g->screen_pos[0].x() - dot_size && mouse_pos.y() > g->screen_pos[0].y() - dot_size &&
-              mouse_pos.x() < g->screen_pos[0].x() + dot_size && mouse_pos.y() < g->screen_pos[0].y() + dot_size) {
-            return g;
-          }
+          if (handle_hit(g->screen_pos[0], 2 * GIZMO_DOT_SIZE)) return g;
           break;
         case GIZMO_TYPE_POLY:
           if (QPolygon(g->screen_pos).containsPoint(mouse_pos, Qt::OddEvenFill)) {
@@ -435,12 +435,7 @@ EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
           }
           break;
         case GIZMO_TYPE_TARGET:
-          if (mouse_pos.x() > g->screen_pos[0].x() - target_size &&
-              mouse_pos.y() > g->screen_pos[0].y() - target_size &&
-              mouse_pos.x() < g->screen_pos[0].x() + target_size &&
-              mouse_pos.y() < g->screen_pos[0].y() + target_size) {
-            return g;
-          }
+          if (handle_hit(g->screen_pos[0], 2 * GIZMO_TARGET_SIZE)) return g;
           break;
       }
     }
