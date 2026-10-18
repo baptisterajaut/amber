@@ -4,6 +4,10 @@
 
 using amber::parse_decimal_input;
 
+// The text parser of the value prompts only. QString::toDouble ignores the default locale, so the fr_FR rows pin that
+// the parser stays locale-free, not the prompt: a dialog wired to the locale again would still pass here. The prompts
+// themselves (LabelSlider::ShowDialog, amber::get_decimal) are driven under fr_FR in
+// test_fieldwidgets.cpp valuePromptIgnoresLocale.
 class TestDecimalInput : public QObject {
   Q_OBJECT
 
