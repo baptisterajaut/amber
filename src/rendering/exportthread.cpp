@@ -581,8 +581,10 @@ bool ExportThread::EncodeVideoFrame(RenderThread* renderer, double timecode_secs
   for (int failed_renders = 0;;) {
     render_complete_ = false;
     renderer->start_render(seq_, 1, nullptr, video_frame->data[0], video_frame->linesize[0] / 4, 0);
+    // Bounded: Interrupt() wakes without the mutex, so its wake can land between this check and the wait; the
+    // timeout re-checks interrupt_ (a lost wake costs at most 100 ms of cancel latency)
     while (!render_complete_ && !interrupt_) {
-      waitCond.wait(&mutex);
+      waitCond.wait(&mutex, 100);
     }
     if (interrupt_) return false;
     if (renderer->rhi_failed()) {
@@ -1046,10 +1048,11 @@ const QString& ExportThread::GetError() { return export_error; }
 bool ExportThread::WasInterrupted() { return interrupt_; }
 
 void ExportThread::Interrupt() {
-  mutex.lock();
+  // Never takes `mutex`: run() holds it across all of Export() but the waits, an encoder call or the final drain
+  // included, which take seconds with lookahead encoders (libaom, two-pass) and froze the GUI thread calling this.
+  // interrupt_ is atomic and every loop of the export checks it; the wake only shortens EncodeVideoFrame's wait.
   interrupt_ = true;
   waitCond.wakeAll();
-  mutex.unlock();
 }
 
 void ExportThread::wake() {
