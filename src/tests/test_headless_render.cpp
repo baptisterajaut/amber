@@ -33,6 +33,8 @@ extern "C" {
 #include <QtEndian>
 #include <QtMath>
 #include <algorithm>
+#include <cerrno>
+#include <cstring>
 #include <functional>
 
 #include "core/audio.h"
@@ -2789,8 +2791,12 @@ class TestHeadlessRender : public QObject {
     QCOMPARE(started, (QVector<int>{0, 1}));
     QCOMPARE(queue.Jobs().at(0).outcome.status, BatchExport::Outcome::Exported);
     QCOMPARE(queue.Jobs().at(1).outcome.status, BatchExport::Outcome::Failed);
-    qInfo("failed: %s", qPrintable(queue.Jobs().at(1).outcome.reason));
-    QVERIFY(!queue.Jobs().at(1).outcome.reason.isEmpty());
+    // The path and the system's words for the error, not a bare "(-2)"
+    const QString reason = queue.Jobs().at(1).outcome.reason;
+    qInfo("failed: %s", qPrintable(reason));
+    QCOMPARE(reason, QString("could not open output file \"%1\": %2")
+                         .arg(QDir::toNativeSeparators(QDir(missing).filePath("Tall.mp4")),
+                              QString::fromLocal8Bit(std::strerror(ENOENT))));
     QCOMPARE(queue.PendingCount(), 1);
     QCOMPARE(amber::ActiveSequence, b.user);
     QCOMPARE(b.wide->playhead, 7L);

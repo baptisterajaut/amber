@@ -26,6 +26,7 @@ extern "C" {
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/error.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 #include <libswresample/swresample.h>
@@ -33,6 +34,7 @@ extern "C" {
 }
 
 #include <QDateTime>
+#include <QDir>
 #include <QFile>
 #include <QtMath>
 
@@ -63,6 +65,14 @@ void warn_unused_options(AVDictionary* dict, const char* what) {
   while ((e = av_dict_get(dict, "", e, AV_DICT_IGNORE_SUFFIX)) != nullptr) {
     qWarning() << what << "ignored option" << e->key << "=" << e->value;
   }
+}
+
+// FFmpeg's text for an error code, for the user: "No such file or directory" for AVERROR(ENOENT) (in the system's
+// language for an errno), "Invalid argument"... The code itself goes to the log.
+QString av_error_text(int code) {
+  char text[AV_ERROR_MAX_STRING_SIZE] = {};
+  av_strerror(code, text, sizeof(text));  // an unknown code still gets "Error number N occurred"
+  return QString::fromUtf8(text);
 }
 
 }  // namespace
@@ -243,13 +253,13 @@ bool ExportThread::SetupVideo() {
   av_dict_free(&opts);
   if (ret < 0) {
     qCritical() << "Could not open output video encoder." << ret;
-    export_error = tr("could not open output video encoder (%1)").arg(QString::number(ret));
+    export_error = tr("could not open output video encoder: %1").arg(av_error_text(ret));
     // The usual cause is a size outside the hardware's range (radeonsi: 128x128 and up), which FFmpeg only logs
     if (hw_frames_ctx_ != nullptr) {
       export_error =
           tr("hardware encoder failed: %1 (%2)")
               .arg(tr("could not open the encoder at %1x%2").arg(params_.video_width).arg(params_.video_height),
-                   QString::number(ret));
+                   av_error_text(ret));
     }
     return false;
   }
@@ -466,7 +476,7 @@ bool ExportThread::SetupAudio() {
   av_dict_free(&aopts);
   if (ret < 0) {
     qCritical() << "Could not open output audio encoder." << ret;
-    export_error = tr("could not open output audio encoder (%1)").arg(QString::number(ret));
+    export_error = tr("could not open output audio encoder: %1").arg(av_error_text(ret));
     return false;
   }
 
@@ -556,7 +566,8 @@ bool ExportThread::SetupContainer() {
     // Failed to get a valid write handle for the exported file. Exit the export and throw an error.
 
     qCritical() << "Could not open output file." << ret;
-    export_error = tr("could not open output file (%1)").arg(QString::number(ret));
+    export_error =
+        tr("could not open output file \"%1\": %2").arg(QDir::toNativeSeparators(params_.filename), av_error_text(ret));
     return false;
   }
   container_opened_ = true;
