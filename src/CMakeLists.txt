@@ -250,6 +250,7 @@ set(UI_SOURCES
   dialogs/replaceclipmediadialog.cpp dialogs/replaceclipmediadialog.h
   dialogs/shadertoyimportdialog.cpp dialogs/shadertoyimportdialog.h
   dialogs/speeddialog.cpp dialogs/speeddialog.h
+  dialogs/subtitleeditor.cpp dialogs/subtitleeditor.h
   dialogs/texteditdialog.cpp dialogs/texteditdialog.h
   dialogs/welcomedialog.cpp dialogs/welcomedialog.h
   effects/ui/boolfieldwidget.cpp effects/ui/boolfieldwidget.h

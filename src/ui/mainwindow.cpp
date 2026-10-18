@@ -44,6 +44,7 @@
 #include "core/shortcutfile.h"
 #include "dialogs/debugdialog.h"
 #include "dialogs/footagerelinkdialog.h"
+#include "dialogs/subtitleeditor.h"
 #include "effects/internal/srtparser.h"
 #include "effects/internal/subtitleeffect.h"
 #include "engine/clip.h"
@@ -986,6 +987,10 @@ void MainWindow::setup_menus() {
   window_scopes_action->setCheckable(true);
   window_scopes_action->setData(reinterpret_cast<quintptr>(panel_scopes));
 
+  // A window, not a panel: no data, which windowMenu_About_To_Be_Shown() would read as a QDockWidget
+  window_subtitle_editor_action_ =
+      MenuHelper::create_menu_action(window_menu, "subtitleeditor", this, SLOT(open_subtitle_editor()));
+
   window_menu->addSeparator();
 
   maximize_panel_ =
@@ -1240,6 +1245,7 @@ void MainWindow::Retranslate() {
   window_sequenceviewer_action->setText(tr("Sequence Viewer"));
   window_undo_history_action->setText(tr("Undo History"));
   window_scopes_action->setText(tr("Scopes"));
+  window_subtitle_editor_action_->setText(tr("Subtitle Editor"));
 
   maximize_panel_->setText(tr("Maximize Panel"));
   lock_panels_->setText(tr("Lock Panels"));
@@ -1638,6 +1644,8 @@ void MainWindow::import_subtitle() {
   // Scroll video area to reveal the track where the subtitle was placed
   panel_timeline->scroll_to_track(track);
 }
+
+void MainWindow::open_subtitle_editor() { SubtitleEditor::Open(); }
 
 void MainWindow::toggle_panel_visibility() {
   QAction* action = static_cast<QAction*>(sender());

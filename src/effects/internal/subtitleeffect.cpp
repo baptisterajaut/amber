@@ -121,13 +121,25 @@ SubtitleEffect::SubtitleEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
 }
 
 void SubtitleEffect::SetCues(const QVector<SubtitleCue>& cues) {
+  QMutexLocker locker(&cues_mutex_);
   cues_ = cues;
-  active_cue_index_ = -1;
+  cues_revision_++;
+  cues_dirty_ = true;
 }
 
-int SubtitleEffect::find_active_cue(qint64 time_ms) const {
-  for (int i = 0; i < cues_.size(); ++i) {
-    if (time_ms >= cues_[i].start_ms && time_ms < cues_[i].end_ms) {
+QVector<SubtitleCue> SubtitleEffect::cues() const {
+  QMutexLocker locker(&cues_mutex_);
+  return cues_;
+}
+
+int SubtitleEffect::cues_revision() const {
+  QMutexLocker locker(&cues_mutex_);
+  return cues_revision_;
+}
+
+int SubtitleEffect::find_active_cue(const QVector<SubtitleCue>& cues, qint64 time_ms) {
+  for (int i = 0; i < cues.size(); ++i) {
+    if (time_ms >= cues[i].start_ms && time_ms < cues[i].end_ms) {
       return i;
     }
   }
@@ -159,15 +171,25 @@ QRhiTexture* SubtitleEffect::process_superimpose(QRhi* rhi, QRhiResourceUpdateBa
     dimensions_changed = true;
   }
 
+  // A snapshot: SetCues() may swap the vector on the main thread while this frame draws
+  QVector<SubtitleCue> cues;
+  bool cues_edited;
+  {
+    QMutexLocker locker(&cues_mutex_);
+    cues = cues_;
+    cues_edited = cues_dirty_;
+    cues_dirty_ = false;
+  }
+
   // Check if the active cue changed
   qint64 time_ms = qRound64(timecode * 1000.0);
-  int new_cue = find_active_cue(time_ms);
-  bool cue_changed = (new_cue != active_cue_index_);
+  int new_cue = find_active_cue(cues, time_ms);
+  bool cue_changed = (new_cue != active_cue_index_) || cues_edited;
   active_cue_index_ = new_cue;
 
   // Update main-thread UI with active cue text (capture by value to avoid cross-thread data race)
   if (cue_changed) {
-    QString cue_text = new_cue >= 0 ? cues_[new_cue].text.left(80) : QString();
+    QString cue_text = new_cue >= 0 ? cues[new_cue].text.left(80) : QString();
     QMetaObject::invokeMethod(
         this, [this, cue_text]() { current_cue_field_->SetValueAt(0, cue_text); }, Qt::QueuedConnection);
   }
@@ -270,12 +292,12 @@ static int CalcVerticalOffset(int valign, int height, int doc_height) {
   return 0;
 }
 
-QString SubtitleEffect::CollectActiveCues(qint64 time_ms) const {
+QString SubtitleEffect::CollectActiveCues(const QVector<SubtitleCue>& cues, qint64 time_ms) {
   QString active_text;
-  for (int i = 0; i < cues_.size(); i++) {
-    if (cues_[i].start_ms <= time_ms && time_ms < cues_[i].end_ms) {
+  for (int i = 0; i < cues.size(); i++) {
+    if (cues[i].start_ms <= time_ms && time_ms < cues[i].end_ms) {
       if (!active_text.isEmpty()) active_text += QLatin1String("<br>");
-      active_text += cues_[i].text;
+      active_text += cues[i].text;
     }
   }
   return active_text;
@@ -285,7 +307,7 @@ void SubtitleEffect::redraw(double timecode) {
   img.fill(Qt::transparent);
 
   qint64 time_ms = qRound64(timecode * 1000.0);
-  QString active_text = CollectActiveCues(time_ms);
+  QString active_text = CollectActiveCues(cues(), time_ms);
   if (active_text.isEmpty()) return;
 
   int padding = qRound(padding_field_->GetDoubleAt(timecode));
@@ -336,7 +358,7 @@ void SubtitleEffect::redraw(double timecode) {
 
 void SubtitleEffect::custom_load(QXmlStreamReader& stream) {
   if (stream.name() == QLatin1String("cues")) {
-    cues_.clear();
+    QVector<SubtitleCue> loaded;
     while (!stream.atEnd() && !(stream.name() == QLatin1String("cues") && stream.isEndElement())) {
       stream.readNext();
       if (stream.name() == QLatin1String("cue") && stream.isStartElement()) {
@@ -344,9 +366,10 @@ void SubtitleEffect::custom_load(QXmlStreamReader& stream) {
         cue.start_ms = stream.attributes().value("start").toLongLong();
         cue.end_ms = stream.attributes().value("end").toLongLong();
         cue.text = stream.readElementText();
-        cues_.append(cue);
+        loaded.append(cue);
       }
     }
+    SetCues(loaded);
   }
 }
 
@@ -354,7 +377,7 @@ void SubtitleEffect::save(QXmlStreamWriter& stream) {
   Effect::save(stream);
 
   stream.writeStartElement("cues");
-  for (const SubtitleCue& cue : cues_) {
+  for (const SubtitleCue& cue : cues()) {
     stream.writeStartElement("cue");
     stream.writeAttribute("start", QString::number(cue.start_ms));
     stream.writeAttribute("end", QString::number(cue.end_ms));
@@ -367,6 +390,6 @@ void SubtitleEffect::save(QXmlStreamWriter& stream) {
 EffectPtr SubtitleEffect::copy(Clip* c) {
   EffectPtr e = Effect::copy(c);
   SubtitleEffect* sub = static_cast<SubtitleEffect*>(e.get());
-  sub->cues_ = cues_;
+  sub->SetCues(cues());
   return e;
 }
