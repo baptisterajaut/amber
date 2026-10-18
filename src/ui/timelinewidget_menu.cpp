@@ -25,6 +25,8 @@
 
 #include "dialogs/clippropertiesdialog.h"
 #include "dialogs/newsequencedialog.h"
+#include "dialogs/subtitleeditor.h"
+#include "effects/internal/subtitleeffect.h"
 #include "engine/undo/undo_generic.h"
 #include "engine/undo/undostack.h"
 #include "global/config.h"
@@ -99,6 +101,18 @@ void TimelineWidget::buildSelectedClipsMenu(Menu& menu, const QVector<Clip*>& se
   }
 
   menu.addAction(tr("Properties"), this, &TimelineWidget::show_clip_properties);
+
+  // The clip under the cursor (the press that opened this menu set cursor_frame/cursor_track), when it has subtitles
+  int clicked = getClipIndexFromCoords(panel_timeline->cursor_frame, panel_timeline->cursor_track);
+  if (clicked >= 0) {
+    Clip* c = amber::ActiveSequence->clips.at(clicked).get();
+    for (const EffectPtr& e : c->effects) {
+      if (qobject_cast<SubtitleEffect*>(e.get()) != nullptr) {
+        menu.addAction(tr("Edit Subtitles..."), this, [c]() { SubtitleEditor::Open(c); });
+        break;
+      }
+    }
+  }
 
   menu.addSeparator();
   QAction* match_frame_action = menu.addAction(tr("Match Frame"));

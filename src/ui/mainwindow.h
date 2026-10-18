@@ -93,6 +93,16 @@ class MainWindow : public QMainWindow {
    */
   void toggle_full_screen();
 
+  /**
+   * @brief Import a .srt file as a new subtitle clip at the playhead (File > Import Subtitle).
+   */
+  void import_subtitle();
+
+  /**
+   * @brief Show the Subtitle Editor window.
+   */
+  void open_subtitle_editor();
+
  signals:
   /**
    * @brief Signal emitted once when the main window has finished initializing
@@ -233,7 +243,6 @@ class MainWindow : public QMainWindow {
    * @brief Open the Relink Media dialog to find missing media files.
    */
   void relink_media();
-  void import_subtitle();
 
   /**
    * @brief Set panel lock
@@ -377,6 +386,7 @@ class MainWindow : public QMainWindow {
   QAction* window_sequenceviewer_action;
   QAction* window_undo_history_action;
   QAction* window_scopes_action;
+  QAction* window_subtitle_editor_action_;
 
   QAction* maximize_panel_;
   QAction* lock_panels_;
