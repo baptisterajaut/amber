@@ -27,6 +27,21 @@
 #include "project/projectelements.h"
 #include "rendering/renderfunctions.h"
 
+static int64_t seek_landing_timestamp(AVFormatContext* formatCtx, int stream_index, int64_t target_pts);
+
+// Where a seek that hit EOF goes next: just before the keyframe it landed on (container index), else the furthest frame
+// decoded since the clip opened, else the stream's declared last frame. AV_NOPTS_VALUE when none is known.
+int64_t Cacher::cacheVideoLastDecodable(int64_t seek_ts) {
+  const int64_t landing = seek_landing_timestamp(formatCtx, clip->media_stream_index(), seek_ts);
+  if (landing != AV_NOPTS_VALUE && landing > 0) return landing - 1;
+  if (latest_decoded_pts_ != AV_NOPTS_VALUE) return latest_decoded_pts_;
+  if (stream->duration != AV_NOPTS_VALUE && stream->avg_frame_rate.num > 0 && stream->avg_frame_rate.den > 0) {
+    const int64_t start = (stream->start_time != AV_NOPTS_VALUE) ? stream->start_time : 0;
+    return start + stream->duration - av_rescale_q(1, av_inv_q(stream->avg_frame_rate), stream->time_base);
+  }
+  return AV_NOPTS_VALUE;
+}
+
 // ---------------------------------------------------------------------------
 // cacheVideoSeekToTarget
 // ---------------------------------------------------------------------------
@@ -37,6 +52,12 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
   int64_t zero = 0;
   bool have_existing = false;
 
+  // Seek a second further back while the landing frame is past the target. EOF instead means nothing is decodable from
+  // the landing point to the end: the target is past the media's real end (a proxy a frame short of its original, a
+  // container that overstates its length). Jump once to where the media is known to decode, then step back doubling
+  // the step: a few passes however far past the end, not one per second.
+  int64_t eof_step = second_pts;
+  bool jumped = false;
   do {
     if (have_existing) av_frame_free(&decoded_frame);
 
@@ -46,9 +67,21 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
 
     retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
 
-    seek_ts = qMax(zero, seek_ts - second_pts);
+    if (retrieve_code == AVERROR_EOF) {
+      const int64_t known = jumped ? AV_NOPTS_VALUE : cacheVideoLastDecodable(seek_ts);
+      jumped = true;
+      if (known != AV_NOPTS_VALUE && known < seek_ts) {
+        seek_ts = qMax(zero, known);
+      } else {
+        seek_ts = qMax(zero, seek_ts - eof_step);
+        eof_step *= 2;
+      }
+    } else {
+      seek_ts = qMax(zero, seek_ts - second_pts);
+    }
     have_existing = true;
-  } while (retrieve_code >= 0 && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts) &&
+  } while ((retrieve_code == AVERROR_EOF ||
+            (retrieve_code >= 0 && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts))) &&
            !seeked_to_zero);
 
   queue_.lock();
@@ -109,23 +142,6 @@ void Cacher::cacheVideoEvictBeforeTimestamp(int64_t minimum_ts) {
 }
 
 // ---------------------------------------------------------------------------
-// cacheVideoHandleNoPtsFrame
-// ---------------------------------------------------------------------------
-bool Cacher::cacheVideoHandleNoPtsFrame(AVFrame* decoded_frame, int64_t target_pts, int retrieve_code) {
-  decoded_frame->pts = target_pts;
-  if (retrieve_code == AVERROR_EOF) {
-    if (retrieved_frame == nullptr) SetRetrievedFrame(decoded_frame);
-    queue_.lock();
-    queue_.append(decoded_frame);
-    queue_.unlock();
-    return true;  // break the decode loop
-  }
-  // Not stored anywhere — free it, the decode loop allocates a fresh frame on the next pass
-  av_frame_free(&decoded_frame);
-  return false;
-}
-
-// ---------------------------------------------------------------------------
 // cacheVideoStillImage — handle still-image clip caching
 // ---------------------------------------------------------------------------
 void Cacher::cacheVideoStillImage() {
@@ -177,8 +193,25 @@ bool Cacher::cacheVideoProcessDecodedFrame(AVFrame* decoded_frame, int retrieve_
     return true;
   }
 
+  // EOF hands back the frame RetrieveFrameAndProcess() allocated, which nothing filled: never queue or retrieve it. A
+  // target past the media's last frame then gets the last decoded one, CacheVideoWorker()'s closest-frame fallback.
+  if (retrieve_code == AVERROR_EOF) {
+    av_frame_free(&decoded_frame);
+    // The media's real end, when frames were decoded since the last seek: later targets past it are served that frame
+    // without seeking again (cacheTryQueueHit(), cacheVideoDynamicClip())
+    queue_.lock();
+    if (!queue_.isEmpty()) video_end_pts_ = latest_decoded_pts_;
+    queue_.unlock();
+    return true;
+  }
+
+  // No timestamp to place it in the queue: free it, the decode loop allocates a fresh frame on the next pass
   if (decoded_frame->pts == AV_NOPTS_VALUE) {
-    return cacheVideoHandleNoPtsFrame(decoded_frame, target_pts, retrieve_code);
+    av_frame_free(&decoded_frame);
+    return false;
+  }
+  if (latest_decoded_pts_ == AV_NOPTS_VALUE || decoded_frame->pts > latest_decoded_pts_) {
+    latest_decoded_pts_ = decoded_frame->pts;
   }
 
   // Discard frames before the minimum timestamp (seconds mode)
@@ -261,7 +294,7 @@ static int64_t seek_landing_timestamp(AVFormatContext* formatCtx, int stream_ind
 // ---------------------------------------------------------------------------
 void Cacher::cacheVideoDynamicClip() {
   bool reversed = IsReversed();
-  int64_t target_pts = seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
+  int64_t target_pts = clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)));
   int64_t second_pts = seconds_to_timestamp(clip, 1);
 
   QueueStats stats = scan_queue(queue_, target_pts);

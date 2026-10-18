@@ -464,6 +464,17 @@ class Cacher : public QThread {
    */
   bool buffersrc_params_set_{false};
 
+  // Video: the largest pts decoded since the clip opened, and the pts of the media's real last frame once a decode
+  // reached EOF (AV_NOPTS_VALUE: not known yet). Only the worker writes them (video_end_pts_ under queue_'s lock),
+  // so it reads them freely; any other thread (cacheTryQueueHit()) reads video_end_pts_ under queue_'s lock.
+  int64_t latest_decoded_pts_{AV_NOPTS_VALUE};
+  int64_t video_end_pts_{AV_NOPTS_VALUE};
+  // A target past the media's real end is its last frame
+  int64_t clampToVideoEnd(int64_t target_pts) const {
+    return (video_end_pts_ != AV_NOPTS_VALUE && target_pts > video_end_pts_) ? video_end_pts_ : target_pts;
+  }
+  int64_t cacheVideoLastDecodable(int64_t seek_ts);
+
   /**
    * @brief FFmpeg buffer sink
    *
@@ -792,14 +803,6 @@ class Cacher : public QThread {
    * Keeps at least one frame and never evicts retrieved_frame.
    */
   void cacheVideoEvictBeforeTimestamp(int64_t minimum_ts);
-
-  /**
-   * @brief Handle a decoded frame with AV_NOPTS_VALUE pts (still-image or seek artifact).
-   *
-   * Assigns target_pts to the frame, and if EOF was also signalled, stores the frame and returns true
-   * (caller should break the decode loop).
-   */
-  bool cacheVideoHandleNoPtsFrame(AVFrame* decoded_frame, int64_t target_pts, int retrieve_code);
 
   /**
    * @brief Cache a single still-image frame (infinite_length clips).

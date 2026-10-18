@@ -664,7 +664,10 @@ QString ExportDialog::queue_summary(const ExportParams& params) const {
   QStringList parts;
   parts.append(formatCombobox->currentText());
   if (params.video_enabled) {
-    parts.append(short_codec_name(vcodecCombobox->currentText()));
+    QString vcodec = short_codec_name(vcodecCombobox->currentText());
+    // The encoder too when it isn't the codec's default (first) one: "H.264 Hardware (VAAPI)", not just "H.264"
+    if (vencoderCombobox->currentIndex() > 0) vcodec += QStringLiteral(" ") + vencoderCombobox->currentText();
+    parts.append(vcodec);
     parts.append(QStringLiteral("%1×%2").arg(params.video_width).arg(params.video_height));
   }
   if (params.audio_enabled) parts.append(short_codec_name(acodecCombobox->currentText()));
@@ -769,6 +772,14 @@ void ExportDialog::vencoder_changed(int) {
 
   const QString name = current_video_encoder();
   has_vencoder_info_ = !name.isEmpty() && amber::find_encoder_info(name, &vencoder_info_);
+  // ProRes has no rate control: prores, prores_aw and prores_ks never read the bit rate ExportThread sets (FFmpeg
+  // 8.0 and master sources), the profile sets the quality. CBA: only ProRes checked; the lossless and image codecs
+  // (PNG, TIFF, rawvideo, HuffYUV...) most likely ignore it too, add them here once checked in their encoder source.
+  const bool rate_control = vcodecCombobox->currentData().toInt() != AV_CODEC_ID_PRORES;
+  compressionTypeLabel->setVisible(rate_control);
+  compressionTypeCombobox->setVisible(rate_control);
+  videoBitrateLabel->setVisible(rate_control);
+  videobitrateSpinbox->setVisible(rate_control);
   rebuild_option_rows(videoGridLayout, kVideoOptionRow, videoGroupbox, has_vencoder_info_ ? &vencoder_info_ : nullptr,
                       video_option_rows_);
   fit_height();  // covers the encoder row too: vcodec_changed() always ends here
@@ -1079,7 +1090,8 @@ void ExportDialog::setup_ui() {
   framerateSpinbox->setValue(0);
   videoGridLayout->addWidget(framerateSpinbox, 4, 1, 1, 1);
 
-  videoGridLayout->addWidget(new QLabel(tr("Compression Type:"), this), 5, 0, 1, 1);
+  compressionTypeLabel = new QLabel(tr("Compression Type:"), this);
+  videoGridLayout->addWidget(compressionTypeLabel, 5, 0, 1, 1);
   compressionTypeCombobox = new QComboBox(videoGroupbox);
   videoGridLayout->addWidget(compressionTypeCombobox, 5, 1, 1, 1);
 

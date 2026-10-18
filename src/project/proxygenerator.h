@@ -28,6 +28,17 @@
 
 #include "project/media.h"
 
+extern "C" {
+#include <libavutil/mathematics.h>
+}
+
+// One frame at frame_rate in time_base (0 if the rate is unknown): the duration of a proxy video packet, which the
+// encoder leaves at 0. A zero-length last sample makes players that honour the mov edit list drop the last frame.
+inline int64_t proxy_frame_duration(AVRational frame_rate, AVRational time_base) {
+  if (frame_rate.num <= 0 || frame_rate.den <= 0) return 0;
+  return av_rescale_q(1, av_inv_q(frame_rate), time_base);
+}
+
 struct ProxyInfo {
   Media* media;
   double size_multiplier;
