@@ -577,7 +577,12 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
       bool is_yuv420p = (frame->format == AV_PIX_FMT_YUV420P);
       bool is_nv12 = (frame->format == AV_PIX_FMT_NV12);
 
-      if (rhi != nullptr && (is_yuv420p || is_nv12)) {
+      if (frame->data[0] == nullptr) {
+        // A frame nothing decoded into (the cacher never hands one out): uploading it would draw an uninitialised
+        // texture. Keep the clip's previous picture, nothing will come to retry for.
+        qWarning() << "Clip::Retrieve: empty frame for clip" << name();
+        ret = true;
+      } else if (rhi != nullptr && (is_yuv420p || is_nv12)) {
         // GPU YUV->RGB path: upload plane textures and convert via shader
         int w = cacher.media_width();
         int h = cacher.media_height();

@@ -984,7 +984,7 @@ void PreferencesDialog::setup_ui() {
   tree_header->setText(1, tr("Shortcut"));
   shortcut_layout->addWidget(keyboard_tree);
 
-  QHBoxLayout* reset_shortcut_layout = new QHBoxLayout(shortcut_tab);
+  QHBoxLayout* reset_shortcut_layout = new QHBoxLayout();  // added to shortcut_layout below
 
   QPushButton* import_shortcut_button = new QPushButton(tr("Import"), shortcut_tab);
   reset_shortcut_layout->addWidget(import_shortcut_button);

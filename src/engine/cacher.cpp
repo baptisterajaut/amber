@@ -422,6 +422,10 @@ void Cacher::OpenWorker() {
     audio_buffer_write = 0;
   }
   reached_end = false;
+  queue_.lock();
+  video_end_pts_ = AV_NOPTS_VALUE;
+  latest_decoded_pts_ = AV_NOPTS_VALUE;
+  queue_.unlock();
 
   if (clip->media() == nullptr) {
     if (clip->track() >= 0) {
@@ -593,7 +597,7 @@ bool Cacher::Cache(long playhead, bool scrubbing, QVector<Clip*>& nests, int pla
     retrieve_lock_.lock();
     queue_.lock();
     retrieved_frame = nullptr;
-    int64_t target_pts = seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
+    int64_t target_pts = clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)));
     for (int i=0;i<queue_.size();i++) {
 
       if (queue_.at(i)->pts == target_pts) {

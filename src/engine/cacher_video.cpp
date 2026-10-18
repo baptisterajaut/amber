@@ -41,6 +41,19 @@ static int64_t seek_landing_timestamp(AVFormatContext* formatCtx, int stream_ind
 #endif
 }
 
+// Where a seek that hit EOF goes next: just before the keyframe it landed on (container index), else the furthest frame
+// decoded since the clip opened, else the stream's declared last frame. AV_NOPTS_VALUE when none is known.
+int64_t Cacher::cacheVideoLastDecodable(int64_t seek_ts) {
+  const int64_t landing = seek_landing_timestamp(formatCtx, clip->media_stream_index(), seek_ts);
+  if (landing != AV_NOPTS_VALUE && landing > 0) return landing - 1;
+  if (latest_decoded_pts_ != AV_NOPTS_VALUE) return latest_decoded_pts_;
+  if (stream->duration != AV_NOPTS_VALUE && stream->avg_frame_rate.num > 0 && stream->avg_frame_rate.den > 0) {
+    const int64_t start = (stream->start_time != AV_NOPTS_VALUE) ? stream->start_time : 0;
+    return start + stream->duration - av_rescale_q(1, av_inv_q(stream->avg_frame_rate), stream->time_base);
+  }
+  return AV_NOPTS_VALUE;
+}
+
 void Cacher::CacheVideoWorker() {
   // Skip video caching if filter graph failed to initialize
   if (filter_graph == nullptr) {
@@ -85,8 +98,8 @@ void Cacher::CacheVideoWorker() {
     // determine if this media is reversed, which will affect how the queue is constructed
     bool reversed = IsReversed();
 
-    // get the timestamp we want in terms of the media's timebase
-    int64_t target_pts = seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
+    // get the timestamp we want in terms of the media's timebase (a target past the media's real end is its last frame)
+    int64_t target_pts = clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)));
 
     // get the value of one second in terms of the media's timebase
     int64_t second_pts = seconds_to_timestamp(clip, 1); // FIXME: possibly magic number?
@@ -143,7 +156,13 @@ void Cacher::CacheVideoWorker() {
       int64_t zero = 0;
 
       // Some formats don't seek reliably to the last keyframe, as a result we need to seek in a loop to ensure we
-      // get a frame prior to the timestamp
+      // get a frame prior to the timestamp: a second further back while the landing frame is past the target. EOF
+      // instead means nothing is decodable from the landing point to the end: the target is past the media's real end
+      // (a proxy a frame short of its original, a container that overstates its length). Jump once to where the media
+      // is known to decode, then step back doubling the step: a few passes however far past the end, not one per
+      // second.
+      int64_t eof_step = second_pts;
+      bool jumped = false;
       do {
 
         // if we already allocated a frame here, we'd better free it
@@ -161,12 +180,24 @@ void Cacher::CacheVideoWorker() {
 
         //qDebug() << "Target:" << target_pts << "Seek:" << seek_ts << "Frame:" << decoded_frame->pts;
 
-        seek_ts = qMax(zero, seek_ts - second_pts);
+        if (seek_retrieve_code == AVERROR_EOF) {
+          const int64_t known = jumped ? AV_NOPTS_VALUE : cacheVideoLastDecodable(seek_ts);
+          jumped = true;
+          if (known != AV_NOPTS_VALUE && known < seek_ts) {
+            seek_ts = qMax(zero, known);
+          } else {
+            seek_ts = qMax(zero, seek_ts - eof_step);
+            eof_step *= 2;
+          }
+        } else {
+          seek_ts = qMax(zero, seek_ts - second_pts);
+        }
 
         have_existing_frame_to_use = true;
-      } while (seek_retrieve_code >= 0
-              && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts)
-              && !seeked_to_zero);
+      } while (
+          (seek_retrieve_code == AVERROR_EOF ||
+           (seek_retrieve_code >= 0 && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts))) &&
+          !seeked_to_zero);
 
       // also we assume none of the frames in the queue are usable
       queue_.lock();
@@ -266,7 +297,23 @@ void Cacher::CacheVideoWorker() {
           av_frame_free(&decoded_frame);
           break;
 
+        } else if (retrieve_code == AVERROR_EOF) {
+
+          // EOF hands back the frame RetrieveFrameAndProcess() allocated, which nothing filled: never queue or retrieve
+          // it. A target past the media's last frame then gets the last decoded one, the closest-frame fallback below.
+          av_frame_free(&decoded_frame);
+          // The media's real end, when frames were decoded since the last seek: later targets past it are served that
+          // frame without seeking again (Cache(), clampToVideoEnd() above)
+          queue_.lock();
+          if (!queue_.isEmpty()) video_end_pts_ = latest_decoded_pts_;
+          queue_.unlock();
+          break;
+
         } else if (decoded_frame->pts != AV_NOPTS_VALUE) {
+
+          if (latest_decoded_pts_ == AV_NOPTS_VALUE || decoded_frame->pts > latest_decoded_pts_) {
+            latest_decoded_pts_ = decoded_frame->pts;
+          }
 
           // check if this frame exceeds the minimum timestamp
           if (previous_queue_type == amber::FRAME_QUEUE_TYPE_SECONDS
@@ -377,24 +424,7 @@ void Cacher::CacheVideoWorker() {
 
         } else {
 
-          // Frame has no timestamp. For still images (JPEG, PNG, etc.) this is expected —
-          // assign PTS 0 so the frame is usable. For video codecs this can happen after
-          // seeking; in that case use the target PTS as a reasonable approximation.
-
-          decoded_frame->pts = target_pts;
-
-          if (retrieve_code == AVERROR_EOF) {
-            // No more frames — this was the last one, use it directly
-            if (retrieved_frame == nullptr) {
-              SetRetrievedFrame(decoded_frame);
-            }
-            queue_.lock();
-            queue_.append(decoded_frame);
-            queue_.unlock();
-            break;
-          }
-
-          // Not stored anywhere — free it, the decode loop allocates a fresh frame on the next pass
+          // No timestamp to place it in the queue: free it, the decode loop allocates a fresh frame on the next pass
           av_frame_free(&decoded_frame);
 
         }
