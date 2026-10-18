@@ -149,7 +149,7 @@ class TestEffectPresets : public QObject {
     QVERIFY(SaveEffectPreset(EffectPresetPathForName("Zeta audio"), "Zeta audio", EFFECT_TYPE_AUDIO, {}));
     const QString accented = QString::fromUtf8("Écho doux/2");
     const QString accented_path = EffectPresetPathForName(accented);
-    QCOMPARE(QFileInfo(accented_path).fileName(), QString("_cho doux_2.xml"));
+    QVERIFY2(QFileInfo(accented_path).fileName().startsWith("_cho doux_2-"), qPrintable(accented_path));
     QVERIFY(SaveEffectPreset(accented_path, accented, EFFECT_TYPE_VIDEO, {}));
     write_file(EffectPresetDir() + "/garbage.xml", "this is <<< not xml");
     write_file(EffectPresetDir() + "/other root.xml", "<effect name=\"Blur/Box Blur\"/>");
@@ -162,6 +162,36 @@ class TestEffectPresets : public QObject {
     for (const EffectPresetInfo& p : video) QCOMPARE(p.subtype, int(EFFECT_TYPE_VIDEO));
     QCOMPARE(video.at(3).path, accented_path);
     QCOMPARE(names(ListEffectPresets(EFFECT_TYPE_AUDIO)), QStringList({"Zeta audio"}));
+  }
+
+  void namesThatSanitiseAlikeKeepTheirOwnFile() {
+    // "Glow!" and "Glow?" both sanitise to "Glow_": the hash suffix keeps them apart, and is stable
+    QVERIFY(EffectPresetPathForName("Glow!") != EffectPresetPathForName("Glow?"));
+    QCOMPARE(EffectPresetPathForName("Glow!"), EffectPresetPathForName("Glow!"));
+    QString replaced;
+    for (const QString& name : {QString("Glow!"), QString("Glow?")}) {
+      const QString path = EffectPresetSavePath(name, &replaced);
+      QVERIFY2(replaced.isEmpty(), qPrintable(name + " would replace " + replaced));
+      QVERIFY(SaveEffectPreset(path, name, EFFECT_TYPE_VIDEO, {}));
+    }
+    QCOMPARE(names(ListEffectPresets(EFFECT_TYPE_VIDEO)), QStringList({"Glow!", "Glow?"}));
+
+    // Saving a name again replaces its own file, and the prompt names it
+    QCOMPARE(EffectPresetSavePath("Glow?", &replaced), EffectPresetPathForName("Glow?"));
+    QCOMPARE(replaced, QString("Glow?"));
+  }
+
+  void presetsSavedBeforeTheHashStillWork() {
+    // A file of the old naming (sanitised name only) is listed, and saving its name again replaces it in place
+    const QString legacy = EffectPresetDir() + "/Old_one.xml";
+    QVERIFY(SaveEffectPreset(legacy, "Old/one", EFFECT_TYPE_VIDEO, {}));
+    QCOMPARE(names(ListEffectPresets(EFFECT_TYPE_VIDEO)), QStringList({"Old/one"}));
+    QString replaced;
+    QCOMPARE(EffectPresetSavePath("Old/one", &replaced), legacy);
+    QCOMPARE(replaced, QString("Old/one"));
+    // A name that only sanitises like it gets a new file, nothing replaced
+    QCOMPARE(EffectPresetSavePath("Old?one", &replaced), EffectPresetPathForName("Old?one"));
+    QVERIFY(replaced.isEmpty());
   }
 
   void missingEffect() {

@@ -344,9 +344,10 @@ void EffectControls::save_preset(EffectUI* clicked) {
                            .trimmed();
   if (!ok || name.isEmpty()) return;
 
-  const QString path = EffectPresetPathForName(name);
-  if (QFileInfo::exists(path) && QMessageBox::question(this, tr("Save as Preset"), tr("Replace preset '%1'?").arg(name),
-                                                       QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
+  QString replaced;
+  const QString path = EffectPresetSavePath(name, &replaced);
+  if (!replaced.isEmpty() && QMessageBox::question(this, tr("Save as Preset"), tr("Replace preset '%1'?").arg(replaced),
+                                                   QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
     return;
   }
   if (!SaveEffectPreset(path, name, subtype, preset_effects)) {
