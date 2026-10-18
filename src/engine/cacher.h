@@ -469,6 +469,14 @@ class Cacher : public QThread {
     return (video_end_pts_ != AV_NOPTS_VALUE && target_pts > video_end_pts_) ? video_end_pts_ : target_pts;
   }
   int64_t cacheVideoLastDecodable(int64_t seek_ts);
+
+  /**
+   * @brief Rebuild a video filter graph that deinterlaces (yadif), dropping the frames it holds from before a seek.
+   *
+   * No-op on a graph without yadif. On failure the graph is gone and RetrieveFrameAndProcess() returns an error.
+   */
+  void cacheVideoResetDeinterlacer();
+
   int64_t videoTargetPts() const;
 
   /**
