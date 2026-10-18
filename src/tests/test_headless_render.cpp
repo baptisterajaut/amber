@@ -45,6 +45,9 @@ extern "C" {
 #include "effects/internal/ladspaeffect.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
+#include "engine/undo/comboaction.h"
+#include "engine/undo/undo_generic.h"
+#include "engine/undo/undostack.h"
 #include "global/config.h"
 #include "global/projectio.h"
 #include "project/footage.h"
@@ -52,6 +55,7 @@ extern "C" {
 #include "project/media.h"
 #include "project/previewgenerator.h"
 #include "project/projectmodel.h"
+#include "project/projectsaver.h"
 #include "project/proxygenerator.h"
 #include "rendering/batchexport.h"
 #include "rendering/encoderoptions.h"
@@ -621,11 +625,11 @@ void write_offset_mp4(const QString& path, int frames, int64_t start) {
 }
 
 // frames frames of a flat colour, luma 24 + 16 * i under a non-neutral chroma (a dropped or swapped chroma plane
-// shows), as interlaced (MBAFF, top field first) H.264 from libx264 in MP4
-void write_interlaced_h264(const QString& path, int frames) {
+// shows), as interlaced (top field first) video in MP4: MBAFF H.264 from libx264 by default
+void write_interlaced_video(const QString& path, int frames, const char* encoder = "libx264") {
   const AVRational rate{int(kFps), 1};
   const QByteArray p = path.toUtf8();
-  const AVCodec* codec = avcodec_find_encoder_by_name("libx264");
+  const AVCodec* codec = avcodec_find_encoder_by_name(encoder);
   QVERIFY(codec != nullptr);
   AVFormatContext* fmt = nullptr;
   QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
@@ -1058,6 +1062,29 @@ class TestHeadlessRender : public QObject {
       QVERIFY2(c->media_length() >= frames, qPrintable(QString("media length %1").arg(c->media_length())));
     }
     QCOMPARE((*seq)->getEndFrame(), frames);
+  }
+
+  // Load project as the active sequence and wait for its footage probes; *video is the V1 clip's footage. Callers
+  // return on QTest::currentTestFailed().
+  void load_and_probe(const QString& project, Footage** video) {
+    *video = nullptr;
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      if (c->track() < 0) *video = f;
+    }
+    QVERIFY(*video != nullptr);
   }
 
   // Points TMPDIR (QDir::tempPath(), where QTemporaryDir goes) at an empty folder of the test's own until the guard
@@ -1720,7 +1747,7 @@ class TestHeadlessRender : public QObject {
   void vaapiInterlacedMatchesSoftware() {
     if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
     const QString video = dir_.filePath("interlaced.mp4");
-    write_interlaced_h264(video, kSourceFrames);
+    write_interlaced_video(video, kSourceFrames);
     if (QTest::currentTestFailed()) return;
     if (!vaapi_decodes(video)) QSKIP("no VAAPI H.264 decode here");
     const QString audio = dir_.filePath("interlaced_tone.wav");
@@ -1778,7 +1805,7 @@ class TestHeadlessRender : public QObject {
   void interlacingKeptWithCachedThumbnail() {
     if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
     const QString video = dir_.filePath("reopen_interlaced.mp4");
-    write_interlaced_h264(video, kSourceFrames);
+    write_interlaced_video(video, kSourceFrames);
     if (QTest::currentTestFailed()) return;
     const QString audio = dir_.filePath("reopen_interlaced_tone.wav");
     {
@@ -1818,6 +1845,137 @@ class TestHeadlessRender : public QObject {
       QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
       QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
     }
+  }
+
+  // The interlacing chosen in Media Properties is saved (only when it differs from the detected value) and wins over
+  // the detection on reopen and on a re-analysis; undo still restores the detected value. It used to be lost on reopen.
+  void interlacingChoiceSaved() {
+    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    const QString video = dir_.filePath("choice_interlaced.mp4");
+    write_interlaced_video(video, kSourceFrames);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("choice_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("choice.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    auto read = [](const QString& path) {
+      QFile f(path);
+      return f.open(QFile::ReadOnly) ? f.readAll() : QByteArray();
+    };
+    Footage* vf = nullptr;
+    load_and_probe(project, &vf);
+    if (QTest::currentTestFailed()) return;
+    QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    // Untouched: no attribute
+    const QString untouched = dir_.filePath("choice_untouched.ove");
+    QVERIFY(amber::save_project_file(untouched, untouched));
+    QVERIFY(!read(untouched).contains("interlacing="));
+
+    // The dialog's change: through the undo stack
+    amber::UndoStack.clear();
+    auto* ca = new ComboAction("Edit Media Properties");
+    ca->append(new SetInt(&vf->video_tracks[0].video_interlacing, VIDEO_BOTTOM_FIELD_FIRST));
+    amber::UndoStack.push(ca);
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_BOTTOM_FIELD_FIRST));
+    amber::UndoStack.undo();
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    amber::UndoStack.redo();
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_BOTTOM_FIELD_FIRST));
+    amber::UndoStack.clear();
+
+    // A re-analysis of the same footage (relink) keeps it
+    Media* media = nullptr;
+    for (const auto& c : amber::ActiveSequence->clips) {
+      if (c->track() < 0) media = c->media();
+    }
+    QVERIFY(media != nullptr);
+    PreviewGenerator::AnalyzeMedia(media);
+    {
+      QPointer<PreviewGenerator> gen(vf->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+    }
+    QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_BOTTOM_FIELD_FIRST));
+
+    const QString chosen = dir_.filePath("choice_bff.ove");
+    QVERIFY(amber::save_project_file(chosen, chosen));
+    QVERIFY(read(chosen).contains(
+        R"(<video id="0" width="64" height="64" framerate="30.0000000000" infinite="0" interlacing="2"/>)"));
+
+    // Reopen (thumbnail cached): the choice, over the detected value
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    load_and_probe(chosen, &vf);
+    if (QTest::currentTestFailed()) return;
+    QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_BOTTOM_FIELD_FIRST));
+
+    // Footage whose file is missing is never analysed: saving keeps the choice it was loaded with
+    const QString missing = dir_.filePath("choice_missing.ove");
+    {
+      QFile f(missing);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(read(chosen).replace("choice_interlaced.mp4", "choice_gone.mp4"));
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    load_and_probe(missing, &vf);
+    if (QTest::currentTestFailed()) return;
+    QVERIFY(vf->invalid);
+    const QString resaved = dir_.filePath("choice_missing_resaved.ove");
+    QVERIFY(amber::save_project_file(resaved, resaved));
+    QVERIFY(read(resaved).contains(R"(<video id="0" interlacing="2"/>)"));
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+  }
+
+  // Interlaced video whose stream doesn't carry its field order (MPEG-4 Part 2 here, DV): read from its first frame
+  // on every open. It came from the thumbnail decode only, so a cached thumbnail (reopen) read progressive.
+  void unknownFieldOrderInterlacedOnReopen() {
+    if (avcodec_find_encoder(AV_CODEC_ID_MPEG4) == nullptr) QSKIP("no MPEG-4 encoder");
+    const QString video = dir_.filePath("unknown_order.mp4");
+    write_interlaced_video(video, kSourceFrames, "mpeg4");
+    if (QTest::currentTestFailed()) return;
+    {
+      // The case under test: FFmpeg doesn't know the field order, the frames say top field first
+      AVFormatContext* fmt = nullptr;
+      QVERIFY(avformat_open_input(&fmt, video.toUtf8().constData(), nullptr, nullptr) == 0);
+      QVERIFY(avformat_find_stream_info(fmt, nullptr) >= 0);
+      const AVFieldOrder order = fmt->streams[0]->codecpar->field_order;
+      avformat_close_input(&fmt);
+      QCOMPARE(int(order), int(AV_FIELD_UNKNOWN));
+    }
+    const QString audio = dir_.filePath("unknown_order_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("unknown_order.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    const QString thumbnail = QDir(get_data_dir().filePath("previews")).filePath(get_file_hash(video) + "t0");
+    for (int open = 0; open < 2; open++) {
+      QCOMPARE(QFileInfo::exists(thumbnail), open == 1);  // the second open reads the cached thumbnail
+      Footage* vf = nullptr;
+      load_and_probe(project, &vf);
+      if (QTest::currentTestFailed()) return;
+      QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+      QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer

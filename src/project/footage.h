@@ -27,6 +27,7 @@ extern "C" {
 
 #include <atomic>
 #include <memory>
+#include <QMap>
 #include <QString>
 #include <QVector>
 #include <QMetaType>
@@ -77,6 +78,9 @@ struct Footage {
   int64_t length;
   QVector<FootageStream> video_tracks;
   QVector<FootageStream> audio_tracks;
+  // Interlacing chosen in Media Properties, by video stream file_index, as the project file holds it: the stream's
+  // analysis (PreviewGenerator::parse_media()) puts it over the detected value. Written by the loader only.
+  QMap<int, int> saved_interlacing;
   int save_id;
   bool ready;
   bool invalid;
