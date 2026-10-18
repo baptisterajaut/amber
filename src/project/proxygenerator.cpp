@@ -88,7 +88,10 @@ static bool setup_proxy_video_stream(int i, AVFormatContext* input_fmt_ctx, AVFo
 #else
   enc_ctx->pix_fmt = enc_codec->pix_fmts ? enc_codec->pix_fmts[0] : AV_PIX_FMT_YUV420P;
 #endif
-  enc_ctx->framerate = dec_ctx->framerate;
+  // The frame rate also sizes the packet durations (write_proxy_packets): fall back on the container's when the
+  // decoder doesn't report one
+  enc_ctx->framerate =
+      (dec_ctx->framerate.num > 0) ? dec_ctx->framerate : av_guess_frame_rate(input_fmt_ctx, in_stream, nullptr);
   enc_ctx->time_base = in_stream->time_base;
   out_stream->time_base = in_stream->time_base;
   if (output_fmt_ctx->oformat->flags & AVFMT_GLOBALHEADER) {
@@ -117,8 +120,13 @@ static bool setup_proxy_video_stream(int i, AVFormatContext* input_fmt_ctx, AVFo
 static void write_proxy_packets(int stream_index, AVPacket* packet, AVFormatContext* output_fmt_ctx,
                                 QVector<AVCodecContext*>& output_streams, bool& skip) {
   int recret;
-  while ((recret = avcodec_receive_packet(output_streams.at(stream_index), packet)) >= 0 && !skip) {
+  AVCodecContext* enc_ctx = output_streams.at(stream_index);
+  while ((recret = avcodec_receive_packet(enc_ctx, packet)) >= 0 && !skip) {
     packet->stream_index = stream_index;
+    // Packets are in the output stream's time base (encode_proxy_frame()), not 1/framerate as in ExportThread::Encode()
+    if (packet->duration == 0) {
+      packet->duration = proxy_frame_duration(enc_ctx->framerate, output_fmt_ctx->streams[stream_index]->time_base);
+    }
     av_interleaved_write_frame(output_fmt_ctx, packet);
     av_packet_unref(packet);
   }

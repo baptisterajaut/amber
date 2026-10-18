@@ -50,6 +50,7 @@ extern "C" {
 #include "project/media.h"
 #include "project/previewgenerator.h"
 #include "project/projectmodel.h"
+#include "project/proxygenerator.h"
 #include "rendering/batchexport.h"
 #include "rendering/encoderoptions.h"
 #include "rendering/exportthread.h"
@@ -1115,6 +1116,68 @@ class TestHeadlessRender : public QObject {
 
     // Export leaves every clip closed, so the viewer reopens them outside export mode, on the proxy
     for (const auto& c : seq->clips) QVERIFY(!c->IsOpen());
+  }
+
+  // A proxy's packets as ProxyGenerator writes them: ProRes in .mov, the encoder and stream in the source's time base
+  // (1/15360 here, not 1/framerate), durations from proxy_frame_duration(). Every frame must decode back: a zero
+  // duration on the last packet makes FFmpeg 9's mov edit list end at its pts and drop it (one frame short)
+  void proxyPacketsKeepLastFrame() {
+    constexpr int kFrames = 10;
+    const AVRational rate{30, 1};
+    const QString path = dir_.filePath("proxy_packets.mov");
+    const QByteArray p = path.toUtf8();
+    const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_PRORES);
+    if (codec == nullptr) QSKIP("no ProRes encoder");
+
+    AVFormatContext* fmt = nullptr;
+    QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
+    AVStream* st = avformat_new_stream(fmt, nullptr);
+    AVCodecContext* enc = avcodec_alloc_context3(codec);
+    enc->width = kSize;
+    enc->height = kSize;
+    enc->pix_fmt = AV_PIX_FMT_YUV422P10;
+    enc->framerate = rate;
+    enc->time_base = AVRational{1, 15360};
+    st->time_base = enc->time_base;
+    if (fmt->oformat->flags & AVFMT_GLOBALHEADER) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+    QVERIFY(avcodec_open2(enc, codec, nullptr) >= 0);
+    avcodec_parameters_from_context(st->codecpar, enc);
+    QVERIFY(avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0);
+    QVERIFY(avformat_write_header(fmt, nullptr) >= 0);
+
+    AVPacket* pkt = av_packet_alloc();
+    auto write_packets = [&]() {
+      while (avcodec_receive_packet(enc, pkt) >= 0) {
+        pkt->stream_index = st->index;
+        if (pkt->duration == 0) pkt->duration = proxy_frame_duration(enc->framerate, st->time_base);
+        av_interleaved_write_frame(fmt, pkt);
+        av_packet_unref(pkt);
+      }
+    };
+    AVFrame* frame = av_frame_alloc();
+    frame->width = kSize;
+    frame->height = kSize;
+    frame->format = AV_PIX_FMT_YUV422P10;
+    QVERIFY(av_frame_get_buffer(frame, 0) >= 0);
+    for (int i = 0; i < kFrames; i++) {
+      av_frame_make_writable(frame);
+      for (int plane = 0; plane < 3; plane++) memset(frame->data[plane], 0, frame->linesize[plane] * kSize);
+      frame->pts = av_rescale_q(i, av_inv_q(rate), st->time_base);  // the muxer's time base, as encode_proxy_frame()
+      avcodec_send_frame(enc, frame);
+      write_packets();
+    }
+    avcodec_send_frame(enc, nullptr);
+    write_packets();
+    QVERIFY(av_write_trailer(fmt) >= 0);
+    av_frame_free(&frame);
+    av_packet_free(&pkt);
+    avcodec_free_context(&enc);
+    avio_closep(&fmt->pb);
+    avformat_free_context(fmt);
+
+    const Decoded out = decode_file(path);
+    QVERIFY(out.ok);
+    QCOMPARE(out.video_frames, kFrames);
   }
 
   // The viewer path (Save Frame renders the viewer's clips) follows Use Proxies live: the grey proxy while on, the
