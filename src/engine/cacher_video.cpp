@@ -488,6 +488,12 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
   int result = 0;
   int receive_ret;
 
+  // A packet the decoder refuses as invalid is skipped for the next one: after a seek into MPEG-PS the first MP2 packet
+  // starts mid-frame, and giving up there left the clip silent from the seek on.
+  // CBA: at most kMaxInvalidPackets in a row, then the error goes up as before (a stream that never decodes).
+  constexpr int kMaxInvalidPackets = 64;
+  int invalid_packets = 0;
+
   // do we need to retrieve a new packet for a new frame?
   av_frame_unref(f);
   while ((receive_ret = avcodec_receive_frame(codecCtx, f)) == AVERROR(EAGAIN)) {
@@ -501,6 +507,7 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
 
     if (read_ret >= 0) {
       int send_ret = avcodec_send_packet(codecCtx, pkt);
+      if (send_ret == AVERROR_INVALIDDATA && invalid_packets++ < kMaxInvalidPackets) continue;
       if (send_ret < 0) {
         qCritical() << "Failed to send packet to decoder." << send_ret;
         return send_ret;
