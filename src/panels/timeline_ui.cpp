@@ -239,6 +239,7 @@ void Timeline::Retranslate() {
   zoomOutButton->setToolTip(tr("Zoom Out") + " (-)");
   recordButton->setToolTip(tr("Record audio"));
   addButton->setToolTip(tr("Add title, solid, bars, etc."));
+  audio_monitor->setToolTip(tr("Audio levels (dBFS). Click to reset the clip indicators."));
 
   UpdateTitle();
 }
