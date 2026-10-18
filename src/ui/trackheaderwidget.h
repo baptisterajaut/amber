@@ -60,7 +60,10 @@ class TrackHeaderWidget : public QWidget {
   void draw_value(QPainter& p, const QRect& r, const QString& text, Qt::Alignment align, bool non_default, bool dimmed);
   // Sets one track's volume or pan on the dragged sequence, live and without an undo entry
   void apply_drag_value();
-  void end_value_drag(bool push_undo);
+  // The drag can still be pushed: same active sequence, undo stack untouched since the press
+  bool value_drag_valid() const;
+  // Stops the drag and pushes it as one undo entry if it changed something and is still valid
+  void end_value_drag();
   void reset_value(int track, Value value);
 
   TimelineWidget* timeline_;
@@ -83,9 +86,11 @@ class TrackHeaderWidget : public QWidget {
   int drag_track_{0};
   SequencePtr drag_seq_;
   QMap<int, TrackState> drag_old_states_;
-  // The live map the sequence pointed at before the current one: the render and cacher threads read track_states
-  // unlocked, so a replaced map is freed one move later, not while a reader may still be in it
-  QMap<int, TrackState> drag_prev_live_;
+  // Every map the drag replaced: the render and cacher threads read track_states unlocked, so none is freed while the
+  // drag runs; cleared on the next press, long after any reader is done with them
+  QVector<QMap<int, TrackState>> drag_live_maps_;
+  int drag_undo_index_{0};
+  int drag_undo_count_{0};
   int drag_volume_tenths_{0};
   int drag_pan_{0};
   QPoint drag_start_global_;

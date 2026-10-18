@@ -295,24 +295,30 @@ void TrackHeaderWidget::apply_drag_value() {
   } else {
     live.insert(drag_track_, s);
   }
-  // swap whole maps, as SetTrackStateCommand: the replaced one stays alive in drag_prev_live_ until the next move
-  drag_prev_live_ = drag_seq_->track_states;
+  // swap whole maps, as SetTrackStateCommand: the replaced one stays alive in drag_live_maps_
+  drag_live_maps_.append(drag_seq_->track_states);
   drag_seq_->track_states = live;
   update();
 }
 
-void TrackHeaderWidget::end_value_drag(bool push_undo) {
+bool TrackHeaderWidget::value_drag_valid() const {
+  return drag_seq_ != nullptr && drag_seq_ == amber::ActiveSequence && amber::UndoStack.index() == drag_undo_index_ &&
+         amber::UndoStack.count() == drag_undo_count_;
+}
+
+void TrackHeaderWidget::end_value_drag() {
+  const bool valid = value_drag_valid();
   const SequencePtr seq = drag_seq_;
   const Value value = drag_value_;
   drag_value_ = kValueNone;
   drag_seq_ = nullptr;
   if (drag_moved_) setCursor(Qt::SizeHorCursor);  // the cursor is back where the drag started, on the value
   drag_moved_ = false;
-  if (seq == nullptr) return;
-
-  if (!push_undo) {
-    drag_prev_live_ = seq->track_states;
-    seq->track_states = drag_old_states_;
+  // CBA: an invalid drag just stops, restoring nothing and pushing nothing. The sequence was switched or closed
+  // (a command would keep a raw pointer to it), or the undo stack moved under the drag (Ctrl+Z replaced the map, and
+  // drag_old_states_ is no longer the state to go back to); a value dragged on a switched-away sequence stays applied
+  // without an undo entry.
+  if (seq == nullptr || !valid) {
     update();
     return;
   }
@@ -527,6 +533,9 @@ void TrackHeaderWidget::mousePressEvent(QMouseEvent* event) {
     drag_track_ = track;
     drag_seq_ = amber::ActiveSequence;
     drag_old_states_ = drag_seq_->track_states;
+    drag_live_maps_.clear();
+    drag_undo_index_ = amber::UndoStack.index();
+    drag_undo_count_ = amber::UndoStack.count();
     drag_volume_tenths_ = qRound(state.volume_db * 10.0);
     drag_pan_ = state.pan;
     drag_start_global_ = QCursor::pos();
@@ -545,8 +554,8 @@ void TrackHeaderWidget::mousePressEvent(QMouseEvent* event) {
 
 void TrackHeaderWidget::mouseMoveEvent(QMouseEvent* event) {
   if (drag_value_ != kValueNone) {
-    if (drag_seq_ != amber::ActiveSequence) {
-      end_value_drag(false);
+    if (!value_drag_valid()) {
+      end_value_drag();  // stops without applying or pushing anything more
       return;
     }
     // the cursor's position now rather than the event's, as LabelSlider: events queued before the warp below are stale
@@ -605,7 +614,7 @@ void TrackHeaderWidget::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void TrackHeaderWidget::mouseReleaseEvent(QMouseEvent*) {
-  if (drag_value_ != kValueNone) end_value_drag(true);
+  if (drag_value_ != kValueNone) end_value_drag();
   resizing_ = false;
   resize_track_ = INT_MIN;
 }
