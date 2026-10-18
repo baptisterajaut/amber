@@ -257,37 +257,30 @@ void TextEffect::redraw(double timecode) {
     }
   }
 
-  // Truncate the revealed text without disturbing the line breaks the word-wrap
-  // pass just computed. Count and cut at grapheme-cluster boundaries, not raw
-  // UTF-16 code units, so combining marks, surrogate pairs, and joined
-  // sequences never get split mid-cluster before shaping even sees them.
-  QVector<QVector<int>> line_bounds;
+  // Reveal without disturbing the line breaks the word-wrap pass just computed, nor the alignment: the lines are
+  // laid out (anchored, justified) whole and only their first graphemes are drawn. Count at grapheme-cluster
+  // boundaries, not raw UTF-16 code units, so combining marks, surrogate pairs, and joined sequences never get split
+  // mid-cluster. Per line: how many graphemes show, and how many of those aren't a plain space (justify only inserts
+  // spaces, so the inked graphemes keep their order).
+  QVector<int> visible_graphemes;
+  QVector<int> visible_ink;
+  QVector<bool> line_whole;
   int total_graphemes = 0;
+  for (const QString& l : lines) total_graphemes += grapheme_boundaries(l).size() - 1;
+
+  int remaining = qRound(total_graphemes * (reveal_val->GetDoubleAt(timecode) * 0.01));
   for (const QString& l : lines) {
-    QVector<int> b = grapheme_boundaries(l);
-    line_bounds.append(b);
-    total_graphemes += b.size() - 1;
-  }
-
-  int graphemes_to_show = qRound(total_graphemes * (reveal_val->GetDoubleAt(timecode) * 0.01));
-
-  QStringList visible_lines;
-  int remaining = graphemes_to_show;
-  for (int li = 0; li < lines.size(); ++li) {
-    const QString& l = lines.at(li);
-    const QVector<int>& b = line_bounds.at(li);
-    int line_grapheme_count = b.size() - 1;
-    if (remaining <= 0) {
-      visible_lines.append(QString());  // keep the slot so valign/height stays stable
-    } else if (line_grapheme_count <= remaining) {
-      visible_lines.append(l);
-      remaining -= line_grapheme_count;
-    } else {
-      visible_lines.append(l.left(b.at(remaining)));  // cut at a real grapheme boundary
-      remaining = 0;
+    const QVector<int> b = grapheme_boundaries(l);
+    const int shown = qBound(0, remaining, int(b.size()) - 1);
+    remaining -= shown;
+    int ink = 0;
+    for (int g = 0; g < shown; ++g) {
+      if (l.mid(b.at(g), b.at(g + 1) - b.at(g)) != QLatin1String(" ")) ink++;
     }
+    visible_graphemes.append(shown);
+    visible_ink.append(ink);
+    line_whole.append(shown == b.size() - 1);
   }
-  lines = visible_lines;
 
   int line_h = qRound(fm.height() * line_height_field->GetDoubleAt(timecode));
   int text_height = (lines.size() - 1) * line_h + fm.height();
@@ -370,7 +363,8 @@ void TextEffect::redraw(double timecode) {
 
   for (int i = 0; i < lines.size(); i++) {
     const QString& line = lines.at(i);
-    if (line.isEmpty()) continue;
+    if (line.isEmpty() || visible_graphemes.at(i) == 0) continue;
+    int ink_left = visible_ink.at(i);
 
     // Shape the whole line once so kerning, ligatures, and script-specific
     // reordering (Arabic joining, Devanagari matra placement, etc.) are all
@@ -393,6 +387,11 @@ void TextEffect::redraw(double timecode) {
     for (int ci = 0; ci < clusters.size() - 1; ++ci) {
       int cluster_start = clusters.at(ci);
       int cluster_len = clusters.at(ci + 1) - cluster_start;
+      // Partly revealed line: stop at its first hidden inked grapheme (spaces draw nothing, wherever they are)
+      if (!line_whole.at(i) && line.mid(cluster_start, cluster_len) != QLatin1String(" ")) {
+        if (ink_left == 0) break;
+        ink_left--;
+      }
 
       // Before the clip starts / after it ends this just clamps to hidden.
       double progress = 1.0;
