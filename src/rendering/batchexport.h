@@ -18,6 +18,18 @@ namespace amber {
 // " (3)"... before the extension.
 QString batch_export_filename(const QString& sequence_name, const QString& ext, const QStringList& taken);
 
+// Digits of the frame number an exported image sequence's files carry before the extension: the "%05d" FFmpeg's image2
+// muxer fills in (ExportDialog::StartExport(), batch_export_path())
+constexpr int kImageSequenceDigits = 5;
+
+// The names taken in a folder of these entries, for batch_export_filename(). With image_sequence, a frame file also
+// takes the name it was exported under: "Sequence 0100001.png" takes "Sequence 01.png".
+QStringList batch_export_taken_names(const QStringList& entries, bool image_sequence);
+
+// Path of name (from batch_export_filename()) in folder; for an image sequence the FFmpeg pattern of its frames,
+// "<folder>/<name without ext>%05d.<ext>", with a '%' of the path doubled
+QString batch_export_path(const QString& folder, const QString& name, const QString& ext, bool image_sequence);
+
 // The export dialog's settings (base) for one sequence of a batch: seq's own size, its whole length or, with use_inout
 // and an in/out range set on seq, that range, written to filename. The frame rate needs nothing: ExportThread always
 // takes the sequence's.

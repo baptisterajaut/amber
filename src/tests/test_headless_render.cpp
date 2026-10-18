@@ -21,6 +21,7 @@ extern "C" {
 #include <QElapsedTimer>
 #include <QFile>
 #include <QGuiApplication>
+#include <QMap>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QPointer>
@@ -843,14 +844,20 @@ class TestHeadlessRender : public QObject {
     return params;
   }
 
-  // Jobs for seqs into folder, named and derived as ExportDialog::start_batch_export() does
-  static QVector<BatchExport::Job> batch_jobs(const QVector<SequencePtr>& seqs, const QString& folder, bool use_inout) {
-    QStringList taken = dir_entries(folder);
+  // Jobs for seqs into folder, named and derived as ExportDialog::start_batch_export() does; a PNG image sequence
+  // with image_sequence
+  static QVector<BatchExport::Job> batch_jobs(const QVector<SequencePtr>& seqs, const QString& folder, bool use_inout,
+                                              bool image_sequence = false) {
+    const QString ext = image_sequence ? "png" : "mp4";
+    ExportParams base = batch_base();
+    if (image_sequence) base.video_codec = AV_CODEC_ID_PNG;
+    QStringList taken = amber::batch_export_taken_names(dir_entries(folder), image_sequence);
     QVector<BatchExport::Job> jobs;
     for (const SequencePtr& s : seqs) {
-      const QString name = amber::batch_export_filename(s->name, "mp4", taken);
+      const QString name = amber::batch_export_filename(s->name, ext, taken);
       taken.append(name);
-      jobs.append({s, amber::batch_export_params(batch_base(), s.get(), use_inout, QDir(folder).filePath(name))});
+      const QString filename = amber::batch_export_path(folder, name, ext, image_sequence);
+      jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename)});
     }
     return jobs;
   }
@@ -2294,8 +2301,6 @@ class TestHeadlessRender : public QObject {
     }
   }
 
-  // Save Frame renders at full resolution even when a viewer request at a preview divider (the viewer's retry after a
-  // failed render, a scrub) arrives before the save has been rendered
   // Batch export: each sequence at its own size, length and frame rate, the in/out range of the one that has it, as
   // the active sequence while it exports; the user's active sequence and every playhead back at the end
   void batchExportEachSequenceAtItsOwnSettings() {
@@ -2402,6 +2407,56 @@ class TestHeadlessRender : public QObject {
     pio_->setSequence(nullptr);
   }
 
+  // An image sequence of a name ending in digits, exported twice into the same folder: the frame files of the first
+  // ("Sequence 0100001.png"...) take its name, so the second gets " (2)" and the first's frames stay as they were
+  void batchExportImageSequenceKeepsExistingFrames() {
+    SequencePtr seq = solid_sequence(3);
+    seq->name = "Sequence 01";
+    const QString folder = dir_.filePath("batch_image_sequence");
+    QVERIFY(QDir().mkpath(folder));
+    VideoCodecParams vparams = yuv420p_params();
+    vparams.pix_fmt = AV_PIX_FMT_RGB24;
+
+    {
+      BatchExport batch(batch_jobs({seq}, folder, false, true), vparams);
+      QVERIFY(run_batch(batch));
+      QCOMPARE(batch.ExportedCount(), 1);
+    }
+    // The frames, not the empty file ExportThread::SetupContainer() leaves under the pattern's own name: it
+    // avio_open()s the path although image2 writes its own files (a single image-sequence export leaves it too)
+    const auto frames = [&folder]() { return dir_entries(folder).filter(QRegularExpression("\\d\\.png$")); };
+    qInfo("first export: %s", qPrintable(dir_entries(folder).join(", ")));
+    const QStringList first = frames();
+    QCOMPARE(first.size(), 3);
+    for (const QString& f : first) {
+      QVERIFY2(QRegularExpression("^Sequence 01\\d{5}\\.png$").match(f).hasMatch(), qPrintable(f));
+    }
+    QMap<QString, QByteArray> before;
+    for (const QString& f : first) {
+      QFile file(QDir(folder).filePath(f));
+      QVERIFY(file.open(QFile::ReadOnly));
+      before.insert(f, file.readAll());
+    }
+
+    seq->clips.first()->effects.at(1)->row(2)->Field(0)->SetValueAt(0.0, QVariant(QColor(Qt::blue)));  // Solid colour
+    QVector<BatchExport::Job> again = batch_jobs({seq}, folder, false, true);
+    QCOMPARE(QFileInfo(again.at(0).params.filename).fileName(), QString("Sequence 01 (2)%05d.png"));
+    {
+      BatchExport batch(again, vparams);
+      QVERIFY(run_batch(batch));
+      QCOMPARE(batch.ExportedCount(), 1);
+    }
+    qInfo("after the second export: %s", qPrintable(dir_entries(folder).join(", ")));
+    const QStringList second = frames();
+    QCOMPARE(second.size(), 6);
+    for (auto it = before.cbegin(); it != before.cend(); ++it) {
+      QFile file(QDir(folder).filePath(it.key()));
+      QVERIFY(file.open(QFile::ReadOnly));
+      QVERIFY2(file.readAll() == it.value(), qPrintable(it.key() + " was overwritten"));
+    }
+    pio_->setSequence(nullptr);
+  }
+
   // Cancel stops the running export (its file removed) and skips the rest; the user's sequence comes back
   void batchExportCancel() {
     BatchSequences b = batch_sequences();
@@ -2425,6 +2480,8 @@ class TestHeadlessRender : public QObject {
     pio_->setSequence(nullptr);
   }
 
+  // Save Frame renders at full resolution even when a viewer request at a preview divider (the viewer's retry after a
+  // failed render, a scrub) arrives before the save has been rendered
   void saveFrameKeepsFullResolution() {
     SequencePtr seq = std::make_shared<Sequence>();
     seq->width = 16;

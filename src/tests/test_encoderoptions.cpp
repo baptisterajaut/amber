@@ -284,6 +284,25 @@ class TestEncoderOptions : public QObject {
     QCOMPARE(amber::batch_export_filename("", "mp4", {"Sequence.mp4"}), QString("Sequence (2).mp4"));
     QCOMPARE(amber::batch_export_filename("a/b", "mp4", {"a_b.mp4"}), QString("a_b (2).mp4"));
   }
+
+  // An image sequence's frame files take the name they were exported under, read with exactly the pattern's digits:
+  // the frames of "Sequence 01" are "Sequence 0100001.png"..., not frames of "Sequence "
+  void batchImageSequenceNames() {
+    const QStringList entries{"Sequence 0100001.png", "Sequence 0100002.png", "Take 7.png", "notes.txt"};
+    const QStringList taken = amber::batch_export_taken_names(entries, true);
+    QVERIFY(taken.contains("Sequence 01.png"));
+    QVERIFY(!taken.contains("Sequence .png"));
+    QVERIFY(taken.contains("Take 7.png"));
+    QCOMPARE(amber::batch_export_filename("Sequence 01", "png", taken), QString("Sequence 01 (2).png"));
+    QCOMPARE(amber::batch_export_filename("Sequence", "png", taken), QString("Sequence.png"));
+    QCOMPARE(amber::batch_export_filename("Sequence 0", "png", taken), QString("Sequence 0.png"));
+    // Not an image sequence: the entries as they are
+    QCOMPARE(amber::batch_export_taken_names(entries, false), entries);
+
+    QCOMPARE(amber::batch_export_path("/out", "Sequence 01.png", "png", true), QString("/out/Sequence 01%05d.png"));
+    QCOMPARE(amber::batch_export_path("/out", "50% cut.png", "png", true), QString("/out/50%% cut%05d.png"));
+    QCOMPARE(amber::batch_export_path("/out", "50% cut.mp4", "mp4", false), QString("/out/50% cut.mp4"));
+  }
 };
 
 QTEST_GUILESS_MAIN(TestEncoderOptions)

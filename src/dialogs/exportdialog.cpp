@@ -505,14 +505,10 @@ void ExportDialog::start_batch_export(const QString& ext) {
   if (folder.isEmpty()) return;
   const bool image_sequence = formatCombobox->currentIndex() == FORMAT_IMG;
 
-  // Names in use: the folder's, then those given to the sequences before. An image sequence's frames are
-  // "<name>00001.<ext>"..., taken as "<name>.<ext>".
-  QStringList taken;
-  static const QRegularExpression frame_number(QStringLiteral("\\d{5,}(\\.[^.]*)$"));
-  for (QString entry : QDir(folder).entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden)) {
-    if (image_sequence) entry.replace(frame_number, QStringLiteral("\\1"));
-    taken.append(entry);
-  }
+  // Names in use: the folder's (an image sequence's frames as the name they were exported under), then those given to
+  // the sequences before
+  QStringList taken = amber::batch_export_taken_names(
+      QDir(folder).entryList(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden), image_sequence);
 
   const ExportParams base = build_export_params(QString());
   const bool use_inout = rangeCombobox->isEnabled() && rangeCombobox->currentIndex() == 1;
@@ -520,13 +516,7 @@ void ExportDialog::start_batch_export(const QString& ext) {
   for (const SequencePtr& s : batch_) {
     const QString name = amber::batch_export_filename(s->name, ext, taken);
     taken.append(name);
-    QString filename = QDir(folder).filePath(name);
-    if (image_sequence) {
-      // As StartExport(), the frame number before the extension; FFmpeg reads the path as a pattern, so a '%' of it
-      // is doubled
-      QString stem = filename.left(filename.size() - ext.size() - 1);
-      filename = stem.replace('%', QStringLiteral("%%")) + "%05d." + ext;
-    }
+    const QString filename = amber::batch_export_path(folder, name, ext, image_sequence);
     jobs.append({s, amber::batch_export_params(base, s.get(), use_inout, filename)});
   }
 
@@ -624,6 +614,7 @@ void ExportDialog::StartExport() {
   if (formatCombobox->currentIndex() == FORMAT_IMG) {
     int ext_location = filename.lastIndexOf('.');
     if (ext_location > filename.lastIndexOf('/')) {
+      // "%05d": amber::kImageSequenceDigits wide (rendering/batchexport.h)
       filename.insert(ext_location, 'd');
       filename.insert(ext_location, '5');
       filename.insert(ext_location, '0');
@@ -853,6 +844,7 @@ void ExportDialog::comp_type_changed(int) {
     case COMPRESSION_TYPE_CBR:
     case COMPRESSION_TYPE_TARGETBR:
       videoBitrateLabel->setText(tr("Bitrate (Mbps):"));
+      // CBA: batch mode takes the first sequence's default, as its sample rate; the same settings for every sequence
       videobitrateSpinbox->setValue(qMax(0.5, (double)qRound((0.01528 * ref_seq_->height) - 4.5)));
       break;
     case COMPRESSION_TYPE_CFR:

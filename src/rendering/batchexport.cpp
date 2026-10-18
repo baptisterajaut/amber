@@ -1,5 +1,8 @@
 #include "rendering/batchexport.h"
 
+#include <QDir>
+#include <QRegularExpression>
+
 #include "engine/sequence.h"
 #include "global/projectio.h"
 
@@ -22,6 +25,30 @@ QString amber::batch_export_filename(const QString& sequence_name, const QString
     name = QStringLiteral("%1 (%2).%3").arg(base).arg(n).arg(ext);
   }
   return name;
+}
+
+QStringList amber::batch_export_taken_names(const QStringList& entries, bool image_sequence) {
+  if (!image_sequence) return entries;
+  // Exactly the pattern's digits, the last ones before the extension: "Sequence 0100001.png" is frame 1 of
+  // "Sequence 01", not of "Sequence "
+  // CBA: frame numbers past the pattern's width get longer; the sequence's first frames still give its name
+  static const QRegularExpression frame_number(QStringLiteral("\\d{%1}(\\.[^.]*)$").arg(amber::kImageSequenceDigits));
+  QStringList taken = entries;
+  for (const QString& entry : entries) {
+    QString name = entry;
+    name.replace(frame_number, QStringLiteral("\\1"));
+    if (name != entry) taken.append(name);
+  }
+  return taken;
+}
+
+QString amber::batch_export_path(const QString& folder, const QString& name, const QString& ext, bool image_sequence) {
+  const QString path = QDir(folder).filePath(name);
+  if (!image_sequence) return path;
+  // FFmpeg reads the whole path as a pattern
+  QString stem = path.left(path.size() - ext.size() - 1);
+  stem.replace('%', QStringLiteral("%%"));
+  return stem + "%0" + QString::number(amber::kImageSequenceDigits) + "d." + ext;
 }
 
 ExportParams amber::batch_export_params(const ExportParams& base, Sequence* seq, bool use_inout,
