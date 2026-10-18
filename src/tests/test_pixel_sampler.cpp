@@ -111,6 +111,25 @@ class TestPixelSampler : public QObject {
     g.widget = QSizeF();
     QCOMPARE(amber::viewer_to_sequence(g, QPointF(10, 10)), QPointF());
   }
+  void handleToleranceIsInWidgetPixels() {
+    // A gizmo dot (5 px half box) stays grabbable at any zoom: the old tolerance, 2 * qRound(2.5 / zoom) sequence
+    // pixels, was 0 above 500 %
+    for (double zoom : {0.25, 0.5, 1.0, 4.0, 8.0, 20.0}) {
+      ViewerFrameGeometry g = fitted();
+      g.zoom = zoom;
+      g.x_scroll = 0.5;
+      g.y_scroll = 0.5;
+      const QPointF dot(960, 540);
+      const QPointF at = amber::sequence_to_viewer(g, dot);
+      QVERIFY2(amber::viewer_point_near(g, dot, at, 5), qPrintable(QString::number(zoom)));
+      QVERIFY2(amber::viewer_point_near(g, dot, at + QPointF(4, -4), 5), qPrintable(QString::number(zoom)));
+      QVERIFY2(!amber::viewer_point_near(g, dot, at + QPointF(7, 0), 5), qPrintable(QString::number(zoom)));
+      QVERIFY2(!amber::viewer_point_near(g, dot, at + QPointF(0, -7), 5), qPrintable(QString::number(zoom)));
+    }
+    ViewerFrameGeometry g = fitted();
+    g.sequence = QSize();
+    QVERIFY(!amber::viewer_point_near(g, QPointF(), QPointF(), 5));  // no frame: nothing to grab
+  }
   void formatPadsToFixedWidth() {
     QString expected = QStringLiteral("X _812  Y _403   R 210  G 180  B _96  A 255");
     expected.replace('_', QChar(0x2007));  // figure space
