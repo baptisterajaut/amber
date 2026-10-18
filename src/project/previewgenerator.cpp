@@ -63,8 +63,8 @@ PreviewGenerator::PreviewGenerator(Media* i) : QThread(nullptr) {
 }
 
 // The interlacing a stream's field order (container or decoder, after avformat_find_stream_info()) says, -1 when
-// FFmpeg doesn't know (DV, MPEG-4 Part 2...). TB and BT count by their first field: ProRes in MOV and H.264 in MKV
-// flag top-field-first frames TB.
+// FFmpeg doesn't know (DV, MPEG-4 Part 2...: see first_frame_interlacing()). TB and BT count by their first field:
+// ProRes in MOV and H.264 in MKV flag top-field-first frames TB.
 static int interlacing_from_field_order(AVFieldOrder order) {
   switch (order) {
     case AV_FIELD_PROGRESSIVE:
@@ -78,6 +78,52 @@ static int interlacing_from_field_order(AVFieldOrder order) {
     default:
       return -1;
   }
+}
+
+// The interlacing a decoded frame is flagged with
+static int frame_interlacing(const AVFrame* frame) {
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
+  if (!(frame->flags & AV_FRAME_FLAG_INTERLACED)) return VIDEO_PROGRESSIVE;
+  return (frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST;
+#else
+  if (!frame->interlaced_frame) return VIDEO_PROGRESSIVE;
+  return frame->top_field_first ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST;
+#endif
+}
+
+// The first decoded frame's interlacing, for a stream whose field order FFmpeg doesn't know: through a separate open of
+// the file, so the thumbnail and waveform pass keeps its own read position. Every analysis of those formats (DV,
+// MPEG-4 Part 2...) pays this one-frame decode, cached thumbnail or not. Progressive if no frame decodes.
+static int first_frame_interlacing(const QString& url, int start_number, int stream_index) {
+  int result = VIDEO_PROGRESSIVE;
+  AVDictionary* opts = nullptr;
+  if (start_number > 0) av_dict_set(&opts, "start_number", QString::number(start_number).toUtf8().constData(), 0);
+  AVFormatContext* fmt = nullptr;
+  const int opened = avformat_open_input(&fmt, url.toUtf8().constData(), nullptr, &opts);
+  av_dict_free(&opts);
+  if (opened != 0) return result;
+  if (avformat_find_stream_info(fmt, nullptr) >= 0 && stream_index < int(fmt->nb_streams)) {
+    const AVCodecParameters* par = fmt->streams[stream_index]->codecpar;
+    const AVCodec* codec = avcodec_find_decoder(par->codec_id);
+    AVCodecContext* ctx = (codec != nullptr) ? avcodec_alloc_context3(codec) : nullptr;
+    if (ctx != nullptr && avcodec_parameters_to_context(ctx, par) >= 0 && avcodec_open2(ctx, codec, nullptr) >= 0) {
+      AVPacket* pkt = av_packet_alloc();
+      AVFrame* frame = av_frame_alloc();
+      int got = AVERROR(EAGAIN);
+      while (got == AVERROR(EAGAIN) && av_read_frame(fmt, pkt) >= 0) {
+        if (pkt->stream_index == stream_index) avcodec_send_packet(ctx, pkt);
+        av_packet_unref(pkt);
+        got = avcodec_receive_frame(ctx, frame);
+      }
+      if (got == AVERROR(EAGAIN) && avcodec_send_packet(ctx, nullptr) >= 0) got = avcodec_receive_frame(ctx, frame);
+      if (got == 0) result = frame_interlacing(frame);
+      av_frame_free(&frame);
+      av_packet_free(&pkt);
+    }
+    avcodec_free_context(&ctx);
+  }
+  avformat_close_input(&fmt);
+  return result;
 }
 
 // Parse a video stream and populate `ms`. Returns true if the stream should be appended.
@@ -108,12 +154,14 @@ bool PreviewGenerator::parse_video_stream(int stream_index, FootageStream& ms) {
 
   ms.video_width = stream->codecpar->width;
   ms.video_height = stream->codecpar->height;
-  // Known here, without decoding a thumbnail: a cached one (reopened project) keeps it. Unknown: progressive until
-  // the thumbnail decode reads the first frame's flags (process_video_frame())
-  // CBA: an unknown field order under a cached thumbnail still reads progressive (DV); cache the frame-detected value
-  // next to the thumbnail if that matters
-  const int interlacing = interlacing_from_field_order(stream->codecpar->field_order);
-  ms.video_auto_interlacing = (interlacing < 0) ? VIDEO_PROGRESSIVE : interlacing;
+  // Known here, before the footage is ready and without the thumbnail decode: a cached thumbnail (reopened project)
+  // keeps it. Unknown field order: the first frame's flags, still images aside
+  int interlacing = interlacing_from_field_order(stream->codecpar->field_order);
+  if (interlacing < 0) {
+    interlacing = ms.infinite_length ? int(VIDEO_PROGRESSIVE)
+                                     : first_frame_interlacing(footage_->url, footage_->start_number, stream_index);
+  }
+  ms.video_auto_interlacing = interlacing;
   ms.video_interlacing = ms.video_auto_interlacing;
   return true;
 }
@@ -423,24 +471,6 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
 
   // Apply rotation from display matrix (e.g. portrait videos from phones)
   apply_rotation_to_preview(s, stream_index);
-
-  // is video interlaced? Only when the stream's field order didn't say (parse_video_stream())
-  if (interlacing_from_field_order(fmt_ctx_->streams[stream_index]->codecpar->field_order) < 0) {
-    // Not over the user's choice (parse_media())
-    const bool chosen =
-        footage_->saved_interlacing.contains(stream_index) || s->video_interlacing != s->video_auto_interlacing;
-#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
-    s->video_auto_interlacing =
-        (temp_frame->flags & AV_FRAME_FLAG_INTERLACED)
-            ? ((temp_frame->flags & AV_FRAME_FLAG_TOP_FIELD_FIRST) ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST)
-            : VIDEO_PROGRESSIVE;
-#else
-    s->video_auto_interlacing = temp_frame->interlaced_frame
-                                    ? (temp_frame->top_field_first ? VIDEO_TOP_FIELD_FIRST : VIDEO_BOTTOM_FIELD_FIRST)
-                                    : VIDEO_PROGRESSIVE;
-#endif
-    if (!chosen) s->video_interlacing = s->video_auto_interlacing;
-  }
 
   s->preview_done = true;
 
