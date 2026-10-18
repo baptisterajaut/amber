@@ -180,6 +180,15 @@ SrtParseResult parse_srt_text(QString content) {
 
 namespace {
 
+// A blank line ends an SRT block: cue text keeps only its non-blank lines
+QStringList non_blank_lines(const QString& lines) {
+  QStringList kept;
+  for (const QString& line : lines.split(QLatin1Char('\n'))) {
+    if (!line.trimmed().isEmpty()) kept.append(line);
+  }
+  return kept;
+}
+
 QString format_timestamp(qint64 ms) {
   qint64 h = ms / 3600000;
   ms -= h * 3600000;
@@ -207,7 +216,7 @@ QString write_srt(const QVector<SubtitleCue>& cues, qint64 offset_ms) {
 
     out += QString::number(index++) + QLatin1Char('\n');
     out += format_timestamp(start) + QLatin1String(" --> ") + format_timestamp(end) + QLatin1Char('\n');
-    out += cue_text_to_lines(cue.text) + QLatin1String("\n\n");
+    out += non_blank_lines(cue_text_to_lines(cue.text)).join(QLatin1Char('\n')) + QLatin1String("\n\n");
   }
   return out;
 }
@@ -241,7 +250,7 @@ QString cue_lines_to_text(const QString& lines) {
   text.replace(QLatin1String("\r\n"), QLatin1String("\n"));
   text.replace(QChar(QChar::LineSeparator), QLatin1Char('\n'));
   text.replace(QChar(QChar::ParagraphSeparator), QLatin1Char('\n'));
-  return text.replace(QLatin1Char('\n'), QLatin1String("<br>"));
+  return non_blank_lines(text).join(QLatin1String("<br>"));
 }
 
 qint64 cue_ms_at_frame(long local_frame, double frame_rate) {

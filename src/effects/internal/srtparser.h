@@ -37,7 +37,8 @@ qint64 shift_cues(QVector<SubtitleCue>& cues, const QVector<int>& indexes, qint6
 // Times a cue can have: start at or after 0, end after start
 bool cue_times_valid(qint64 start_ms, qint64 end_ms);
 
-// "<br>" (any case, also "<br/>") <-> '\n', for showing and editing cue text as plain lines
+// "<br>" (any case, also "<br/>") <-> '\n', for showing and editing cue text as plain lines. Blank lines are dropped
+// going back to cue text (write_srt() drops them too): in SRT a blank line ends the cue.
 QString cue_text_to_lines(const QString& text);
 QString cue_lines_to_text(const QString& lines);
 

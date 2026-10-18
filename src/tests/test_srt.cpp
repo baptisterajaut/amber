@@ -25,6 +25,7 @@ class TestSrt : public QObject {
   void testShiftClampsAtZero();
   void testValidation();
   void testTextLines();
+  void testBlankLinesDropped();
   void testFrameMapping();
 };
 
@@ -244,6 +245,21 @@ void TestSrt::testTextLines() {
   QCOMPARE(cue_text_to_lines("a<br>b<br/>c<BR />d"), QString("a\nb\nc\nd"));
   QCOMPARE(cue_lines_to_text("a\nb\r\nc"), QString("a<br>b<br>c"));
   QCOMPARE(cue_lines_to_text(cue_text_to_lines("x<br>y")), QString("x<br>y"));
+}
+
+void TestSrt::testBlankLinesDropped() {
+  // A blank line inside the text would end the SRT block and turn the rest into garbage on re-import
+  QVector<SubtitleCue> cues = {{0, 1000, "a<br><br>b<br> <br>"}, {2000, 3000, "next"}};
+  QCOMPARE(write_srt(cues), QString("1\n00:00:00,000 --> 00:00:01,000\na\nb\n\n"
+                                    "2\n00:00:02,000 --> 00:00:03,000\nnext\n\n"));
+  SrtParseResult r = parse_srt_text(write_srt(cues));
+  QCOMPARE(r.skipped, 0);
+  QCOMPARE(r.cues.size(), 2);
+  QCOMPARE(r.cues[0].text, QString("a<br>b"));
+  QCOMPARE(r.cues[1].text, QString("next"));
+
+  QCOMPARE(cue_lines_to_text("a\n\nb\n"), QString("a<br>b"));
+  QCOMPARE(cue_lines_to_text("a\n  \n indented"), QString("a<br> indented"));
 }
 
 void TestSrt::testFrameMapping() {
