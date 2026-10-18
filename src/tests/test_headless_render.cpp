@@ -1936,6 +1936,123 @@ class TestHeadlessRender : public QObject {
     QCOMPARE(shown / kStep, int(kFar / kStep));
   }
 
+  // Images stay stills (infinite length, no frame rate) next to mpeg4InMpegTsPlays()'s looser still test
+  void stillsStayStills_data() {
+    QTest::addColumn<QString>("file");
+    QTest::newRow("png") << "still.png";
+    QTest::newRow("jpeg") << "still.jpg";
+  }
+
+  void stillsStayStills() {
+    QFETCH(QString, file);
+    const QString image = dir_.filePath(file);
+    QImage img(kSize, kSize, QImage::Format_RGB32);
+    img.fill(Qt::darkCyan);
+    QVERIFY(img.save(image));
+    const QString audio = dir_.filePath(file + "_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath(file + ".ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, image, audio).toUtf8());
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    QCOMPARE(vf->video_tracks.size(), 1);
+    QVERIFY(vf->video_tracks.at(0).infinite_length);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+  }
+
+  // MPEG-4 Part 2 in MPEG-TS has no average frame rate (avg_frame_rate 0/0), only r_frame_rate: the probe took it for a
+  // still image, and the export held its first frame
+  void mpeg4InMpegTsPlays() {
+    constexpr int kFrames = 12;
+    const QString video = dir_.filePath("mpeg4_plays.ts");
+    write_offset_mp4(video, kFrames, 0);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("mpeg4_plays_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("mpeg4_plays.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    QVERIFY(!vf->video_tracks.at(0).infinite_length);
+    QCOMPARE(vf->video_tracks.at(0).video_frame_rate, kFps);
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kFrames);
+
+    const ExportParams params = video_params(dir_.filePath("mpeg4_plays_out.mp4"), seq.get(), AV_CODEC_ID_MPEG4,
+                                             QString(), COMPRESSION_TYPE_CBR, 2.0);
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded out = decode_file(params.filename, true);
+    QVERIFY(out.ok);
+    QCOMPARE(long(out.video_frames), kClipOut);
+    QVector<int> matched;
+    QVector<int> expected;
+    for (int k = 0; k < out.video_frames; k++) {
+      matched.append(closest_grey_frame(src.rgba, out.rgba[k]));
+      expected.append(k);
+    }
+    QString shown;
+    for (int m : matched) shown += QString::number(m) + ' ';
+    qInfo("export frames show source frames: %s", qPrintable(shown));
+    QCOMPARE(matched, expected);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+  }
+
   // A seek into MPEG-4 Part 2 in MPEG-PS (no index: the seek lands between keyframes) starts decoding on frames whose
   // reference is missing; that decoder hands them out anyway, grey, and the export opened on them. A clip trimmed into
   // the middle of a GOP seeks there on its first frame.
