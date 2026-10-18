@@ -664,7 +664,10 @@ QString ExportDialog::queue_summary(const ExportParams& params) const {
   QStringList parts;
   parts.append(formatCombobox->currentText());
   if (params.video_enabled) {
-    parts.append(short_codec_name(vcodecCombobox->currentText()));
+    QString vcodec = short_codec_name(vcodecCombobox->currentText());
+    // The encoder too when it isn't the codec's default (first) one: "H.264 Hardware (VAAPI)", not just "H.264"
+    if (vencoderCombobox->currentIndex() > 0) vcodec += QStringLiteral(" ") + vencoderCombobox->currentText();
+    parts.append(vcodec);
     parts.append(QStringLiteral("%1×%2").arg(params.video_width).arg(params.video_height));
   }
   if (params.audio_enabled) parts.append(short_codec_name(acodecCombobox->currentText()));
