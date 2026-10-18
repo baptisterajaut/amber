@@ -276,6 +276,13 @@ void ProxyGenerator::transcode(const ProxyInfo& info) {
   Footage* footage = info.media->to_footage();
   current_progress = 0.0;
 
+  // Last guard (ProxyDialog already avoids it): opening the output for writing truncates it, never let it be the source
+  if (same_file_path(info.path, footage->url)) {
+    qCritical() << "Proxy: refusing to write the proxy over its source" << footage->url;
+    footage->proxy = false;
+    return;
+  }
+
   AVFormatContext* input_fmt_ctx = nullptr;
   AVFormatContext* output_fmt_ctx = nullptr;
   if (!proxy_open_contexts(footage->url, info.path, footage->start_number, input_fmt_ctx, output_fmt_ctx)) {
