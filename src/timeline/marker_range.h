@@ -12,8 +12,12 @@ namespace amber::marker_range {
 // A press this many pixels or closer to a range marker's end tick grabs the end.
 constexpr int kEndTickHitRange = 3;
 
+// A range marker drawn shorter than this has no grabbable end tick: its end would sit in the head's own hit band
+// (MARKER_SIZE each side) and win every press, so the marker could not be moved. Zoom in to resize it.
+constexpr int kMinEndTickLength = 2 * MARKER_SIZE;
+
 // Index of the first range marker whose end tick is within kEndTickHitRange px of pos_x, or -1. Point markers
-// (duration 0) have no end tick.
+// (duration 0) and range markers shorter than kMinEndTickLength px on screen have no end tick.
 int end_tick_at(const QVector<Marker>& markers, int pos_x, const std::function<int(long)>& frame_to_screen);
 
 // Duration of a marker starting at marker_frame whose end is dragged to end_frame, clamped to >= 0.

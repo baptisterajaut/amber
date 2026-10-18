@@ -8,7 +8,9 @@ int end_tick_at(const QVector<Marker>& markers, int pos_x, const std::function<i
   for (int i = 0; i < markers.size(); i++) {
     const Marker& m = markers.at(i);
     if (m.duration <= 0) continue;
-    if (std::abs(pos_x - frame_to_screen(m.frame + m.duration)) <= kEndTickHitRange) return i;
+    const int end_x = frame_to_screen(m.frame + m.duration);
+    if (end_x - frame_to_screen(m.frame) < kMinEndTickLength) continue;
+    if (std::abs(pos_x - end_x) <= kEndTickHitRange) return i;
   }
   return -1;
 }
