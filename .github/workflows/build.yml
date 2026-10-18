@@ -138,6 +138,12 @@ jobs:
           find "$QT_PLUGINS" -name "*virtualkeyboard*" -delete 2>/dev/null || true
           find "$QT_PLUGINS" -name "*pdf*" -delete 2>/dev/null || true
           $(brew --prefix qt@6)/bin/macdeployqt Amber.app
+          # macdeployqt rewrites install names, which breaks the linker's ad-hoc signatures: Apple Silicon then kills
+          # the app at launch ("Code Signature Invalid", #82). Re-sign ad hoc, the loose plugins first (--deep skips
+          # Contents/Effects), then the bundle, and fail here rather than on the user's Mac if it is still invalid.
+          find Amber.app/Contents/Effects -type f \( -name '*.so' -o -name '*.dylib' \) -exec codesign --force --sign - {} \;
+          codesign --force --deep --sign - Amber.app
+          codesign --verify --deep --strict --verbose=2 Amber.app
 
       - name: Create .dmg
         run: |
