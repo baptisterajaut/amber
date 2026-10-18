@@ -55,25 +55,27 @@ static QShader loadQsb(const QString& path) {
 }
 
 QMutex RenderThread::deferred_delete_mutex_;
-QVector<QRhiResource*> RenderThread::deferred_delete_queue_;
+QHash<QRhi*, QVector<QRhiResource*>> RenderThread::deferred_delete_queue_;
 
 void RenderThread::DeferRhiResourceDeletion(QRhiResource* res) {
   if (res == nullptr) return;
   QMutexLocker lock(&deferred_delete_mutex_);
-  deferred_delete_queue_.append(res);
+  deferred_delete_queue_[res->rhi()].append(res);
 }
 
 void RenderThread::DeferRhiResourceDeletion(const QVector<QRhiResource*>& resources) {
   QMutexLocker lock(&deferred_delete_mutex_);
   for (auto* res : resources) {
-    if (res) deferred_delete_queue_.append(res);
+    if (res) deferred_delete_queue_[res->rhi()].append(res);
   }
 }
 
 void RenderThread::drainDeferredDeletes() {
   QMutexLocker lock(&deferred_delete_mutex_);
-  qDeleteAll(deferred_delete_queue_);
-  deferred_delete_queue_.clear();
+  // Only this thread's QRhi's resources: another QRhi's release queue isn't thread-safe and its GL textures need its
+  // own context. Under nullptr, resources whose QRhi is already gone: deleting them only frees the wrapper.
+  qDeleteAll(deferred_delete_queue_.take(rhi_));
+  qDeleteAll(deferred_delete_queue_.take(nullptr));
 }
 
 RenderThread::RenderThread() : front_buffer_switcher(false), queued(false) {}
@@ -502,11 +504,14 @@ bool RenderThread::rhi_failed() const { return rhi_failed_.load(); }
 
 bool RenderThread::frame_failed() const { return frame_failed_.load(); }
 
-void RenderThread::cancel() {
+void RenderThread::cancel(Sequence* close_clips) {
   // Same lost-wakeup guard as start_render()'s export path: run() holds wait_lock_ from its `running` check until
   // wait_cond_.wait() releases it, so taking the lock here means the wake can't land in between. Blocks until the
   // current paint() finishes, which wait() below did anyway.
   wait_lock_.lock();
+  // No frame renders while wait_lock_ is held: the clips close between frames, and their resources reach this
+  // thread's queue before delete_ctx() drains it for the last time and destroys the QRhi they belong to
+  if (close_clips != nullptr) close_active_clips(close_clips);
   running = false;
   wait_cond_.wakeAll();
   wait_lock_.unlock();
