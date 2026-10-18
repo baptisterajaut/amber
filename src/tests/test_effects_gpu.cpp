@@ -151,6 +151,8 @@ class TestEffectsGpu : public QObject {
   void noiseShaderOutputDiffers();
   void vignetteDarkensCorners();
   void pixelateBlocks();
+  void privacyMaskHardEdgeCensorsInside_data();
+  void privacyMaskHardEdgeCensorsInside();
   void crossstitchOutputDiffers();
   void volumetricLightOutputDiffers();
 
@@ -2995,6 +2997,52 @@ void TestEffectsGpu::pixelateBlocks() {
       qAbs(in_block_a.r - next_block.r) + qAbs(in_block_a.g - next_block.g) + qAbs(in_block_a.b - next_block.b);
   QVERIFY2(same_d <= 12, qPrintable(QString("expected same-block pixels equal, sum-diff=%1").arg(same_d)));
   QVERIFY2(diff_d > 4, qPrintable(QString("expected next-block pixel different, sum-diff=%1").arg(diff_d)));
+}
+
+void TestEffectsGpu::privacyMaskHardEdgeCensorsInside_data() {
+  QTest::addColumn<double>("softness");
+  QTest::newRow("softness 0") << 0.0;  // equal smoothstep edges: undefined, inverted the mask on Mesa
+  QTest::newRow("softness 50") << 50.0;
+}
+
+void TestEffectsGpu::privacyMaskHardEdgeCensorsInside() {
+  // Left-to-right gradient, mask radius 25 (16 px on 64 px) at the centre, pixelate at intensity 100 (20 blocks
+  // across, 3.2 px each). Inside the circle the row is snapped to blocks (differs from the gradient), outside it is
+  // the untouched gradient. An inverted mask censors the outside and leaves the secret clear.
+  QFETCH(double, softness);
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 4, 0, 0.0);  // left→right
+  const QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Privacy Mask");
+  QVERIFY(fx != nullptr);
+  h_->set_field_double(fx.get(), 1, 0, 25.0);      // Radius
+  h_->set_field_double(fx.get(), 2, 0, softness);  // Softness
+  h_->set_field_double(fx.get(), 3, 0, 100.0);     // Intensity
+  h_->set_field_bool(fx.get(), 4, 0, true);        // Pixelate
+  const QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QCOMPARE(pixels.size(), baseline.size());
+
+  // Inside: the 12 px around the centre (well within the soft edge too) are mostly snapped away from the gradient
+  int censored = 0;
+  for (int x = 26; x < 38; x++) {
+    if (qAbs(pixel_at(pixels, 64, x, 32).r - pixel_at(baseline, 64, x, 32).r) > 2) censored++;
+  }
+  QVERIFY2(censored >= 6, qPrintable(QString("inside the mask only %1 of 12 pixels are censored").arg(censored)));
+
+  // Outside: every pixel of the left and right bands and of the corners is the gradient
+  for (int y : {2, 32, 61}) {
+    for (int x : {0, 2, 5, 8, 56, 59, 62}) {
+      const int got = pixel_at(pixels, 64, x, y).r;
+      const int want = pixel_at(baseline, 64, x, y).r;
+      QVERIFY2(qAbs(got - want) <= 2,
+               qPrintable(QString("outside the mask (%1,%2) changed: %3 vs %4").arg(x).arg(y).arg(got).arg(want)));
+    }
+  }
 }
 
 void TestEffectsGpu::crossstitchOutputDiffers() {
