@@ -150,6 +150,65 @@ class TestEncoderOptions : public QObject {
     QCOMPARE(level->default_value, QString("5"));
   }
 
+  // libvpx-vp9: CRF 0..63 (FFmpeg's -1 is "not set"), the VP9 guide's 31 by default, cpu-used narrowed to 0..8
+  void libvpxVp9Descriptor() {
+    if (avcodec_find_encoder_by_name("libvpx-vp9") == nullptr) QSKIP("libvpx-vp9 not in this FFmpeg build");
+    EncoderInfo info;
+    QVERIFY(amber::find_encoder_info("libvpx-vp9", &info));
+    QCOMPARE(info.codec_id, AV_CODEC_ID_VP9);
+    QCOMPARE(info.quality_key, QString("crf"));
+    QCOMPARE(info.quality_min, 0);
+    QCOMPARE(info.quality_max, 63);
+    QCOMPARE(info.quality_default, 31);
+    QVERIFY(info.supports_average_bitrate);
+    QVERIFY(info.supports_two_pass);
+    QVERIFY(info.two_pass_stats_key.isEmpty());  // stats_out/stats_in
+    const EncoderOption* speed = find_option(info, "cpu-used");
+    QVERIFY(speed != nullptr);
+    QCOMPARE(speed->kind, EncoderOption::Int);
+    QCOMPARE(speed->min, 0);
+    QCOMPARE(speed->max, 8);
+    QCOMPARE(speed->default_value, QString("1"));  // FFmpeg's default
+    QCOMPARE(info.options.size(), 1);
+    // VP8 stays on the old path
+    QVERIFY(!amber::find_encoder_info("libvpx", &info));
+  }
+
+  // Two-pass where FFmpeg n9.0's wrapper implements AV_CODEC_FLAG_PASS1/PASS2 (sources cited in encoderoptions.cpp),
+  // libx264 and libx265 through a stats file option
+  void twoPassFlags() {
+    // Not librav1e: its wrapper never gets pass data out of rav1e (encoderoptions.cpp)
+    const QStringList two_pass = {"libx264", "libx265", "libvpx-vp9", "libaom-av1", "libsvtav1"};
+    for (const EncoderInfo& raw : amber::encoder_table()) {
+      QCOMPARE(raw.supports_two_pass, two_pass.contains(raw.name));
+      EncoderInfo info;
+      if (!amber::find_encoder_info(raw.name, &info)) continue;  // not installed
+      qInfo("%s: two-pass %d, stats file option \"%s\"", qPrintable(info.name), int(info.supports_two_pass),
+            qPrintable(info.two_pass_stats_key));
+      QCOMPARE(info.supports_two_pass, raw.supports_two_pass);
+      // Only for average bitrate, which every two-pass encoder has
+      if (info.supports_two_pass) QVERIFY(info.supports_average_bitrate);
+    }
+    EncoderInfo x264;
+    if (amber::find_encoder_info("libx264", &x264)) QCOMPARE(x264.two_pass_stats_key, QString("stats"));
+    EncoderInfo x265;
+    if (amber::find_encoder_info("libx265", &x265)) QCOMPARE(x265.two_pass_stats_key, QString("x265-stats"));
+  }
+
+  // A stats file option the encoder doesn't know turns two-pass off
+  void twoPassNeedsItsStatsOption() {
+    const AVCodec* x264 = avcodec_find_encoder_by_name("libx264");
+    if (x264 == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    EncoderInfo raw;
+    raw.name = "libx264";
+    raw.codec_id = AV_CODEC_ID_H264;
+    raw.supports_two_pass = true;
+    raw.two_pass_stats_key = "stats";
+    QVERIFY(amber::validate_encoder_info(raw, x264).supports_two_pass);
+    raw.two_pass_stats_key = "amber_no_such_stats_option";
+    QVERIFY(!amber::validate_encoder_info(raw, x264).supports_two_pass);
+  }
+
   void unknownEncoderNotFound() {
     EncoderInfo info;
     QVERIFY(!amber::find_encoder_info("amber_no_such_encoder", &info));

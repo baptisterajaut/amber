@@ -14,7 +14,7 @@ struct AVOutputFormat;
 
 // Per-encoder export settings the export dialog shows as extra rows (ROADMAP "Per-codec options panel", #58). Pure
 // data plus FFmpeg lookups: no widgets, so the tests and ExportThread use it too.
-// CBA: lot 1 — no two-pass, VP9 CRF or hardware encoders yet (ROADMAP #58)
+// CBA: no hardware encoders yet (ROADMAP #58)
 namespace amber {
 
 // One encoder setting, shown as a combo (Choice) or a spin box (Int)
@@ -48,6 +48,10 @@ struct EncoderInfo {
   int quality_max = 0;
   int quality_default = 0;
   bool supports_average_bitrate = false;  // bit_rate alone gives an average-bitrate (ABR/VBR) encode
+  // FFmpeg's wrapper implements AV_CODEC_FLAG_PASS1/PASS2: an average-bitrate export can analyse first
+  // (ExportThread). The stats go through stats_out/stats_in, or with a file option through a file.
+  bool supports_two_pass = false;
+  QString two_pass_stats_key;  // AVOption naming the stats file (libx264, libx265); empty: stats_out/stats_in
   QVector<EncoderOption> options;
 };
 

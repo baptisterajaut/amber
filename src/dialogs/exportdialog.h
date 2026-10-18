@@ -233,6 +233,11 @@ private:
   void update_faststart();
 
   /**
+   * @brief Shows the two-pass checkbox only in Average bitrate mode, for an encoder with supports_two_pass
+   */
+  void update_two_pass();
+
+  /**
    * @brief Fits the dialog's height to its rows, once the current event is done
    *
    * Option rows, the encoder row and the fast start checkbox come and go with the format and encoder. Without this
@@ -335,6 +340,16 @@ private:
    * @brief movflags=+faststart, for the MOV family of formats
    */
   QCheckBox* faststartCheckbox;
+
+  /**
+   * @brief Two-pass encoding (ExportParams::two_pass), under the compression type
+   */
+  QCheckBox* twoPassCheckbox;
+
+  /**
+   * @brief "Pass 1 of 2" while a two-pass export runs (ExportThread::PassChanged), empty for one pass
+   */
+  QString export_pass_;
 
   /**
    * @brief ComboBox for the exported audio's codec

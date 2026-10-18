@@ -83,6 +83,11 @@ bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, 
 
   while (ret >= 0) {
     ret = avcodec_receive_packet(codec_ctx, packet);
+    // Pass-1 statistics, read as FFmpeg's CLI does (ffmpeg_enc.c): after every packet and on the drain's EOF.
+    // libavcodec empties stats_out before each call (encode.c), so nothing is read twice.
+    if (pass_ == 1 && (ret >= 0 || ret == AVERROR_EOF) && codec_ctx->stats_out != nullptr) {
+      pass1_stats_.append(codec_ctx->stats_out);
+    }
     if (ret == AVERROR(EAGAIN)) {
       return true;
     } else if (ret < 0) {
@@ -91,6 +96,12 @@ bool ExportThread::Encode(AVFormatContext* ofmt_ctx, AVCodecContext* codec_ctx, 
         export_error = tr("failed to receive packet from encoder (%1)").arg(QString::number(ret));
       }
       return false;
+    }
+
+    // The analysis pass writes nothing
+    if (pass_ == 1) {
+      av_packet_unref(packet);
+      continue;
     }
 
     packet->stream_index = stream->index;
@@ -174,6 +185,15 @@ bool ExportThread::SetupVideo() {
     vcodec_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
   }
 
+  // Two-pass: the analysis pass writes statistics, the real one reads them back
+  if (pass_ == 1) {
+    vcodec_ctx->flags |= AV_CODEC_FLAG_PASS1;
+  } else if (pass_ == 2) {
+    vcodec_ctx->flags |= AV_CODEC_FLAG_PASS2;
+    // Set and freed by the user (avcodec.h), read until the context is freed: pass1_stats_ stays untouched until then
+    if (!pass1_stats_.isEmpty()) vcodec_ctx->stats_in = pass1_stats_.data();
+  }
+
   // Set export to be multithreaded
   AVDictionary* opts = nullptr;
   if (vcodec_params_.threads == 0) {
@@ -183,12 +203,14 @@ bool ExportThread::SetupVideo() {
   }
 
   // Quality-based: the encoder's quality option gets the value. An H.264/H.265 encoder without a descriptor gets crf,
-  // as before descriptors. Bit rate stays 0 (libaom needs that for constant quality).
+  // as before descriptors. A descriptor's encoder gets no bit rate: libvpx-vp9 and libaom only encode at constant
+  // quality without one (constrained quality with one). Their codec defaults already say b=0; this makes sure.
   if (params_.video_compression_type == COMPRESSION_TYPE_CFR) {
     amber::EncoderInfo info;
     QString key;
     if (amber::find_encoder_info(QString::fromUtf8(vcodec->name), &info)) {
       key = info.quality_key;
+      if (!key.isEmpty()) vcodec_ctx->bit_rate = 0;
     } else if (vcodec->id == AV_CODEC_ID_H264 || vcodec->id == AV_CODEC_ID_HEVC) {
       key = QStringLiteral("crf");
     }
@@ -196,6 +218,9 @@ bool ExportThread::SetupVideo() {
       av_dict_set(&opts, key.toUtf8().constData(),
                   QString::number(static_cast<int>(params_.video_bitrate)).toUtf8().constData(), 0);
     }
+  }
+  if (pass_ != 0 && !stats_file_.isEmpty()) {
+    av_dict_set(&opts, stats_key_.toUtf8().constData(), stats_file_.toUtf8().constData(), 0);
   }
   add_options(&opts, params_.video_options);
 
@@ -457,6 +482,8 @@ bool ExportThread::SetupContainer() {
     export_error = tr("could not create output format context");
     return false;
   }
+  // The analysis pass only needs the context, to set the encoder up exactly as for the file (global header)
+  if (pass_ == 1) return true;
 
   ret = avio_open(&fmt_ctx->pb, c_filename, AVIO_FLAG_WRITE);
   if (ret < 0) {
@@ -612,13 +639,14 @@ bool ExportThread::EncodeAudioFrames(long& file_audio_samples, double timecode_s
 bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samples) {
   qint64 total_time = 0;
   long frame_count = 1;
+  const bool audio = params_.audio_enabled && pass_ != 1;  // the analysis pass is video only
 
   // end_frame is exclusive (the frame after the last clip, or the out point): N sequence frames give N video frames
   while (seq_->playhead < params_.end_frame && !interrupt_) {
     qint64 frame_start_time = QDateTime::currentMSecsSinceEpoch();
 
     int audio_cachers = 0;
-    if (params_.audio_enabled) {
+    if (audio) {
       ResetAudioFillCount();
       audio_cachers = amber::rendering::compose_audio(seq_, false, 1, true);
     }
@@ -629,7 +657,7 @@ bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samp
       if (!EncodeVideoFrame(renderer, timecode_secs)) return false;
     }
 
-    if (params_.audio_enabled) {
+    if (audio) {
       // Audio up to the end of this frame, so the last frame's audio isn't cut and both streams end together
       double frame_end_secs = double(seq_->playhead + 1 - params_.start_frame) / seq_->frame_rate;
       if (!EncodeAudioFrames(file_audio_samples, frame_end_secs, audio_cachers)) return false;
@@ -641,10 +669,16 @@ bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samp
     qint64 avg_time = total_time / frame_count;
     qint64 eta = remaining_frames * avg_time;
 
-    emit ProgressChanged(
-        qRound((double(seq_->playhead + 1 - params_.start_frame) / double(params_.end_frame - params_.start_frame)) *
-               100.0),
-        eta);
+    double done = double(seq_->playhead + 1 - params_.start_frame) / double(params_.end_frame - params_.start_frame);
+    // Two-pass: each pass is half of the bar. While analysing, the ETA adds pass 2 at pass 1's pace.
+    // CBA: optimistic for libx264, whose first pass uses fast settings; a per-encoder pace ratio if it matters
+    if (pass_ == 1) {
+      done /= 2;
+      eta += (params_.end_frame - params_.start_frame) * avg_time;
+    } else if (pass_ == 2) {
+      done = 0.5 + done / 2;
+    }
+    emit ProgressChanged(qRound(done * 100.0), eta);
 
     seq_->playhead++;
     frame_count++;
@@ -672,8 +706,82 @@ bool ExportThread::FlushEncoders() {
   if (!FlushPaletteGraph()) return false;
   // Encode() also returns false on the AVERROR_EOF that ends a normal drain; only a set export_error is a failure
   if (params_.video_enabled) Encode(fmt_ctx, vcodec_ctx, nullptr, video_pkt, video_stream);
-  if (params_.audio_enabled) Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
+  if (params_.audio_enabled && pass_ != 1) Encode(fmt_ctx, acodec_ctx, nullptr, audio_pkt, audio_stream);
   return export_error.isEmpty();
+}
+
+// Renders and encodes the whole range with a renderer of its own, then closes the clips it opened. Rendering state
+// (audio_rendering flag + autorecovery timer) is restored on the main thread by finish_export() — starting a QTimer
+// from this thread triggers "Timers cannot be started from another thread". False on failure and on interrupt.
+bool ExportThread::RenderPass(long& file_audio_samples) {
+  RenderThread* renderer = new RenderThread();
+  if (gl_fallback_surface_) renderer->setGlFallbackSurface(gl_fallback_surface_);
+  renderer->start(QThread::HighestPriority);
+  connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
+
+  bool frames_ok = EncodeAllFrames(renderer, file_audio_samples);
+
+  renderer->cancel();
+  delete renderer;
+
+  close_active_clips(seq_);
+  return frames_ok && !interrupt_;
+}
+
+// params_.two_pass, when it can apply: Average bitrate video through an encoder whose FFmpeg wrapper implements
+// two-pass. Sets stats_key_ for an encoder that keeps its stats in a file.
+bool ExportThread::TwoPassApplies() {
+  if (!params_.two_pass) return false;
+  const AVCodec* codec = params_.video_enabled
+                             ? amber::find_encoder(params_.video_encoder, static_cast<AVCodecID>(params_.video_codec))
+                             : nullptr;
+  amber::EncoderInfo info;
+  if (params_.video_compression_type != COMPRESSION_TYPE_TARGETBR || codec == nullptr ||
+      !amber::find_encoder_info(QString::fromUtf8(codec->name), &info) || !info.supports_two_pass) {
+    qInfo() << "Export: two-pass ignored, it needs Average bitrate video through an encoder that supports it";
+    return false;
+  }
+  stats_key_ = info.two_pass_stats_key;
+  return true;
+}
+
+// Two-pass, pass 1: every frame rendered and encoded as in pass 2, by an encoder opened with AV_CODEC_FLAG_PASS1.
+// Its statistics are kept, its packets dropped; no audio, no file. Pass 2 then starts as a one-pass export does.
+bool ExportThread::AnalysisPass() {
+  if (!stats_key_.isEmpty()) {
+    // Not the encoder's default name, which is in the working directory. run() removes the folder.
+    stats_dir_ = std::make_unique<QTemporaryDir>();
+    if (!stats_dir_->isValid()) {
+      export_error = tr("two-pass analysis failed (%1)").arg(tr("could not create a temporary folder"));
+      return false;
+    }
+    stats_file_ = stats_dir_->filePath("pass1.log");
+  }
+
+  pass_ = 1;
+  emit PassChanged(1, 2);
+  long no_audio = 0;
+  bool ok = SetupContainer() && SetupVideo() && RenderPass(no_audio) && FlushEncoders();
+  // Frees the pass-1 encoder, which is when libx264 and libx265 finish their stats file
+  Cleanup();
+  if (ok && stats_key_.isEmpty() && pass1_stats_.isEmpty()) {
+    export_error = tr("the encoder wrote no statistics");
+    ok = false;
+  }
+  if (!ok) {
+    if (!interrupt_) {
+      export_error =
+          tr("two-pass analysis failed (%1)").arg(export_error.isEmpty() ? tr("unknown error") : export_error);
+    }
+    return false;
+  }
+
+  // As prepare_export() left them: RenderPass() has closed the clips already
+  seq_->playhead = params_.start_frame;
+  if (params_.audio_enabled) clear_audio_ibuffer(params_.start_frame);
+  pass_ = 2;
+  emit PassChanged(2, 2);
+  return true;
 }
 
 // Returns true only when the file was fully written. False on any failure and on interrupt (an interrupt does not
@@ -681,6 +789,9 @@ bool ExportThread::FlushEncoders() {
 bool ExportThread::Export() {
   QByteArray ba = params_.filename.toUtf8();
   c_filename = qstrdup(ba.constData());
+
+  // Before the file exists: a failed or interrupted analysis leaves nothing behind
+  if (TwoPassApplies() && !AnalysisPass()) return false;
 
   if (!SetupContainer()) return false;
   if (!SetupVideo()) return false;
@@ -701,24 +812,7 @@ bool ExportThread::Export() {
   }
 
   long file_audio_samples = 0;
-
-  RenderThread* renderer = new RenderThread();
-  if (gl_fallback_surface_) renderer->setGlFallbackSurface(gl_fallback_surface_);
-  renderer->start(QThread::HighestPriority);
-  connect(renderer, &RenderThread::ready, this, &ExportThread::wake);
-
-  bool frames_ok = EncodeAllFrames(renderer, file_audio_samples);
-
-  renderer->cancel();
-  delete renderer;
-
-  // Clean up clip state.  Rendering state (audio_rendering flag + autorecovery
-  // timer) is restored on the main thread by finish_export()
-  // — starting a QTimer from this thread triggers "Timers cannot be started
-  // from another thread".
-  close_active_clips(seq_);
-
-  if (interrupt_ || !frames_ok) return false;
+  if (!RenderPass(file_audio_samples)) return false;
 
   if (!FlushSwrAudio(file_audio_samples)) return false;
   if (interrupt_) return false;
@@ -737,6 +831,8 @@ bool ExportThread::Export() {
   return true;
 }
 
+// Frees what the Setup*() functions allocated and resets the pointers: the analysis pass of a two-pass export runs it
+// before pass 2 sets up again
 void ExportThread::Cleanup() {
   if (fmt_ctx != nullptr) {
     // The final buffered write happens here: a full disk can fail it after a clean trailer
@@ -746,6 +842,9 @@ void ExportThread::Cleanup() {
       export_error = tr("could not close output file (%1)").arg(QString::number(close_ret));
     }
     avformat_free_context(fmt_ctx);
+    fmt_ctx = nullptr;
+    video_stream = nullptr;  // owned by fmt_ctx
+    audio_stream = nullptr;
   }
 
   if (acodec_ctx != nullptr) {
@@ -774,6 +873,7 @@ void ExportThread::Cleanup() {
 
   if (sws_ctx != nullptr) {
     sws_freeContext(sws_ctx);
+    sws_ctx = nullptr;
   }
 
   if (palette_graph != nullptr) {
@@ -791,8 +891,6 @@ void ExportThread::Cleanup() {
   if (sws_frame != nullptr) {
     av_frame_free(&sws_frame);
   }
-
-  delete[] c_filename;
 }
 
 void ExportThread::run() {
@@ -811,6 +909,9 @@ void ExportThread::run() {
 
   // Clean up anything that was allocated in Export() (whether it succeeded or not)
   Cleanup();
+  delete[] c_filename;
+  c_filename = nullptr;
+  stats_dir_.reset();  // the pass-2 encoder, freed above, was the last to read the stats file
   if (!export_error.isEmpty()) succeeded = false;  // Cleanup() reports a failed close
 
   // Callers judge success by !WasInterrupted() && GetError().isEmpty(): a failure must never leave both clear
