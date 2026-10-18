@@ -1,5 +1,6 @@
 // Encoder descriptors (rendering/encoderoptions): validation against the installed FFmpeg's AVOptions, encoder
-// availability and order, muxer fast start detection. Encoders missing from this FFmpeg build are skipped.
+// availability and order, muxer fast start detection. Encoders missing from this FFmpeg build are skipped. Also the
+// file names of a batch export (rendering/batchexport).
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -9,6 +10,7 @@ extern "C" {
 
 #include <QTest>
 
+#include "rendering/batchexport.h"
 #include "rendering/encoderoptions.h"
 
 using amber::EncoderInfo;
@@ -245,6 +247,42 @@ class TestEncoderOptions : public QObject {
     QVERIFY(!amber::filename_supports_faststart("x.webm"));
     QVERIFY(!amber::filename_supports_faststart("x.avi"));
     QVERIFY(!amber::filename_supports_faststart("x.nosuchextension"));
+  }
+
+  void batchFilenameKeepsName() {
+    QCOMPARE(amber::batch_export_filename("Interview", "mp4", {}), QString("Interview.mp4"));
+    QCOMPARE(amber::batch_export_filename("Sequence 01", "mkv", {}), QString("Sequence 01.mkv"));
+    QCOMPARE(amber::batch_export_filename(QString::fromUtf8("Été – plan 2"), "mov", {}),
+             QString::fromUtf8("Été – plan 2.mov"));
+  }
+
+  // What Windows refuses (and '/' everywhere) becomes '_'; so do control characters
+  void batchFilenameReplacesInvalidCharacters() {
+    QCOMPARE(amber::batch_export_filename("a/b\\c:d*e?f\"g<h>i|j", "mp4", {}), QString("a_b_c_d_e_f_g_h_i_j.mp4"));
+    QCOMPARE(amber::batch_export_filename("tab\there\nnewline", "mp4", {}), QString("tab_here_newline.mp4"));
+    QCOMPARE(amber::batch_export_filename("50% cut", "mp4", {}), QString("50% cut.mp4"));
+  }
+
+  // Surrounding spaces and trailing dots go (Windows drops trailing dots); nothing left gives "Sequence"
+  void batchFilenameEmptyName() {
+    QCOMPARE(amber::batch_export_filename("", "mp4", {}), QString("Sequence.mp4"));
+    QCOMPARE(amber::batch_export_filename("   ", "mp4", {}), QString("Sequence.mp4"));
+    QCOMPARE(amber::batch_export_filename("...", "mp4", {}), QString("Sequence.mp4"));
+    QCOMPARE(amber::batch_export_filename("  Teaser  ", "mp4", {}), QString("Teaser.mp4"));
+    QCOMPARE(amber::batch_export_filename("Final. ", "mp4", {}), QString("Final.mp4"));
+    QCOMPARE(amber::batch_export_filename("v1.2", "mp4", {}), QString("v1.2.mp4"));
+  }
+
+  // A taken name gets " (2)", " (3)"... before the extension, taken names compared case-insensitively
+  void batchFilenameCollisions() {
+    QCOMPARE(amber::batch_export_filename("Interview", "mp4", {"Interview.mp4"}), QString("Interview (2).mp4"));
+    QCOMPARE(amber::batch_export_filename("Interview", "mp4", {"interview.MP4", "Interview (2).mp4"}),
+             QString("Interview (3).mp4"));
+    // Another extension, or a longer name, isn't a collision
+    QCOMPARE(amber::batch_export_filename("Interview", "mp4", {"Interview.mov", "Interview 2.mp4"}),
+             QString("Interview.mp4"));
+    QCOMPARE(amber::batch_export_filename("", "mp4", {"Sequence.mp4"}), QString("Sequence (2).mp4"));
+    QCOMPARE(amber::batch_export_filename("a/b", "mp4", {"a_b.mp4"}), QString("a_b (2).mp4"));
   }
 };
 

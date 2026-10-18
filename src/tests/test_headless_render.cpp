@@ -34,6 +34,7 @@ extern "C" {
 #include <algorithm>
 #include <functional>
 
+#include "core/audio.h"
 #include "core/headlessappcontext.h"
 #include "effects/effect.h"
 #include "engine/clip.h"
@@ -45,6 +46,7 @@ extern "C" {
 #include "project/media.h"
 #include "project/previewgenerator.h"
 #include "project/projectmodel.h"
+#include "rendering/batchexport.h"
 #include "rendering/exportthread.h"
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
@@ -799,6 +801,77 @@ class TestHeadlessRender : public QObject {
         qputenv("TMPDIR", saved);
       }
     });
+  }
+
+  // The batch sequences of the BatchExport tests: Wide (64x48, 30 fps, 10 frames) and Tall (32x64, 25 fps, 6 frames,
+  // in/out range 1-4), both solid_sequence(), and the user's active sequence; each has its playhead away from 0
+  struct BatchSequences {
+    SequencePtr wide;
+    SequencePtr tall;
+    SequencePtr user;
+  };
+  static BatchSequences batch_sequences() {
+    BatchSequences b;
+    b.wide = solid_sequence(10);
+    b.wide->name = "Wide";
+    b.wide->width = 64;
+    b.wide->height = 48;
+    b.wide->playhead = 7;
+    b.tall = solid_sequence(6);
+    b.tall->name = "Tall";
+    b.tall->width = 32;
+    b.tall->height = 64;
+    b.tall->frame_rate = 25.0;
+    b.tall->using_workarea = true;
+    b.tall->workarea_in = 1;
+    b.tall->workarea_out = 4;
+    b.tall->playhead = 2;
+    b.user = solid_sequence(4);
+    b.user->name = "User";
+    b.user->playhead = 3;
+    return b;
+  }
+
+  // The export dialog's settings a batch starts from: MPEG-4 video, no audio
+  static ExportParams batch_base() {
+    ExportParams params{};
+    params.video_enabled = true;
+    params.video_codec = AV_CODEC_ID_MPEG4;
+    params.video_compression_type = COMPRESSION_TYPE_CBR;
+    params.video_bitrate = 2.0;
+    params.audio_enabled = false;
+    return params;
+  }
+
+  // Jobs for seqs into folder, named and derived as ExportDialog::start_batch_export() does
+  static QVector<BatchExport::Job> batch_jobs(const QVector<SequencePtr>& seqs, const QString& folder, bool use_inout) {
+    QStringList taken = dir_entries(folder);
+    QVector<BatchExport::Job> jobs;
+    for (const SequencePtr& s : seqs) {
+      const QString name = amber::batch_export_filename(s->name, "mp4", taken);
+      taken.append(name);
+      jobs.append({s, amber::batch_export_params(batch_base(), s.get(), use_inout, QDir(folder).filePath(name))});
+    }
+    return jobs;
+  }
+
+  // Runs batch to its end; on_start gets each job index as its export starts. False on time-out.
+  bool run_batch(BatchExport& batch, const std::function<void(int)>& on_start = nullptr) {
+    bool finished = false;
+    connect(&batch, &BatchExport::Finished, this, [&finished]() { finished = true; });
+    if (on_start) {
+      connect(&batch, &BatchExport::SequenceStarted, this,
+              [&on_start](int index, int, const QString&) { on_start(index); });
+    }
+    batch.Start();
+    return QTest::qWaitFor([&finished]() { return finished; }, 120000);
+  }
+
+  static VideoCodecParams yuv420p_params() {
+    VideoCodecParams vparams;
+    vparams.pix_fmt = AV_PIX_FMT_YUV420P;
+    vparams.threads = 0;
+    return vparams;
   }
 
   // Audio-only export of a whole sequence from start_frame to its end
@@ -2223,6 +2296,135 @@ class TestHeadlessRender : public QObject {
 
   // Save Frame renders at full resolution even when a viewer request at a preview divider (the viewer's retry after a
   // failed render, a scrub) arrives before the save has been rendered
+  // Batch export: each sequence at its own size, length and frame rate, the in/out range of the one that has it, as
+  // the active sequence while it exports; the user's active sequence and every playhead back at the end
+  void batchExportEachSequenceAtItsOwnSettings() {
+    BatchSequences b = batch_sequences();
+    pio_->setSequence(b.user);
+    const QString folder = dir_.filePath("batch_own_settings");
+    QVERIFY(QDir().mkpath(folder));
+
+    QVector<BatchExport::Job> jobs = batch_jobs({b.wide, b.tall}, folder, true);
+    QCOMPARE(jobs.at(0).params.video_width, 64);
+    QCOMPARE(jobs.at(0).params.video_height, 48);
+    QCOMPARE(jobs.at(0).params.start_frame, 0L);
+    QCOMPARE(jobs.at(0).params.end_frame, 10L);  // no in/out range: whole
+    QCOMPARE(jobs.at(1).params.video_width, 32);
+    QCOMPARE(jobs.at(1).params.video_height, 64);
+    QCOMPARE(jobs.at(1).params.start_frame, 1L);
+    QCOMPARE(jobs.at(1).params.end_frame, 4L);
+    // "Entire Sequence": the in/out range is ignored
+    const ExportParams whole = amber::batch_export_params(batch_base(), b.tall.get(), false, "x.mp4");
+    QCOMPARE(whole.start_frame, 0L);
+    QCOMPARE(whole.end_frame, 6L);
+
+    BatchExport batch(jobs, yuv420p_params());
+    QVector<SequencePtr> active;
+    QVector<long> playheads;
+    QVERIFY(run_batch(batch, [&](int index) {
+      active.append(amber::ActiveSequence);
+      playheads.append(jobs.at(index).seq->playhead);
+    }));
+    QCOMPARE(active, (QVector<SequencePtr>{b.wide, b.tall}));
+    QCOMPARE(playheads, (QVector<long>{0, 1}));  // prepare_export() put them at the export start
+    QCOMPARE(batch.ExportedCount(), 2);
+    QVERIFY(!batch.WasCancelled());
+    QCOMPARE(batch.Summary("/out"), QString("2 sequences exported to /out"));
+
+    // The user's sequence and playheads back, out of rendering mode
+    QCOMPARE(amber::ActiveSequence, b.user);
+    QCOMPARE(b.user->playhead, 3L);
+    QCOMPARE(b.wide->playhead, 7L);
+    QCOMPARE(b.tall->playhead, 2L);
+    QVERIFY(!audio_rendering);
+
+    QCOMPARE(dir_entries(folder), (QStringList{"Tall.mp4", "Wide.mp4"}));
+    const Decoded wide = decode_file(QDir(folder).filePath("Wide.mp4"));
+    QVERIFY(wide.ok && wide.has_video);
+    QCOMPARE(wide.width, 64);
+    QCOMPARE(wide.height, 48);
+    QCOMPARE(wide.video_frames, 10);
+    QVERIFY2(qAbs(wide.video_fps - 30.0) < 0.001, qPrintable(QString::number(wide.video_fps)));
+    const Decoded tall = decode_file(QDir(folder).filePath("Tall.mp4"));
+    QVERIFY(tall.ok && tall.has_video);
+    QCOMPARE(tall.width, 32);
+    QCOMPARE(tall.height, 64);
+    QCOMPARE(tall.video_frames, 3);
+    QVERIFY2(qAbs(tall.video_fps - 25.0) < 0.001, qPrintable(QString::number(tall.video_fps)));
+
+    // Again into the same folder: new names, nothing overwritten
+    QVector<BatchExport::Job> again = batch_jobs({b.wide, b.tall}, folder, true);
+    QCOMPARE(QFileInfo(again.at(0).params.filename).fileName(), QString("Wide (2).mp4"));
+    QCOMPARE(QFileInfo(again.at(1).params.filename).fileName(), QString("Tall (2).mp4"));
+    pio_->setSequence(nullptr);
+  }
+
+  // A sequence that fails (an encoder that doesn't exist) or can't start (no clips) doesn't stop the others. Started
+  // with no active sequence (the Project panel's menu needs none), the batch leaves none.
+  void batchExportContinuesPastFailures() {
+    BatchSequences b = batch_sequences();
+    SequencePtr empty = std::make_shared<Sequence>();
+    empty->name = "Empty";
+    empty->width = kSize;
+    empty->height = kSize;
+    empty->frame_rate = kFps;
+    empty->audio_frequency = kAudioRate;
+    pio_->setSequence(nullptr);
+    const QString folder = dir_.filePath("batch_failures");
+    QVERIFY(QDir().mkpath(folder));
+
+    QVector<BatchExport::Job> jobs = batch_jobs({b.wide, empty, b.tall}, folder, false);
+    jobs[0].params.video_encoder = "amber_no_such_encoder";
+    BatchExport batch(jobs, yuv420p_params());
+    QVector<int> started;
+    QVERIFY(run_batch(batch, [&](int index) { started.append(index); }));
+    QCOMPARE(started, (QVector<int>{0, 2}));
+
+    const QVector<BatchExport::Outcome>& o = batch.Outcomes();
+    QCOMPARE(o.at(0).status, BatchExport::Outcome::Failed);
+    QVERIFY2(o.at(0).reason.contains("amber_no_such_encoder"), qPrintable(o.at(0).reason));
+    QCOMPARE(o.at(1).status, BatchExport::Outcome::Skipped);
+    QCOMPARE(o.at(2).status, BatchExport::Outcome::Exported);
+    const QString summary = batch.Summary("/out");
+    qInfo("%s", qPrintable(summary));
+    QVERIFY(summary.startsWith("1 of 3 exported to /out."));
+    QVERIFY(summary.contains("Wide failed: " + o.at(0).reason));
+    QVERIFY(summary.contains("Empty skipped: "));
+
+    QCOMPARE(dir_entries(folder), QStringList{"Tall.mp4"});  // the failed export left nothing
+    const Decoded tall = decode_file(QDir(folder).filePath("Tall.mp4"));
+    QVERIFY(tall.ok);
+    QCOMPARE(tall.video_frames, 6);
+    QCOMPARE(amber::ActiveSequence, SequencePtr());
+    QCOMPARE(b.wide->playhead, 7L);
+    QCOMPARE(b.tall->playhead, 2L);
+    QVERIFY(!audio_rendering);
+    pio_->setSequence(nullptr);
+  }
+
+  // Cancel stops the running export (its file removed) and skips the rest; the user's sequence comes back
+  void batchExportCancel() {
+    BatchSequences b = batch_sequences();
+    pio_->setSequence(b.user);
+    const QString folder = dir_.filePath("batch_cancel");
+    QVERIFY(QDir().mkpath(folder));
+
+    BatchExport batch(batch_jobs({b.wide, b.tall}, folder, false), yuv420p_params());
+    connect(&batch, &BatchExport::ProgressChanged, &batch, &BatchExport::Cancel);
+    QVector<int> started;
+    QVERIFY(run_batch(batch, [&](int index) { started.append(index); }));
+    QCOMPARE(started, QVector<int>{0});
+    QVERIFY(batch.WasCancelled());
+    QCOMPARE(batch.ExportedCount(), 0);
+    QCOMPARE(batch.Outcomes().at(0).status, BatchExport::Outcome::Cancelled);
+    QCOMPARE(batch.Outcomes().at(1).status, BatchExport::Outcome::Cancelled);
+    QCOMPARE(dir_entries(folder), QStringList{});
+    QCOMPARE(amber::ActiveSequence, b.user);
+    QCOMPARE(b.wide->playhead, 7L);
+    QVERIFY(!audio_rendering);
+    pio_->setSequence(nullptr);
+  }
+
   void saveFrameKeepsFullResolution() {
     SequencePtr seq = std::make_shared<Sequence>();
     seq->width = 16;
