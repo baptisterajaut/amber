@@ -180,6 +180,8 @@ void SetSelectionsCommand::doUndo() {
     return;
   }
   seq->selections = old_data;
+  // a track locked since then keeps no selection
+  seq->remove_locked_selections();
   done = false;
 }
 
@@ -190,6 +192,7 @@ void SetSelectionsCommand::doRedo() {
   }
   if (!done) {
     seq->selections = new_data;
+    seq->remove_locked_selections();
     done = true;
   }
 }

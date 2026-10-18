@@ -165,6 +165,24 @@ class TestTrackStates : public QObject {
     QCOMPARE(v1->timeline_in(), 20L);
   }
 
+  // An undo that restores selections (a move's "Select" step) doesn't bring one back on a track locked since
+  void selectionUndoSkipsLockedTracks() {
+    Sequence s;
+    Selection sel;
+    sel.in = 0;
+    sel.out = 10;
+    sel.track = 0;
+    SetSelectionsCommand cmd(&s);
+    cmd.old_data = {sel};
+    cmd.new_data = {};
+    s.set_track_state(0, make_state(false, false, false, true));
+    cmd.undo();
+    QVERIFY(s.selections.isEmpty());
+    ClipPtr c = add_clip(s, 0, 0, 10);
+    s.selections.append(sel);
+    QVERIFY(!s.IsClipSelected(c.get()));  // and a selection that slipped through selects nothing
+  }
+
   void undoCommandSwapsMapAndDropsLockedSelections() {
     Sequence s;
     Selection sel;
