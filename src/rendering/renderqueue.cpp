@@ -1,5 +1,6 @@
 #include "rendering/renderqueue.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -45,6 +46,11 @@ bool amber::same_output_path(const QString& a, const QString& b) {
 RenderQueue::RenderQueue(QObject* parent) : QObject(parent) {
   // ProjectModel::clear() is the one reset: AmberGlobal::ClearProject(), which new, open and the load errors go through
   connect(&amber::project_model, &QAbstractItemModel::modelReset, this, &RenderQueue::Clear);
+  // The queue lives until static destruction: its last references to sequences deleted from the project go at quit,
+  // from exec(), while the main window, its viewer's render thread and amber::app_ctx are still there for ~Clip
+  if (QCoreApplication::instance() != nullptr) {
+    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &RenderQueue::Clear);
+  }
 }
 
 QString RenderQueue::Add(const amber::QueuedJob& job) {

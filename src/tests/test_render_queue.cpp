@@ -253,9 +253,19 @@ class TestRenderQueue : public QObject {
     QCOMPARE(q.TakenNames("/OUT/"), (QStringList{"Wide.mp4", "Tall.png", "100% (2).png"}));
     QCOMPARE(q.TakenNames("/elsewhere"), QStringList{"Other.mp4"});
     QCOMPARE(q.TakenNames("/nowhere"), QStringList{});
-    // As ExportDialog::queue_export() names a batch: after the queued names
+    // As ExportDialog::QueueExport() names a batch: after the queued names
     QCOMPARE(amber::batch_export_filename("Wide", "mp4", q.TakenNames("/out")), QString("Wide (2).mp4"));
     QCOMPARE(amber::batch_export_filename("Tall", "png", q.TakenNames("/out")), QString("Tall (2).png"));
+  }
+
+  // Quitting clears the queue from exec(), while the app is still whole: its sequences don't wait for static
+  // destruction. Last: it runs and leaves the application's event loop.
+  void clearedAtQuit() {
+    RenderQueue& q = amber::render_queue();
+    QVERIFY(q.Add(job(sequence("Deleted", 10), "/out/deleted.mp4")).isEmpty());
+    QTimer::singleShot(0, qApp, &QCoreApplication::quit);
+    QCoreApplication::exec();
+    QCOMPARE(q.Count(), 0);
   }
 };
 

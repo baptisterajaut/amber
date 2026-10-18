@@ -43,6 +43,8 @@ bool same_output_path(const QString& a, const QString& b);
 // rendered again, any other is on the next Render(). Cleared with the project (the project model's reset: new, open,
 // close), as the sequences belong to it. GUI thread only.
 // CBA: in memory only; saving the queue with the project if asked
+// CBA: a sequence deleted from the project while queued stays in memory, its clips as they were (open cachers too),
+// until its row is removed or the queue cleared; closing its clips on delete if the memory matters
 // CBA: modal render (level 1); exporting a copy of the sequence to keep editing is level 2 (see report)
 class RenderQueue : public QObject {
   Q_OBJECT
