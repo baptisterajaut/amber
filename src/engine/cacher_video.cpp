@@ -294,7 +294,7 @@ static int64_t seek_landing_timestamp(AVFormatContext* formatCtx, int stream_ind
 // ---------------------------------------------------------------------------
 void Cacher::cacheVideoDynamicClip() {
   bool reversed = IsReversed();
-  int64_t target_pts = clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)));
+  int64_t target_pts = videoTargetPts();
   int64_t second_pts = seconds_to_timestamp(clip, 1);
 
   QueueStats stats = scan_queue(queue_, target_pts);

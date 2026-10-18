@@ -497,6 +497,98 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
   return d;
 }
 
+// frames frames of uniform grey, frame i at luma 24 + 16 * i (still told apart after a codec round trip), as MPEG-4 in
+// MP4 at 1/90000 with the first frame at pts start: video that starts after 0, as a camera's MPEG-TS or an MP4 muxed
+// audio first
+void write_offset_mp4(const QString& path, int frames, int64_t start) {
+  const AVRational rate{int(kFps), 1};
+  const QByteArray p = path.toUtf8();
+  const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_MPEG4);
+  QVERIFY(codec != nullptr);
+  AVFormatContext* fmt = nullptr;
+  QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
+  AVStream* st = avformat_new_stream(fmt, nullptr);
+  st->time_base = AVRational{1, 90000};
+  AVCodecContext* enc = avcodec_alloc_context3(codec);
+  enc->width = kSize;
+  enc->height = kSize;
+  enc->pix_fmt = AV_PIX_FMT_YUV420P;
+  enc->framerate = rate;
+  enc->time_base = av_inv_q(rate);
+  enc->bit_rate = 2000000;
+  if (fmt->oformat->flags & AVFMT_GLOBALHEADER) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+  QVERIFY(avcodec_open2(enc, codec, nullptr) >= 0);
+  avcodec_parameters_from_context(st->codecpar, enc);
+  QVERIFY(avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0);
+  QVERIFY(avformat_write_header(fmt, nullptr) >= 0);
+  const int64_t offset = av_rescale_q(start, AVRational{1, 90000}, st->time_base);  // the muxer may change it
+
+  AVPacket* pkt = av_packet_alloc();
+  auto write_packets = [&]() {
+    while (avcodec_receive_packet(enc, pkt) >= 0) {
+      if (pkt->duration == 0) pkt->duration = 1;  // in enc->time_base: else FFmpeg 9's edit list drops the last frame
+      av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+      pkt->pts += offset;
+      pkt->dts += offset;
+      pkt->stream_index = st->index;
+      av_interleaved_write_frame(fmt, pkt);
+      av_packet_unref(pkt);
+    }
+  };
+  AVFrame* frame = av_frame_alloc();
+  frame->width = kSize;
+  frame->height = kSize;
+  frame->format = AV_PIX_FMT_YUV420P;
+  QVERIFY(av_frame_get_buffer(frame, 0) >= 0);
+  for (int i = 0; i < frames; i++) {
+    av_frame_make_writable(frame);
+    memset(frame->data[0], 24 + 16 * i, frame->linesize[0] * kSize);
+    memset(frame->data[1], 128, frame->linesize[1] * kSize / 2);
+    memset(frame->data[2], 128, frame->linesize[2] * kSize / 2);
+    frame->pts = i;
+    avcodec_send_frame(enc, frame);
+    write_packets();
+  }
+  avcodec_send_frame(enc, nullptr);
+  write_packets();
+  QVERIFY(av_write_trailer(fmt) >= 0);
+  av_frame_free(&frame);
+  av_packet_free(&pkt);
+  avcodec_free_context(&enc);
+  avio_closep(&fmt->pb);
+  avformat_free_context(fmt);
+}
+
+// The first video stream's start_time in seconds, -1 if the file can't be read or doesn't say
+double video_start_seconds(const QString& path) {
+  AVFormatContext* fmt = nullptr;
+  if (avformat_open_input(&fmt, path.toUtf8().constData(), nullptr, nullptr) < 0) return -1;
+  double start = -1;
+  if (avformat_find_stream_info(fmt, nullptr) >= 0) {
+    const int vi = av_find_best_stream(fmt, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    if (vi >= 0 && fmt->streams[vi]->start_time != AV_NOPTS_VALUE) {
+      start = fmt->streams[vi]->start_time * av_q2d(fmt->streams[vi]->time_base);
+    }
+  }
+  avformat_close_input(&fmt);
+  return start;
+}
+
+// Index of the frame in frames whose mean red is closest to the RGBA image's, -1 if there is none
+int closest_grey_frame(const QVector<QByteArray>& frames, const QByteArray& rgba) {
+  auto mean_red = [](const QByteArray& f) {
+    double sum = 0;
+    for (int i = 0; i < f.size(); i += 4) sum += uchar(f[i]);
+    return f.isEmpty() ? 0.0 : sum / (f.size() / 4);
+  };
+  const double target = mean_red(rgba);
+  int best = -1;
+  for (int i = 0; i < frames.size(); i++) {
+    if (best < 0 || qAbs(mean_red(frames[i]) - target) < qAbs(mean_red(frames[best]) - target)) best = i;
+  }
+  return best;
+}
+
 // Offset of the first top-level box of this type in an MP4/MOV file, -1 if there is none
 qint64 mp4_box_offset(const QByteArray& file, const char* type) {
   qint64 pos = 0;
@@ -1319,6 +1411,100 @@ class TestHeadlessRender : public QObject {
     delete surface;
     QVERIFY2(first_ok, "seconds past the proxy's end did not hold its last frame");
     QVERIFY2(second_ok, "a second frame past the proxy's end did not hold its last frame");
+  }
+
+  // Media whose video stream starts after 0 (MPEG-TS camera files, MP4s muxed audio first): clip frame N is the
+  // video's frame N, in the export and in the viewer. The target pts used to count from 0, so every frame came out
+  // late by the start offset, frame 0 held and the last ones never shown.
+  void videoStartOffsetKeepsFrames() {
+    constexpr int64_t kStart = 4500;  // 50 ms at 1/90000, a frame and a half at kFps: 2 frames late without the fix
+    constexpr long kViewerFrame = 5;
+    const QString video = dir_.filePath("start_offset.mp4");
+    write_offset_mp4(video, kSourceFrames, kStart);
+    if (QTest::currentTestFailed()) return;
+    const double start = video_start_seconds(video);
+    QVERIFY2(qAbs(start - 0.05) < 0.001, qPrintable(QString("video start_time %1 s").arg(start)));
+    const QString audio = dir_.filePath("start_offset_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("start_offset.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+    }
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kSourceFrames);
+
+    // Export: sequential decode, the queue serving most frames
+    ExportParams params;
+    params.filename = dir_.filePath("start_offset_out.mp4");
+    params.video_enabled = true;
+    params.video_codec = AV_CODEC_ID_MPEG4;
+    params.video_width = kSize;
+    params.video_height = kSize;
+    params.video_compression_type = COMPRESSION_TYPE_CBR;
+    params.video_bitrate = 2.0;
+    params.audio_enabled = false;
+    params.start_frame = 0;
+    params.end_frame = seq->getEndFrame();
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded out = decode_file(params.filename, true);
+    QVERIFY(out.ok);
+    QCOMPARE(long(out.video_frames), kClipOut);
+    QVector<int> matched;
+    QVector<int> expected;
+    for (int k = 0; k < out.video_frames; k++) {
+      matched.append(closest_grey_frame(src.rgba, out.rgba[k]));
+      expected.append(k);
+    }
+    QString shown;
+    for (int m : matched) shown += QString::number(m) + ' ';
+    qInfo("export frames show source frames: %s", qPrintable(shown));
+
+    // Viewer: a freshly opened clip seeks straight to the frame
+    QOffscreenSurface* surface = QRhiGles2InitParams::newFallbackSurface();
+    auto* rt = new RenderThread();
+    rt->setGlFallbackSurface(surface);
+    rt->start();
+    const QString fn = dir_.filePath("start_offset_viewer.png");
+    QFile::remove(fn);
+    seq->playhead = kViewerFrame;
+    rt->start_render(seq.get(), 1, fn);  // re-queued until the clip's texture is ready
+    const bool saved = QTest::qWaitFor([&] { return QFileInfo::exists(fn); }, 10000);
+    close_active_clips(seq.get());  // before the render thread drains the deferred RHI deletions on shutdown
+    rt->cancel();
+    delete rt;
+    delete surface;
+    QVERIFY(saved);
+    const QImage img = QImage(fn).convertToFormat(QImage::Format_RGBA8888);
+    const int viewer = closest_grey_frame(
+        src.rgba, QByteArray(reinterpret_cast<const char*>(img.constBits()), int(img.sizeInBytes())));
+    qInfo("viewer frame %ld shows source frame %d", kViewerFrame, viewer);
+
+    QCOMPARE(matched, expected);
+    QCOMPARE(viewer, int(kViewerFrame));
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
