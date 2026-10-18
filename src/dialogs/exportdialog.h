@@ -501,6 +501,7 @@ private:
    * @brief ComboBox for the exported video compression type
    */
   QComboBox* compressionTypeCombobox;
+  QLabel* compressionTypeLabel;  // hidden with the combo and the bitrate row for codecs without rate control
 
   /**
    * @brief Time value set when exporting begins to determine the total duration of the export

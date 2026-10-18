@@ -772,6 +772,14 @@ void ExportDialog::vencoder_changed(int) {
 
   const QString name = current_video_encoder();
   has_vencoder_info_ = !name.isEmpty() && amber::find_encoder_info(name, &vencoder_info_);
+  // ProRes has no rate control: prores, prores_aw and prores_ks never read the bit rate ExportThread sets (FFmpeg
+  // 8.0 and master sources), the profile sets the quality. CBA: only ProRes checked; the lossless and image codecs
+  // (PNG, TIFF, rawvideo, HuffYUV...) most likely ignore it too, add them here once checked in their encoder source.
+  const bool rate_control = vcodecCombobox->currentData().toInt() != AV_CODEC_ID_PRORES;
+  compressionTypeLabel->setVisible(rate_control);
+  compressionTypeCombobox->setVisible(rate_control);
+  videoBitrateLabel->setVisible(rate_control);
+  videobitrateSpinbox->setVisible(rate_control);
   rebuild_option_rows(videoGridLayout, kVideoOptionRow, videoGroupbox, has_vencoder_info_ ? &vencoder_info_ : nullptr,
                       video_option_rows_);
   fit_height();  // covers the encoder row too: vcodec_changed() always ends here
@@ -1082,7 +1090,8 @@ void ExportDialog::setup_ui() {
   framerateSpinbox->setValue(0);
   videoGridLayout->addWidget(framerateSpinbox, 4, 1, 1, 1);
 
-  videoGridLayout->addWidget(new QLabel(tr("Compression Type:"), this), 5, 0, 1, 1);
+  compressionTypeLabel = new QLabel(tr("Compression Type:"), this);
+  videoGridLayout->addWidget(compressionTypeLabel, 5, 0, 1, 1);
   compressionTypeCombobox = new QComboBox(videoGroupbox);
   videoGridLayout->addWidget(compressionTypeCombobox, 5, 1, 1, 1);
 
