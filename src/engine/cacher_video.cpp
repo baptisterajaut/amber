@@ -75,6 +75,8 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
 
     seeked_to_zero = (seek_ts == 0);
     avcodec_flush_buffers(codecCtx);
+    last_raw_video_pts_ = AV_NOPTS_VALUE;
+    skip_to_keyframe_ = kSeekSkipFrames;
     cacheVideoResetDeinterlacer();
     av_seek_frame(formatCtx, clip->media_stream_index(), seek_ts, AVSEEK_FLAG_BACKWARD);
 
@@ -104,11 +106,20 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
   return retrieve_code;
 }
 
+// Whether this pass may serve the request waiting now. One that came in while it ran (playhead_ moved on) waits for the
+// next pass (CacheVideoWorker() runs again) when it needs that exact frame: an export, a paused viewer. The pass used
+// to hand it its own queue's last frame, a frame or more early. Playback and scrubbing keep taking it: the nearest
+// frame decoded so far beats waiting while the decode is behind (the next pass may seek and re-decode a GOP).
+bool Cacher::passServesRequest() const {
+  if (pass_playhead_ == playhead_) return true;
+  return !clip->OpenedForExport() && (playback_speed_ != 0 || scrubbing_);
+}
+
 // ---------------------------------------------------------------------------
 // cacheVideoMaybeSetRetrieved
 // ---------------------------------------------------------------------------
 void Cacher::cacheVideoMaybeSetRetrieved(AVFrame* decoded_frame, int64_t target_pts, bool& seeked_to_zero) {
-  if (retrieved_frame != nullptr) return;
+  if (retrieved_frame != nullptr || !passServesRequest()) return;
 
   if (decoded_frame->pts == target_pts) {
     SetRetrievedFrame(decoded_frame);
@@ -307,7 +318,7 @@ static int64_t seek_landing_timestamp(AVFormatContext* formatCtx, int stream_ind
 // ---------------------------------------------------------------------------
 void Cacher::cacheVideoDynamicClip() {
   bool reversed = IsReversed();
-  int64_t target_pts = videoTargetPts();
+  int64_t target_pts = videoTargetPts(pass_playhead_);
   int64_t second_pts = seconds_to_timestamp(clip, 1);
 
   QueueStats stats = scan_queue(queue_, target_pts);
@@ -386,6 +397,7 @@ void Cacher::CacheVideoWorker() {
     return;
   }
 
+  pass_playhead_ = playhead_;
   WakeMainThread();
 
   if (clip->media_stream() != nullptr && clip->media_stream()->infinite_length) {
@@ -395,7 +407,7 @@ void Cacher::CacheVideoWorker() {
   }
 
   // If we couldn't find the exact target frame, fall back to the closest available frame
-  if (retrieved_frame == nullptr) {
+  if (retrieved_frame == nullptr && passServesRequest()) {
     if (!queue_.isEmpty()) {
       qDebug() << "Exact frame not found, using closest available frame from queue";
       SetRetrievedFrame(queue_.last());
@@ -492,6 +504,14 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
   return result;
 }
 
+static bool frame_is_key(const AVFrame* f) {
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
+  return (f->flags & AV_FRAME_FLAG_KEY) != 0;
+#else
+  return f->key_frame != 0;
+#endif
+}
+
 int Cacher::RetrieveFrameAndProcess(AVFrame** f) {
   if (!f) {
     qWarning() << "Cacher::RetrieveFrameAndProcess: output frame pointer is null";
@@ -513,6 +533,28 @@ int Cacher::RetrieveFrameAndProcess(AVFrame** f) {
     if (read_code >= 0) {
       // we retrieved a decoded video frame, which we will send to the AVFilter stack to convert to RGBA (with other
       // adjustments if necessary)
+
+      // After a seek, MPEG-4 Part 2 (in MPEG-PS/TS, which seek between keyframes) hands out the frames before the
+      // next keyframe decoded from the missing reference: grey. MPEG-2, H.264 and HEVC decoders hold those back.
+      // CBA: at most kSeekSkipFrames, then frames go through as before: a stream without keyframes (intra refresh)
+      // still decodes, a GOP longer than that shows its first frames grey. Raise it if such GOPs turn up.
+      if (skip_to_keyframe_ > 0) {
+        if (!frame_is_key(frame_)) {
+          skip_to_keyframe_--;
+          av_frame_unref(frame_);
+          continue;
+        }
+        skip_to_keyframe_ = 0;
+      }
+
+      // A frame whose packet had no pts of its own (MPEG-PS: one pts per packet, a packet can start several frames)
+      // has only the decoder's guess, and the last one out of the decoder not even that: the frame before's plus a
+      // frame. Without a timestamp the frame has no place in the queue and is dropped.
+      if (frame_->pts == AV_NOPTS_VALUE) frame_->pts = frame_->best_effort_timestamp;
+      if (frame_->pts == AV_NOPTS_VALUE && last_raw_video_pts_ != AV_NOPTS_VALUE && stream->avg_frame_rate.num > 0) {
+        frame_->pts = last_raw_video_pts_ + av_rescale_q(1, av_inv_q(stream->avg_frame_rate), stream->time_base);
+      }
+      last_raw_video_pts_ = frame_->pts;
 
       // On the first successful decode after (re)opening the filter graph, lock the buffersrc
       // to the actual frame layout. For software decoding this matches what we seeded from

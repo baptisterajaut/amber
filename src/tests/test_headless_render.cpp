@@ -191,6 +191,59 @@ QByteArray dc_wav(double seconds, double level) {
   return wav_from_pcm(pcm);
 }
 
+// wav's PCM (a wav_from_pcm() file) as audio-only MPEG-TS, SMPTE 302M (PCM, read back sample for sample): audio that
+// starts after 0, at 1.4 s as FFmpeg's own MPEG-TS muxing puts it, as a camera's MPEG-TS
+bool write_audio_ts(const QString& path, const QByteArray& wav) {
+  const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_S302M);
+  if (codec == nullptr) return false;
+  const QByteArray p = path.toUtf8();
+  AVFormatContext* fmt = nullptr;
+  if (avformat_alloc_output_context2(&fmt, nullptr, "mpegts", p.constData()) < 0) return false;
+  AVStream* st = avformat_new_stream(fmt, nullptr);
+  AVCodecContext* enc = avcodec_alloc_context3(codec);
+  enc->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
+  enc->sample_fmt = AV_SAMPLE_FMT_S16;
+  enc->sample_rate = kAudioRate;
+  av_channel_layout_default(&enc->ch_layout, 2);
+  enc->time_base = AVRational{1, kAudioRate};
+  bool ok = avcodec_open2(enc, codec, nullptr) >= 0 && avcodec_parameters_from_context(st->codecpar, enc) >= 0;
+  st->time_base = enc->time_base;
+  ok = ok && avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0 && avformat_write_header(fmt, nullptr) >= 0;
+  const QByteArray pcm = wav.mid(44);  // after wav_from_pcm()'s header
+  constexpr int kFrameSamples = 1024;
+  AVFrame* frame = av_frame_alloc();
+  AVPacket* pkt = av_packet_alloc();
+  auto write_packets = [&]() {
+    while (ok && avcodec_receive_packet(enc, pkt) >= 0) {
+      av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+      pkt->stream_index = st->index;
+      ok = av_interleaved_write_frame(fmt, pkt) >= 0;
+    }
+  };
+  for (int offset = 0; ok && offset < pcm.size(); offset += kFrameSamples * 4) {
+    frame->nb_samples = qMin(int(pcm.size()) - offset, kFrameSamples * 4) / 4;
+    frame->format = AV_SAMPLE_FMT_S16;
+    frame->sample_rate = kAudioRate;
+    av_channel_layout_default(&frame->ch_layout, 2);
+    ok = av_frame_get_buffer(frame, 0) >= 0;
+    if (!ok) break;
+    memcpy(frame->data[0], pcm.constData() + offset, frame->nb_samples * 4);
+    frame->pts = offset / 4 + qRound64(1.4 * kAudioRate);
+    ok = avcodec_send_frame(enc, frame) >= 0;
+    av_frame_unref(frame);
+    write_packets();
+  }
+  avcodec_send_frame(enc, nullptr);
+  write_packets();
+  if (ok) ok = av_write_trailer(fmt) >= 0;
+  av_frame_free(&frame);
+  av_packet_free(&pkt);
+  avcodec_free_context(&enc);
+  avio_closep(&fmt->pb);
+  avformat_free_context(fmt);
+  return ok;
+}
+
 // A NUT file of frames checkerboard frames (stream 0, raw YUV 4:2:0) and as long a stereo half-scale 440 Hz
 // sine (stream 1, S16 PCM at kAudioRate): one footage with both a video and an audio stream
 bool write_av_nut(const QString& path, int frames) {
@@ -340,7 +393,7 @@ QString nested_fixture(const QString& url, const QString& wav_a, const QString& 
 
 // Two sequences over one WAV: Forward plays it, Reversed plays it with the reverse flag (the test moves Forward's
 // in point to the span Reversed reads)
-QString reversed_fixture(const QString& url, const QString& wav) {
+QString reversed_fixture(const QString& url, const QString& wav, long out = kClipOut) {
   return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <version>%1</version>
@@ -369,7 +422,7 @@ QString reversed_fixture(const QString& url, const QString& wav) {
 </project>
 )")
       .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), wav.toHtmlEscaped(), QString::number(kSize),
-           QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(kClipOut));
+           QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(out));
 }
 
 // One clip on A1 over timeline [0, out), trimmed by clip_in, at a speed (no pitch correction), optionally reversed: a
@@ -563,16 +616,18 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
   return d;
 }
 
-// frames frames of uniform grey, frame i at luma 24 + 16 * i (still told apart after a codec round trip), as MPEG-4 in
-// MP4 at 1/90000 with the first frame at pts start: video that starts after 0, as a camera's MPEG-TS or an MP4 muxed
-// audio first
-void write_offset_mp4(const QString& path, int frames, int64_t start) {
+// frames frames of uniform grey, frame i at luma 24 + 16 * (i / frames_per_step) (still told apart after a codec round
+// trip), as MPEG-4 Part 2 (keyframes where the grey changes) at 1/90000 with the first frame at pts start: video that
+// starts after 0, as a camera's MPEG-TS or an MP4 muxed audio first. In MP4, or the container path's extension names
+void write_offset_mp4(const QString& path, int frames, int64_t start, int frames_per_step = 1) {
   const AVRational rate{int(kFps), 1};
   const QByteArray p = path.toUtf8();
   const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_MPEG4);
   QVERIFY(codec != nullptr);
   AVFormatContext* fmt = nullptr;
   QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
+  // A packet per frame in MPEG-PS, each with its pts, as a real recording's (see write_interlaced_video())
+  if (strcmp(fmt->oformat->name, "mpeg") == 0) fmt->packet_size = 64;
   AVStream* st = avformat_new_stream(fmt, nullptr);
   st->time_base = AVRational{1, 90000};
   AVCodecContext* enc = avcodec_alloc_context3(codec);
@@ -608,7 +663,7 @@ void write_offset_mp4(const QString& path, int frames, int64_t start) {
   QVERIFY(av_frame_get_buffer(frame, 0) >= 0);
   for (int i = 0; i < frames; i++) {
     av_frame_make_writable(frame);
-    memset(frame->data[0], 24 + 16 * i, frame->linesize[0] * kSize);
+    memset(frame->data[0], 24 + 16 * (i / frames_per_step), frame->linesize[0] * kSize);
     memset(frame->data[1], 128, frame->linesize[1] * kSize / 2);
     memset(frame->data[2], 128, frame->linesize[2] * kSize / 2);
     frame->pts = i;
@@ -628,7 +683,7 @@ void write_offset_mp4(const QString& path, int frames, int64_t start) {
 // frames frames of a flat colour, luma 24 + 16 * i under a non-neutral chroma (a dropped or swapped chroma plane
 // shows), as interlaced (top field first) video in the container path's extension names: MBAFF H.264 from libx264 by
 // default (mpeg2video in .mpg: MPEG-PS, whose video starts at 0.5 s)
-void write_interlaced_video(const QString& path, int frames, const char* encoder = "libx264") {
+void write_interlaced_video(const QString& path, int frames, const char* encoder = "libx264", int ps_packet_size = 64) {
   const AVRational rate{int(kFps), 1};
   const QByteArray p = path.toUtf8();
   const AVCodec* codec = avcodec_find_encoder_by_name(encoder);
@@ -636,8 +691,8 @@ void write_interlaced_video(const QString& path, int frames, const char* encoder
   AVFormatContext* fmt = nullptr;
   QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
   // MPEG-PS packs these tiny frames several to a 2048-byte packet, which carries one pts: small packets give every
-  // frame its own, as a real recording's frames have
-  if (strcmp(fmt->oformat->name, "mpeg") == 0) fmt->packet_size = 64;
+  // frame its own, as a real recording's frames have; larger ones leave a frame here and there without
+  if (strcmp(fmt->oformat->name, "mpeg") == 0) fmt->packet_size = ps_packet_size;
   AVStream* st = avformat_new_stream(fmt, nullptr);
   AVCodecContext* enc = avcodec_alloc_context3(codec);
   enc->width = kSize;
@@ -729,6 +784,21 @@ bool vaapi_decodes(const QString& path) {
   return hw;
 }
 
+// The first audio stream's start_time in seconds, -1 if the file can't be read or doesn't say
+double audio_start_seconds(const QString& path) {
+  AVFormatContext* fmt = nullptr;
+  if (avformat_open_input(&fmt, path.toUtf8().constData(), nullptr, nullptr) < 0) return -1;
+  double start = -1;
+  if (avformat_find_stream_info(fmt, nullptr) >= 0) {
+    const int ai = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+    if (ai >= 0 && fmt->streams[ai]->start_time != AV_NOPTS_VALUE) {
+      start = fmt->streams[ai]->start_time * av_q2d(fmt->streams[ai]->time_base);
+    }
+  }
+  avformat_close_input(&fmt);
+  return start;
+}
+
 // The first video stream's start_time in seconds, -1 if the file can't be read or doesn't say
 double video_start_seconds(const QString& path) {
   AVFormatContext* fmt = nullptr;
@@ -742,6 +812,24 @@ double video_start_seconds(const QString& path) {
   }
   avformat_close_input(&fmt);
   return start;
+}
+
+// The video packets' pts in path, AV_NOPTS_VALUE for those without one
+QVector<int64_t> video_packet_pts(const QString& path) {
+  QVector<int64_t> pts;
+  AVFormatContext* fmt = nullptr;
+  if (avformat_open_input(&fmt, path.toUtf8().constData(), nullptr, nullptr) < 0) return pts;
+  if (avformat_find_stream_info(fmt, nullptr) >= 0) {
+    const int vi = av_find_best_stream(fmt, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    AVPacket* pkt = av_packet_alloc();
+    while (vi >= 0 && av_read_frame(fmt, pkt) >= 0) {
+      if (pkt->stream_index == vi) pts.append(pkt->pts);
+      av_packet_unref(pkt);
+    }
+    av_packet_free(&pkt);
+  }
+  avformat_close_input(&fmt);
+  return pts;
 }
 
 // Index of the frame in frames whose mean red, green and blue is closest to the RGBA image's, -1 if there is none. All
@@ -1767,6 +1855,146 @@ class TestHeadlessRender : public QObject {
     QCOMPARE(viewer, int(kViewerFrame));
   }
 
+  // A frame asked while the cacher still fills its queue for the previous one is that frame, not the previous request's
+  // latest: the running pass served the new request with its own queue's last frame. A long upcoming queue keeps the
+  // first pass decoding (5 minutes of tiny frames) while the paused viewer (speed 0) asks for a frame far ahead.
+  void viewerGetsTheFrameItAsked() {
+    constexpr int kFrames = 9000;
+    constexpr int kStep = 700;  // frames per grey level: 13 levels over the file
+    constexpr long kFar = 8900;
+    const int saved_type = amber::CurrentConfig.upcoming_queue_type;
+    const double saved_size = amber::CurrentConfig.upcoming_queue_size;
+    const auto restore = qScopeGuard([saved_type, saved_size] {
+      amber::CurrentConfig.upcoming_queue_type = saved_type;
+      amber::CurrentConfig.upcoming_queue_size = saved_size;
+    });
+    amber::CurrentConfig.upcoming_queue_type = amber::FRAME_QUEUE_TYPE_SECONDS;
+    amber::CurrentConfig.upcoming_queue_size = 600;
+    const QString video = dir_.filePath("far_request.mp4");
+    write_offset_mp4(video, kFrames, 0, kStep);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("far_request_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("far_request.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio, QString(), kFrames).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+    }
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kFrames);
+
+    QOffscreenSurface* surface = QRhiGles2InitParams::newFallbackSurface();
+    auto* rt = new RenderThread();
+    rt->setGlFallbackSurface(surface);
+    rt->start();
+    const QString first = dir_.filePath("far_request_0.png");
+    const QString far = dir_.filePath("far_request_far.png");
+    seq->playhead = 0;
+    rt->start_render(seq.get(), 0, first);
+    const bool first_saved = QTest::qWaitFor([&] { return QFileInfo::exists(first); }, 10000);
+    seq->playhead = kFar;  // the first pass is still decoding towards the queue's end
+    rt->start_render(seq.get(), 0, far);
+    const bool far_saved = QTest::qWaitFor([&] { return QFileInfo::exists(far); }, 10000);
+    close_active_clips(seq.get());  // before the render thread drains the deferred RHI deletions on shutdown
+    rt->cancel();
+    delete rt;
+    delete surface;
+    QVERIFY(first_saved);
+    QVERIFY(far_saved);
+    const QImage img = QImage(far).convertToFormat(QImage::Format_RGBA8888);
+    const int shown = closest_grey_frame(
+        src.rgba, QByteArray(reinterpret_cast<const char*>(img.constBits()), int(img.sizeInBytes())));
+    qInfo("viewer frame %ld shows grey level %d (source frame %d), expected level %ld", kFar, shown / kStep, shown,
+          kFar / kStep);
+    QCOMPARE(shown / kStep, int(kFar / kStep));
+  }
+
+  // A seek into MPEG-4 Part 2 in MPEG-PS (no index: the seek lands between keyframes) starts decoding on frames whose
+  // reference is missing; that decoder hands them out anyway, grey, and the export opened on them. A clip trimmed into
+  // the middle of a GOP seeks there on its first frame.
+  void seekIntoGopStartsOnKeyframe() {
+    constexpr int kFrames = 48;
+    constexpr int kStep = 4;     // frames per grey level: 12 levels
+    constexpr long kClipIn = 6;  // keyframes where the grey changes: 4, 8...
+    const QString video = dir_.filePath("mpeg4.mpg");
+    write_offset_mp4(video, kFrames, 0, kStep);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("mpeg4_ps_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("mpeg4_ps.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) c->set_clip_in(kClipIn);
+    }
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kFrames);
+
+    const ExportParams params = video_params(dir_.filePath("mpeg4_ps_out.mp4"), seq.get(), AV_CODEC_ID_MPEG4, QString(),
+                                             COMPRESSION_TYPE_CBR, 2.0);
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded out = decode_file(params.filename, true);
+    QVERIFY(out.ok);
+    QCOMPARE(long(out.video_frames), kClipOut);
+    QVector<int> levels;
+    QVector<int> expected;
+    for (int k = 0; k < out.video_frames; k++) {
+      levels.append(closest_grey_frame(src.rgba, out.rgba[k]) / kStep);
+      expected.append(int((kClipIn + k) / kStep));
+    }
+    QString shown;
+    for (int l : levels) shown += QString::number(l) + ' ';
+    qInfo("export frames show grey levels: %s", qPrintable(shown));
+    QCOMPARE(levels, expected);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+  }
+
   // Interlaced video decoded in hardware: the VAAPI transfer hands NV12 to a filter link negotiated from the stream's
   // yuv420p, and yadif, which has no NV12, read the missing third plane and crashed the editor on open. Its export
   // completes and matches the software decode's frame for frame.
@@ -2009,21 +2237,33 @@ class TestHeadlessRender : public QObject {
   // clip whose video starts after 0 (MPEG-PS, MPEG-TS) its first frames as whatever the repeated seeks found. The
   // MPEG-PS clip's first seek lands past its first frame and seeks again: yadif kept the frames from before, and the
   // export opened on one of them. The clip runs to the media's end: yadif lets a frame out once it has the next one,
-  // and held the last one back.
+  // and held the last one back. MPEG-PS carries a pts per packet, not per frame: in larger packets a frame starting
+  // after another one gets none of its own, the decoder only a best_effort_timestamp, and the cacher dropped it (the
+  // export showed the frame before in its place); FFmpeg's length estimate skips such packets, and the last frames fell
+  // past the footage's length (black).
   void interlacedExportKeepsFrames_data() {
     QTest::addColumn<QString>("encoder");
     QTest::addColumn<QString>("file");
-    QTest::newRow("h264-mp4") << "libx264" << "frames_interlaced.mp4";
-    QTest::newRow("mpeg2-ps") << "mpeg2video" << "frames_interlaced.mpg";
+    QTest::addColumn<int>("ps_packet_size");
+    QTest::newRow("h264-mp4") << "libx264" << "frames_interlaced.mp4" << 0;
+    QTest::newRow("mpeg2-ps") << "mpeg2video" << "frames_interlaced.mpg" << 64;
+    QTest::newRow("mpeg2-ps-frames-without-pts") << "mpeg2video" << "frames_without_pts.mpg" << 600;
   }
 
   void interlacedExportKeepsFrames() {
     QFETCH(QString, encoder);
     QFETCH(QString, file);
+    QFETCH(int, ps_packet_size);
     if (avcodec_find_encoder_by_name(qPrintable(encoder)) == nullptr) QSKIP("encoder not in this FFmpeg build");
     const QString video = dir_.filePath(file);
-    write_interlaced_video(video, kSourceFrames, qPrintable(encoder));
+    write_interlaced_video(video, kSourceFrames, qPrintable(encoder), ps_packet_size);
     if (QTest::currentTestFailed()) return;
+    if (ps_packet_size > 64) {
+      // Packets without a pts of their own
+      const QVector<int64_t> pts = video_packet_pts(video);
+      QCOMPARE(pts.size(), kSourceFrames);
+      QVERIFY(pts.count(AV_NOPTS_VALUE) > 0);
+    }
     const QString audio = dir_.filePath(file + "_tone.wav");
     {
       QFile f(audio);
@@ -2181,9 +2421,27 @@ class TestHeadlessRender : public QObject {
 
   // A reversed audio clip must export as the time-reversed forward export: the reverse path decodes a span, flips it
   // and must hand the whole flipped buffer to the mixer, not the last raw frame it decoded
+  // Audio starting after 0 too (MPEG-TS): the reverse cutoff compared the decoded pts with the clip time, and a
+  // reversed clip's first start_time seconds came out silent
+  void reversedAudioMatchesForward_data() {
+    QTest::addColumn<bool>("mpeg_ts");
+    QTest::newRow("wav") << false;
+    QTest::newRow("mpeg-ts") << true;
+  }
+
   void reversedAudioMatchesForward() {
-    const QString wav = dir_.filePath("ramp.wav");
-    {
+    QFETCH(bool, mpeg_ts);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();  // find_sequence() below would find the previous row's
+    const QString wav = dir_.filePath(mpeg_ts ? "ramp.ts" : "ramp.wav");
+    // The TS clip spans the media's last 3 s, its start_time and more
+    const long out = mpeg_ts ? long(3 * kFps) : kClipOut;
+    if (mpeg_ts) {
+      if (avcodec_find_encoder(AV_CODEC_ID_S302M) == nullptr) QSKIP("no SMPTE 302M encoder in this FFmpeg build");
+      QVERIFY(write_audio_ts(wav, sine_wav(440.0, 0.5, true, 4.0)));
+      QVERIFY2(audio_start_seconds(wav) > 1.0,
+               qPrintable(QString("audio start_time %1 s").arg(audio_start_seconds(wav))));
+    } else {
       QFile f(wav);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
       f.write(sine_wav(440.0, 0.5, true));
@@ -2192,7 +2450,7 @@ class TestHeadlessRender : public QObject {
     {
       QFile f(project);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(reversed_fixture(project, wav).toUtf8());
+      f.write(reversed_fixture(project, wav, out).toUtf8());
     }
 
     bool succeeded = false;
@@ -2225,11 +2483,11 @@ class TestHeadlessRender : public QObject {
     QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
     QVERIFY(footage->ready);
     QVERIFY(!footage->invalid);
-    QVERIFY(rev_clip->media_length() > kClipOut);
+    QVERIFY(rev_clip->media_length() > out);
     // A reversed clip plays from the media's last frame down (playhead_to_clip_seconds: media_length - frame - 1), so
-    // timeline [0, kClipOut) reads source frames [media_length - 1 - kClipOut, media_length - 1) backwards: start the
+    // timeline [0, out) reads source frames [media_length - 1 - out, media_length - 1) backwards: start the
     // forward clip there so both exports cover the same source span
-    fwd_clip->set_clip_in(rev_clip->media_length() - 1 - kClipOut);
+    fwd_clip->set_clip_in(rev_clip->media_length() - 1 - out);
 
     auto export_audio = [this](Sequence* seq, const QString& name, QString& path) -> QString {
       ExportParams params{};
@@ -2261,7 +2519,7 @@ class TestHeadlessRender : public QObject {
 
     // Over the clip's span, the reversed export read forwards must match the forward export read backwards, up to a
     // few samples of alignment (where each path rounds the span's ends): take the best lag, compare sample by sample
-    const int span = int(qRound64(kClipOut / kFps * kAudioRate));
+    const int span = int(qRound64(out / kFps * kAudioRate));
     QVERIFY(fwd.audio_left.size() >= span);
     QVERIFY(rev.audio_left.size() >= span);
     constexpr int kMaxLag = 8;

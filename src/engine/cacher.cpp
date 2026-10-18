@@ -486,6 +486,7 @@ void Cacher::OpenWorker() {
   queue_.lock();
   video_end_pts_ = AV_NOPTS_VALUE;
   latest_decoded_pts_ = AV_NOPTS_VALUE;
+  last_raw_video_pts_ = AV_NOPTS_VALUE;
   queue_.unlock();
 
   if (clip->media() == nullptr) {
@@ -627,9 +628,9 @@ void Cacher::Open() {
 // The playhead's pts in the video stream, clamped to the media's real end. Clip time 0 is the stream's first frame:
 // a stream starting after 0 (MPEG-TS, an MP4 muxed audio first) is offset by its start_time, as the audio path does.
 // A negative or unknown start_time counts from 0.
-int64_t Cacher::videoTargetPts() const {
+int64_t Cacher::videoTargetPts(long playhead) const {
   const int64_t start = (stream != nullptr) ? qMax(int64_t(0), stream->start_time) : 0;
-  return clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)) + start);
+  return clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead)) + start);
 }
 
 // ---------------------------------------------------------------------------
@@ -671,8 +672,8 @@ bool Cacher::cacheTryQueueHit() {
   queue_.lock();
   retrieved_frame = nullptr;
   // Audio clips keep the bare clip-time pts: their queue holds decode buffers, not frames to serve
-  int64_t target_pts =
-      (clip->track() < 0) ? videoTargetPts() : seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
+  int64_t target_pts = (clip->track() < 0) ? videoTargetPts(playhead_)
+                                           : seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_));
   bool found = cacheFindFrameInQueue(target_pts);
   queue_.unlock();
   retrieve_lock_.unlock();
