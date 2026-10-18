@@ -88,6 +88,11 @@ if(NOFREI0R)
   list(APPEND AMBER_DEFINITIONS -DNOFREI0R)
 endif()
 
+option(NOLADSPA "Disable LADSPA audio plugin support" OFF)
+if(NOLADSPA)
+  list(APPEND AMBER_DEFINITIONS -DNOLADSPA)
+endif()
+
 if(AMBER_TARGET_WINDOWS)
   find_package(OpenColorIO)
   if(OPENCOLORIO_FOUND)
@@ -162,6 +167,7 @@ add_library(amber-engine OBJECT
   effects/internal/fillleftrighteffect.cpp effects/internal/fillleftrighteffect.h
   effects/internal/frei0reffect.cpp effects/internal/frei0reffect.h
   effects/internal/gradienteffect.cpp effects/internal/gradienteffect.h
+  effects/internal/ladspaeffect.cpp effects/internal/ladspaeffect.h
   effects/internal/limitereffect.cpp effects/internal/limitereffect.h
   effects/internal/linearfadetransition.cpp effects/internal/linearfadetransition.h
   effects/internal/logarithmicfadetransition.cpp effects/internal/logarithmicfadetransition.h
@@ -209,6 +215,7 @@ add_library(amber-engine OBJECT
   global/debug.cpp global/debug.h
   global/projectio.cpp global/projectio.h
   # other
+  include/ladspa.h
   include/vestige.h
   timeline/mediaimportdata.cpp timeline/mediaimportdata.h
 )

@@ -86,7 +86,7 @@ void parse_effect_into_clip(QXmlStreamReader& stream, Clip* c) {
     if (attr.name() == QLatin1String("name")) effect_name = attr.value().toString();
     else if (attr.name() == QLatin1String("enabled")) effect_enabled = (attr.value() == QLatin1String("1"));
   }
-  const EffectMeta* meta = effect_name.isEmpty() ? nullptr : get_meta_from_name(effect_name);
+  const EffectMeta* meta = get_meta_from_attributes(stream.attributes());
   if (meta == nullptr) {
     EffectPtr ve(new VoidEffect(c, effect_name));
     ve->SetEnabled(effect_enabled);
@@ -268,13 +268,11 @@ bool deserialize_clipboard_from_xml(const QByteArray& xml, QVector<MediaPtr>& im
       }
       clipboard.append(c);
     } else if (type == CLIPBOARD_TYPE_EFFECT && stream.name() == QLatin1String("effect")) {
-      QString effect_name;
       bool effect_enabled = true;
       for (const auto& attr : stream.attributes()) {
-        if (attr.name() == QLatin1String("name")) effect_name = attr.value().toString();
-        else if (attr.name() == QLatin1String("enabled")) effect_enabled = (attr.value() == QLatin1String("1"));
+        if (attr.name() == QLatin1String("enabled")) effect_enabled = (attr.value() == QLatin1String("1"));
       }
-      const EffectMeta* meta = effect_name.isEmpty() ? nullptr : get_meta_from_name(effect_name);
+      const EffectMeta* meta = get_meta_from_attributes(stream.attributes());
       if (meta == nullptr) {
         // Skip effects whose meta isn't registered in this process — would deserialize as a void
         // effect but VoidEffect needs a Clip* parent. Effects in the clipboard live unparented;

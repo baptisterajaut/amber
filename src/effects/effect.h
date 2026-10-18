@@ -53,6 +53,9 @@ struct EffectMeta {
   int internal;
   int type;
   int subtype;
+  // LADSPA: the descriptor's index in its library (path/filename) and its UniqueID
+  int plugin_index = -1;
+  unsigned long plugin_id = 0;
 };
 extern std::deque<EffectMeta> effects;  // deque: push_back keeps EffectMeta* (Effect::meta, menu data) valid
 
@@ -93,6 +96,7 @@ enum EffectInternal : uint8_t {
   EFFECT_INTERNAL_DELAY,
   EFFECT_INTERNAL_REVERB,
   EFFECT_INTERNAL_CHORUS,
+  EFFECT_INTERNAL_LADSPA,
   EFFECT_INTERNAL_COUNT
 };
 
@@ -133,6 +137,14 @@ struct GLTextureCoords {
 };
 
 const EffectMeta* get_meta_from_name(const QString& input);
+// The meta a saved <effect> element refers to. A LADSPA effect is found by its ladspa_id attribute (the plugin's
+// UniqueID: its displayed name gets a " (<UniqueID>)" suffix or loses it as same-named plugins come and go); an id that
+// isn't installed finds nothing (Missing Effect), never another plugin with that name. Everything else, and a LADSPA
+// effect saved without the id, is found by name as get_meta_from_name() does.
+const EffectMeta* find_effect_meta(const std::deque<EffectMeta>& list, const QString& saved_name,
+                                   unsigned long ladspa_id);
+// find_effect_meta() over the registered effects, with the element's name and ladspa_id attributes
+const EffectMeta* get_meta_from_attributes(const QXmlStreamAttributes& attrs);
 
 qint16 mix_audio_sample(qint16 a, qint16 b);
 

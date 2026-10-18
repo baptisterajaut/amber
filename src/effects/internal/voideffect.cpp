@@ -51,6 +51,7 @@ EffectPtr VoidEffect::copy(Clip* c) {
 
 void VoidEffect::load(QXmlStreamReader &stream) {
   QString tag = stream.name().toString();
+  ladspa_id_ = stream.attributes().value(QLatin1String("ladspa_id")).toString();
 
   QXmlStreamWriter writer(&bytes);
 
@@ -77,6 +78,7 @@ void VoidEffect::save(QXmlStreamWriter &stream) {
   if (!name.isEmpty()) {
     stream.writeAttribute("name", name);
     stream.writeAttribute("enabled", QString::number(IsEnabled()));
+    if (!ladspa_id_.isEmpty()) stream.writeAttribute("ladspa_id", ladspa_id_);
 
     // force xml writer to expand <effect> tag, ignored when loading
     stream.writeStartElement("void");

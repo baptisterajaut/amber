@@ -75,4 +75,10 @@ bool frei0r_effects_visible();
 /// project is cleared (new project, before each open).
 void set_project_uses_frei0r(bool uses);
 
+#ifndef NOLADSPA
+/// Registers the plugins amber::ladspa::scan() finds in amber::ladspa::search_paths(). Called by EffectInit after
+/// Frei0r; tests call it directly.
+void load_ladspa_effects();
+#endif
+
 #endif // EFFECTLOADERS_H

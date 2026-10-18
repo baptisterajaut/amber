@@ -15,6 +15,7 @@ QWidget* DoubleFieldWidget::CreateWidget(QWidget* existing) {
 
   if (existing == nullptr) {
     ls = new LabelSlider();
+    ls->SetDecimalPlaces(df->GetDecimalPlaces());  // before SetDefault, which draws the text
 
     if (!qIsNaN(df->GetMinimum())) {
       ls->SetMinimum(df->GetMinimum());

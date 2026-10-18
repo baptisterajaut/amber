@@ -39,6 +39,7 @@ public:
   void save(QXmlStreamWriter &stream) override;
 private:
   QByteArray bytes;
+  QString ladspa_id_;  // written back so a reinstalled LADSPA plugin is found again (Effect::save)
   EffectMeta void_meta;
 };
 

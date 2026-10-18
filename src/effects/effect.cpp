@@ -65,6 +65,7 @@
 #include "effects/internal/fillleftrighteffect.h"
 #include "effects/internal/frei0reffect.h"
 #include "effects/internal/gradienteffect.h"
+#include "effects/internal/ladspaeffect.h"
 #include "effects/internal/limitereffect.h"
 #include "effects/internal/paneffect.h"
 #include "effects/internal/parametriceqeffect.h"
@@ -366,6 +367,10 @@ static EffectPtr CreateInternalEffect(Clip* c, const EffectMeta* em) {
       return std::make_shared<ReverbEffect>(c, em);
     case EFFECT_INTERNAL_CHORUS:
       return std::make_shared<ChorusEffect>(c, em);
+#ifndef NOLADSPA
+    case EFFECT_INTERNAL_LADSPA:
+      return std::make_shared<LadspaEffect>(c, em);
+#endif
     default:
       return nullptr;
   }
@@ -830,6 +835,8 @@ void Effect::custom_load(QXmlStreamReader&) {}
 void Effect::save(QXmlStreamWriter& stream) {
   stream.writeAttribute("name", meta->category + "/" + meta->name);
   stream.writeAttribute("enabled", QString::number(IsEnabled()));
+  // The name of a LADSPA effect depends on the installed plugins (" (<UniqueID>)" on a collision): its id doesn't
+  if (meta->internal == EFFECT_INTERNAL_LADSPA) stream.writeAttribute("ladspa_id", QString::number(meta->plugin_id));
 
   for (auto row : rows) {
     if (row->IsSavable()) {
@@ -883,7 +890,7 @@ void Effect::load_from_string(const QByteArray& s) {
       const QXmlStreamAttributes& attributes = stream.attributes();
       for (const auto& attr : attributes) {
         if (attr.name() == QLatin1String("name")) {
-          if (get_meta_from_name(attr.value().toString()) == meta) {
+          if (get_meta_from_attributes(attributes) == meta) {
             // pass off to standard loading function
             load(stream);
           } else {
@@ -1262,20 +1269,37 @@ void Effect::delete_texture() {
   superimposeTex_ = nullptr;
 }
 
-const EffectMeta* get_meta_from_name(const QString& input) {
-  int split_index = input.indexOf('/');
+const EffectMeta* get_meta_from_name(const QString& input) { return find_effect_meta(effects, input, 0); }
+
+const EffectMeta* find_effect_meta(const std::deque<EffectMeta>& list, const QString& saved_name,
+                                   unsigned long ladspa_id) {
+  if (ladspa_id != 0) {
+    for (const auto& effect : list) {
+      if (effect.internal == EFFECT_INTERNAL_LADSPA && effect.plugin_id == ladspa_id) return &effect;
+    }
+    return nullptr;
+  }
+
+  int split_index = saved_name.indexOf('/');
   QString category;
   if (split_index > -1) {
-    category = input.left(split_index);
+    category = saved_name.left(split_index);
   }
-  QString name = input.mid(split_index + 1);
+  QString name = saved_name.mid(split_index + 1);
 
-  for (const auto& effect : effects) {
+  for (const auto& effect : list) {
     if (effect.name == name && (effect.category == category || category.isEmpty())) {
       return &effect;
     }
   }
   return nullptr;
+}
+
+const EffectMeta* get_meta_from_attributes(const QXmlStreamAttributes& attrs) {
+  const QString name = attrs.value(QLatin1String("name")).toString();
+  const unsigned long ladspa_id = attrs.value(QLatin1String("ladspa_id")).toULong();
+  if (name.isEmpty() && ladspa_id == 0) return nullptr;
+  return find_effect_meta(effects, name, ladspa_id);
 }
 
 qint16 mix_audio_sample(qint16 a, qint16 b) {

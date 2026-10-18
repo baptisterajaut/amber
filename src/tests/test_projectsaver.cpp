@@ -12,6 +12,7 @@
 #include "effects/effect.h"
 #include "effects/effectfield.h"
 #include "effects/effectrow.h"
+#include "effects/internal/ladspaeffect.h"
 #include "effects/transition.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
@@ -410,6 +411,92 @@ class TestProjectSaver : public QObject {
     QVERIFY(f.open(QFile::ReadOnly));
     QVERIFY(f.readAll().startsWith("<?xml"));
   }
+
+#ifndef NOLADSPA
+  // A LADSPA effect saves as "LADSPA/<plugin name>" with its control ports as fields "<port index>": a project with
+  // amp_mono's Gain keyframed reloads the same effect with the same keyframes and saves the same bytes
+  void ladspaEffectRoundTrip() {
+    const EffectMeta* meta = nullptr;
+    for (const EffectMeta& em : effects) {
+      if (em.internal == EFFECT_INTERNAL_LADSPA && em.plugin_id == 1048) meta = &em;
+    }
+    if (meta == nullptr) {
+      for (const EffectMeta& em : amber::ladspa::scan(amber::ladspa::search_paths())) {
+        if (em.plugin_id == 1048) {
+          effects.push_back(em);
+          meta = &effects.back();
+        }
+      }
+    }
+    if (meta == nullptr) QSKIP("amp_mono (1048, LADSPA SDK amp.so) not installed");
+    const QString saved_name = "LADSPA/" + meta->name;
+    QCOMPARE(get_meta_from_name(saved_name), meta);
+
+    reset_project();
+    const QString footage = QStringLiteral(SOURCE_DIR "/tests/fixtures/t1_yuv_input.mp4");
+    const QString fixture_path = dir_.filePath("ladspa.ove");
+    {
+      QFile f(fixture_path);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(QString(R"(<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <version>%1</version>
+    <url>%2</url>
+    <media>
+        <footage id="1" folder="0" name="clip" url="%3"/>
+    </media>
+    <sequences>
+        <sequence id="1" folder="0" name="Inner" width="64" height="64" framerate="30" afreq="48000" alayout="3"
+                  open="1">
+            <clip id="0" enabled="1" name="amp" clipin="0" in="0" out="30" track="0" r="128" g="192" b="128"
+                  autoscale="1" speed="1" maintainpitch="0" reverse="0">
+                <linked></linked>
+                <effect name="%4" enabled="1">
+                    <row><field id="0" value="1"><key value="1" frame="0" type="0" prehx="0" prehy="0" posthx="0" posthy="0"/><key value="0.5" frame="30" type="0" prehx="0" prehy="0" posthx="0" posthy="0"/></field></row>
+                </effect>
+            </clip>
+        </sequence>
+    </sequences>
+</project>
+)")
+                  .arg(QString::number(amber::kSaveVersion), fixture_path.toHtmlEscaped(), footage.toHtmlEscaped(),
+                       saved_name.toHtmlEscaped())
+                  .toUtf8());
+    }
+    auto check = [&]() {
+      ClipPtr clip = inner_clip("amp");
+      QVERIFY(clip != nullptr);
+      QCOMPARE(clip->effects.size(), 1);
+      Effect* e = clip->effects.at(0).get();
+      QCOMPARE(e->meta, meta);
+      QCOMPARE(e->row_count(), 1);
+      EffectField* gain = field_by_id(e, "0");
+      QVERIFY(gain != nullptr);
+      QCOMPARE(gain->keyframes.size(), 2);
+      QCOMPARE(gain->keyframes.at(1).time, 30L);
+      QCOMPARE(gain->keyframes.at(1).data.toDouble(), 0.5);
+      QCOMPARE(gain->GetValueAt(0.5).toDouble(), 0.75);  // halfway between the keys
+    };
+    QVERIFY(load(fixture_path));
+    check();
+    if (QTest::currentTestFailed()) return;
+    const QString a = dir_.filePath("ladspa_a.ove");
+    const QString b = dir_.filePath("ladspa_b.ove");
+    QVERIFY(amber::save_project_file(a, a));
+    reset_project();
+    QVERIFY(load(a));
+    check();
+    if (QTest::currentTestFailed()) return;
+    QVERIFY(amber::save_project_file(b, a));
+    QFile fa(a), fb(b);
+    QVERIFY(fa.open(QFile::ReadOnly));
+    QVERIFY(fb.open(QFile::ReadOnly));
+    const QByteArray ba = fa.readAll(), bb = fb.readAll();
+    QVERIFY2(ba == bb, qPrintable(first_difference(ba, bb)));
+    // Loaded by name (the fixture has no id), saved with the plugin's UniqueID
+    QVERIFY(ba.contains(QString(R"(<effect name="%1" enabled="1" ladspa_id="1048">)").arg(saved_name).toUtf8()));
+  }
+#endif
 };
 
 // TextEffect's FontField queries QFontDatabase, which needs a QGuiApplication (same main as the GPU tests)

@@ -88,7 +88,7 @@ QVector<EffectPtr> LoadEffectPreset(const QString& path, Clip* parent, int* miss
     }
     const QXmlStreamAttributes attrs = stream.attributes();
     const QString effect_name = attrs.value("name").toString();
-    const EffectMeta* meta = effect_name.isEmpty() ? nullptr : get_meta_from_name(effect_name);
+    const EffectMeta* meta = effect_name.isEmpty() ? nullptr : get_meta_from_attributes(attrs);
     EffectPtr e = (meta != nullptr && meta->type == EFFECT_TYPE_EFFECT) ? Effect::Create(parent, meta) : nullptr;
     if (e == nullptr) {
       (*missing)++;
