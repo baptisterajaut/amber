@@ -28,6 +28,7 @@ Amber 2.0 is pre-alpha. The preview build is rebuilt from the `2.0.x` branch and
 - **Save As** proposes the current file name, or a timestamped name for a project that was never saved.
 - **Re-open the last project on startup**, in Preferences > Behavior (off by default).
 - **Middle-click edge scrolling** in the timeline, in Preferences > Behavior (off by default; middle-drag still pans).
+- **Markers with duration**: a marker can mark a section instead of a single frame, drawn as a coloured band in the rulers and on clips. Drag the band's end to change its length, Alt-drag a marker to stretch one out, or type a Duration in Marker Properties. Range ends snap like markers. A project opened in 1.x keeps the markers but loses their durations.
 - **Linked clips move across tracks together**: dragging a video clip up to V2 takes its linked audio down to A2, and dragging the audio down takes the video up, as in other editors. This applies to every selected clip on the other side, linked or not. When one of them is already next to the video/audio boundary and can't go further, the drag only moves the clips in time. Alt-click still selects a clip without its links.
 - **Thinner tracks**: tracks can shrink to 15 px instead of 30 (#73).
 - **Timeline ruler**: timecode labels no longer overlap, and dragging a marker to the edge scrolls the view.

@@ -91,7 +91,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 - Layout presets (Default, 3-Point Editing, Color)
 - ~~Color labels on media in project panel~~ (shipped in v1.7.0)
 - Proxy toggle — done in 2.0: Use Proxies (on by default), in the viewer's preview resolution menu and in View (keymap id `useproxies`, no default shortcut). Off, every clip whose footage has a proxy switches to the original file, live, during playback too, without regenerating anything; on, back to the proxy. Export always decodes the original; Save Frame follows the viewer. `Clip::Open()` latches the setting next to the export mode, and `NeedsCacherReconfigure()` reopens a proxied clip whose latch no longer matches (`amber-engine-tests`, `viewerFollowsUseProxies` in `amber-test-headless-render`)
-- Markers with duration — range markers with in/out points, Premiere-style section marking (#15)
+- Markers with duration — done in 2.0: a marker can span a section, drawn as a band in the rulers and on clips. Drag its end tick to resize it, Alt-drag a point marker to give it a duration, or set Duration in Marker Properties. Range ends are snap points. Saved as a `duration` attribute that 1.x ignores. (#15)
 - Effect presets save/load — serialize effect parameters, apply saved presets to clips (#15)
 
 ### Rendering pipeline optimizations
