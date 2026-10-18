@@ -54,6 +54,14 @@ int64_t Cacher::cacheVideoLastDecodable(int64_t seek_ts) {
   return AV_NOPTS_VALUE;
 }
 
+// The playhead's pts in the video stream, clamped to the media's real end. Clip time 0 is the stream's first frame:
+// a stream starting after 0 (MPEG-TS, an MP4 muxed audio first) is offset by its start_time, as the audio path does.
+// A negative or unknown start_time counts from 0.
+int64_t Cacher::videoTargetPts() const {
+  const int64_t start = (stream != nullptr) ? qMax(int64_t(0), stream->start_time) : 0;
+  return clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)) + start);
+}
+
 void Cacher::CacheVideoWorker() {
   // Skip video caching if filter graph failed to initialize
   if (filter_graph == nullptr) {
@@ -99,7 +107,7 @@ void Cacher::CacheVideoWorker() {
     bool reversed = IsReversed();
 
     // get the timestamp we want in terms of the media's timebase (a target past the media's real end is its last frame)
-    int64_t target_pts = clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)));
+    int64_t target_pts = videoTargetPts();
 
     // get the value of one second in terms of the media's timebase
     int64_t second_pts = seconds_to_timestamp(clip, 1); // FIXME: possibly magic number?
