@@ -76,6 +76,7 @@ int Cacher::cacheVideoSeekToTarget(int64_t target_pts, int64_t second_pts, AVFra
     seeked_to_zero = (seek_ts == 0);
     avcodec_flush_buffers(codecCtx);
     last_raw_video_pts_ = AV_NOPTS_VALUE;
+    skip_to_keyframe_ = kSeekSkipFrames;
     cacheVideoResetDeinterlacer();
     av_seek_frame(formatCtx, clip->media_stream_index(), seek_ts, AVSEEK_FLAG_BACKWARD);
 
@@ -503,6 +504,14 @@ int Cacher::RetrieveFrameFromDecoder(AVFrame* f) {
   return result;
 }
 
+static bool frame_is_key(const AVFrame* f) {
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(58, 29, 100)
+  return (f->flags & AV_FRAME_FLAG_KEY) != 0;
+#else
+  return f->key_frame != 0;
+#endif
+}
+
 int Cacher::RetrieveFrameAndProcess(AVFrame** f) {
   if (!f) {
     qWarning() << "Cacher::RetrieveFrameAndProcess: output frame pointer is null";
@@ -524,6 +533,19 @@ int Cacher::RetrieveFrameAndProcess(AVFrame** f) {
     if (read_code >= 0) {
       // we retrieved a decoded video frame, which we will send to the AVFilter stack to convert to RGBA (with other
       // adjustments if necessary)
+
+      // After a seek, MPEG-4 Part 2 (in MPEG-PS/TS, which seek between keyframes) hands out the frames before the
+      // next keyframe decoded from the missing reference: grey. MPEG-2, H.264 and HEVC decoders hold those back.
+      // CBA: at most kSeekSkipFrames, then frames go through as before: a stream without keyframes (intra refresh)
+      // still decodes, a GOP longer than that shows its first frames grey. Raise it if such GOPs turn up.
+      if (skip_to_keyframe_ > 0) {
+        if (!frame_is_key(frame_)) {
+          skip_to_keyframe_--;
+          av_frame_unref(frame_);
+          continue;
+        }
+        skip_to_keyframe_ = 0;
+      }
 
       // A frame whose packet had no pts of its own (MPEG-PS: one pts per packet, a packet can start several frames)
       // has only the decoder's guess, and the last one out of the decoder not even that: the frame before's plus a

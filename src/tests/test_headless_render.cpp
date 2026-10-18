@@ -563,8 +563,8 @@ Decoded decode_file(const QString& path, bool keep_frames = false) {
 }
 
 // frames frames of uniform grey, frame i at luma 24 + 16 * (i / frames_per_step) (still told apart after a codec round
-// trip), as MPEG-4 in MP4 at 1/90000 with the first frame at pts start: video that starts after 0, as a camera's
-// MPEG-TS or an MP4 muxed audio first
+// trip), as MPEG-4 Part 2 (keyframes where the grey changes) at 1/90000 with the first frame at pts start: video that
+// starts after 0, as a camera's MPEG-TS or an MP4 muxed audio first. In MP4, or the container path's extension names
 void write_offset_mp4(const QString& path, int frames, int64_t start, int frames_per_step = 1) {
   const AVRational rate{int(kFps), 1};
   const QByteArray p = path.toUtf8();
@@ -572,6 +572,8 @@ void write_offset_mp4(const QString& path, int frames, int64_t start, int frames
   QVERIFY(codec != nullptr);
   AVFormatContext* fmt = nullptr;
   QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
+  // A packet per frame in MPEG-PS, each with its pts, as a real recording's (see write_interlaced_video())
+  if (strcmp(fmt->oformat->name, "mpeg") == 0) fmt->packet_size = 64;
   AVStream* st = avformat_new_stream(fmt, nullptr);
   st->time_base = AVRational{1, 90000};
   AVCodecContext* enc = avcodec_alloc_context3(codec);
@@ -1837,6 +1839,71 @@ class TestHeadlessRender : public QObject {
     qInfo("viewer frame %ld shows grey level %d (source frame %d), expected level %ld", kFar, shown / kStep, shown,
           kFar / kStep);
     QCOMPARE(shown / kStep, int(kFar / kStep));
+  }
+
+  // A seek into MPEG-4 Part 2 in MPEG-PS (no index: the seek lands between keyframes) starts decoding on frames whose
+  // reference is missing; that decoder hands them out anyway, grey, and the export opened on them. A clip trimmed into
+  // the middle of a GOP seeks there on its first frame.
+  void seekIntoGopStartsOnKeyframe() {
+    constexpr int kFrames = 48;
+    constexpr int kStep = 4;     // frames per grey level: 12 levels
+    constexpr long kClipIn = 6;  // keyframes where the grey changes: 4, 8...
+    const QString video = dir_.filePath("mpeg4.mpg");
+    write_offset_mp4(video, kFrames, 0, kStep);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("mpeg4_ps_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("mpeg4_ps.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) c->set_clip_in(kClipIn);
+    }
+    const Decoded src = decode_file(video, true);
+    QVERIFY(src.ok);
+    QCOMPARE(src.video_frames, kFrames);
+
+    const ExportParams params = video_params(dir_.filePath("mpeg4_ps_out.mp4"), seq.get(), AV_CODEC_ID_MPEG4, QString(),
+                                             COMPRESSION_TYPE_CBR, 2.0);
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded out = decode_file(params.filename, true);
+    QVERIFY(out.ok);
+    QCOMPARE(long(out.video_frames), kClipOut);
+    QVector<int> levels;
+    QVector<int> expected;
+    for (int k = 0; k < out.video_frames; k++) {
+      levels.append(closest_grey_frame(src.rgba, out.rgba[k]) / kStep);
+      expected.append(int((kClipIn + k) / kStep));
+    }
+    QString shown;
+    for (int l : levels) shown += QString::number(l) + ' ';
+    qInfo("export frames show grey levels: %s", qPrintable(shown));
+    QCOMPARE(levels, expected);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();
   }
 
   // Interlaced video decoded in hardware: the VAAPI transfer hands NV12 to a filter link negotiated from the stream's

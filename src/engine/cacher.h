@@ -357,6 +357,12 @@ class Cacher : public QThread {
   int64_t last_raw_video_pts_{AV_NOPTS_VALUE};
 
   /**
+   * @brief Video frames still to skip after a seek while waiting for a keyframe (RetrieveFrameAndProcess())
+   */
+  int skip_to_keyframe_{0};
+  static constexpr int kSeekSkipFrames = 300;
+
+  /**
    * @brief Current Sequence scrubbing state set by Cache()
    */
   bool scrubbing_;
