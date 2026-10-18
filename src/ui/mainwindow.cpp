@@ -1329,6 +1329,9 @@ void MainWindow::updateTitle() {
 
 void MainWindow::closeEvent(QCloseEvent* e) {
   if (amber::Global->can_close_project()) {
+    // the layout saved below must be the real one, not the maximized panel (others hidden and floating)
+    leave_maximized_panel();
+
     // stop proxy generator thread
     amber::proxy_generator.cancel();
 
