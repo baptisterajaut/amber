@@ -286,5 +286,17 @@ void Sequence::getTrackLimits(int* video_tracks, int* audio_tracks) {
   if (audio_tracks != nullptr) *audio_tracks = at;
 }
 
+void Sequence::getShownTrackLimits(int* video_tracks, int* audio_tracks) {
+  int vt = 0;
+  int at = 0;
+  getTrackLimits(&vt, &at);
+  for (auto it = track_states.constBegin(); it != track_states.constEnd(); ++it) {
+    vt = qMin(vt, it.key());
+    at = qMax(at, it.key());
+  }
+  if (video_tracks != nullptr) *video_tracks = vt;
+  if (audio_tracks != nullptr) *audio_tracks = at;
+}
+
 // static variable for the currently active sequence
 SequencePtr amber::ActiveSequence = nullptr;

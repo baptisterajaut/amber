@@ -117,6 +117,30 @@ class TestTrackStates : public QObject {
     QVERIFY(!s.first_locked_track({}).has_value());
   }
 
+  // A track with a state but no clip stays in the shown range, so its toggle never goes off screen
+  void shownTrackLimitsIncludeStates() {
+    Sequence s;
+    add_clip(s, -1, 0, 10);
+    add_clip(s, 1, 0, 10);
+    int v = 0, a = 0;
+    s.getShownTrackLimits(&v, &a);
+    QCOMPARE(v, -1);
+    QCOMPARE(a, 1);
+    s.set_track_state(3, make_state(false, false, true, false));   // solo on A4, no clip there
+    s.set_track_state(-3, make_state(true, false, false, false));  // V3 hidden, no clip there
+    s.getShownTrackLimits(&v, &a);
+    QCOMPARE(v, -3);
+    QCOMPARE(a, 3);
+    s.getTrackLimits(&v, &a);  // the clip range itself is unchanged
+    QCOMPARE(v, -1);
+    QCOMPARE(a, 1);
+    Sequence empty;
+    empty.set_track_state(2, make_state(false, true, false, false));
+    empty.getShownTrackLimits(&v, &a);
+    QCOMPARE(v, 0);
+    QCOMPARE(a, 2);
+  }
+
   void lockedClipIndexes() {
     Sequence s;
     add_clip(s, -1, 0, 10);

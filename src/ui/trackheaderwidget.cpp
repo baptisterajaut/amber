@@ -60,7 +60,7 @@ TrackHeaderWidget::TrackHeaderWidget(TimelineWidget* timeline, QScrollBar* verti
 void TrackHeaderWidget::track_range(int* first, int* last) {
   int video_limit = 0;
   int audio_limit = 0;
-  amber::ActiveSequence->getTrackLimits(&video_limit, &audio_limit);
+  amber::ActiveSequence->getShownTrackLimits(&video_limit, &audio_limit);
   *first = video_limit - 1;
   *last = audio_limit + 1;
 }

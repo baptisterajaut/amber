@@ -651,15 +651,10 @@ void TimelineWidget::paintEvent(QPaintEvent*) {
   if (amber::ActiveSequence != nullptr) {
     QPainter p(this);
 
-    // get widget width and height
+    // track range: the clips' tracks and the tracks with a header state, as the header column draws
     int video_track_limit = 0;
     int audio_track_limit = 0;
-    for (auto clip : amber::ActiveSequence->clips) {
-      if (clip != nullptr) {
-        video_track_limit = qMin(video_track_limit, clip->track());
-        audio_track_limit = qMax(audio_track_limit, clip->track());
-      }
-    }
+    amber::ActiveSequence->getShownTrackLimits(&video_track_limit, &audio_track_limit);
 
     int panel_height = compute_panel_height();
     scrollBar->setMaximum(qMax(0, panel_height - height()));

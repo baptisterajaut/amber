@@ -616,7 +616,7 @@ void Timeline::scroll_to_track(int track) {
 
   amber::timeline_layout::TrackHeights h;
   int video_count = 0, audio_count = 0;
-  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  amber::ActiveSequence->getShownTrackLimits(&video_count, &audio_count);
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t) h.audio.append(GetTrackHeight(t));
 
@@ -644,7 +644,7 @@ int Timeline::SeamY() {
   }
   amber::timeline_layout::TrackHeights h;
   int video_count = 0, audio_count = 0;
-  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  amber::ActiveSequence->getShownTrackLimits(&video_count, &audio_count);
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t) h.audio.append(GetTrackHeight(t));
   // Add an empty drop-zone at the top, mirroring the existing one at the bottom of audio.
@@ -662,7 +662,7 @@ int Timeline::PanelHeight() {
   }
   amber::timeline_layout::TrackHeights h;
   int video_count = 0, audio_count = 0;
-  amber::ActiveSequence->getTrackLimits(&video_count, &audio_count);
+  amber::ActiveSequence->getShownTrackLimits(&video_count, &audio_count);
   for (int t = -1; t >= video_count; --t) h.video.append(GetTrackHeight(t));
   for (int t = 0; t <= audio_count; ++t) h.audio.append(GetTrackHeight(t));
   // padding: one default-height empty track above video and below audio (drop zones)

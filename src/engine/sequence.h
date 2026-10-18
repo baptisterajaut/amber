@@ -41,6 +41,9 @@ class Sequence {
   SequencePtr copy();
   QString name;
   void getTrackLimits(int* video_tracks, int* audio_tracks);
+  // getTrackLimits() widened to every track with a stored state, so a toggle on a track without clips stays on screen
+  // (the header and the clip area draw this range plus one empty track on each side)
+  void getShownTrackLimits(int* video_tracks, int* audio_tracks);
   long getEndFrame();
   int width;
   int height;
