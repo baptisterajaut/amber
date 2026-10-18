@@ -890,6 +890,13 @@ void PreferencesDialog::setup_ui() {
       found_preferred_device = true;
     }
   }
+  // A saved device that isn't plugged in now (headphones off, USB device unplugged) stays selected, so OK saves it
+  // back unchanged instead of resetting the preference to Default. Playback falls back to the default device meanwhile.
+  if (!found_preferred_device && !amber::CurrentConfig.preferred_audio_output.isEmpty()) {
+    audio_output_devices->addItem(tr("%1 (not connected)").arg(amber::CurrentConfig.preferred_audio_output),
+                                  amber::CurrentConfig.preferred_audio_output);
+    audio_output_devices->setCurrentIndex(audio_output_devices->count() - 1);
+  }
 
   audio_tab_layout->addWidget(audio_output_devices, row, 1);
 
@@ -912,6 +919,11 @@ void PreferencesDialog::setup_ui() {
       audio_input_devices->setCurrentIndex(audio_input_devices->count()-1);
       found_preferred_device = true;
     }
+  }
+  if (!found_preferred_device && !amber::CurrentConfig.preferred_audio_input.isEmpty()) {
+    audio_input_devices->addItem(tr("%1 (not connected)").arg(amber::CurrentConfig.preferred_audio_input),
+                                 amber::CurrentConfig.preferred_audio_input);
+    audio_input_devices->setCurrentIndex(audio_input_devices->count() - 1);
   }
 
   audio_tab_layout->addWidget(audio_input_devices, row, 1);
