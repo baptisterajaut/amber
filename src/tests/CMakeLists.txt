@@ -119,6 +119,15 @@ target_include_directories(amber-test-graph-view-math PRIVATE ${CMAKE_SOURCE_DIR
 target_link_libraries(amber-test-graph-view-math PRIVATE Qt6::Test Qt6::Widgets Qt6::GuiPrivate)
 add_test(NAME amber-test-graph-view-math COMMAND amber-test-graph-view-math)
 
+add_executable(amber-test-decimal-input
+  test_decimal_input.cpp
+  ${CMAKE_SOURCE_DIR}/core/decimalinput.cpp
+  ${CMAKE_SOURCE_DIR}/core/decimalinput.h
+)
+target_include_directories(amber-test-decimal-input PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(amber-test-decimal-input PRIVATE Qt6::Test)
+add_test(NAME amber-test-decimal-input COMMAND amber-test-decimal-input)
+
 # Footage::decode_url(). footage.cpp needs only PreviewGenerator::cancel(), stubbed in the test; Clip-side export
 # mode (OpenedForExport, NeedsCacherReconfigure) needs the engine and is not covered here.
 add_executable(amber-test-footage
