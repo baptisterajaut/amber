@@ -21,14 +21,18 @@
 #ifndef AUDIOMONITOR_H
 #define AUDIOMONITOR_H
 
-#include <QWidget>
-#include <QTimer>
+#include <QElapsedTimer>
 #include <QMutex>
+#include <QTimer>
+#include <QWidget>
+
+#include "core/audiometer.h"
 
 /**
  * @brief The AudioMonitor class
  *
- * Used to show a visual representation of audio currently playing
+ * Used to show a visual representation of audio currently playing: a dBFS peak meter per channel with a scale,
+ * peak-hold markers and clip indicators that stay lit until the monitor is clicked
  */
 class AudioMonitor : public QWidget
 {
@@ -64,11 +68,9 @@ protected:
   void paintEvent(QPaintEvent *) override;
 
   /**
-   * @brief Internal resize event handler
-   *
-   * Triggers a repaint when the widget is resized.
+   * @brief Clicking the monitor resets the clip indicators
    */
-  void resizeEvent(QResizeEvent *) override;
+  void mousePressEvent(QMouseEvent *) override;
 
 signals:
 
@@ -76,15 +78,18 @@ public slots:
 
 private:
   /**
-   * @brief Internal gradient object from red to yellow to green
+   * @brief Meter ballistics, fed from the audio thread and advanced by the GUI thread, both under meter_mutex
    */
-  QLinearGradient gradient;
+  amber::AudioMeterState meter;
+  QMutex meter_mutex;
+  QElapsedTimer clock;
 
   /**
-   * @brief Internal value storage
+   * @brief ~30 fps timer letting the meters fall, only running while they are above the floor
    */
-  QVector<double> values;
-  QMutex values_mutex;
+  QTimer anim_timer;
+
+  void animate();
 
   /**
    * @brief Internal timer to clear the audio monitor after a certain amount of time
