@@ -44,6 +44,10 @@ public:
    */
   void SetMaximum(double maximum);
 
+  // NaN when unset (no bound)
+  double GetMinimum() const { return min_; }
+  double GetMaximum() const { return max_; }
+
   /**
    * @brief Sets the default number for this field to `d`.
    */
