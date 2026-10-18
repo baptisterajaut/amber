@@ -190,6 +190,59 @@ QByteArray dc_wav(double seconds, double level) {
   return wav_from_pcm(pcm);
 }
 
+// wav's PCM (a wav_from_pcm() file) as audio-only MPEG-TS, SMPTE 302M (PCM, read back sample for sample): audio that
+// starts after 0, at 1.4 s as FFmpeg's own MPEG-TS muxing puts it, as a camera's MPEG-TS
+bool write_audio_ts(const QString& path, const QByteArray& wav) {
+  const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_S302M);
+  if (codec == nullptr) return false;
+  const QByteArray p = path.toUtf8();
+  AVFormatContext* fmt = nullptr;
+  if (avformat_alloc_output_context2(&fmt, nullptr, "mpegts", p.constData()) < 0) return false;
+  AVStream* st = avformat_new_stream(fmt, nullptr);
+  AVCodecContext* enc = avcodec_alloc_context3(codec);
+  enc->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
+  enc->sample_fmt = AV_SAMPLE_FMT_S16;
+  enc->sample_rate = kAudioRate;
+  av_channel_layout_default(&enc->ch_layout, 2);
+  enc->time_base = AVRational{1, kAudioRate};
+  bool ok = avcodec_open2(enc, codec, nullptr) >= 0 && avcodec_parameters_from_context(st->codecpar, enc) >= 0;
+  st->time_base = enc->time_base;
+  ok = ok && avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0 && avformat_write_header(fmt, nullptr) >= 0;
+  const QByteArray pcm = wav.mid(44);  // after wav_from_pcm()'s header
+  constexpr int kFrameSamples = 1024;
+  AVFrame* frame = av_frame_alloc();
+  AVPacket* pkt = av_packet_alloc();
+  auto write_packets = [&]() {
+    while (ok && avcodec_receive_packet(enc, pkt) >= 0) {
+      av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+      pkt->stream_index = st->index;
+      ok = av_interleaved_write_frame(fmt, pkt) >= 0;
+    }
+  };
+  for (int offset = 0; ok && offset < pcm.size(); offset += kFrameSamples * 4) {
+    frame->nb_samples = qMin(int(pcm.size()) - offset, kFrameSamples * 4) / 4;
+    frame->format = AV_SAMPLE_FMT_S16;
+    frame->sample_rate = kAudioRate;
+    av_channel_layout_default(&frame->ch_layout, 2);
+    ok = av_frame_get_buffer(frame, 0) >= 0;
+    if (!ok) break;
+    memcpy(frame->data[0], pcm.constData() + offset, frame->nb_samples * 4);
+    frame->pts = offset / 4 + qRound64(1.4 * kAudioRate);
+    ok = avcodec_send_frame(enc, frame) >= 0;
+    av_frame_unref(frame);
+    write_packets();
+  }
+  avcodec_send_frame(enc, nullptr);
+  write_packets();
+  if (ok) ok = av_write_trailer(fmt) >= 0;
+  av_frame_free(&frame);
+  av_packet_free(&pkt);
+  avcodec_free_context(&enc);
+  avio_closep(&fmt->pb);
+  avformat_free_context(fmt);
+  return ok;
+}
+
 // A NUT file of frames checkerboard frames (stream 0, raw YUV 4:2:0) and as long a stereo half-scale 440 Hz
 // sine (stream 1, S16 PCM at kAudioRate): one footage with both a video and an audio stream
 bool write_av_nut(const QString& path, int frames) {
@@ -339,7 +392,7 @@ QString nested_fixture(const QString& url, const QString& wav_a, const QString& 
 
 // Two sequences over one WAV: Forward plays it, Reversed plays it with the reverse flag (the test moves Forward's
 // in point to the span Reversed reads)
-QString reversed_fixture(const QString& url, const QString& wav) {
+QString reversed_fixture(const QString& url, const QString& wav, long out = kClipOut) {
   return QString(R"(<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <version>%1</version>
@@ -368,7 +421,7 @@ QString reversed_fixture(const QString& url, const QString& wav) {
 </project>
 )")
       .arg(QString::number(amber::kSaveVersion), url.toHtmlEscaped(), wav.toHtmlEscaped(), QString::number(kSize),
-           QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(kClipOut));
+           QString::number(kFps, 'f', 10), QString::number(kAudioRate), QString::number(out));
 }
 
 // One clip on A1 over timeline [0, out), trimmed by clip_in, at a speed (no pitch correction), optionally reversed: a
@@ -728,6 +781,21 @@ bool vaapi_decodes(const QString& path) {
   avformat_close_input(&fmt);
   av_buffer_unref(&device);
   return hw;
+}
+
+// The first audio stream's start_time in seconds, -1 if the file can't be read or doesn't say
+double audio_start_seconds(const QString& path) {
+  AVFormatContext* fmt = nullptr;
+  if (avformat_open_input(&fmt, path.toUtf8().constData(), nullptr, nullptr) < 0) return -1;
+  double start = -1;
+  if (avformat_find_stream_info(fmt, nullptr) >= 0) {
+    const int ai = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+    if (ai >= 0 && fmt->streams[ai]->start_time != AV_NOPTS_VALUE) {
+      start = fmt->streams[ai]->start_time * av_q2d(fmt->streams[ai]->time_base);
+    }
+  }
+  avformat_close_input(&fmt);
+  return start;
 }
 
 // The first video stream's start_time in seconds, -1 if the file can't be read or doesn't say
@@ -2332,9 +2400,27 @@ class TestHeadlessRender : public QObject {
 
   // A reversed audio clip must export as the time-reversed forward export: the reverse path decodes a span, flips it
   // and must hand the whole flipped buffer to the mixer, not the last raw frame it decoded
+  // Audio starting after 0 too (MPEG-TS): the reverse cutoff compared the decoded pts with the clip time, and a
+  // reversed clip's first start_time seconds came out silent
+  void reversedAudioMatchesForward_data() {
+    QTest::addColumn<bool>("mpeg_ts");
+    QTest::newRow("wav") << false;
+    QTest::newRow("mpeg-ts") << true;
+  }
+
   void reversedAudioMatchesForward() {
-    const QString wav = dir_.filePath("ramp.wav");
-    {
+    QFETCH(bool, mpeg_ts);
+    amber::ActiveSequence = nullptr;
+    amber::project_model.clear();  // find_sequence() below would find the previous row's
+    const QString wav = dir_.filePath(mpeg_ts ? "ramp.ts" : "ramp.wav");
+    // The TS clip spans the media's last 3 s, its start_time and more
+    const long out = mpeg_ts ? long(3 * kFps) : kClipOut;
+    if (mpeg_ts) {
+      if (avcodec_find_encoder(AV_CODEC_ID_S302M) == nullptr) QSKIP("no SMPTE 302M encoder in this FFmpeg build");
+      QVERIFY(write_audio_ts(wav, sine_wav(440.0, 0.5, true, 4.0)));
+      QVERIFY2(audio_start_seconds(wav) > 1.0,
+               qPrintable(QString("audio start_time %1 s").arg(audio_start_seconds(wav))));
+    } else {
       QFile f(wav);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
       f.write(sine_wav(440.0, 0.5, true));
@@ -2343,7 +2429,7 @@ class TestHeadlessRender : public QObject {
     {
       QFile f(project);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(reversed_fixture(project, wav).toUtf8());
+      f.write(reversed_fixture(project, wav, out).toUtf8());
     }
 
     bool succeeded = false;
@@ -2376,11 +2462,11 @@ class TestHeadlessRender : public QObject {
     QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
     QVERIFY(footage->ready);
     QVERIFY(!footage->invalid);
-    QVERIFY(rev_clip->media_length() > kClipOut);
+    QVERIFY(rev_clip->media_length() > out);
     // A reversed clip plays from the media's last frame down (playhead_to_clip_seconds: media_length - frame - 1), so
-    // timeline [0, kClipOut) reads source frames [media_length - 1 - kClipOut, media_length - 1) backwards: start the
+    // timeline [0, out) reads source frames [media_length - 1 - out, media_length - 1) backwards: start the
     // forward clip there so both exports cover the same source span
-    fwd_clip->set_clip_in(rev_clip->media_length() - 1 - kClipOut);
+    fwd_clip->set_clip_in(rev_clip->media_length() - 1 - out);
 
     auto export_audio = [this](Sequence* seq, const QString& name, QString& path) -> QString {
       ExportParams params{};
@@ -2412,7 +2498,7 @@ class TestHeadlessRender : public QObject {
 
     // Over the clip's span, the reversed export read forwards must match the forward export read backwards, up to a
     // few samples of alignment (where each path rounds the span's ends): take the best lag, compare sample by sample
-    const int span = int(qRound64(kClipOut / kFps * kAudioRate));
+    const int span = int(qRound64(out / kFps * kAudioRate));
     QVERIFY(fwd.audio_left.size() >= span);
     QVERIFY(rev.audio_left.size() >= span);
     constexpr int kMaxLag = 8;
