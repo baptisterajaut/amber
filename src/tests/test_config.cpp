@@ -37,6 +37,24 @@ class TestConfig : public QObject {
     QVERIFY(cfg.show_frei0r_effects);
   }
 
+  // Why the subtitle editor compares the committed text with the cell's before parsing it: in the Milliseconds view at
+  // a non-integer rate the frame -> text -> frame round trip is off (h/m/s split at qRound(fps), rebuilt at the real
+  // rate). Should the conversion become symmetric, drop the QEXPECT_FAIL.
+  void millisecondsViewRoundTripIsAsymmetric() {
+    const double rate = 23.976024;
+    const QString shown = frame_to_timecode(2400, amber::kTimecodeMilliseconds, rate);
+    QCOMPARE(shown, QString("100000"));
+    QCOMPARE(frame_to_timecode(2400, amber::kTimecodeMilliseconds, rate), shown);  // the cell text is stable
+    QEXPECT_FAIL("", "timecode_to_frame() does not invert frame_to_timecode() in the Milliseconds view", Continue);
+    QCOMPARE(timecode_to_frame(shown, amber::kTimecodeMilliseconds, rate), 2400L);
+    // Integer rates and the other views round-trip
+    QCOMPARE(
+        timecode_to_frame(frame_to_timecode(2400, amber::kTimecodeMilliseconds, 24), amber::kTimecodeMilliseconds, 24),
+        2400L);
+    QCOMPARE(timecode_to_frame(frame_to_timecode(2400, amber::kTimecodeNonDrop, rate), amber::kTimecodeNonDrop, rate),
+             2400L);
+  }
+
   void savedTogglesRoundTrip() {
     QTemporaryDir dir;
     const QString path = dir.filePath("config.xml");

@@ -673,16 +673,21 @@ void SubtitleEditor::apply_edit(int row, int column, const QString& value, int e
     return;
   }
 
+  // The frames the cell showed: retyping them leaves a cue that starts between frames where it is (no snap, no undo
+  // step)
+  const long shown_start = cue_ms_to_frame(cue.start_ms);
+  const long shown_end = cue_ms_to_frame(cue.end_ms);
+  // Text first: in the Milliseconds view at a non-integer rate timecode_to_frame() doesn't invert frame_to_timecode(),
+  // so Enter on an untouched cell would parse to another frame and move the cue
+  const long shown = column == kColStart ? shown_start : column == kColEnd ? shown_end : shown_end - shown_start;
+  if (value.trimmed() == timecode(shown)) return;
+
   long frames;
   if (!parse_timecode(value, false, &frames)) {
     show_message(tr("\"%1\" is not a timecode.").arg(value.trimmed()));
     return;
   }
 
-  // The frames the cell showed: retyping them leaves a cue that starts between frames where it is (no snap, no undo
-  // step)
-  const long shown_start = cue_ms_to_frame(cue.start_ms);
-  const long shown_end = cue_ms_to_frame(cue.end_ms);
   if ((column == kColStart && frames == shown_start) || (column == kColEnd && frames == shown_end) ||
       (column == kColDuration && frames == shown_end - shown_start)) {
     return;
