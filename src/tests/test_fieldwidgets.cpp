@@ -5,13 +5,16 @@
 #include "effects/effect.h"
 #include "effects/effectrow.h"
 #include "effects/fields/boolfield.h"
+#include "effects/fields/colorfield.h"
 #include "effects/fields/combofield.h"
 #include "effects/fields/curvefield.h"
 #include "effects/fields/doublefield.h"
+#include "effects/fields/gradientrampfield.h"
 #include "effects/ui/boolfieldwidget.h"
 #include "effects/ui/combofieldwidget.h"
 #include "effects/ui/curvefieldwidget.h"
 #include "effects/ui/doublefieldwidget.h"
+#include "effects/ui/gradientrampfieldwidget.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "engine/undo/comboaction.h"
@@ -21,6 +24,7 @@
 #include "tests/test_appcontext_stub.h"
 #include "ui/comboboxex.h"
 #include "ui/curveeditor.h"
+#include "ui/gradientrampeditor.h"
 #include "ui/labelslider.h"
 
 // ui/menu.cpp (LabelSlider's context menu) calls it; the real one lives in global/global.cpp, which pulls the app
@@ -43,10 +47,13 @@ class TestFieldWidgets : public QObject {
   void doubleSameValueAddsNoEntry();
   void comboPickIsOneEntry();
   void curveGestureIsOneEntry();
+  void rampGestureIsOneEntry();
+  void rampEndColorIsOneEntry();
+  void rampReverseIsOneEntry();
   void singleClipEntryIsUnchanged();
 
  private:
-  enum Row { kBool, kDouble, kCombo, kCurve };
+  enum Row { kBool, kDouble, kCombo, kCurve, kStart, kEnd, kRamp };
 
   // The way EffectUI builds a shared row: the first clip's wrapper creates the widget, the second attaches to it
   template <class W>
@@ -106,6 +113,12 @@ EffectPtr TestFieldWidgets::MakeEffect(Clip* clip) {
   combo->AddItem("B", 1);
   combo->AddItem("C", 2);
   new CurveField(new EffectRow(e.get(), "Curve"), "curve");
+  ColorField* start = new ColorField(new EffectRow(e.get(), "Start"), "start_color");
+  start->SetValueAt(0, QColor(Qt::black));
+  ColorField* end = new ColorField(new EffectRow(e.get(), "End"), "end_color");
+  end->SetValueAt(0, QColor(Qt::white));
+  GradientRampField* ramp = new GradientRampField(new EffectRow(e.get(), "Ramp", true, false), "ramp");
+  ramp->SetEndFields(start, end);
   return e;
 }
 
@@ -273,6 +286,71 @@ void TestFieldWidgets::curveGestureIsOneEntry() {
   amber::UndoStack.undo();
   QCOMPARE(a->GetValueAt(0).toString(), identity);
   QCOMPARE(b->GetValueAt(0).toString(), identity);
+}
+
+void TestFieldWidgets::rampGestureIsOneEntry() {
+  GradientRampEditor* editor = static_cast<GradientRampEditor*>(SharedWidget<GradientRampFieldWidget>(kRamp));
+  EffectField* a = FieldA(kRamp);
+  EffectField* b = FieldB(kRamp);
+  const QString edited = QStringLiteral("0.5 #ff0000ff");
+
+  emit editor->rampEdited(QStringLiteral("0.4 #ff0000ff"));
+  emit editor->rampEdited(edited);
+  emit editor->editFinished(QStringLiteral("Move Color Stop"), true);
+  QCOMPARE(amber::UndoStack.count(), 1);
+  QCOMPARE(amber::UndoStack.text(0), QStringLiteral("Move Color Stop"));
+  QCOMPARE(a->GetValueAt(0).toString(), edited);
+  QCOMPARE(b->GetValueAt(0).toString(), edited);
+
+  amber::UndoStack.undo();
+  QCOMPARE(a->GetValueAt(0).toString(), QString());
+  QCOMPARE(b->GetValueAt(0).toString(), QString());
+
+  // A gesture back where it started: restored, no entry
+  emit editor->rampEdited(edited);
+  emit editor->editFinished(QStringLiteral("Add Color Stop"), false);
+  QCOMPARE(amber::UndoStack.count(), 1);
+  QCOMPARE(amber::UndoStack.index(), 0);
+  QCOMPARE(a->GetValueAt(0).toString(), QString());
+  QCOMPARE(b->GetValueAt(0).toString(), QString());
+}
+
+void TestFieldWidgets::rampEndColorIsOneEntry() {
+  GradientRampEditor* editor = static_cast<GradientRampEditor*>(SharedWidget<GradientRampFieldWidget>(kRamp));
+  emit editor->endColorEdited(1, QColor(Qt::green));
+  QCOMPARE(amber::UndoStack.count(), 1);
+  QCOMPARE(FieldA(kEnd)->GetValueAt(0).value<QColor>(), QColor(Qt::green));
+  QCOMPARE(FieldB(kEnd)->GetValueAt(0).value<QColor>(), QColor(Qt::green));
+  QCOMPARE(FieldA(kStart)->GetValueAt(0).value<QColor>(), QColor(Qt::black));
+  amber::UndoStack.undo();
+  QCOMPARE(FieldA(kEnd)->GetValueAt(0).value<QColor>(), QColor(Qt::white));
+  QCOMPARE(FieldB(kEnd)->GetValueAt(0).value<QColor>(), QColor(Qt::white));
+}
+
+void TestFieldWidgets::rampReverseIsOneEntry() {
+  GradientRampEditor* editor = static_cast<GradientRampEditor*>(SharedWidget<GradientRampFieldWidget>(kRamp));
+  FieldB(kStart)->SetValueAt(0, QColor(Qt::red));
+  FieldB(kEnd)->SetValueAt(0, QColor(Qt::blue));
+  FieldA(kRamp)->SetValueAt(0, QStringLiteral("0.2 #00ff00ff"));
+  editor->setRamp(FieldA(kRamp)->GetValueAt(0).toString());
+  editor->setEndColors(Qt::black, Qt::white);
+
+  editor->reverseRamp();
+  // One entry: both clips' stops, and each clip's own ends swapped
+  QCOMPARE(amber::UndoStack.count(), 1);
+  QCOMPARE(amber::UndoStack.text(0), QStringLiteral("Reverse Color Ramp"));
+  QCOMPARE(FieldA(kRamp)->GetValueAt(0).toString(), QStringLiteral("0.8 #00ff00ff"));
+  QCOMPARE(FieldB(kRamp)->GetValueAt(0).toString(), QStringLiteral("0.8 #00ff00ff"));
+  QCOMPARE(FieldA(kStart)->GetValueAt(0).value<QColor>(), QColor(Qt::white));
+  QCOMPARE(FieldA(kEnd)->GetValueAt(0).value<QColor>(), QColor(Qt::black));
+  QCOMPARE(FieldB(kStart)->GetValueAt(0).value<QColor>(), QColor(Qt::blue));
+  QCOMPARE(FieldB(kEnd)->GetValueAt(0).value<QColor>(), QColor(Qt::red));
+
+  amber::UndoStack.undo();
+  QCOMPARE(FieldA(kRamp)->GetValueAt(0).toString(), QStringLiteral("0.2 #00ff00ff"));
+  QCOMPARE(FieldB(kRamp)->GetValueAt(0).toString(), QString());
+  QCOMPARE(FieldA(kStart)->GetValueAt(0).value<QColor>(), QColor(Qt::black));
+  QCOMPARE(FieldB(kEnd)->GetValueAt(0).value<QColor>(), QColor(Qt::blue));
 }
 
 void TestFieldWidgets::singleClipEntryIsUnchanged() {
