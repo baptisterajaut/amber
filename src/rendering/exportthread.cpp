@@ -24,6 +24,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/error.h>
 #include <libavutil/pixdesc.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
@@ -31,6 +32,7 @@ extern "C" {
 
 #include <QApplication>
 #include <QDateTime>
+#include <QDir>
 #include <QFile>
 #include <QPainter>
 #include <QtMath>
@@ -47,6 +49,14 @@ extern "C" {
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
+
+// FFmpeg's text for an error code, for the user: "No such file or directory" for AVERROR(ENOENT) (in the system's
+// language for an errno), "Invalid argument"... The code itself goes to the log.
+static QString av_error_text(int code) {
+  char text[AV_ERROR_MAX_STRING_SIZE] = {};
+  av_strerror(code, text, sizeof(text));  // an unknown code still gets "Error number N occurred"
+  return QString::fromUtf8(text);
+}
 
 ExportThread::ExportThread(const ExportParams &params,
                            const VideoCodecParams& vparams,
@@ -196,7 +206,7 @@ bool ExportThread::SetupVideo() {
   av_dict_free(&opts);
   if (ret < 0) {
     qCritical() << "Could not open output video encoder." << ret;
-    export_error = tr("could not open output video encoder (%1)").arg(QString::number(ret));
+    export_error = tr("could not open output video encoder: %1").arg(av_error_text(ret));
     return false;
   }
 
@@ -315,7 +325,7 @@ bool ExportThread::SetupAudio() {
   ret = avcodec_open2(acodec_ctx, acodec, nullptr);
   if (ret < 0) {
     qCritical() << "Could not open output audio encoder." << ret;
-    export_error = tr("could not open output audio encoder (%1)").arg(QString::number(ret));
+    export_error = tr("could not open output audio encoder: %1").arg(av_error_text(ret));
     return false;
   }
 
@@ -413,7 +423,8 @@ bool ExportThread::SetupContainer() {
     // Failed to get a valid write handle for the exported file. Exit the export and throw an error.
 
     qCritical() << "Could not open output file." << ret;
-    export_error = tr("could not open output file (%1)").arg(QString::number(ret));
+    export_error =
+        tr("could not open output file \"%1\": %2").arg(QDir::toNativeSeparators(params_.filename), av_error_text(ret));
     return false;
   }
   container_opened_ = true;
