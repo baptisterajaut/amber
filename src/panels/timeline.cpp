@@ -816,6 +816,8 @@ static bool compute_ripple_params(const QVector<Selection>& selections, const QV
     ClipPtr c = clips.at(i);
     if (c == nullptr || c->timeline_in() >= ripple_point || c->timeline_out() <= ripple_point) continue;
     if (clip_overlaps_any_selection(c.get(), selections)) continue;
+    // a locked track doesn't shift (RippleAction ignores it), so it can't collide
+    if (amber::ActiveSequence->track_locked(c->track())) continue;
     clamp_ripple_length(c.get(), clips, ripple_length);
   }
   return true;
@@ -917,7 +919,7 @@ void Timeline::ChangeTrackHeightUniformly(int diff) {
 
   // get range of tracks currently active
   int min_track, max_track;
-  amber::ActiveSequence->getTrackLimits(&min_track, &max_track);
+  amber::ActiveSequence->getShownTrackLimits(&min_track, &max_track);
 
   // for each active track, set the track to increase/decrease based on `diff`
   for (int i = min_track; i <= max_track; i++) {

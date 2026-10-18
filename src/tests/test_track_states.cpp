@@ -3,6 +3,8 @@
 
 #include <QtTest>
 
+#include <climits>
+
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "engine/undo/undo_timeline.h"
@@ -57,6 +59,24 @@ class TestTrackStates : public QObject {
     QVERIFY(s.track_states.isEmpty());
     s.set_track_state(3, TrackState());  // never stored
     QVERIFY(s.track_states.isEmpty());
+  }
+
+  // A corrupt index can't make the shown range span billions of tracks
+  void outOfRangeIndexesAreIgnored() {
+    Sequence s;
+    s.set_track_state(2000000000, make_state(false, false, false, true));
+    s.set_track_state(INT_MIN, make_state(false, false, true, false));
+    s.set_track_state(100, make_state(false, true, false, false));
+    s.set_track_state(-100, make_state(true, false, false, false));
+    QVERIFY(s.track_states.isEmpty());
+    s.set_track_state(99, make_state(false, true, false, false));
+    s.set_track_state(-99, make_state(true, false, false, false));
+    QCOMPARE(s.track_states.size(), 2);
+    s.track_states.insert(1 << 30, make_state(false, false, false, true));  // bypassing the setter
+    int v = 0, a = 0;
+    s.getShownTrackLimits(&v, &a);
+    QCOMPARE(v, -99);
+    QCOMPARE(a, 99);
   }
 
   void audibleWithoutSolo() {

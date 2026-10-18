@@ -186,10 +186,8 @@ void TrackHeaderWidget::toggle(int track, Toggle toggle, bool all_of_kind) {
       cmd->setText(tr("Toggle Track Lock"));
       break;
   }
+  // its redo repaints, and rebuilds Effect Controls when a lock changes
   amber::UndoStack.push(cmd);
-
-  // a lock drops selections: rebuild Effect Controls from what is left
-  update_ui(toggle == kToggleLock);
 }
 
 void TrackHeaderWidget::draw_button(QPainter& p, const Button& b, bool on) {
@@ -330,18 +328,19 @@ void TrackHeaderWidget::mousePressEvent(QMouseEvent* event) {
   if (amber::ActiveSequence == nullptr || event->button() != Qt::LeftButton) return;
   const QPoint pos = event->position().toPoint();
 
+  // buttons first: on a short row the resize band overlaps them
+  int track;
+  Toggle t;
+  if (hit_button(pos, &track, &t)) {
+    toggle(track, t, event->modifiers() & Qt::ShiftModifier);
+    return;
+  }
+
   const int edge_track = resize_edge_track(pos.y());
   if (edge_track != INT_MIN) {
     resizing_ = true;
     resize_track_ = edge_track;
     resize_last_y_ = pos.y();
-    return;
-  }
-
-  int track;
-  Toggle t;
-  if (hit_button(pos, &track, &t)) {
-    toggle(track, t, event->modifiers() & Qt::ShiftModifier);
   }
 }
 
@@ -360,7 +359,9 @@ void TrackHeaderWidget::mouseMoveEvent(QMouseEvent* event) {
     return;
   }
 
-  if (resize_edge_track(y) != INT_MIN) {
+  int track;
+  Toggle t;
+  if (!hit_button(event->position().toPoint(), &track, &t) && resize_edge_track(y) != INT_MIN) {
     setCursor(Qt::SizeVerCursor);
   } else {
     unsetCursor();

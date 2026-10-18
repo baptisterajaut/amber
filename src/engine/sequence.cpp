@@ -67,6 +67,7 @@ SequencePtr Sequence::copy() {
 TrackState Sequence::track_state(int track) const { return track_states.value(track); }
 
 void Sequence::set_track_state(int track, const TrackState& state) {
+  if (!amber::track_state_index_valid(track)) return;
   if (state.is_default()) {
     track_states.remove(track);
   } else {
@@ -291,6 +292,7 @@ void Sequence::getShownTrackLimits(int* video_tracks, int* audio_tracks) {
   int at = 0;
   getTrackLimits(&vt, &at);
   for (auto it = track_states.constBegin(); it != track_states.constEnd(); ++it) {
+    if (!amber::track_state_index_valid(it.key())) continue;
     vt = qMin(vt, it.key());
     at = qMax(at, it.key());
   }

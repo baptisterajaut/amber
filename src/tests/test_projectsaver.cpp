@@ -71,6 +71,11 @@ QString fixture(const QString& url, const QString& footage) {
                   autoscale="1" type="%4" sequence="1" speed="1" maintainpitch="0" reverse="0">
                 <linked></linked>
             </clip>
+            <track index="2000000000" locked="1"/>
+            <track index="-2147483648" solo="1"/>
+            <track index="100" muted="1"/>
+            <track index="-100" hidden="1"/>
+            <track index="x" locked="1"/>
         </sequence>
     </sequences>
 </project>
@@ -295,6 +300,7 @@ class TestProjectSaver : public QObject {
     QVERIFY(inner->track_state(0).muted);
     QVERIFY(inner->track_state(1).solo);
     QVERIFY(!inner->track_state(-2).locked);  // only the flags that were written
+    // Outer's fixture <track>s are out of range or malformed: all dropped
     QVERIFY(find_media("Outer")->to_sequence()->track_states.isEmpty());
     SequencePtr outer2 = find_media("Outer")->to_sequence();
     QCOMPARE(outer2->clips.size(), 1);

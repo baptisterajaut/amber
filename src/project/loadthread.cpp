@@ -244,8 +244,8 @@ void LoadThread::parse_track_state(QXmlStreamReader& stream, Sequence* s) {
       t.locked = on;
     }
   }
-  // a missing or malformed index is ignored rather than landing on V1/A1
-  if (index_ok) s->set_track_state(index, t);
+  // a missing, malformed or out-of-range index is ignored rather than landing on V1/A1
+  if (index_ok && amber::track_state_index_valid(index)) s->set_track_state(index, t);
 }
 
 QString LoadThread::resolve_footage_url(const QString& raw_url) {

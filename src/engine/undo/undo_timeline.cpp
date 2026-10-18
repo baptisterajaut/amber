@@ -82,12 +82,21 @@ void SetTrackStateCommand::apply(const QMap<int, TrackState>& states) {
   }
   // The render thread reads track_states unlocked (collect_active_clips). Both maps stay shared with this command, so
   // the assignment only swaps which one the sequence points at and never frees one a render is reading.
+  bool locks_changed = false;
+  for (int track : seq->track_states.keys() + states.keys()) {
+    if (seq->track_states.value(track).locked != states.value(track).locked) {
+      locks_changed = true;
+      break;
+    }
+  }
   seq->track_states = states;
   // locking a track drops its selections (selections themselves aren't undone)
   seq->remove_locked_selections();
   if (amber::app_ctx) {
     amber::app_ctx->refreshViewer();
     amber::app_ctx->refreshTimeline();
+    // Effect Controls and the graph editor may still show a clip that just got locked: rebuild from what is left
+    if (locks_changed) amber::app_ctx->updateUi(true);
   }
 }
 
