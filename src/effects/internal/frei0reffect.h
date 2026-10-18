@@ -52,8 +52,8 @@ public:
   void migrate_old_positions();
   QLibrary handle;
   f0r_instance_t instance{nullptr};
-  int param_count;
-  f0rGetParamInfo get_param_info;
+  int param_count{0};  // stays 0 (no rows) when the plugin fails to load
+  f0rGetParamInfo get_param_info{nullptr};
   void destruct_module();
   void construct_module(int width, int height);
   bool open{false};

@@ -88,9 +88,9 @@ Frei0rEffect::Frei0rEffect(Clip* c, const EffectMeta *em) :
   }
   info_func(&info);
 
-  param_count = info.num_params;
-
   get_param_info = reinterpret_cast<f0rGetParamInfo>(handle.resolve("f0r_get_param_info"));
+  // f0r_get_param_info is mandatory, but a plugin lacking it would be called through null: no parameters then
+  param_count = get_param_info != nullptr ? info.num_params : 0;
   for (int i=0;i<param_count;i++) {
     f0r_param_info_t param_info;
     get_param_info(&param_info, i);
