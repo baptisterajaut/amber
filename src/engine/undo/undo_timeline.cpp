@@ -74,6 +74,8 @@ void SetTrackStateCommand::apply(const QMap<int, TrackState>& states) {
     qWarning() << "SetTrackStateCommand: seq is null";
     return;
   }
+  // The render thread reads track_states unlocked (collect_active_clips). Both maps stay shared with this command, so
+  // the assignment only swaps which one the sequence points at and never frees one a render is reading.
   seq->track_states = states;
   // locking a track drops its selections (selections themselves aren't undone)
   seq->remove_locked_selections();
