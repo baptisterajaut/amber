@@ -135,8 +135,9 @@ void RenderQueue::Render() {
     TakeOutcomes(index);  // the jobs before: done, failed or skipped
     started_ = index;
     rendering_row_ = run_rows_.at(index);
-    emit Changed();
+    // JobStarted first: a view resets the row's progress there, Changed then shows it at 0 %, not the last job's 100 %
     emit JobStarted(rendering_row_, index, count);
+    emit Changed();
   });
   connect(batch_, &BatchExport::ProgressChanged, this, &RenderQueue::ProgressChanged);
   connect(batch_, &BatchExport::PassChanged, this, &RenderQueue::PassChanged);

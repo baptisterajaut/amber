@@ -83,7 +83,7 @@ class RenderQueue : public QObject {
  signals:
   // A row added, removed or its outcome changed
   void Changed();
-  // row of Jobs(); number from 0 of count, the rows this Render() renders
+  // row of Jobs(); number from 0 of count, the rows this Render() renders. Comes before the Changed() of that start.
   void JobStarted(int row, int number, int count);
   // The running export's
   void ProgressChanged(int value, qint64 remaining_ms);
