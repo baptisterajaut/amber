@@ -338,6 +338,7 @@ set(OLIVE_SOURCES
   ui/comboboxex.h
   ui/cursors.cpp
   ui/cursors.h
+  ui/decimalinput.h
   ui/effectui.cpp
   ui/effectui.h
   ui/embeddedfilechooser.cpp
