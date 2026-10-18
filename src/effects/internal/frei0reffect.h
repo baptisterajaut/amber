@@ -54,7 +54,7 @@ class Frei0rEffect : public Effect {
   void migrate_old_positions();
   QLibrary handle;
   f0r_instance_t instance{nullptr};
-  int param_count;
+  int param_count{0};  // stays 0 (no rows) when the plugin fails to load
   f0rGetParamInfo get_param_info{nullptr};
   f0rUpdateFunc update_func_{nullptr};
   f0rSetParamValue set_param_func_{nullptr};
