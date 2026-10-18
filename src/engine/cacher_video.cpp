@@ -143,7 +143,8 @@ void Cacher::CacheVideoWorker() {
       int64_t zero = 0;
 
       // Some formats don't seek reliably to the last keyframe, as a result we need to seek in a loop to ensure we
-      // get a frame prior to the timestamp
+      // get a frame prior to the timestamp. Also seek further back while nothing is decodable from there to the end
+      // (EOF: a target past the media's last frame, e.g. a proxy a frame short of its original)
       do {
 
         // if we already allocated a frame here, we'd better free it
@@ -164,9 +165,10 @@ void Cacher::CacheVideoWorker() {
         seek_ts = qMax(zero, seek_ts - second_pts);
 
         have_existing_frame_to_use = true;
-      } while (seek_retrieve_code >= 0
-              && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts)
-              && !seeked_to_zero);
+      } while (
+          (seek_retrieve_code == AVERROR_EOF ||
+           (seek_retrieve_code >= 0 && (decoded_frame->pts == AV_NOPTS_VALUE || decoded_frame->pts > target_pts))) &&
+          !seeked_to_zero);
 
       // also we assume none of the frames in the queue are usable
       queue_.lock();
@@ -263,6 +265,13 @@ void Cacher::CacheVideoWorker() {
           // again, an EOF isn't an "error" but will how we add frames (see below)
 
           qCritical() << "Failed to retrieve frame from buffersink." << retrieve_code;
+          av_frame_free(&decoded_frame);
+          break;
+
+        } else if (retrieve_code == AVERROR_EOF) {
+
+          // EOF hands back the frame RetrieveFrameAndProcess() allocated, which nothing filled: never queue or retrieve
+          // it. A target past the media's last frame then gets the last decoded one, the closest-frame fallback below.
           av_frame_free(&decoded_frame);
           break;
 
@@ -377,24 +386,7 @@ void Cacher::CacheVideoWorker() {
 
         } else {
 
-          // Frame has no timestamp. For still images (JPEG, PNG, etc.) this is expected —
-          // assign PTS 0 so the frame is usable. For video codecs this can happen after
-          // seeking; in that case use the target PTS as a reasonable approximation.
-
-          decoded_frame->pts = target_pts;
-
-          if (retrieve_code == AVERROR_EOF) {
-            // No more frames — this was the last one, use it directly
-            if (retrieved_frame == nullptr) {
-              SetRetrievedFrame(decoded_frame);
-            }
-            queue_.lock();
-            queue_.append(decoded_frame);
-            queue_.unlock();
-            break;
-          }
-
-          // Not stored anywhere — free it, the decode loop allocates a fresh frame on the next pass
+          // No timestamp to place it in the queue: free it, the decode loop allocates a fresh frame on the next pass
           av_frame_free(&decoded_frame);
 
         }
