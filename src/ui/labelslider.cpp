@@ -95,7 +95,7 @@ QString LabelSlider::ValueToString() {
   } else {
     switch (display_type) {
     case FrameNumber:
-      return frame_to_timecode(long(v), amber::CurrentConfig.timecode_view, frame_rate);
+      return signed_frame_to_timecode(long(v), amber::CurrentConfig.timecode_view, frame_rate);
     case Percent:
       return QString::number((v*100), 'f', decimal_places).append("%");
     case Decibel:
@@ -312,7 +312,7 @@ void LabelSlider::ShowDialog()
     if (s.isEmpty()) return;
 
     // parse string timecode to a frame number
-    d = timecode_to_frame(s, amber::CurrentConfig.timecode_view, frame_rate);
+    d = signed_timecode_to_frame(s, amber::CurrentConfig.timecode_view, frame_rate);
 
   } else {
 
