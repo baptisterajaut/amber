@@ -505,13 +505,17 @@ EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
 void ViewerWidget::move_gizmos(QMouseEvent* event, bool done) {
   const QRectF fr = frame_rect();
   if (selected_gizmo != nullptr && !fr.isEmpty()) {
-    // CBA: rounded per mouse event, so past 100% zoom a 1 px move is 0 or 1 sequence pixel; carry the remainder if
-    // slow drags feel off
     double multiplier_x = double(viewer->seq->width) / fr.width();
     double multiplier_y = double(viewer->seq->height) / fr.height();
 
-    int x_movement = qRound((event->position().toPoint().x() - drag_start_x) * multiplier_x);
-    int y_movement = qRound((event->position().toPoint().y() - drag_start_y) * multiplier_y);
+    // Carry the rounding remainder: rounded per event, slow drags past 100% zoom would never move and drags below a
+    // non-integer zoom would overshoot
+    double dx = (event->position().toPoint().x() - drag_start_x) * multiplier_x + gizmo_x_rem_;
+    double dy = (event->position().toPoint().y() - drag_start_y) * multiplier_y + gizmo_y_rem_;
+    int x_movement = qRound(dx);
+    int y_movement = qRound(dy);
+    gizmo_x_rem_ = dx - x_movement;
+    gizmo_y_rem_ = dy - y_movement;
 
     gizmos->gizmo_move(selected_gizmo, x_movement, y_movement,
                        get_timecode(gizmos->parent_clip, gizmos->parent_clip->sequence->playhead), done);
@@ -598,7 +602,16 @@ void ViewerWidget::press_set_gizmo_drag(QMouseEvent* event) {
   drag_start_y = event->position().toPoint().y();
   gizmo_x_mvmt = 0;
   gizmo_y_mvmt = 0;
+  gizmo_x_rem_ = 0;
+  gizmo_y_rem_ = 0;
   selected_gizmo = get_gizmo_from_mouse(drag_start_x, drag_start_y);
+}
+
+bool ViewerWidget::gizmo_handle_at(const QPoint& widget_pos) {
+  // A guide can be grabbed anywhere along its length, a handle only at its spot. A gizmo body (polygon) doesn't win,
+  // so a guide stays grabbable across a transformed clip
+  EffectGizmo* g = get_gizmo_from_mouse(widget_pos.x(), widget_pos.y());
+  return g != nullptr && g->get_type() != GIZMO_TYPE_POLY;
 }
 
 void ViewerWidget::mousePressEvent(QMouseEvent* event) {
@@ -612,7 +625,8 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
     QPointF sp = amber::viewer_to_sequence(frame_geometry(), event->position());
     int video_x = qRound(sp.x());
     int image_y = qRound(sp.y());
-    if (press_handle_guide(video_x, image_y, event)) return;
+    bool on_handle = (event->buttons() & Qt::LeftButton) && gizmo_handle_at(event->position().toPoint());
+    if (!on_handle && press_handle_guide(video_x, image_y, event)) return;
     if (event->buttons() & Qt::LeftButton) press_set_gizmo_drag(event);
   } else if (event->buttons() & Qt::LeftButton) {
     press_set_gizmo_drag(event);
@@ -620,7 +634,7 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   dragging = true;
 }
 
-bool ViewerWidget::move_handle_guide_drag(int video_x, int image_y) {
+bool ViewerWidget::move_handle_guide_drag(int video_x, int image_y, const QPoint& widget_pos) {
   if (dragging_guide_index_ >= 0) {
     Guide& g = viewer->seq->guides[dragging_guide_index_];
     int raw_pos = (g.orientation == Guide::Horizontal) ? image_y : video_x;
@@ -638,7 +652,8 @@ bool ViewerWidget::move_handle_guide_drag(int video_x, int image_y) {
     update();
     return true;
   }
-  if (!dragging && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
+  if (!dragging && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides &&
+      !gizmo_handle_at(widget_pos)) {
     bool hit_mirror = false;
     int idx = find_guide_at(video_x, image_y, &hit_mirror);
     if (idx >= 0) {
@@ -689,7 +704,7 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
     int video_x = qRound(sp.x());
     int image_y = qRound(sp.y());
 
-    if (move_handle_guide_drag(video_x, image_y)) return;
+    if (move_handle_guide_drag(video_x, image_y, event->position().toPoint())) return;
     hovered_guide_index_ = -1;
   }
 

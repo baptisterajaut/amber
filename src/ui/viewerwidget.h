@@ -141,13 +141,15 @@ class ViewerWidget : public QRhiWidget {
   void guide_action_delete();
   void guide_action_mirror();
   // Returns true if the event was fully handled (caller should return).
-  bool move_handle_guide_drag(int video_x, int image_y);
+  bool move_handle_guide_drag(int video_x, int image_y, const QPoint& widget_pos);
   void move_handle_dragging(QMouseEvent* event);
   // Returns true if the event was fully handled by color-pick mode (caller should return).
   bool press_handle_color_pick(QMouseEvent* event);
   // Returns true if a guide was hit (right-click context menu or left-click drag started).
   bool press_handle_guide(int video_x, int image_y, QMouseEvent* event);
   void press_set_gizmo_drag(QMouseEvent* event);
+  // True over a gizmo handle (dot/target), which takes the mouse before a guide under it
+  bool gizmo_handle_at(const QPoint& widget_pos);
   // Uploads a new frame texture to the RHI pipeline if the frame dimensions changed.
   void render_update_frame_texture(QRhiResourceUpdateBatch* u, const char* frame_data, int fw, int fh);
   bool creating_guide_{false};
@@ -166,6 +168,9 @@ class ViewerWidget : public QRhiWidget {
   int drag_start_y;
   int gizmo_x_mvmt;
   int gizmo_y_mvmt;
+  // Sub-pixel gizmo drag movement not yet applied, carried between mouse events
+  double gizmo_x_rem_{0};
+  double gizmo_y_rem_{0};
   EffectGizmo* selected_gizmo{nullptr};
   RenderThread* renderer;
   QOffscreenSurface* gl_fallback_surface_{nullptr};  // owned by us, created on GUI thread
