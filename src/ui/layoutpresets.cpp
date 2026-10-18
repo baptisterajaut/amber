@@ -1,5 +1,6 @@
 #include "layoutpresets.h"
 
+#include <QCryptographicHash>
 #include <QDebug>
 #include <QFile>
 #include <QFileInfo>
@@ -88,6 +89,14 @@ QVector<LayoutEntry> list_layouts(const QDir& dir) {
   std::sort(list.begin(), list.end(),
             [](const LayoutEntry& a, const LayoutEntry& b) { return a.name.compare(b.name, Qt::CaseInsensitive) < 0; });
   return list;
+}
+
+QString layout_file_for(const QDir& dir, const QString& name) {
+  for (const LayoutEntry& layout : list_layouts(dir)) {
+    if (layout.name == name) return layout.path;
+  }
+  const QByteArray hash = QCryptographicHash::hash(name.toUtf8(), QCryptographicHash::Sha1).toHex().left(8);
+  return dir.filePath(sanitize_layout_name(name) + '-' + QString::fromLatin1(hash) + ".xml");
 }
 
 }  // namespace amber

@@ -24,7 +24,7 @@ struct LayoutEntry {
   QString path;
 };
 
-// Characters outside [A-Za-z0-9 _-] become '_'. The file of a user layout is "<sanitized>.xml".
+// Characters outside [A-Za-z0-9 _-] become '_': the readable part of a user layout's file name (see layout_file_for)
 QString sanitize_layout_name(const QString& name);
 
 bool write_layout_file(const QString& path, const LayoutData& data);
@@ -35,6 +35,11 @@ bool read_layout_file(const QString& path, LayoutData* data);
 // The readable *.xml layouts of dir, sorted by name (case-insensitive). A layout without a name attribute is listed
 // under its file base name.
 QVector<LayoutEntry> list_layouts(const QDir& dir);
+
+// The file the user layout called `name` is saved to in dir: the layout already stored under that exact name, whatever
+// its file is called (older versions used "<sanitized>.xml"), else "<sanitized>-<hash>.xml". The hash of the real name
+// keeps names that sanitize alike apart ("Edit!"/"Edit?", accents, CJK, case on Windows/macOS file systems).
+QString layout_file_for(const QDir& dir, const QString& name);
 
 }  // namespace amber
 
