@@ -132,6 +132,7 @@ add_library(amber-engine OBJECT
   effects/effectfields.h
   effects/effectgizmo.cpp effects/effectgizmo.h
   effects/effectloaders.cpp effects/effectloaders.h
+  effects/effectpresets.cpp effects/effectpresets.h
   effects/effectrow.cpp effects/effectrow.h
   effects/keyframe.cpp effects/keyframe.h
   effects/transition.cpp effects/transition.h

@@ -119,6 +119,12 @@ class EffectControls : public Panel {
   void DeleteEffect(ComboAction* ca, Effect* effect_ref);
 
   void show_effect_menu(int type, int subtype);
+  // The "Presets" submenu at the top of the Add Video/Audio Effect menus
+  void add_presets_menu(Menu& effects_menu, int subtype);
+  // Appends the preset's effects to the selected clips of effect_menu_subtype's kind, one undo entry
+  void apply_preset(const QString& path, const QString& name);
+  // "Save as Preset..." from `clicked`'s title menu: the selected effects of its subtype, or just it if unselected
+  void save_preset(EffectUI* clicked);
   // Adds `meta` (an effect or a transition, per effect_menu_type/subtype) to the selected clips, one undo entry
   void add_effect_to_selected_clips(const EffectMeta* meta);
   void load_keyframes();

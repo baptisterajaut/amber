@@ -21,20 +21,25 @@
 #include "effectcontrols.h"
 
 #include <QApplication>
+#include <QFileInfo>
 #include <QIcon>
+#include <QInputDialog>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QShowEvent>
 #include <QSpacerItem>
+#include <QStatusBar>
 #include <QTimer>
 #include <QVBoxLayout>
 
 #include "dialogs/shadertoyimportdialog.h"
 #include "effects/effect.h"
 #include "effects/effectloaders.h"
+#include "effects/effectpresets.h"
 #include "effects/transition.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
@@ -52,6 +57,7 @@
 #include "ui/collapsiblewidget.h"
 #include "ui/icons.h"
 #include "ui/keyframeview.h"
+#include "ui/mainwindow.h"
 #include "ui/menu.h"
 #include "ui/menuhelper.h"
 #include "ui/resizablescrollbar.h"
@@ -98,15 +104,10 @@ void EffectControls::set_zoom(bool in) {
 }
 
 void EffectControls::menu_select(QAction* q) {
+  // Actions without a meta (ShaderToy import, presets) have their own triggered handler; QMenu::triggered still
+  // reaches here for them, submenu actions included
   const EffectMeta* meta = reinterpret_cast<const EffectMeta*>(q->data().value<quintptr>());
-  if (meta == nullptr) {
-    // "Import ShaderToy Shader...", the only action without a meta
-    ShaderToyImportDialog dialog(this);
-    if (dialog.exec() == QDialog::Accepted && dialog.imported_meta() != nullptr) {
-      add_effect_to_selected_clips(dialog.imported_meta());
-    }
-    return;
-  }
+  if (meta == nullptr) return;
   add_effect_to_selected_clips(meta);
 }
 
@@ -248,13 +249,109 @@ void EffectControls::show_effect_menu(int type, int subtype) {
 
   effects_loaded_mutex.unlock();
 
+  if (type == EFFECT_TYPE_EFFECT) {
+    add_presets_menu(effects_menu, subtype);
+  }
+
   if (type == EFFECT_TYPE_EFFECT && subtype == EFFECT_TYPE_VIDEO) {
     effects_menu.addSeparator();
-    effects_menu.addAction(tr("Import ShaderToy Shader..."));  // no data: menu_select opens the import dialog
+    effects_menu.addAction(tr("Import ShaderToy Shader..."), this, [this]() {
+      ShaderToyImportDialog dialog(this);
+      if (dialog.exec() == QDialog::Accepted && dialog.imported_meta() != nullptr) {
+        add_effect_to_selected_clips(dialog.imported_meta());
+      }
+    });
   }
 
   connect(&effects_menu, &QMenu::triggered, this, &EffectControls::menu_select);
   effects_menu.exec(QCursor::pos());
+}
+
+// Added after the effect actions, which are inserted sorted by text, so that "Presets" stays first
+void EffectControls::add_presets_menu(Menu& effects_menu, int subtype) {
+  auto* presets_menu = new Menu(&effects_menu);
+  presets_menu->setTitle(tr("Presets"));
+
+  const QVector<EffectPresetInfo> presets = ListEffectPresets(subtype);
+  if (presets.isEmpty()) {
+    presets_menu->addAction(tr("No presets yet: right-click an effect's title to save one"))->setEnabled(false);
+  } else {
+    for (const EffectPresetInfo& p : presets) {
+      presets_menu->addAction(p.name, this, [this, p]() { apply_preset(p.path, p.name); });
+    }
+    presets_menu->addSeparator();
+    auto* delete_menu = new Menu(presets_menu);
+    delete_menu->setTitle(tr("Delete Preset"));
+    for (const EffectPresetInfo& p : presets) {
+      delete_menu->addAction(p.name, this, [this, p]() {
+        if (QMessageBox::question(this, tr("Delete Preset"), tr("Delete preset '%1'?").arg(p.name),
+                                  QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+          QFile::remove(p.path);
+        }
+      });
+    }
+    presets_menu->addMenu(delete_menu);
+  }
+
+  QAction* first = effects_menu.actions().value(0);
+  effects_menu.insertMenu(first, presets_menu);
+  effects_menu.insertSeparator(first);
+}
+
+void EffectControls::apply_preset(const QString& path, const QString& name) {
+  ComboAction* ca = new ComboAction(tr("Apply Preset"));
+  int missing = 0;
+  for (auto c : selected_clips_) {
+    if ((c->track() < 0) != (effect_menu_subtype == EFFECT_TYPE_VIDEO)) continue;
+    // Appended without the paste conflict dialog: presets stack, as in Premiere, and Ctrl+Z is one step away
+    for (const EffectPtr& e : LoadEffectPreset(path, c, &missing)) {
+      ca->append(new AddEffectCommand(c, e, nullptr));
+    }
+  }
+  if (ca->hasActions()) {
+    amber::UndoStack.push(ca);
+  } else {
+    delete ca;
+  }
+  if (missing > 0 && amber::MainWindow != nullptr) {
+    amber::MainWindow->statusBar()->showMessage(
+        tr("%1 effect(s) in preset '%2' are not available on this system").arg(QString::number(missing), name), 5000);
+  }
+  Reload();
+  if (panel_sequence_viewer != nullptr) {
+    panel_sequence_viewer->viewer_widget->frame_update();
+  }
+}
+
+void EffectControls::save_preset(EffectUI* clicked) {
+  Effect* clicked_effect = clicked->GetEffect();
+  const int subtype = clicked_effect->meta->subtype;
+  QVector<Effect*> preset_effects;
+  if (clicked->IsSelected()) {
+    for (auto open_effect : open_effects_) {
+      Effect* e = open_effect->GetEffect();
+      if (open_effect->IsSelected() && e->meta->type == EFFECT_TYPE_EFFECT && e->meta->subtype == subtype) {
+        preset_effects.append(e);
+      }
+    }
+  } else {
+    preset_effects.append(clicked_effect);
+  }
+
+  bool ok = false;
+  const QString name = QInputDialog::getText(this, tr("Save as Preset"), tr("Preset name:"), QLineEdit::Normal,
+                                             preset_effects.size() == 1 ? clicked_effect->meta->name : QString(), &ok)
+                           .trimmed();
+  if (!ok || name.isEmpty()) return;
+
+  const QString path = EffectPresetPathForName(name);
+  if (QFileInfo::exists(path) && QMessageBox::question(this, tr("Save as Preset"), tr("Replace preset '%1'?").arg(name),
+                                                       QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
+    return;
+  }
+  if (!SaveEffectPreset(path, name, subtype, preset_effects)) {
+    QMessageBox::critical(this, tr("Save Preset Failed"), tr("Failed to open \"%1\" for writing.").arg(path));
+  }
 }
 
 void EffectControls::Clear(bool clear_cache) {
@@ -305,6 +402,7 @@ void EffectControls::open_effect(QVBoxLayout* layout, Effect* e) {
 
   connect(container, &EffectUI::CutRequested, this, &EffectControls::cut);
   connect(container, &EffectUI::CopyRequested, this, [this]() { copy(); });
+  connect(container, &EffectUI::SavePresetRequested, this, [this, container]() { save_preset(container); });
   connect(container, &EffectUI::deselect_others, this, &EffectControls::deselect_all_effects);
   connect(container, &EffectUI::visibleChanged, this, [this]() { SyncLabelColumnWidth(); });
 
