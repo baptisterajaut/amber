@@ -187,6 +187,25 @@ class TestEffects : public QObject {
     }
   }
 
+  // A plugin that fails to load (moved, uninstalled) leaves an effect with no rows that passes frames through
+  void frei0rMissingPluginPassesThrough() {
+    EffectMeta meta;
+    meta.name = "Gone";
+    meta.category = "Frei0r";
+    meta.path = "/nonexistent";
+    meta.filename = "gone.so";
+    meta.internal = EFFECT_INTERNAL_FREI0R;
+    ScopedAppContext app_ctx;
+    Sequence seq;
+    Clip clip(&seq);
+    Frei0rEffect effect(&clip, &meta);
+    QCOMPARE(effect.row_count(), 0);
+    QByteArray in(8 * 8 * 4, char(40));
+    QByteArray out(8 * 8 * 4, char(0));
+    effect.process_image(0.0, reinterpret_cast<uint8_t*>(in.data()), reinterpret_cast<uint8_t*>(out.data()), 8, 8, 32);
+    QCOMPARE(out, in);
+  }
+
   // Positions saved before they were scaled from the fields' 0-100 to the plugin's 0-1 were sent as is, so only 0-1
   // meant anything: loading such data scales them by 100, static values, keyframes and their handles alike. Data
   // saved now carries a marker and loads unchanged, even a position within 1% of the corner.
