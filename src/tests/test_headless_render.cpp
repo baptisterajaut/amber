@@ -71,8 +71,8 @@ constexpr long kClipOut = 10;  // both clips span frames [0, 10)
 constexpr int kSourceFrames = 12;
 constexpr int kAudioRate = 48000;
 
-// kSourceFrames frames of an 8x8-pixel black/white checkerboard (limited range), YUV 4:2:0, as a Y4M stream
-QByteArray checkerboard_y4m() {
+// frames frames of an 8x8-pixel black/white checkerboard (limited range), YUV 4:2:0, as a Y4M stream
+QByteArray checkerboard_y4m(int frames = kSourceFrames) {
   QByteArray luma(kSize * kSize, Qt::Uninitialized);
   for (int y = 0; y < kSize; y++) {
     for (int x = 0; x < kSize; x++) {
@@ -82,7 +82,7 @@ QByteArray checkerboard_y4m() {
   const QByteArray chroma(kSize * kSize / 2, char(128));  // U and V planes, 32x32 each
   QByteArray y4m = QByteArray("YUV4MPEG2 W") + QByteArray::number(kSize) + " H" + QByteArray::number(kSize) + " F" +
                    QByteArray::number(int(kFps)) + ":1 Ip A1:1 C420jpeg\n";
-  for (int i = 0; i < kSourceFrames; i++) {
+  for (int i = 0; i < frames; i++) {
     y4m += "FRAME\n";
     y4m += luma;
     y4m += chroma;
@@ -680,13 +680,15 @@ class TestHeadlessRender : public QObject {
   }
 
   // Load, as the active sequence, a checkerboard original whose footage has a finished uniform grey proxy, plus a tone
-  // clip, and wait for the probes. The proxy holds proxy_frames frames. Callers return on QTest::currentTestFailed().
-  void load_proxied_project(const QString& name, int proxy_frames = kSourceFrames) {
+  // clip, and wait for the probes. The original holds source_frames frames, the proxy proxy_frames, both clips span
+  // [0, out). Callers return on QTest::currentTestFailed().
+  void load_proxied_project(const QString& name, int proxy_frames = kSourceFrames, int source_frames = kSourceFrames,
+                            long out = kClipOut) {
     const QString video = dir_.filePath(name + "_checkerboard.y4m");
     {
       QFile f(video);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(checkerboard_y4m());
+      f.write(checkerboard_y4m(source_frames));
     }
     const QString proxy = dir_.filePath(name + "_checkerboard.proxy.y4m");
     {
@@ -704,7 +706,7 @@ class TestHeadlessRender : public QObject {
     {
       QFile f(project);
       QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
-      f.write(fixture(project, video, audio, proxy).toUtf8());
+      f.write(fixture(project, video, audio, proxy, out).toUtf8());
     }
 
     bool succeeded = false;
@@ -1274,6 +1276,49 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(seek_ok, "seeking past the proxy's end did not hold its last frame");
     QVERIFY(inside_ok);
     QVERIFY2(decode_ok, "decoding past the proxy's end did not hold its last frame");
+  }
+
+  // Seconds past a proxy's end (as with media whose container overstates its length): the viewer holds the proxy's
+  // last frame, found in one jump back rather than a seek per second of overshoot, and further frames past the end are
+  // served without seeking again
+  void viewerFarPastProxyEnd() {
+    constexpr int kProxyFrames = 4;
+    constexpr int kFrames = 300;  // the original and the clip: 10 s at kFps
+    const bool saved = amber::CurrentConfig.use_proxies;
+    const auto restore = qScopeGuard([saved] { amber::CurrentConfig.use_proxies = saved; });
+    amber::CurrentConfig.use_proxies = true;
+    load_proxied_project("far_proxy", kProxyFrames, kFrames, kFrames);
+    if (QTest::currentTestFailed()) return;
+    SequencePtr seq = amber::ActiveSequence;
+
+    QOffscreenSurface* surface = QRhiGles2InitParams::newFallbackSurface();
+    auto* rt = new RenderThread();
+    rt->setGlFallbackSurface(surface);
+    rt->start();
+    auto grey_at = [&](long frame, const QString& file) -> bool {
+      const QString fn = dir_.filePath(file);
+      QFile::remove(fn);
+      seq->playhead = frame;
+      QElapsedTimer timer;
+      timer.start();
+      rt->start_render(seq.get(), 1, fn);  // re-queued until the clip's texture is ready
+      if (!QTest::qWaitFor([&] { return QFileInfo::exists(fn); }, 10000)) return false;
+      const QImage img(fn);
+      const int a = qGray(img.pixel(4, 4));
+      const int b = qGray(img.pixel(12, 4));
+      qInfo("frame %ld: %d %d in %lld ms (grey proxy: ~128 for both)", frame, a, b, timer.elapsed());
+      return qAbs(a - 128) <= 16 && qAbs(b - 128) <= 16;
+    };
+    // Freshly opened, 9.5 s past the proxy's end; then more than a second away from that, still past the end
+    const bool first_ok = grey_at(kFrames - 10, "far_past_proxy.png");
+    const bool second_ok = grey_at(kFrames / 2, "far_past_proxy_again.png");
+
+    close_active_clips(seq.get());  // before the render thread drains the deferred RHI deletions on shutdown
+    rt->cancel();
+    delete rt;
+    delete surface;
+    QVERIFY2(first_ok, "seconds past the proxy's end did not hold its last frame");
+    QVERIFY2(second_ok, "a second frame past the proxy's end did not hold its last frame");
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer

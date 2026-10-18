@@ -464,6 +464,17 @@ class Cacher : public QThread {
    */
   bool buffersrc_params_set_{false};
 
+  // Video: the largest pts decoded since the clip opened, and the pts of the media's real last frame once a decode
+  // reached EOF (AV_NOPTS_VALUE: not known yet). video_end_pts_ is written by the worker and read by
+  // cacheTryQueueHit(), both under queue_'s lock.
+  int64_t latest_decoded_pts_{AV_NOPTS_VALUE};
+  int64_t video_end_pts_{AV_NOPTS_VALUE};
+  // A target past the media's real end is its last frame
+  int64_t clampToVideoEnd(int64_t target_pts) const {
+    return (video_end_pts_ != AV_NOPTS_VALUE && target_pts > video_end_pts_) ? video_end_pts_ : target_pts;
+  }
+  int64_t cacheVideoLastDecodable(int64_t seek_ts);
+
   /**
    * @brief FFmpeg buffer sink
    *
