@@ -23,6 +23,10 @@
 
 #include "undoactions.h"
 
+#include "effects/internal/srtparser.h"
+
+class SubtitleEffect;
+
 class SetEffectEnabled : public AmberAction {
 public:
   SetEffectEnabled(Effect* e, bool enabled);
@@ -195,6 +199,19 @@ private:
   Member member_;
   QVariant old_value_;
   QVariant new_value_;
+};
+
+// Swaps a Subtitle effect's whole cue list (old <-> new): one Subtitle Editor gesture is one undo step. The
+// command's text names the gesture ("Edit Subtitle", "Shift Subtitles"...).
+class SetSubtitleCues : public AmberAction {
+public:
+  SetSubtitleCues(SubtitleEffect* e, const QVector<SubtitleCue>& new_cues, const QString& name);
+  void doUndo() override;
+  void doRedo() override;
+private:
+  SubtitleEffect* effect_;
+  QVector<SubtitleCue> old_cues_;
+  QVector<SubtitleCue> new_cues_;
 };
 
 #endif // UNDO_EFFECT_H

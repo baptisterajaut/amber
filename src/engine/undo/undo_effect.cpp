@@ -22,6 +22,7 @@
 
 #include "core/appcontext.h"
 #include "effects/effectfield.h"
+#include "effects/internal/subtitleeffect.h"
 #include "engine/clip.h"
 
 SetEffectEnabled::SetEffectEnabled(Effect *e, bool enabled) :
@@ -415,4 +416,19 @@ void KeyframeMemberChange::apply(const QVariant& value) {
     case kPostHandleX: key.post_handle_x = value.toDouble(); break;
     case kPostHandleY: key.post_handle_y = value.toDouble(); break;
   }
+}
+
+SetSubtitleCues::SetSubtitleCues(SubtitleEffect* e, const QVector<SubtitleCue>& new_cues, const QString& name)
+    : effect_(e), old_cues_(e->cues()), new_cues_(new_cues) {
+  setText(name);
+}
+
+void SetSubtitleCues::doUndo() {
+  effect_->SetCues(old_cues_);
+  if (amber::app_ctx) amber::app_ctx->refreshViewer();
+}
+
+void SetSubtitleCues::doRedo() {
+  effect_->SetCues(new_cues_);
+  if (amber::app_ctx) amber::app_ctx->refreshViewer();
 }

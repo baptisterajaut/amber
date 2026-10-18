@@ -2,12 +2,25 @@
 
 #include "core/math.h"
 #include "effects/effect.h"
+#include "effects/internal/subtitleeffect.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
+#include "engine/undo/undo_effect.h"
+#include "test_appcontext_stub.h"
 
 #ifndef NOFREI0R
 #include "effects/internal/frei0reffect.h"
 #endif
+
+namespace {
+// Effect::FieldChanged() and ~Effect call into amber::app_ctx: install a silent one for the test's lifetime. Declared
+// before the effects so it is destroyed after them.
+struct ScopedAppContext {
+  TestAppContext ctx;
+  ScopedAppContext() { amber::app_ctx = &ctx; }
+  ~ScopedAppContext() { amber::app_ctx = nullptr; }
+};
+}  // namespace
 
 class TestEffects : public QObject {
   Q_OBJECT
@@ -51,6 +64,82 @@ class TestEffects : public QObject {
     QString name = original.name();
     QColor restored(name);
     QCOMPARE(restored, original);
+  }
+
+  // The Subtitle Editor's undo step: redo installs the new cue list, undo restores the old one, each bumps the revision
+  // the editor watches
+  void subtitleCuesUndoRedo() {
+    EffectMeta meta;
+    meta.name = "Subtitle";
+    meta.category = "Render";
+    meta.internal = EFFECT_INTERNAL_SUBTITLE;
+    meta.type = EFFECT_TYPE_EFFECT;
+    ScopedAppContext app_ctx;
+    Sequence seq;
+    Clip clip(&seq);
+    SubtitleEffect effect(&clip, &meta);
+
+    const QVector<SubtitleCue> before = {{0, 1000, "One"}, {2000, 3000, "Two"}};
+    effect.SetCues(before);
+    const int rev = effect.cues_revision();
+
+    QVector<SubtitleCue> after = before;
+    after[1].text = "Two<br>edited";
+    after.append({4000, 4500, "Three"});
+
+    SetSubtitleCues action(&effect, after, "Edit Subtitle");
+    QCOMPARE(action.text(), QString("Edit Subtitle"));
+    QCOMPARE(effect.cues().size(), 2);  // nothing changes before redo
+
+    action.redo();
+    QCOMPARE(effect.cues().size(), 3);
+    QCOMPARE(effect.cues()[1].text, QString("Two<br>edited"));
+    QVERIFY(effect.cues_revision() > rev);
+
+    action.undo();
+    QCOMPARE(effect.cues().size(), 2);
+    QCOMPARE(effect.cues()[1].text, QString("Two"));
+
+    action.redo();
+    QCOMPARE(effect.cues()[2].start_ms, qint64(4000));
+  }
+
+  // Edited cues go through the unchanged <cues> save format: save() then load() on a fresh effect gives them back
+  void subtitleCuesSaveLoad() {
+    EffectMeta meta;
+    meta.name = "Subtitle";
+    meta.category = "Render";
+    meta.internal = EFFECT_INTERNAL_SUBTITLE;
+    meta.type = EFFECT_TYPE_EFFECT;
+    ScopedAppContext app_ctx;
+    Sequence seq;
+    Clip clip(&seq);
+    SubtitleEffect effect(&clip, &meta);
+    const QVector<SubtitleCue> cues = {{40, 1500, "A &amp; <i>b</i>"}, {1500, 99000, "line<br>break"}};
+    effect.SetCues(cues);
+
+    QByteArray xml;
+    QXmlStreamWriter writer(&xml);
+    writer.writeStartElement("effect");
+    effect.save(writer);
+    writer.writeEndElement();
+
+    SubtitleEffect loaded(&clip, &meta);
+    QXmlStreamReader reader(xml);
+    while (!reader.atEnd()) {
+      reader.readNext();
+      if (reader.isStartElement() && reader.name() == QLatin1String("effect")) {
+        loaded.load(reader);
+        break;
+      }
+    }
+
+    QCOMPARE(loaded.cues().size(), cues.size());
+    for (int i = 0; i < cues.size(); i++) {
+      QCOMPARE(loaded.cues()[i].start_ms, cues[i].start_ms);
+      QCOMPARE(loaded.cues()[i].end_ms, cues[i].end_ms);
+      QCOMPARE(loaded.cues()[i].text, cues[i].text);
+    }
   }
 
 #ifndef NOFREI0R
