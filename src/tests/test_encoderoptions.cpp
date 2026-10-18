@@ -8,6 +8,7 @@ extern "C" {
 #include <libavutil/opt.h>
 }
 
+#include <QElapsedTimer>
 #include <QTest>
 
 #include "rendering/batchexport.h"
@@ -118,6 +119,78 @@ class TestEncoderOptions : public QObject {
     QVERIFY(preset->choices.contains("ultrafast"));
     QVERIFY(preset->choices.contains("veryslow"));
     QCOMPARE(preset->choices.size(), preset->choice_labels.size());
+  }
+
+  void vaapiDescriptors_data() {
+    QTest::addColumn<QString>("encoder");
+    QTest::addColumn<int>("codec");
+    QTest::addColumn<QString>("quality_key");
+    QTest::addColumn<int>("max");
+    QTest::addColumn<int>("quality_default");
+    // qp runs 0..52 with 0 "not set" (the table's 1..51 stays); the defaults are FFmpeg's default_quality
+    // (encoderoptions.cpp). av1_vaapi has no qp: global_quality, 0..255 as AV1's base_q_idx.
+    QTest::newRow("h264_vaapi") << "h264_vaapi" << int(AV_CODEC_ID_H264) << "qp" << 51 << 20;
+    QTest::newRow("hevc_vaapi") << "hevc_vaapi" << int(AV_CODEC_ID_HEVC) << "qp" << 51 << 25;
+    QTest::newRow("av1_vaapi") << "av1_vaapi" << int(AV_CODEC_ID_AV1) << "global_quality" << 255 << 25;
+  }
+
+  // The VAAPI descriptors against the installed FFmpeg: constant QP or average bitrate, no two-pass, no option rows,
+  // NV12 then P010 offered to the probe
+  void vaapiDescriptors() {
+    QFETCH(QString, encoder);
+    QFETCH(int, codec);
+    QFETCH(QString, quality_key);
+    QFETCH(int, max);
+    QFETCH(int, quality_default);
+    if (avcodec_find_encoder_by_name(encoder.toUtf8().constData()) == nullptr) QSKIP("not in this FFmpeg build");
+    EncoderInfo info;
+    QVERIFY(amber::find_encoder_info(encoder, &info));
+    QCOMPARE(int(info.codec_id), codec);
+    QCOMPARE(info.label, QString("Hardware (VAAPI)"));
+    QCOMPARE(info.hw_device_type, AV_HWDEVICE_TYPE_VAAPI);
+    QCOMPARE(info.hw_sw_formats, (QVector<int>{AV_PIX_FMT_NV12, AV_PIX_FMT_P010}));
+    QCOMPARE(info.quality_key, quality_key);
+    QCOMPARE(info.quality_min, 1);
+    QCOMPARE(info.quality_max, max);
+    QCOMPARE(info.quality_default, quality_default);
+    QCOMPARE(info.quality_mode_options, (amber::EncoderOptionValues{{"rc_mode", "CQP"}}));
+    QVERIFY(info.supports_average_bitrate);
+    QVERIFY(!info.supports_two_pass);
+    QVERIFY(!amber::two_pass_works(info));
+    QVERIFY(info.options.isEmpty());
+    QCOMPARE(amber::hardware_frame_format(info.hw_device_type), AV_PIX_FMT_VAAPI);
+  }
+
+  // The probe fails cleanly without a device, for an unknown encoder and for a software one; with the default device
+  // it lists what it encodes, cached, and available_encoders() follows it, after the software encoders
+  void hardwareProbe() {
+    QVERIFY(!amber::hardware_encode_test("amber_no_such_encoder", AV_HWDEVICE_TYPE_VAAPI, AV_PIX_FMT_NV12));
+    EncoderInfo flac;
+    if (amber::find_encoder_info("flac", &flac)) QVERIFY(amber::hardware_encoder_formats(flac).isEmpty());
+    for (const char* name : {"h264_vaapi", "hevc_vaapi", "av1_vaapi"}) {
+      EncoderInfo info;
+      if (!amber::find_encoder_info(name, &info)) continue;  // not in this FFmpeg build
+      // A device node that doesn't exist: device creation fails, nothing else runs
+      QVERIFY(!amber::hardware_encode_test(name, AV_HWDEVICE_TYPE_VAAPI, AV_PIX_FMT_NV12, "/nonexistent/amber-dri"));
+      QElapsedTimer timer;
+      timer.start();
+      const QVector<int> formats = amber::hardware_encoder_formats(info);
+      const qint64 first = timer.elapsed();
+      QStringList names;
+      for (int f : formats) names.append(amber::hardware_format_label(f));
+      qInfo("%s: %s, probe %lld ms", name, formats.isEmpty() ? "unavailable" : qPrintable(names.join(", ")), first);
+      timer.restart();
+      QCOMPARE(amber::hardware_encoder_formats(info), formats);  // the cached answer
+      QVERIFY(timer.elapsed() < 50);
+      QCOMPARE(amber::hardware_encoder_works(info), !formats.isEmpty());
+      // NV12 comes first: without it nothing else is tried
+      if (!formats.isEmpty()) QCOMPARE(formats.first(), int(AV_PIX_FMT_NV12));
+      const QStringList listed = amber::available_encoders(info.codec_id);
+      QCOMPARE(listed.contains(name), !formats.isEmpty());
+      if (!formats.isEmpty()) QCOMPARE(listed.last(), QString(name));
+    }
+    QCOMPARE(amber::hardware_format_label(AV_PIX_FMT_NV12), QString("NV12 (8-bit)"));
+    QCOMPARE(amber::hardware_format_label(AV_PIX_FMT_P010), QString("P010 (10-bit)"));
   }
 
   void libsvtav1Ranges() {
@@ -272,13 +345,17 @@ class TestEncoderOptions : public QObject {
     QVERIFY(!amber::find_encoder_info("mpeg4", &info));
   }
 
-  // AV1: SVT-AV1, then rav1e, then libaom, whichever are installed, never a hardware encoder
+  // AV1: SVT-AV1, then rav1e, then libaom, whichever are installed, then VAAPI where it encodes
   void av1EncoderOrder() {
     const QStringList av1 = amber::available_encoders(AV_CODEC_ID_AV1);
     qInfo("AV1 encoders: %s", qPrintable(av1.join(", ")));
     QStringList expected;
     for (const char* name : {"libsvtav1", "librav1e", "libaom-av1"}) {
       if (avcodec_find_encoder_by_name(name) != nullptr) expected.append(name);
+    }
+    EncoderInfo vaapi;
+    if (amber::find_encoder_info("av1_vaapi", &vaapi) && amber::hardware_encoder_works(vaapi)) {
+      expected.append("av1_vaapi");
     }
     QCOMPARE(av1, expected);
   }
@@ -289,7 +366,12 @@ class TestEncoderOptions : public QObject {
     if (mpeg4 == nullptr) QSKIP("no MPEG-4 encoder");
     QCOMPARE(amber::available_encoders(AV_CODEC_ID_MPEG4), QStringList{QString(mpeg4->name)});
     if (avcodec_find_encoder_by_name("libx264") != nullptr) {
-      QCOMPARE(amber::available_encoders(AV_CODEC_ID_H264), QStringList{"libx264"});
+      QStringList expected{"libx264"};
+      EncoderInfo vaapi;
+      if (amber::find_encoder_info("h264_vaapi", &vaapi) && amber::hardware_encoder_works(vaapi)) {
+        expected.append("h264_vaapi");
+      }
+      QCOMPARE(amber::available_encoders(AV_CODEC_ID_H264), expected);
     }
   }
 
