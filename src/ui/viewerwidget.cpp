@@ -529,13 +529,9 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
     container->dragScrollPress(event->position().toPoint() * container->zoom);
   } else if (viewer->seq != nullptr && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
-    QPointF sp = amber::viewer_to_sequence(frame_geometry(), event->position());
-    int video_x = qRound(sp.x());
-    int image_y = qRound(sp.y());
-
     if (event->buttons() & Qt::RightButton) {
       bool hit_mirror = false;
-      int idx = find_guide_at(video_x, image_y, &hit_mirror);
+      int idx = find_guide_at(event->position(), &hit_mirror);
       if (idx >= 0) {
         show_guide_context_menu(idx, event->globalPosition().toPoint(), hit_mirror);
         setContextMenuPolicy(Qt::PreventContextMenu);
@@ -544,7 +540,7 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
       }
     } else if (event->buttons() & Qt::LeftButton) {
       bool hit_mirror = false;
-      int idx = gizmo_handle_at(event->position().toPoint()) ? -1 : find_guide_at(video_x, image_y, &hit_mirror);
+      int idx = gizmo_handle_at(event->position().toPoint()) ? -1 : find_guide_at(event->position(), &hit_mirror);
       if (idx >= 0) {
         dragging_guide_index_ = idx;
         dragging_guide_old_pos_ = viewer->seq->guides[idx].position;
@@ -615,7 +611,7 @@ void ViewerWidget::mouseMoveEvent(QMouseEvent* event) {
     if (!dragging && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides &&
         !gizmo_handle_at(event->position().toPoint())) {
       bool hit_mirror = false;
-      int idx = find_guide_at(video_x, image_y, &hit_mirror);
+      int idx = find_guide_at(event->position(), &hit_mirror);
       if (idx >= 0) {
         hovered_guide_index_ = idx;
         hovered_mirror_side_ = hit_mirror;
@@ -869,32 +865,33 @@ void ViewerWidget::draw_gizmos(QPainter& p) {
 
 }
 
-int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {
-  const QRectF fr = frame_rect();
-  if (viewer->seq == nullptr || fr.isEmpty()) return -1;
-  int threshold = qMax(3, int(5.0 * viewer->seq->width / fr.width()));
+int ViewerWidget::find_guide_at(const QPointF& widget_pos, bool* hit_mirror) const {
+  if (viewer->seq == nullptr || frame_rect().isEmpty()) return -1;
+  // Grab band each side of the line, widget pixels: the same on screen at any zoom
+  const double threshold = 5.0;
+  const amber::ViewerFrameGeometry fg = frame_geometry();
   for (int i = 0; i < viewer->seq->guides.size(); i++) {
     const Guide& g = viewer->seq->guides[i];
     if (g.orientation == Guide::Horizontal) {
-      if (qAbs(video_y - g.position) <= threshold) {
+      if (amber::viewer_line_distance(fg, true, g.position, widget_pos) <= threshold) {
         if (hit_mirror) *hit_mirror = false;
         return i;
       }
       if (g.mirror) {
         int mirror_pos = viewer->seq->height - g.position;
-        if (qAbs(video_y - mirror_pos) <= threshold) {
+        if (amber::viewer_line_distance(fg, true, mirror_pos, widget_pos) <= threshold) {
           if (hit_mirror) *hit_mirror = true;
           return i;
         }
       }
     } else {
-      if (qAbs(video_x - g.position) <= threshold) {
+      if (amber::viewer_line_distance(fg, false, g.position, widget_pos) <= threshold) {
         if (hit_mirror) *hit_mirror = false;
         return i;
       }
       if (g.mirror) {
         int mirror_pos = viewer->seq->width - g.position;
-        if (qAbs(video_x - mirror_pos) <= threshold) {
+        if (amber::viewer_line_distance(fg, false, mirror_pos, widget_pos) <= threshold) {
           if (hit_mirror) *hit_mirror = true;
           return i;
         }
