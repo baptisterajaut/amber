@@ -124,7 +124,9 @@ private:
   QMutex mutex;
   QWaitCondition waitCond;
   bool render_complete_{false};
-  bool container_opened_{false};  // avio_open succeeded: a file exists at params_.filename
+  // avio_open succeeded: a file exists at params_.filename. Never for an AVFMT_NOFILE muxer (image2): its frames stay
+  // on failure, as they always have
+  bool container_opened_{false};
 
   QString export_error;
 
