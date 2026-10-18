@@ -8,8 +8,6 @@ namespace amber::shadertoy {
 
 namespace {
 
-QString tr(const char* s) { return QCoreApplication::translate("ShaderToy", s); }
-
 // The header every generated shader starts with. The varying keeps common.vert's name `vTexCoord`: the GLSL 150
 // output of the OpenGL backend has no location qualifiers, so GL matches it by name.
 const char* const kHeader = R"(#version 440
@@ -129,7 +127,8 @@ QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString*
   int unterminated_line = 0;
   text = blank_comments(text, &unterminated_line);
   if (unterminated_line > 0) {
-    return reject(error, tr("Unterminated /* comment starting at line %1.").arg(unterminated_line));
+    return reject(error, QCoreApplication::translate("ShaderToy", "Unterminated /* comment starting at line %1.")
+                             .arg(unterminated_line));
   }
 
   // Ports and copy-pastes carry these; the header already declares all of them
@@ -141,15 +140,19 @@ QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString*
                           "iChannelResolution|iChannelTime|iSampleRate|iChannel[0-3])\\b[^;{}]*;")));
 
   if (!text.contains(QRegularExpression(QStringLiteral("\\bvoid\\s+mainImage\\s*\\(")))) {
-    return reject(error, tr("No mainImage() found: a ShaderToy shader defines "
-                            "void mainImage(out vec4 fragColor, in vec2 fragCoord)."));
+    return reject(error, QCoreApplication::translate("ShaderToy",
+                                                     "No mainImage() found: a ShaderToy shader defines "
+                                                     "void mainImage(out vec4 fragColor, in vec2 fragCoord)."));
   }
   if (text.contains(QRegularExpression(QStringLiteral("\\bvoid\\s+main\\s*\\(")))) {
-    return reject(error, tr("Remove main(): Amber generates main() and calls mainImage()."));
+    return reject(error, QCoreApplication::translate("ShaderToy",
+                                                     "Remove main(): Amber generates main() and calls mainImage()."));
   }
   const QRegularExpressionMatch channel = QRegularExpression(QStringLiteral("\\biChannel[1-3]\\b")).match(text);
   if (channel.hasMatch()) {
-    return reject(error, tr("%1 isn't available: only iChannel0 (the clip) in this version.").arg(channel.captured()));
+    return reject(error, QCoreApplication::translate("ShaderToy",
+                                                     "%1 isn't available: only iChannel0 (the clip) in this version.")
+                             .arg(channel.captured()));
   }
   // These sample with coordinates the helpers can't flip (gradients, offsets, gathers, projective coordinates)
   const QRegularExpressionMatch unflippable =
@@ -159,7 +162,8 @@ QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString*
                                         "texelFetchOffset|textureQueryLod)\\s*\\("))
           .match(text);
   if (unflippable.hasMatch()) {
-    return reject(error, tr("%1() on iChannel0 isn't supported in this version.").arg(unflippable.captured(1)));
+    return reject(error, QCoreApplication::translate("ShaderToy", "%1() on iChannel0 isn't supported in this version.")
+                             .arg(unflippable.captured(1)));
   }
 
   QSet<QString> reserved;
@@ -168,10 +172,12 @@ QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString*
   QString members;
   for (const Param& p : params) {
     if (reserved.contains(p.name) || p.name.startsWith(QLatin1String("amber_"))) {
-      return reject(error, tr("Parameter \"%1\" uses a name reserved by Amber.").arg(p.name));
+      return reject(
+          error,
+          QCoreApplication::translate("ShaderToy", "Parameter \"%1\" uses a name reserved by Amber.").arg(p.name));
     }
     if (seen.contains(p.name)) {
-      return reject(error, tr("Parameter \"%1\" is declared twice.").arg(p.name));
+      return reject(error, QCoreApplication::translate("ShaderToy", "Parameter \"%1\" is declared twice.").arg(p.name));
     }
     seen.insert(p.name);
     members += QStringLiteral("  %1 %2;\n").arg(p.glsl_type, p.name);
@@ -189,19 +195,21 @@ QString to_amber_glsl(const QString& src, const QVector<Param>& params, QString*
 }
 
 QString effect_name_error(const QString& name) {
-  if (name.isEmpty()) return tr("Enter a name for the effect.");
+  if (name.isEmpty()) return QCoreApplication::translate("ShaderToy", "Enter a name for the effect.");
   for (const QChar c : name) {
     if (c.unicode() < 0x20 || QStringLiteral("/\\:*?\"<>|").contains(c)) {
-      return tr("The name can't contain / \\ : * ? \" < > | or control characters.");
+      return QCoreApplication::translate("ShaderToy",
+                                         "The name can't contain / \\ : * ? \" < > | or control characters.");
     }
   }
   if (name.startsWith('.') || name.endsWith('.') || name.endsWith(' ')) {
-    return tr("The name can't start with a dot or end with a dot or a space.");
+    return QCoreApplication::translate("ShaderToy", "The name can't start with a dot or end with a dot or a space.");
   }
   // Windows refuses these as a file's base name, whatever the extension ("NUL.shadertoy", "con.v2")
   static const QRegularExpression kReserved(QStringLiteral("^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\\..*)?$"),
                                             QRegularExpression::CaseInsensitiveOption);
-  if (kReserved.match(name).hasMatch()) return tr("\"%1\" is a reserved device name on Windows.").arg(name);
+  if (kReserved.match(name).hasMatch())
+    return QCoreApplication::translate("ShaderToy", "\"%1\" is a reserved device name on Windows.").arg(name);
   return {};
 }
 

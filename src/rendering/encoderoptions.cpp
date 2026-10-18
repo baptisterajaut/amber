@@ -22,18 +22,24 @@ namespace amber {
 
 namespace {
 
-QString tr(const char* s) { return QCoreApplication::translate("EncoderOptions", s); }
-
 // x264 and x265 share their preset names (x264.h / x265.h x26x_preset_names; placebo left out)
 EncoderOption x26x_preset() {
   EncoderOption o;
   o.key = "preset";
-  o.label = tr("Speed preset:");  // "Preset:" is the export preset row at the top of the dialog
-  o.tooltip = tr("Slower presets make smaller files at the same quality");
+  o.label = QCoreApplication::translate(
+      "EncoderOptions", "Speed preset:");  // "Preset:" is the export preset row at the top of the dialog
+  o.tooltip = QCoreApplication::translate("EncoderOptions", "Slower presets make smaller files at the same quality");
   o.kind = EncoderOption::Choice;
   o.choices = {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"};
-  o.choice_labels = {tr("Ultrafast"), tr("Superfast"), tr("Very fast"), tr("Faster"),   tr("Fast"),
-                     tr("Medium"),    tr("Slow"),      tr("Slower"),    tr("Very slow")};
+  o.choice_labels = {QCoreApplication::translate("EncoderOptions", "Ultrafast"),
+                     QCoreApplication::translate("EncoderOptions", "Superfast"),
+                     QCoreApplication::translate("EncoderOptions", "Very fast"),
+                     QCoreApplication::translate("EncoderOptions", "Faster"),
+                     QCoreApplication::translate("EncoderOptions", "Fast"),
+                     QCoreApplication::translate("EncoderOptions", "Medium"),
+                     QCoreApplication::translate("EncoderOptions", "Slow"),
+                     QCoreApplication::translate("EncoderOptions", "Slower"),
+                     QCoreApplication::translate("EncoderOptions", "Very slow")};
   o.default_value = "medium";
   return o;
 }
@@ -53,9 +59,10 @@ EncoderOption int_option(const char* key, const QString& label, const QString& t
 }
 
 QVector<EncoderInfo> build_table() {
-  const QString x26x_crf_tooltip =
-      tr("Quality Factor:\n\n0 = lossless\n17-18 = visually lossless (compressed, but unnoticeable)\n23 = high "
-         "quality\n51 = lowest quality possible");
+  const QString x26x_crf_tooltip = QCoreApplication::translate(
+      "EncoderOptions",
+      "Quality Factor:\n\n0 = lossless\n17-18 = visually lossless (compressed, but unnoticeable)\n23 = high "
+      "quality\n51 = lowest quality possible");
   QVector<EncoderInfo> t;
 
   // ffmpeg -h encoder=libx264 (FFmpeg 9.0): -preset <string> (default "medium"); -crf <float> (from -1 to FLT_MAX)
@@ -65,8 +72,8 @@ QVector<EncoderInfo> build_table() {
   x264.codec_id = AV_CODEC_ID_H264;
   x264.label = "x264";
   x264.quality_key = "crf";
-  x264.quality_mode_label = tr("Quality-based (Constant Rate Factor)");
-  x264.quality_label = tr("Quality (CRF):");
+  x264.quality_mode_label = QCoreApplication::translate("EncoderOptions", "Quality-based (Constant Rate Factor)");
+  x264.quality_label = QCoreApplication::translate("EncoderOptions", "Quality (CRF):");
   x264.quality_tooltip = x26x_crf_tooltip;
   x264.quality_min = 0;
   x264.quality_max = 51;
@@ -99,10 +106,10 @@ QVector<EncoderInfo> build_table() {
   EncoderInfo svt;
   svt.name = "libsvtav1";
   svt.codec_id = AV_CODEC_ID_AV1;
-  svt.label = tr("SVT-AV1 (fast)");
+  svt.label = QCoreApplication::translate("EncoderOptions", "SVT-AV1 (fast)");
   svt.quality_key = "crf";
-  svt.quality_mode_label = tr("Quality-based (Constant Rate Factor)");
-  svt.quality_label = tr("Quality (CRF):");
+  svt.quality_mode_label = QCoreApplication::translate("EncoderOptions", "Quality-based (Constant Rate Factor)");
+  svt.quality_label = QCoreApplication::translate("EncoderOptions", "Quality (CRF):");
   svt.quality_min = 1;
   svt.quality_max = 63;
   svt.quality_default = 35;
@@ -115,9 +122,11 @@ QVector<EncoderInfo> build_table() {
   svt.supports_two_pass = true;
   svt.two_pass_min_avcodec = AV_VERSION_INT(62, 23, 104);
   svt.two_pass_probe = true;
-  svt.options = {int_option("preset", tr("Speed preset:"),
-                            tr("0 = slowest, smallest file\n13 = fastest\nDefault lets SVT-AV1 choose"), 0, 13,
-                            QString(), tr("Default"))};
+  svt.options = {
+      int_option("preset", QCoreApplication::translate("EncoderOptions", "Speed preset:"),
+                 QCoreApplication::translate("EncoderOptions",
+                                             "0 = slowest, smallest file\n13 = fastest\nDefault lets SVT-AV1 choose"),
+                 0, 13, QString(), QCoreApplication::translate("EncoderOptions", "Default"))};
   t.append(svt);
 
   // ffmpeg -h encoder=librav1e: -qp <int> (from -1 to 255) (default -1); -speed <int> (from -1 to 10) (default -1).
@@ -127,8 +136,8 @@ QVector<EncoderInfo> build_table() {
   rav1e.codec_id = AV_CODEC_ID_AV1;
   rav1e.label = "rav1e";
   rav1e.quality_key = "qp";
-  rav1e.quality_mode_label = tr("Quality-based (Constant Quantizer)");
-  rav1e.quality_label = tr("Quantizer (QP):");
+  rav1e.quality_mode_label = QCoreApplication::translate("EncoderOptions", "Quality-based (Constant Quantizer)");
+  rav1e.quality_label = QCoreApplication::translate("EncoderOptions", "Quantizer (QP):");
   rav1e.quality_min = 0;
   rav1e.quality_max = 255;
   rav1e.quality_default = 100;
@@ -136,9 +145,11 @@ QVector<EncoderInfo> build_table() {
   // No two-pass: librav1e.c handles PASS1/PASS2 (225-249, 517-535), but never asks rav1e to emit pass data
   // (rav1e_config_set_emit_data, rav1e.h), so stats_out stays empty: ffmpeg -pass 1 writes a 0-byte log with
   // FFmpeg 9.0.2 and rav1e 0.8.1
-  rav1e.options = {int_option("speed", tr("Speed:"),
-                              tr("0 = slowest, smallest file\n10 = fastest\nDefault lets rav1e choose (6)"), 0, 10,
-                              QString(), tr("Default"))};
+  rav1e.options = {
+      int_option("speed", QCoreApplication::translate("EncoderOptions", "Speed:"),
+                 QCoreApplication::translate("EncoderOptions",
+                                             "0 = slowest, smallest file\n10 = fastest\nDefault lets rav1e choose (6)"),
+                 0, 10, QString(), QCoreApplication::translate("EncoderOptions", "Default"))};
   t.append(rav1e);
 
   // ffmpeg -h encoder=libaom-av1: -cpu-used <int> (from 0 to 8) (default 1); -crf <int> (from -1 to 63) (default -1).
@@ -147,10 +158,10 @@ QVector<EncoderInfo> build_table() {
   EncoderInfo aom;
   aom.name = "libaom-av1";
   aom.codec_id = AV_CODEC_ID_AV1;
-  aom.label = tr("libaom (slow)");
+  aom.label = QCoreApplication::translate("EncoderOptions", "libaom (slow)");
   aom.quality_key = "crf";
-  aom.quality_mode_label = tr("Quality-based (Constant Rate Factor)");
-  aom.quality_label = tr("Quality (CRF):");
+  aom.quality_mode_label = QCoreApplication::translate("EncoderOptions", "Quality-based (Constant Rate Factor)");
+  aom.quality_label = QCoreApplication::translate("EncoderOptions", "Quality (CRF):");
   aom.quality_min = 0;
   aom.quality_max = 63;
   aom.quality_default = 32;
@@ -158,7 +169,9 @@ QVector<EncoderInfo> build_table() {
   // libaomenc.c:840-845 and 921-945: PASS1/PASS2 select the first/last pass, PASS2 decodes stats_in; 1387-1397:
   // stats_out at the drain. Unconditional since the wrapper came in n4.0 (libaomenc.c:325-328, 394-421, 639-648).
   aom.supports_two_pass = true;
-  aom.options = {int_option("cpu-used", tr("Speed:"), tr("0 = slowest, smallest file\n8 = fastest"), 0, 8, "1")};
+  aom.options = {int_option("cpu-used", QCoreApplication::translate("EncoderOptions", "Speed:"),
+                            QCoreApplication::translate("EncoderOptions", "0 = slowest, smallest file\n8 = fastest"), 0,
+                            8, "1")};
   t.append(aom);
 
   // ffmpeg -h encoder=libvpx-vp9: -crf <int> (from -1 to 63) (default -1); -cpu-used <int> (from -8 to 8) (default 1).
@@ -172,15 +185,17 @@ QVector<EncoderInfo> build_table() {
   vp9.codec_id = AV_CODEC_ID_VP9;
   vp9.label = "libvpx";
   vp9.quality_key = "crf";
-  vp9.quality_mode_label = tr("Quality-based (Constant Quality)");
-  vp9.quality_label = tr("Quality (CRF):");
+  vp9.quality_mode_label = QCoreApplication::translate("EncoderOptions", "Quality-based (Constant Quality)");
+  vp9.quality_label = QCoreApplication::translate("EncoderOptions", "Quality (CRF):");
   vp9.quality_min = 0;
   vp9.quality_max = 63;
   vp9.quality_default = 31;
   vp9.supports_average_bitrate = true;
   vp9.supports_two_pass = true;
-  vp9.options = {int_option("cpu-used", tr("Speed:"),
-                            tr("Higher is faster, lower makes smaller files at the same quality"), 0, 8, "1")};
+  vp9.options = {int_option(
+      "cpu-used", QCoreApplication::translate("EncoderOptions", "Speed:"),
+      QCoreApplication::translate("EncoderOptions", "Higher is faster, lower makes smaller files at the same quality"),
+      0, 8, "1")};
   t.append(vp9);
 
   // compression_level is a generic AVCodecContext option (-1 = encoder default); flacenc.c uses 5 for -1 and
@@ -189,8 +204,10 @@ QVector<EncoderInfo> build_table() {
   flac.name = "flac";
   flac.codec_id = AV_CODEC_ID_FLAC;
   flac.label = "FLAC";
-  flac.options = {int_option("compression_level", tr("Compression level:"),
-                             tr("Higher = smaller file, slower export; always lossless"), 0, 12, "5")};
+  flac.options = {
+      int_option("compression_level", QCoreApplication::translate("EncoderOptions", "Compression level:"),
+                 QCoreApplication::translate("EncoderOptions", "Higher = smaller file, slower export; always lossless"),
+                 0, 12, "5")};
   t.append(flac);
 
   // Hardware encoders last: available_encoders() keeps the table order, so they come after the software ones of their
@@ -202,10 +219,10 @@ QVector<EncoderInfo> build_table() {
   EncoderInfo h264_vaapi;
   h264_vaapi.name = "h264_vaapi";
   h264_vaapi.codec_id = AV_CODEC_ID_H264;
-  h264_vaapi.label = tr("Hardware (VAAPI)");
+  h264_vaapi.label = QCoreApplication::translate("EncoderOptions", "Hardware (VAAPI)");
   h264_vaapi.quality_key = "qp";
-  h264_vaapi.quality_mode_label = tr("Quality-based (Constant QP)");
-  h264_vaapi.quality_label = tr("Quality (QP):");
+  h264_vaapi.quality_mode_label = QCoreApplication::translate("EncoderOptions", "Quality-based (Constant QP)");
+  h264_vaapi.quality_label = QCoreApplication::translate("EncoderOptions", "Quality (QP):");
   h264_vaapi.quality_min = 1;
   h264_vaapi.quality_max = 51;
   h264_vaapi.quality_default = 20;
@@ -228,7 +245,7 @@ QVector<EncoderInfo> build_table() {
   av1_vaapi.name = "av1_vaapi";
   av1_vaapi.codec_id = AV_CODEC_ID_AV1;
   av1_vaapi.quality_key = "global_quality";
-  av1_vaapi.quality_label = tr("Quantizer (QP):");
+  av1_vaapi.quality_label = QCoreApplication::translate("EncoderOptions", "Quantizer (QP):");
   av1_vaapi.quality_max = 255;
   av1_vaapi.quality_default = 25;
   t.append(av1_vaapi);
@@ -540,9 +557,9 @@ bool hardware_encoder_works(const EncoderInfo& info) { return !hardware_encoder_
 QString hardware_format_label(int sw_format) {
   switch (sw_format) {
     case AV_PIX_FMT_NV12:
-      return tr("NV12 (8-bit)");
+      return QCoreApplication::translate("EncoderOptions", "NV12 (8-bit)");
     case AV_PIX_FMT_P010:
-      return tr("P010 (10-bit)");
+      return QCoreApplication::translate("EncoderOptions", "P010 (10-bit)");
     default:
       return QString::fromUtf8(av_get_pix_fmt_name(static_cast<AVPixelFormat>(sw_format)));
   }
