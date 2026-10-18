@@ -2266,6 +2266,35 @@ class TestHeadlessRender : public QObject {
     QVERIFY(!QFileInfo::exists(params.filename));
   }
 
+  // An image sequence leaves its frames and nothing else: image2 opens each frame's file itself, so no empty file
+  // named after the pattern ("frame%05d.png")
+  void exportImageSequenceWritesOnlyFrames() {
+    if (avcodec_find_encoder(AV_CODEC_ID_PNG) == nullptr) QSKIP("PNG encoder not in this FFmpeg build");
+    SequencePtr seq = solid_sequence(3);
+    const QString folder = dir_.filePath("image_sequence");
+    QVERIFY(QDir().mkpath(folder));
+    ExportParams params;
+    params.filename = QDir(folder).filePath("frame%05d.png");
+    params.video_enabled = true;
+    params.video_codec = AV_CODEC_ID_PNG;
+    params.video_width = kSize;
+    params.video_height = kSize;
+    params.video_compression_type = COMPRESSION_TYPE_CBR;
+    params.video_bitrate = 20.0;  // Mbps
+    params.audio_enabled = false;
+    params.start_frame = 0;
+    params.end_frame = 3;
+    const QString error = export_sequence(seq.get(), params, AV_PIX_FMT_RGB24);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    const QStringList entries = dir_entries(folder);
+    qInfo("image sequence: %s", qPrintable(entries.join(", ")));
+    QCOMPARE(entries, QStringList({"frame00001.png", "frame00002.png", "frame00003.png"}));
+    for (const QString& f : entries) {
+      QCOMPARE(QImage(QDir(folder).filePath(f)).size(), QSize(kSize, kSize));
+    }
+  }
+
   // Save Frame writes a PNG with straight alpha too, and a format without alpha the composite over black
   void saveFrameWritesStraightAlpha_data() {
     QTest::addColumn<QString>("file");
@@ -2427,9 +2456,8 @@ class TestHeadlessRender : public QObject {
       QVERIFY(run_batch(batch));
       QCOMPARE(batch.ExportedCount(), 1);
     }
-    // The frames, not the empty file ExportThread::SetupContainer() leaves under the pattern's own name: it
-    // avio_open()s the path although image2 writes its own files (a single image-sequence export leaves it too)
-    const auto frames = [&folder]() { return dir_entries(folder).filter(QRegularExpression("\\d\\.png$")); };
+    // Every entry is a frame: no file under the pattern's own name (exportImageSequenceWritesOnlyFrames())
+    const auto frames = [&folder]() { return dir_entries(folder); };
     qInfo("first export: %s", qPrintable(dir_entries(folder).join(", ")));
     const QStringList first = frames();
     QCOMPARE(first.size(), 3);
