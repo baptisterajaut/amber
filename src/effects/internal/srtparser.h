@@ -48,6 +48,11 @@ bool cue_times_valid(qint64 start_ms, qint64 end_ms);
 QString cue_text_to_lines(const QString& text);
 QString cue_lines_to_text(const QString& lines);
 
+// Cue text as the HTML the SubtitleEffect renders: the style tags (<i>, <b>, <u>, <s>, their closers, any case) and
+// <br> are kept, every other '<' and '>' is escaped so "a < b and c > d" shows as written instead of being read as a
+// tag
+QString cue_text_to_html(const QString& text);
+
 // The SubtitleEffect's time in ms at a clip-local frame (playhead - timeline_in + clip_in), computed exactly the way
 // rendering does: get_timecode() = frame / frame_rate seconds, then qRound64(timecode * 1000). Clip speed plays no
 // part, as it plays none in the effect's timecode.

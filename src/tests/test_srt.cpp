@@ -8,6 +8,9 @@ class TestSrt : public QObject {
   void testBasicParse();
   void testHtmlTags();
   void testUnsupportedTagsStripped();
+  void testLiteralAngleBracketsKept();
+  void testAssOverridesStripped();
+  void testCueTextToHtml();
   void testMultiLineCue();
   void testMalformedCueSkipped();
   void testEmptyFile();
@@ -73,6 +76,31 @@ void TestSrt::testUnsupportedTagsStripped() {
   auto result = parse_srt(f.fileName());
   QCOMPARE(result.cues.size(), 1);
   QCOMPARE(result.cues[0].text, QString("colored text"));
+}
+
+// Only markup is stripped: a '<' or '>' that is text stays, and the renderer gets it escaped
+void TestSrt::testLiteralAngleBracketsKept() {
+  auto result = parse_srt_text(
+      "1\n00:00:01,000 --> 00:00:02,000\nif a < b and c > d\n<3 you > all\n\n"
+      "2\n00:00:03,000 --> 00:00:04,000\n<s>struck</s> <FONT COLOR=\"red\">red</FONT> <I>it</I>\n\n");
+  QCOMPARE(result.cues.size(), 2);
+  QCOMPARE(result.cues[0].text, QString("if a < b and c > d<br><3 you > all"));
+  QCOMPARE(result.cues[1].text, QString("<s>struck</s> red <I>it</I>"));
+}
+
+void TestSrt::testAssOverridesStripped() {
+  auto result =
+      parse_srt_text("1\n00:00:01,000 --> 00:00:02,000\n{\\an8}Top\n{\\i1}slanted{\\i0} {not an override}\n\n");
+  QCOMPARE(result.cues.size(), 1);
+  QCOMPARE(result.cues[0].text, QString("Top<br>slanted {not an override}"));
+}
+
+void TestSrt::testCueTextToHtml() {
+  QCOMPARE(cue_text_to_html("if a < b and c > d"), QString("if a &lt; b and c &gt; d"));
+  QCOMPARE(cue_text_to_html("<i>x</i><br>y <3<BR/><B>z</B> <s>s</s>"),
+           QString("<i>x</i><br>y &lt;3<BR/><B>z</B> <s>s</s>"));
+  QCOMPARE(cue_text_to_html("<span>s</span>"), QString("&lt;span&gt;s&lt;/span&gt;"));
+  QCOMPARE(cue_text_to_html(""), QString());
 }
 
 void TestSrt::testMultiLineCue() {

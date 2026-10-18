@@ -297,7 +297,7 @@ QString SubtitleEffect::CollectActiveCues(const QVector<SubtitleCue>& cues, qint
   for (int i = 0; i < cues.size(); i++) {
     if (cues[i].start_ms <= time_ms && time_ms < cues[i].end_ms) {
       if (!active_text.isEmpty()) active_text += QLatin1String("<br>");
-      active_text += cues[i].text;
+      active_text += cue_text_to_html(cues[i].text);
     }
   }
   return active_text;
