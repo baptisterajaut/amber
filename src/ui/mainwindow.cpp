@@ -264,6 +264,10 @@ MainWindow::MainWindow(QWidget* parent)
     }
   }
 
+  // install the translator before any UI text is built: the status bar welcome message and the auto-recovery prompt
+  // (check_for_autorecovery_file) are shown once and never retranslated
+  amber::Global->load_translation_from_config();
+
   Restyle();
 
   amber::icon::Initialize();
@@ -288,9 +292,6 @@ MainWindow::MainWindow(QWidget* parent)
 
   // start omnipotent proxy generator process
   amber::proxy_generator.start();
-
-  // load preferred language from file
-  amber::Global->load_translation_from_config();
 
   // set default strings
   Retranslate();
@@ -963,6 +964,10 @@ void MainWindow::setup_menus() {
 }
 
 void MainWindow::Retranslate() {
+  // The translator is installed before the menus and panels exist (see the constructor); a LanguageChange delivered
+  // in between has nothing to retranslate yet, and the constructor calls Retranslate() once they are built.
+  if (file_menu == nullptr) return;
+
   file_menu->setTitle(tr("&File"));
   new_menu->setTitle(tr("&New"));
   open_project->setText(tr("&Open Project"));

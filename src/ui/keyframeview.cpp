@@ -83,7 +83,7 @@ void KeyframeView::show_context_menu(const QPoint& pos) {
     QAction* hold = menu.addAction(tr("Hold"));
     hold->setData(EFFECT_KEYFRAME_HOLD);
     menu.addSeparator();
-    menu.addAction("Graph Editor");
+    menu.addAction(tr("Graph Editor"));
     menu.addSeparator();
     QAction* properties = menu.addAction(tr("Properties..."));
     properties->setData(-2);  // sentinel to distinguish from type actions

@@ -26,6 +26,7 @@
 #include <QApplication>
 #include <QStyleFactory>
 #include <QDebug>
+#include <QLibraryInfo>
 
 #include "panels/panels.h"
 #include "core/path.h"
@@ -75,6 +76,7 @@ OliveGlobal::OliveGlobal()
 
   // alloc QTranslator
   translator = std::unique_ptr<QTranslator>(new QTranslator());
+  qt_translator = std::unique_ptr<QTranslator>(new QTranslator());
 }
 
 const QString &OliveGlobal::get_project_file_filter() {
@@ -153,6 +155,12 @@ QString OliveGlobal::get_recent_project_list_file() {
   return get_data_dir().filePath("recents");
 }
 
+// Never read by Amber: lupdate extracts it, and QGuiApplication looks it up whenever a translator is installed or
+// removed, switching the whole UI to right-to-left when the loaded language translates it as "RTL".
+//: Translate this string to "RTL" for right-to-left languages (Arabic, Hebrew...), "LTR" for all others.
+[[maybe_unused]] static const char* const kLayoutDirectionMarker =
+    QT_TRANSLATE_NOOP("QGuiApplication", "QT_LAYOUT_DIRECTION");
+
 void OliveGlobal::load_translation_from_config() {
   QString language_file = amber::CurrentRuntimeConfig.external_translation_file.isEmpty() ?
         amber::CurrentConfig.language_file :
@@ -161,8 +169,9 @@ void OliveGlobal::load_translation_from_config() {
   // clear runtime language file so if the user sets a different language, we won't load it next time
   amber::CurrentRuntimeConfig.external_translation_file.clear();
 
-  // remove current translation if there is one
+  // remove current translations if there are any
   QApplication::removeTranslator(translator.get());
+  QApplication::removeTranslator(qt_translator.get());
 
   if (!language_file.isEmpty()) {
 
@@ -172,6 +181,24 @@ void OliveGlobal::load_translation_from_config() {
     // load translation file
     if (QFileInfo::exists(full_language_path)
         && translator->load(full_language_path)) {
+      // Qt's own strings (standard dialog buttons, key names in shortcuts) in the same language, else they stay in
+      // English (under KDE Plasma the platform theme supplies the button texts itself, in the system language). Same
+      // locale parsing as the language list in PreferencesDialog ("amber_pt-BR" -> pt-BR). Not looked up in Amber's
+      // language folders: the language list shows every .qm found there.
+      const QString base_name = QFileInfo(language_file).baseName();
+      const QLocale locale(base_name.mid(base_name.lastIndexOf('_') + 1));
+      // <appdir>/translations: Windows packages; Contents/Resources/translations: macOS bundle (data files don't
+      // belong in Contents/MacOS, which code signing treats as code); Qt's own path: AppImage (qt.conf) and system Qt.
+      const QDir app_dir(get_app_path());
+      for (const QString& dir : {app_dir.filePath("translations"), app_dir.filePath("../Resources/translations"),
+                                 QLibraryInfo::path(QLibraryInfo::TranslationsPath)}) {
+        if (qt_translator->load(locale, "qtbase", "_", dir)) {
+          QApplication::installTranslator(qt_translator.get());
+          break;
+        }
+      }
+
+      // installed last so it is searched first: Amber's file wins over Qt's on shared contexts
       QApplication::installTranslator(translator.get());
     } else {
       qWarning() << "Failed to load translation file" << full_language_path << ". No language will be loaded.";
