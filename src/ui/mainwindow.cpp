@@ -60,6 +60,7 @@
 #include "project/proxygenerator.h"
 #include "rendering/audio.h"
 #include "rendering/renderfunctions.h"
+#include "rendering/renderqueue.h"
 #include "ui/appcontextimpl.h"
 #include "ui/cursors.h"
 #include "ui/focusfilter.h"
@@ -668,6 +669,9 @@ void MainWindow::setup_menus() {
 
   export_action = MenuHelper::create_menu_action(file_menu, "export", amber::Global.get(), SLOT(open_export_dialog()),
                                                  QKeySequence("Ctrl+M"));
+  render_queue_action =
+      MenuHelper::create_menu_action(file_menu, "renderqueue", amber::Global.get(), SLOT(open_render_queue_dialog()));
+  connect(&amber::render_queue(), &RenderQueue::Changed, this, &MainWindow::update_render_queue_action);
   export_frame_action = MenuHelper::create_menu_action(file_menu, "exportframe", panel_sequence_viewer->viewer_widget,
                                                        SLOT(save_frame()), QKeySequence("Ctrl+Shift+E"));
 
@@ -1158,6 +1162,8 @@ void MainWindow::Retranslate() {
   relink_media_action->setStatusTip(tr("Reconnect media files that have moved or are missing"));
   export_action->setText(tr("&Export..."));
   export_action->setStatusTip(tr("Render and export the active sequence to a video file"));
+  update_render_queue_action();
+  render_queue_action->setStatusTip(tr("Render the exports queued from the Export dialog"));
   export_frame_action->setText(tr("Export &Frame..."));
   export_frame_action->setStatusTip(tr("Export the current frame as an image"));
   exit_action->setText(tr("E&xit"));
@@ -1675,6 +1681,13 @@ void MainWindow::set_panels_locked(bool locked) {
   }
 
   amber::CurrentConfig.locked_panels = locked;
+}
+
+void MainWindow::update_render_queue_action() {
+  const RenderQueue& queue = amber::render_queue();
+  const int pending = queue.PendingCount();
+  render_queue_action->setText(pending > 0 ? tr("Render Queue (%1)...").arg(pending) : tr("Render Queue..."));
+  render_queue_action->setEnabled(queue.Count() > 0);
 }
 
 void MainWindow::fileMenu_About_To_Be_Shown() {

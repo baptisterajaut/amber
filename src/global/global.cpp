@@ -38,6 +38,7 @@
 #include "dialogs/footagerelinkdialog.h"
 #include "dialogs/loaddialog.h"
 #include "dialogs/preferencesdialog.h"
+#include "dialogs/renderqueuedialog.h"
 #include "dialogs/speeddialog.h"
 #include "dialogs/welcomedialog.h"
 #include "effects/effectloaders.h"
@@ -409,6 +410,11 @@ void AmberGlobal::open_export_dialog() {
     ExportDialog e(amber::MainWindow);
     e.exec();
   }
+}
+
+void AmberGlobal::open_render_queue_dialog() {
+  RenderQueueDialog d(amber::MainWindow);
+  d.exec();
 }
 
 void AmberGlobal::finished_initialize() {
