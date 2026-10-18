@@ -57,6 +57,7 @@
 #include "transition.h"
 
 #include "effects/internal/audionoiseeffect.h"
+#include "effects/internal/choruseffect.h"
 #include "effects/internal/compressoreffect.h"
 #include "effects/internal/cornerpineffect.h"
 #include "effects/internal/delayeffect.h"
@@ -68,6 +69,7 @@
 #include "effects/internal/paneffect.h"
 #include "effects/internal/parametriceqeffect.h"
 #include "effects/internal/progressbareffect.h"
+#include "effects/internal/reverbeffect.h"
 #include "effects/internal/richtexteffect.h"
 #include "effects/internal/shakeeffect.h"
 #include "effects/internal/solideffect.h"
@@ -360,6 +362,10 @@ static EffectPtr CreateInternalEffect(Clip* c, const EffectMeta* em) {
       return std::make_shared<LimiterEffect>(c, em);
     case EFFECT_INTERNAL_DELAY:
       return std::make_shared<DelayEffect>(c, em);
+    case EFFECT_INTERNAL_REVERB:
+      return std::make_shared<ReverbEffect>(c, em);
+    case EFFECT_INTERNAL_CHORUS:
+      return std::make_shared<ChorusEffect>(c, em);
     default:
       return nullptr;
   }

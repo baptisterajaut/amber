@@ -22,8 +22,8 @@ extern "C" {
 #include "effects/transition.h"
 #include "engine/clip.h"
 #include "rendering/renderfunctions.h"
-#include "tests/test_render_harness.h"
 #include "tests/test_gpu_required.h"
+#include "tests/test_render_harness.h"
 
 // External entry point from effectloaders.cpp (no header export), as in test_render_harness.cpp
 extern void load_shader_effects_worker(const QString& effects_path);
@@ -89,6 +89,7 @@ class TestEffectsGpu : public QObject {
   void audioDynamicsDefaultsProcess();
   void parametricEqDefaultsAreBitExact();
   void limiterHoldsFullScaleSquare();
+  void reverbChorusMixZeroIsBitExact();
 
   // Phase 3a — Blur family (XML shader effects).
   void boxblurRadiusZero();
@@ -1538,7 +1539,7 @@ void TestEffectsGpu::audioDynamicsDefaultsProcess() {
   // Tone -> each stateful audio effect at its defaults: processes the chunk and leaves an audible signal. The
   // harness calls process_audio() outside a cacher, so the effects see stream nullptr at 48 kHz.
   const EffectInternal ids[] = {EFFECT_INTERNAL_PARAMETRICEQ, EFFECT_INTERNAL_COMPRESSOR, EFFECT_INTERNAL_LIMITER,
-                                EFFECT_INTERNAL_DELAY};
+                                EFFECT_INTERNAL_DELAY,        EFFECT_INTERNAL_REVERB,     EFFECT_INTERNAL_CHORUS};
   for (EffectInternal id : ids) {
     auto seq = h_->make_sequence(64, 64, 30.0);
     Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
@@ -1578,6 +1579,29 @@ void TestEffectsGpu::limiterHoldsFullScaleSquare() {
   qInfo("limiter on a full-scale square: peak %d (ceiling %.1f)", peak, 32768 * qPow(10.0, -1.0 / 20.0));
   QVERIFY2(peak <= 29205, qPrintable(QString("peak %1").arg(peak)));
   QVERIFY2(peak >= 29000, qPrintable(QString("peak %1").arg(peak)));
+}
+
+void TestEffectsGpu::reverbChorusMixZeroIsBitExact() {
+  // Mix 0 skips the processing: the samples come out byte for byte. Mix is row 3 of Reverb, row 2 of Chorus.
+  const struct {
+    EffectInternal id;
+    int mix_row;
+  } cases[] = {{EFFECT_INTERNAL_REVERB, 3}, {EFFECT_INTERNAL_CHORUS, 2}};
+  for (const auto& tc : cases) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);
+    h_->set_field_double(c->effects[0].get(), 2, 0, 50.0);
+    const QByteArray ref = h_->render_audio(c, 0.0, 100);
+    EffectPtr fx = h_->attach_internal(c, tc.id, EFFECT_TYPE_EFFECT);
+    QVERIFY(fx != nullptr);
+    QByteArray buf = ref;
+    fx->process_audio(0.0, 0.1, reinterpret_cast<quint8*>(buf.data()), buf.size(), 2);
+    QVERIFY(buf != ref);  // the default mix does something
+    h_->set_field_double(fx.get(), tc.mix_row, 0, 0.0);
+    buf = ref;
+    fx->process_audio(0.1, 0.2, reinterpret_cast<quint8*>(buf.data()), buf.size(), 2);
+    QVERIFY(buf == ref);
+  }
 }
 
 // ---------------------------------------------------------------------------

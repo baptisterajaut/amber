@@ -1,7 +1,9 @@
 #include <QtMath>
 #include <QtTest>
 
+#include <algorithm>
 #include <cmath>
+#include <random>
 #include <vector>
 
 #include "core/audiodsp.h"
@@ -46,6 +48,30 @@ void delay_chunk(amber::StreamStates<DelayLine>& states, const amber::AudioProce
   if (reset) line->reset(ctx.sample_rate);
   line->set(10.0, 0.5, 0.5, ctx.sample_rate);
   line->process(frames, n);
+}
+
+// Sum of x^2 over both channels, frames [from, to)
+double energy(const std::vector<float>& v, int from, int to) {
+  double e = 0;
+  for (size_t i = size_t(from) * 2; i < size_t(to) * 2; i++) e += double(v[i]) * v[i];
+  return e;
+}
+
+// n frames of silence with a unit impulse on both channels at frame 0
+std::vector<float> impulse(int n) {
+  std::vector<float> v(size_t(n) * 2, 0.0f);
+  v[0] = v[1] = 1.0f;
+  return v;
+}
+
+// Impulse response of a fresh reverb, 100 % wet, processed in cacher-sized chunks
+std::vector<float> reverb_ir(double room, double damp, double width, int n) {
+  std::vector<float> v = impulse(n);
+  Reverb r;
+  r.reset(kRate);
+  r.set(room, damp, width, 1.0);
+  for (int i = 0; i < n; i += 4096) r.process(v.data() + size_t(i) * 2, std::min(4096, n - i));
+  return v;
 }
 
 }  // namespace
@@ -290,6 +316,159 @@ class TestAudioDsp : public QObject {
     b.set(peaking(1000, 12, 4, kRate));
     b.process(v.data(), kRate * 2);
     QCOMPARE(peak(v, kRate), 0.0);
+  }
+
+  void reverbMixZeroIsIdentity() {
+    std::vector<float> v = sine(440, 0.5, 8192);
+    const std::vector<float> ref = v;
+    Reverb r;
+    r.reset(kRate);
+    r.set(0.5, 0.5, 1.0, 0.0);
+    r.process(v.data(), 8192);
+    QVERIFY(v == ref);
+  }
+
+  void reverbImpulseTailDecays() {
+    const std::vector<float> v = reverb_ir(0.5, 0.5, 1.0, kRate * 2);
+    const double early = energy(v, kRate / 10, kRate * 6 / 10);
+    const double late = energy(v, kRate, kRate * 3 / 2);
+    qInfo("reverb impulse, room 50 %%: energy [0.1, 0.6] s %.6g, [1.0, 1.5] s %.6g", early, late);
+    QVERIFY(peak(v, kRate / 10) > 0);  // still ringing after 100 ms
+    QVERIFY(early > 0);
+    QVERIFY(late < early);
+  }
+
+  void reverbLargerRoomRingsLonger() {
+    const double small = energy(reverb_ir(0.3, 0.5, 1.0, kRate * 2), kRate, kRate * 2);
+    const double large = energy(reverb_ir(0.9, 0.5, 1.0, kRate * 2), kRate, kRate * 2);
+    qInfo("reverb impulse, energy [1, 2] s: room 30 %% %.6g, room 90 %% %.6g", small, large);
+    QVERIFY(large > small);
+  }
+
+  void reverbNoiseStaysBounded() {
+    // 10 s of full-scale white noise (both channels alike, the loudest tank input) at 100 % wet: finite, and below 4
+    // at the default room. The largest, least damped room rings much louder, but still doesn't run away.
+    const int n = kRate * 10;
+    const struct {
+      double room, damp, bound;
+    } cases[] = {{0.5, 0.5, 4.0}, {1.0, 0.0, 8.0}};
+    for (const auto& tc : cases) {
+      std::vector<float> v(size_t(n) * 2);
+      std::mt19937 rng(1234);
+      std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+      for (int i = 0; i < n; i++) v[i * 2] = v[i * 2 + 1] = dist(rng);
+      Reverb r;
+      r.reset(kRate);
+      r.set(tc.room, tc.damp, 1.0, 1.0);
+      for (int i = 0; i < n; i += 4096) r.process(v.data() + size_t(i) * 2, std::min(4096, n - i));
+      bool finite = true;
+      for (float x : v) finite = finite && std::isfinite(x);
+      const double p = peak(v, 0);
+      const double rms = std::sqrt(energy(v, n / 2, n) / n);
+      qInfo(
+          "reverb, 10 s of full-scale noise (rms 0.577), room %.0f %% damping %.0f %%: peak %.4f, rms %.4f (last 5 s)",
+          tc.room * 100, tc.damp * 100, p, rms);
+      QVERIFY(finite);
+      QVERIFY2(p < tc.bound, qPrintable(QString("peak %1").arg(p)));
+    }
+  }
+
+  void reverbWidthZeroIsMono() {
+    const std::vector<float> v = reverb_ir(0.5, 0.5, 0.0, kRate);
+    for (int i = 0; i < kRate; i++) {
+      QVERIFY2(v[i * 2] == v[i * 2 + 1],
+               qPrintable(QString("frame %1: %2 vs %3").arg(i).arg(v[i * 2]).arg(v[i * 2 + 1])));
+    }
+    // And full width is not
+    const std::vector<float> wide = reverb_ir(0.5, 0.5, 1.0, kRate);
+    bool differs = false;
+    for (int i = 0; i < kRate && !differs; i++) differs = wide[i * 2] != wide[i * 2 + 1];
+    QVERIFY(differs);
+  }
+
+  void reverbResetEmptiesTheTank() {
+    std::vector<float> v = impulse(kRate);
+    Reverb r;
+    r.reset(kRate);
+    r.set(0.5, 0.5, 1.0, 1.0);
+    r.process(v.data(), 1000);  // the impulse is in the combs, nothing out yet (the shortest is 1215 frames)
+    Reverb control = r;
+    r.reset(kRate);  // same rate: cleared in place
+    std::fill(v.begin(), v.end(), 0.0f);
+    std::vector<float> tail = v;
+    r.process(v.data(), kRate);
+    control.process(tail.data(), kRate);
+    QCOMPARE(peak(v, 0), 0.0);
+    QVERIFY(peak(tail, 0) > 0);  // without the reset it rings
+  }
+
+  void reverbTailFlushesToZero() {
+    const std::vector<float> v = reverb_ir(0.5, 0.5, 1.0, kRate * 12);
+    QCOMPARE(peak(v, kRate * 11), 0.0);
+  }
+
+  void chorusMixZeroIsIdentity() {
+    std::vector<float> v = sine(440, 0.5, 8192);
+    const std::vector<float> ref = v;
+    Chorus c;
+    c.reset(kRate);
+    c.set(1.0, 3.0, 0.0, kRate);
+    c.process(v.data(), 8192);
+    QVERIFY(v == ref);
+  }
+
+  void chorusDepthZeroIsAPlainDelay() {
+    // Base 7 ms = 336 frames at 48 kHz, an integer delay: the linear interpolation reads the sample itself
+    const int lag = int(std::lround(Chorus::kBaseMs * kRate / 1000.0));
+    QCOMPARE(lag, 336);
+    const int n = 8192;
+    std::vector<float> x(size_t(n) * 2);
+    std::mt19937 rng(42);
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+    for (float& s : x) s = dist(rng);
+    std::vector<float> v = x;
+    Chorus c;
+    c.reset(kRate);
+    c.set(1.0, 0.0, 0.5, kRate);
+    c.process(v.data(), n);
+    double d = 0;
+    for (int i = 0; i < n; i++) {
+      for (int ch = 0; ch < 2; ch++) {
+        const double delayed = i >= lag ? x[size_t(i - lag) * 2 + ch] : 0.0;
+        const double expected = x[size_t(i) * 2 + ch] * 0.5 + delayed * 0.5;
+        d = std::max(d, std::fabs(v[size_t(i) * 2 + ch] - expected));
+      }
+    }
+    QVERIFY2(d < 1e-4, qPrintable(QString("max delta %1").arg(d)));
+  }
+
+  void chorusSineStaysBoundedAndWide() {
+    std::vector<float> v = sine(440, 0.5, kRate);
+    Chorus c;
+    c.reset(kRate);
+    c.set(1.0, 3.0, 0.5, kRate);
+    c.process(v.data(), kRate);
+    const double p = peak(v, 0);
+    double side = 0;
+    for (int i = 0; i < kRate; i++) side = std::max(side, double(std::fabs(v[i * 2] - v[i * 2 + 1])));
+    qInfo("chorus, 0.5 sine, depth 3 ms, mix 50 %%: peak %.4f, max |L - R| %.4f", p, side);
+    QVERIFY(p <= 0.5 + 1e-6);
+    QVERIFY(side > 0.01);
+  }
+
+  void chorusLfoPersistsAcrossChunks() {
+    const std::vector<float> in = sine(440, 0.5, 8192);
+    std::vector<float> whole = in, split = in;
+    Chorus a, b;
+    a.reset(kRate);
+    b.reset(kRate);
+    a.set(2.0, 5.0, 0.5, kRate);
+    b.set(2.0, 5.0, 0.5, kRate);
+    a.process(whole.data(), 8192);
+    b.process(split.data(), 4096);
+    b.process(split.data() + 4096 * 2, 4096);
+    QVERIFY(whole == split);
+    QVERIFY(whole != in);
   }
 
   void scopeKeepsTheOutermostContext() {
