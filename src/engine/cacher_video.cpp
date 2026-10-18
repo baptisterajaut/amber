@@ -62,6 +62,18 @@ int64_t Cacher::videoTargetPts() const {
   return clampToVideoEnd(seconds_to_timestamp(clip, playhead_to_clip_seconds(clip, playhead_)) + start);
 }
 
+// yadif outputs a frame once it holds the next one and keeps the one before: after a seek it would hand out fields from
+// before it, with their old timestamps, ahead of the new position's. A fresh graph forgets them. Progressive graphs
+// hold no frame and are kept.
+void Cacher::cacheVideoResetDeinterlacer() {
+  if (filter_graph == nullptr || avfilter_graph_get_filter(filter_graph, "yadif") == nullptr) return;
+  avfilter_graph_free(&filter_graph);
+  buffersrc_ctx = nullptr;
+  buffersink_ctx = nullptr;
+  filter_graph = avfilter_graph_alloc();
+  if (filter_graph != nullptr) openWorkerVideoFilter(clip->media_stream());
+}
+
 void Cacher::CacheVideoWorker() {
   // Skip video caching if filter graph failed to initialize
   if (filter_graph == nullptr) {
@@ -182,6 +194,7 @@ void Cacher::CacheVideoWorker() {
         seeked_to_zero = (seek_ts == 0);
 
         avcodec_flush_buffers(codecCtx);
+        cacheVideoResetDeinterlacer();
         av_seek_frame(formatCtx, clip->media_stream_index(), seek_ts, AVSEEK_FLAG_BACKWARD);
 
         seek_retrieve_code = RetrieveFrameAndProcess(&decoded_frame);
@@ -529,6 +542,8 @@ int Cacher::RetrieveFrameAndProcess(AVFrame **f)
 
   // frame for FFmpeg to decode into
   *f = av_frame_alloc();
+  // No graph: rebuilding it after a seek failed (cacheVideoResetDeinterlacer())
+  if (buffersink_ctx == nullptr) return AVERROR(EINVAL);
 
   // loop to pull frames from the AVFilter stack
   while ((retrieve_code = av_buffersink_get_frame(buffersink_ctx, *f)) == AVERROR(EAGAIN)) {
@@ -580,6 +595,12 @@ int Cacher::RetrieveFrameAndProcess(AVFrame **f)
       // there are no more frames in this file
       if (read_code != AVERROR_EOF) {
         qCritical() << "Failed to read frame." << read_code;
+      } else if (avfilter_graph_get_filter(filter_graph, "yadif") != nullptr) {
+        // yadif lets a frame out once it holds the next one: the last frame waits for the end of the stream. That
+        // closes the graph, which the next seek rebuilds (cacheVideoResetDeinterlacer()).
+        av_buffersrc_add_frame_flags(buffersrc_ctx, nullptr, 0);
+        retrieve_code = av_buffersink_get_frame(buffersink_ctx, *f);
+        if (retrieve_code >= 0) read_code = 0;
       }
       break;
     }
@@ -587,6 +608,11 @@ int Cacher::RetrieveFrameAndProcess(AVFrame **f)
 
   if (read_code == AVERROR_EOF) {
     return AVERROR_EOF;
+  }
+  // yadif at field rate (mode=3) outputs in half the stream's time base, pts doubled: back to the stream's, which
+  // every target, queue lookup and seek compares against. A no-op without yadif (same time base).
+  if (retrieve_code >= 0 && (*f)->pts != AV_NOPTS_VALUE) {
+    (*f)->pts = av_rescale_q((*f)->pts, av_buffersink_get_time_base(buffersink_ctx), stream->time_base);
   }
   return retrieve_code;
 }
