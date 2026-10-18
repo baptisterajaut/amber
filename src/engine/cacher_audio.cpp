@@ -406,8 +406,10 @@ bool Cacher::cacheAudioFetchFrame(AVFrame*& frame, int& nb_bytes, bool reverse_a
     nb_bytes = frame->nb_samples * av_get_bytes_per_sample(static_cast<AVSampleFormat>(frame->format)) *
                frame->ch_layout.nb_channels;
   if (new_frame) {
+    // Effects take the clip-local time of the chunk's sample 0; audio_buffer_write is where sample frame_sample_index_
+    // lands (non-zero on the first chunk after a seek that stops short of its target, e.g. FLAC or MP3)
     apply_audio_effects(clip,
-                        bytes_to_seconds(audio_buffer_write, 2, current_audio_freq()) +
+                        bytes_to_seconds(audio_buffer_write - frame_sample_index_, 2, current_audio_freq()) +
                             double(audio_ibuffer_frame.load()) / clip->sequence->frame_rate +
                             ((double)clip->clip_in(true) / clip->sequence->frame_rate) -
                             ((double)timeline_in / last_fr),
@@ -581,8 +583,12 @@ void Cacher::CacheAudioWorker() {
       while ((frame_sample_index_ == -1 || frame_sample_index_ >= nb_bytes) && nb_bytes > 0) {
         // create "new frame"
         memset(frame_->data[0], 0, nb_bytes);
-        apply_audio_effects(clip, bytes_to_seconds(frame->pts, frame->ch_layout.nb_channels, frame->sample_rate), frame,
-                            nb_bytes, nests_);
+        // Effects take the clip-local time of the chunk's sample 0 (get_timecode()): the first chunk after a reset lands
+        // at the reset playhead or the clip's in point, pts counts the bytes generated since
+        const double first_chunk = double(qMax(timeline_in, target_frame) - timeline_in) / last_fr +
+                                   double(clip->clip_in(true)) / clip->sequence->frame_rate;
+        apply_audio_effects(clip, first_chunk + bytes_to_seconds(frame->pts, 2, current_audio_freq()), frame, nb_bytes,
+                            nests_);
         frame_->pts += nb_bytes;
         frame_sample_index_ = 0;
         if (audio_buffer_write == 0) {
