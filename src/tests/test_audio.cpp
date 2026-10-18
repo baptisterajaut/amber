@@ -87,6 +87,55 @@ class TestAudio : public QObject {
     QCOMPARE(get_buffer_offset_from_frame(30.0, 50), qint64(-1));
     audio_ibuffer_frame.store(0);
   }
+
+  // -- amber::apply_stereo_gain (track volume and pan) ------------------------
+
+  void testStereoGainUnityUntouched() {
+    QByteArray buf = stereo({1000, -2000, 32767, -32768});
+    const QByteArray before = buf;
+    amber::apply_stereo_gain(reinterpret_cast<quint8*>(buf.data()), buf.size(), 1.0, 1.0);
+    QCOMPARE(buf, before);
+  }
+
+  void testStereoGainHalves() {
+    QByteArray buf = stereo({1000, -2000, 32766, -32768});
+    amber::apply_stereo_gain(reinterpret_cast<quint8*>(buf.data()), buf.size(), 0.5, 0.5);
+    QCOMPARE(samples(buf), QVector<qint16>({500, -1000, 16383, -16384}));
+  }
+
+  void testStereoGainSaturates() {
+    QByteArray buf = stereo({20000, -20000, 32767, -32768});
+    amber::apply_stereo_gain(reinterpret_cast<quint8*>(buf.data()), buf.size(), 2.0, 2.0);
+    QCOMPARE(samples(buf), QVector<qint16>({32767, -32768, 32767, -32768}));
+  }
+
+  void testStereoGainChannelsIndependent() {
+    // L R L R
+    QByteArray buf = stereo({1000, 1000, -4000, -4000});
+    amber::apply_stereo_gain(reinterpret_cast<quint8*>(buf.data()), buf.size(), 0.0, 0.25);
+    QCOMPARE(samples(buf), QVector<qint16>({0, 250, 0, -1000}));
+    buf = stereo({1000, 1000});
+    amber::apply_stereo_gain(reinterpret_cast<quint8*>(buf.data()), buf.size(), 1.0, 0.5);
+    QCOMPARE(samples(buf), QVector<qint16>({1000, 500}));
+  }
+
+ private:
+  // Interleaved S16 little-endian, as the cacher's frames
+  static QByteArray stereo(const QVector<qint16>& values) {
+    QByteArray buf;
+    for (qint16 v : values) {
+      buf.append(char(v & 0xFF));
+      buf.append(char((v >> 8) & 0xFF));
+    }
+    return buf;
+  }
+  static QVector<qint16> samples(const QByteArray& buf) {
+    QVector<qint16> values;
+    for (int i = 0; i + 1 < buf.size(); i += 2) {
+      values.append(qint16((quint8(buf[i + 1]) << 8) | quint8(buf[i])));
+    }
+    return values;
+  }
 };
 
 QTEST_GUILESS_MAIN(TestAudio)

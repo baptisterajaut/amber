@@ -1,10 +1,12 @@
 // Track header states (Sequence::track_states): the getters the render, audio and lock paths read, the undo command
 // the header pushes, and the lock helpers.
 
+#include <QtMath>
 #include <QtTest>
 
 #include <climits>
 
+#include "core/audio.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
 #include "engine/undo/undo_timeline.h"
@@ -110,6 +112,95 @@ class TestTrackStates : public QObject {
     QVERIFY(!s.track_audible(-1));           // nor video tracks as audio
   }
 
+  void gainPanDefaults() {
+    Sequence s;
+    double l = 0, r = 0;
+    s.track_gain_pan(0, &l, &r);
+    QCOMPARE(l, 1.0);
+    QCOMPARE(r, 1.0);
+    // a muted track keeps unity gains: muting is handled by not playing the clips
+    s.set_track_state(1, make_state(false, true, false, false));
+    s.track_gain_pan(1, &l, &r);
+    QCOMPARE(l, 1.0);
+    QCOMPARE(r, 1.0);
+  }
+
+  void gainPanVolume() {
+    Sequence s;
+    TrackState t;
+    t.volume_db = amber::kTrackVolumeMinDb;
+    s.set_track_state(0, t);
+    double l = 1, r = 1;
+    s.track_gain_pan(0, &l, &r);
+    QCOMPARE(l, 0.0);  // -60 dB is silence, not 0.001
+    QCOMPARE(r, 0.0);
+    t.volume_db = 6.0;
+    s.set_track_state(0, t);
+    s.track_gain_pan(0, &l, &r);
+    QVERIFY2(qAbs(l - 1.9953) < 0.001, qPrintable(QString::number(l)));
+    QCOMPARE(r, l);
+    t.volume_db = -6.0;
+    s.set_track_state(0, t);
+    s.track_gain_pan(0, &l, &r);
+    QVERIFY2(qAbs(l - 0.5012) < 0.001, qPrintable(QString::number(l)));
+  }
+
+  void gainPanPan() {
+    Sequence s;
+    TrackState t;
+    t.pan = 100;  // hard right: the left channel goes, the right stays
+    s.set_track_state(0, t);
+    double l = 1, r = 1;
+    s.track_gain_pan(0, &l, &r);
+    QVERIFY(qAbs(l) < 1e-9);
+    QCOMPARE(r, 1.0);
+    t.pan = -100;
+    s.set_track_state(0, t);
+    s.track_gain_pan(0, &l, &r);
+    QCOMPARE(l, 1.0);
+    QVERIFY(qAbs(r) < 1e-9);
+    // PanEffect's law at L30, times the volume
+    t.pan = -30;
+    t.volume_db = -6.0;
+    s.set_track_state(0, t);
+    s.track_gain_pan(0, &l, &r);
+    const double gain = qPow(10.0, -6.0 / 20.0);
+    QVERIFY(qAbs(l - gain) < 1e-9);
+    QVERIFY(qAbs(r - gain * (1.0 - log_volume(0.3))) < 1e-9);
+  }
+
+  void gainPanIgnoresVideoTracks() {
+    Sequence s;
+    TrackState t;
+    t.volume_db = -20.0;
+    t.pan = 50;
+    s.set_track_state(-1, t);
+    double l = 0, r = 0;
+    s.track_gain_pan(-1, &l, &r);
+    QCOMPARE(l, 1.0);
+    QCOMPARE(r, 1.0);
+  }
+
+  void volumePanAreNotDefault() {
+    TrackState t;
+    QVERIFY(t.is_default());
+    t.volume_db = -0.1;
+    QVERIFY(!t.is_default());
+    QVERIFY(t != TrackState());
+    t.volume_db = 0.0;
+    QVERIFY(t.is_default());
+    t.pan = 1;
+    QVERIFY(!t.is_default());
+    QVERIFY(t != TrackState());
+    // a reset to the defaults erases the key, as for the toggles
+    Sequence s;
+    s.set_track_state(2, t);
+    QCOMPARE(s.track_states.size(), 1);
+    t.pan = 0;
+    s.set_track_state(2, t);
+    QVERIFY(s.track_states.isEmpty());
+  }
+
   void copyKeepsStates() {
     Sequence s;
     s.width = 64;  // no default initializers on these, and copy() reads them
@@ -118,12 +209,17 @@ class TestTrackStates : public QObject {
     s.audio_frequency = 48000;
     s.audio_layout = 3;
     s.set_track_state(-2, make_state(true, false, false, false));
-    s.set_track_state(1, make_state(false, false, true, true));
+    TrackState mixed = make_state(false, false, true, true);
+    mixed.volume_db = -3.5;
+    mixed.pan = 20;
+    s.set_track_state(1, mixed);
     SequencePtr copy = s.copy();
     QCOMPARE(copy->track_states.size(), 2);
     QVERIFY(copy->track_state(-2).hidden);
     QVERIFY(copy->track_state(1).solo);
     QVERIFY(copy->track_state(1).locked);
+    QCOMPARE(copy->track_state(1).volume_db, -3.5);
+    QCOMPARE(copy->track_state(1).pan, 20);
   }
 
   void firstLockedTrack() {

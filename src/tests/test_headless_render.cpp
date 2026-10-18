@@ -972,6 +972,88 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(best_delta <= 2.0f / 32768, qPrintable(QString("max delta %1 at lag %2").arg(best_delta).arg(best_lag)));
   }
 
+  // Track volume and pan scale the exported mix: -6 dB on A1 brings the RMS to about half (x0.501), a hard right pan
+  // silences the left channel and a hard left pan leaves it as it was
+  void trackVolumeAndPanScaleTheMix() {
+    const QString video = dir_.filePath("gain_checkerboard.y4m");
+    {
+      QFile f(video);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(checkerboard_y4m());
+    }
+    const QString audio = dir_.filePath("gain_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("gain.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      QPointer<PreviewGenerator> gen(c->media()->to_footage()->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+    }
+
+    // Audio only, lossless; RMS of the left channel
+    int run = 0;
+    auto left_rms = [&](double volume_db, int pan, double* rms) -> QString {
+      TrackState t;
+      t.volume_db = volume_db;
+      t.pan = pan;
+      seq->set_track_state(0, t);
+      ExportParams params{};
+      params.filename = dir_.filePath(QString("gain_%1.wav").arg(run++));
+      params.video_enabled = false;
+      params.audio_enabled = true;
+      params.audio_codec = AV_CODEC_ID_PCM_S16LE;
+      params.audio_sampling_rate = kAudioRate;
+      params.audio_bitrate = 1536;  // ignored by PCM
+      params.start_frame = 0;
+      params.end_frame = seq->getEndFrame();
+      const QString error = export_sequence(seq.get(), params);
+      if (!error.isEmpty()) return error;
+      const Decoded d = decode_file(params.filename);
+      if (!d.ok || !d.has_audio || d.audio_left.size() < kAudioRate / 10) return "no audio decoded";
+      double sum = 0;
+      for (float v : d.audio_left) sum += double(v) * v;
+      *rms = qSqrt(sum / d.audio_left.size());
+      return QString();
+    };
+
+    double unity = 0, minus6 = 0, right = 0, left = 0;
+    QString error = left_rms(0.0, 0, &unity);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    error = left_rms(-6.0, 0, &minus6);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    error = left_rms(0.0, 100, &right);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    error = left_rms(0.0, -100, &left);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    seq->set_track_state(0, TrackState());
+
+    const double ratio = minus6 / unity;
+    qInfo("left RMS: unity %.4f, -6 dB %.4f (ratio %.4f), R100 %.6f, L100 %.4f", unity, minus6, ratio, right, left);
+    QVERIFY2(unity > 0.3, "unity export is silent or too quiet");  // a half-scale sine: RMS 0.354
+    QVERIFY2(qAbs(ratio - 0.501) < 0.005, qPrintable(QString("ratio %1").arg(ratio)));
+    QVERIFY2(right < 1e-4, qPrintable(QString("R100 left RMS %1").arg(right)));
+    QVERIFY2(qAbs(left - unity) < 1e-4, qPrintable(QString("L100 left RMS %1").arg(left)));
+  }
+
   // A viewer request (start_render() without pixels or file name, published without the thread's lock) must be rendered
   // even when it lands between the thread's "anything queued?" check and its wait. Each request goes out the moment
   // the previous frame is announced, right when the thread runs that check: without the bounded wait in run() the

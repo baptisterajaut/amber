@@ -64,6 +64,9 @@ QString fixture(const QString& url, const QString& footage) {
             </clip>
             <marker frame="5" name="sequence marker" label="3" duration="45"/>
             <marker frame="60" name="point marker"/>
+            <track index="2" volume="40" pan="-500"/>
+            <track index="3" volume="abc" pan="12.5"/>
+            <track index="4" volume="nan"/>
         </sequence>
         <sequence id="2" folder="0" name="Outer" width="64" height="64" framerate="30" afreq="48000" alayout="3"
                   open="1">
@@ -227,6 +230,16 @@ class TestProjectSaver : public QObject {
     inner_seq->set_track_state(0, muted);
     inner_seq->set_track_state(1, solo);
     inner_seq->set_track_state(-1, locked);
+    // The fixture's out-of-range volume and pan were clamped on load, its bad numbers kept the defaults
+    QCOMPARE(inner_seq->track_states.size(), 5);
+    QCOMPARE(inner_seq->track_state(2).volume_db, amber::kTrackVolumeMaxDb);
+    QCOMPARE(inner_seq->track_state(2).pan, -100);
+    QVERIFY(!inner_seq->track_states.contains(3));
+    QVERIFY(!inner_seq->track_states.contains(4));
+    TrackState mixed;
+    mixed.volume_db = -6.5;
+    mixed.pan = -30;
+    inner_seq->set_track_state(5, mixed);
 
     const QString a = dir_.filePath("a.ove");
     const QString b = dir_.filePath("b.ove");
@@ -260,11 +273,13 @@ class TestProjectSaver : public QObject {
     for (const QByteArray& line : ba.split('\n')) {
       if (line.contains("<track ")) track_lines.append(line.trimmed());
     }
-    QCOMPARE(track_lines.size(), 4);
+    QCOMPARE(track_lines.size(), 6);
     QCOMPARE(track_lines.at(0), QByteArray(R"(<track index="-2" hidden="1"/>)"));
     QCOMPARE(track_lines.at(1), QByteArray(R"(<track index="-1" locked="1"/>)"));
     QCOMPARE(track_lines.at(2), QByteArray(R"(<track index="0" muted="1"/>)"));
     QCOMPARE(track_lines.at(3), QByteArray(R"(<track index="1" solo="1"/>)"));
+    QCOMPARE(track_lines.at(4), QByteArray(R"(<track index="2" volume="12.0" pan="-100"/>)"));
+    QCOMPARE(track_lines.at(5), QByteArray(R"(<track index="5" volume="-6.5" pan="-30"/>)"));
     const int outer_at = ba.indexOf(R"(name="Outer")");
     QVERIFY(outer_at > 0);
     QVERIFY(!ba.mid(outer_at, ba.indexOf("</sequence>", outer_at) - outer_at).contains("<track"));
@@ -294,7 +309,12 @@ class TestProjectSaver : public QObject {
     QCOMPARE(inner->markers.at(0).color_label, 3);
     QCOMPARE(inner->markers.at(0).duration, 45L);
     QCOMPARE(inner->markers.at(1).duration, 0L);
-    QCOMPARE(inner->track_states.size(), 4);
+    QCOMPARE(inner->track_states.size(), 6);
+    QCOMPARE(inner->track_state(5).volume_db, -6.5);
+    QCOMPARE(inner->track_state(5).pan, -30);
+    QVERIFY(!inner->track_state(5).muted);
+    QCOMPARE(inner->track_state(0).volume_db, 0.0);  // only the values that were written
+    QCOMPARE(inner->track_state(0).pan, 0);
     QVERIFY(inner->track_state(-2).hidden);
     QVERIFY(inner->track_state(-1).locked);
     QVERIFY(inner->track_state(0).muted);

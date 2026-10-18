@@ -210,7 +210,8 @@ static void save_sequence_item(QXmlStreamWriter& stream, Media* m, int folder) {
     save_marker(stream, marker);
   }
 
-  // Track header toggles, only the non-default tracks (QMap order), only the true flags. 1.x skips the element.
+  // Track header state, only the non-default tracks (QMap order), only the true flags and the non-default volume and
+  // pan. 1.x skips the element.
   for (auto it = s->track_states.constBegin(); it != s->track_states.constEnd(); ++it) {
     const TrackState& t = it.value();
     stream.writeStartElement("track");
@@ -219,6 +220,8 @@ static void save_sequence_item(QXmlStreamWriter& stream, Media* m, int folder) {
     if (t.muted) stream.writeAttribute("muted", "1");
     if (t.solo) stream.writeAttribute("solo", "1");
     if (t.locked) stream.writeAttribute("locked", "1");
+    if (t.volume_db != 0.0) stream.writeAttribute("volume", QString::number(t.volume_db, 'f', 1));
+    if (t.pan != 0) stream.writeAttribute("pan", QString::number(t.pan));
     stream.writeEndElement();
   }
   stream.writeEndElement();  // sequence
