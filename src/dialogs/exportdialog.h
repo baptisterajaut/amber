@@ -148,6 +148,14 @@ private:
   void setup_ui();
 
   /**
+   * @brief Fits the dialog's height to its rows, once the current event is done
+   *
+   * The Compression Type and Bitrate rows come and go with the codec. Without this the dialog keeps the height of
+   * the tallest set and spreads the spare height between the rows.
+   */
+  void fit_height();
+
+  /**
    * @brief Enables/disables certain UI objects based on the exporting state.
    *
    * Some UI controls don't need to be set while exporting. This function enables/disables them appropriately.
