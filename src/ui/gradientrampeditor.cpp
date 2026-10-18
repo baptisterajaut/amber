@@ -43,7 +43,7 @@ void GradientRampEditor::setRamp(const QString& value) {
   const Ramp parsed = parse(value);
   if (parsed == ramp_) return;
   ramp_ = parsed;
-  if (selected_ >= ramp_.size()) selected_ = -1;
+  selected_ = -1;  // an outside change (undo, another clip) may have moved the stops: a kept index would point elsewhere
   if (last_added_ >= ramp_.size()) last_added_ = -1;
   update();
 }
