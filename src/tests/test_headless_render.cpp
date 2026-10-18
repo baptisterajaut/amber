@@ -12,6 +12,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavfilter/avfilter.h>
 #include <libavformat/avformat.h>
+#include <libavutil/hwcontext.h>
 #include <libavutil/log.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
@@ -616,6 +617,106 @@ void write_offset_mp4(const QString& path, int frames, int64_t start) {
   avcodec_free_context(&enc);
   avio_closep(&fmt->pb);
   avformat_free_context(fmt);
+}
+
+// frames frames of a flat colour, luma 24 + 16 * i under a non-neutral chroma (a dropped or swapped chroma plane
+// shows), as interlaced (MBAFF, top field first) H.264 from libx264 in MP4
+void write_interlaced_h264(const QString& path, int frames) {
+  const AVRational rate{int(kFps), 1};
+  const QByteArray p = path.toUtf8();
+  const AVCodec* codec = avcodec_find_encoder_by_name("libx264");
+  QVERIFY(codec != nullptr);
+  AVFormatContext* fmt = nullptr;
+  QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
+  AVStream* st = avformat_new_stream(fmt, nullptr);
+  AVCodecContext* enc = avcodec_alloc_context3(codec);
+  enc->width = kSize;
+  enc->height = kSize;
+  enc->pix_fmt = AV_PIX_FMT_YUV420P;
+  enc->framerate = rate;
+  enc->time_base = av_inv_q(rate);
+  enc->field_order = AV_FIELD_TT;
+  enc->flags |= AV_CODEC_FLAG_INTERLACED_DCT | AV_CODEC_FLAG_INTERLACED_ME;
+  if (fmt->oformat->flags & AVFMT_GLOBALHEADER) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+  QVERIFY(avcodec_open2(enc, codec, nullptr) >= 0);
+  avcodec_parameters_from_context(st->codecpar, enc);
+  st->time_base = enc->time_base;
+  QVERIFY(avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0);
+  QVERIFY(avformat_write_header(fmt, nullptr) >= 0);
+
+  AVPacket* pkt = av_packet_alloc();
+  auto write_packets = [&]() {
+    while (avcodec_receive_packet(enc, pkt) >= 0) {
+      if (pkt->duration == 0) pkt->duration = 1;  // in enc->time_base: else FFmpeg 9's edit list drops the last frame
+      av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+      pkt->stream_index = st->index;
+      av_interleaved_write_frame(fmt, pkt);
+      av_packet_unref(pkt);
+    }
+  };
+  AVFrame* frame = av_frame_alloc();
+  frame->width = kSize;
+  frame->height = kSize;
+  frame->format = AV_PIX_FMT_YUV420P;
+  QVERIFY(av_frame_get_buffer(frame, 0) >= 0);
+  for (int i = 0; i < frames; i++) {
+    av_frame_make_writable(frame);
+    memset(frame->data[0], 24 + 16 * i, frame->linesize[0] * kSize);
+    memset(frame->data[1], 96, frame->linesize[1] * kSize / 2);
+    memset(frame->data[2], 176, frame->linesize[2] * kSize / 2);
+    frame->flags |= AV_FRAME_FLAG_INTERLACED | AV_FRAME_FLAG_TOP_FIELD_FIRST;
+    frame->pts = i;
+    avcodec_send_frame(enc, frame);
+    write_packets();
+  }
+  avcodec_send_frame(enc, nullptr);
+  write_packets();
+  QVERIFY(av_write_trailer(fmt) >= 0);
+  av_frame_free(&frame);
+  av_packet_free(&pkt);
+  avcodec_free_context(&enc);
+  avio_closep(&fmt->pb);
+  avformat_free_context(fmt);
+}
+
+// Whether VAAPI decodes path's video here, as the cacher asks for it (a device, and this codec and profile on it):
+// without both, hardware decoding falls back to software and its path isn't exercised
+bool vaapi_decodes(const QString& path) {
+  AVBufferRef* device = nullptr;
+  if (av_hwdevice_ctx_create(&device, AV_HWDEVICE_TYPE_VAAPI, nullptr, nullptr, 0) < 0) return false;
+  bool hw = false;
+  AVFormatContext* fmt = nullptr;
+  if (avformat_open_input(&fmt, path.toUtf8().constData(), nullptr, nullptr) >= 0 &&
+      avformat_find_stream_info(fmt, nullptr) >= 0) {
+    const int vi = av_find_best_stream(fmt, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    const AVCodec* codec = vi >= 0 ? avcodec_find_decoder(fmt->streams[vi]->codecpar->codec_id) : nullptr;
+    AVCodecContext* ctx = codec != nullptr ? avcodec_alloc_context3(codec) : nullptr;
+    if (ctx != nullptr) {
+      avcodec_parameters_to_context(ctx, fmt->streams[vi]->codecpar);
+      ctx->hw_device_ctx = av_buffer_ref(device);
+      if (avcodec_open2(ctx, codec, nullptr) >= 0) {
+        AVPacket* pkt = av_packet_alloc();
+        AVFrame* frame = av_frame_alloc();
+        bool got = false;
+        while (!got && av_read_frame(fmt, pkt) >= 0) {
+          if (pkt->stream_index == vi) avcodec_send_packet(ctx, pkt);
+          av_packet_unref(pkt);
+          got = avcodec_receive_frame(ctx, frame) == 0;
+        }
+        if (!got) {
+          avcodec_send_packet(ctx, nullptr);
+          got = avcodec_receive_frame(ctx, frame) == 0;
+        }
+        hw = got && frame->format == AV_PIX_FMT_VAAPI;
+        av_frame_free(&frame);
+        av_packet_free(&pkt);
+      }
+      avcodec_free_context(&ctx);
+    }
+  }
+  avformat_close_input(&fmt);
+  av_buffer_unref(&device);
+  return hw;
 }
 
 // The first video stream's start_time in seconds, -1 if the file can't be read or doesn't say
@@ -1610,6 +1711,64 @@ class TestHeadlessRender : public QObject {
 
     QCOMPARE(matched, expected);
     QCOMPARE(viewer, int(kViewerFrame));
+  }
+
+  // Interlaced video decoded in hardware: the VAAPI transfer hands NV12 to a filter link negotiated from the stream's
+  // yuv420p, and yadif, which has no NV12, read the missing third plane and crashed the editor on open. Its export
+  // completes and matches the software decode's frame for frame.
+  void vaapiInterlacedMatchesSoftware() {
+    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    const QString video = dir_.filePath("interlaced.mp4");
+    write_interlaced_h264(video, kSourceFrames);
+    if (QTest::currentTestFailed()) return;
+    if (!vaapi_decodes(video)) QSKIP("no VAAPI H.264 decode here");
+    const QString audio = dir_.filePath("interlaced_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("interlaced.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Footage* vf = nullptr;
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      Footage* f = c->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      if (c->track() < 0) vf = f;
+    }
+    QVERIFY(vf != nullptr);
+    // Detected by the probe: without it the cacher adds no yadif and nothing here is tested
+    QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+
+    auto restore = qScopeGuard([] { amber::CurrentConfig.hardware_decoding = false; });
+    Decoded out[2];  // [hardware decoding]
+    for (int hw = 1; hw >= 0; hw--) {
+      amber::CurrentConfig.hardware_decoding = hw;
+      const ExportParams params = video_params(dir_.filePath(hw ? "interlaced_hw.mp4" : "interlaced_sw.mp4"), seq.get(),
+                                               AV_CODEC_ID_MPEG4, QString(), COMPRESSION_TYPE_CBR, 2.0);
+      const QString error = export_sequence(seq.get(), params);
+      QVERIFY2(error.isEmpty(), qPrintable(error));
+      out[hw] = decode_file(params.filename, true);
+      QVERIFY(out[hw].ok);
+      QCOMPARE(long(out[hw].video_frames), kClipOut);
+    }
+    QVERIFY(out[1].rgba == out[0].rgba);
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
