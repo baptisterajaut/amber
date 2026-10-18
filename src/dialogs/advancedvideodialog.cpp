@@ -106,7 +106,7 @@ AdvancedVideoDialog::AdvancedVideoDialog(QWidget *parent,
 
   // with the thread count, "0" is considered automatics
   thread_spinbox_->setMinimum(0);
-  thread_spinbox_->setSpecialValueText("Auto");
+  thread_spinbox_->setSpecialValueText(tr("Auto"));
 
   // load current thread value
   thread_spinbox_->setValue(params_.threads);

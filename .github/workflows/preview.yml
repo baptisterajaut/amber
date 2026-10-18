@@ -116,6 +116,11 @@ jobs:
           cp effects/*.xml effects/*.frag effects/*.vert Amber.app/Contents/Effects/ 2>/dev/null || true
           mkdir -p Amber.app/Contents/ExportPresets
           cp ../src/exportpresets/* Amber.app/Contents/ExportPresets/ 2>/dev/null || true
+          # Translations, before macdeployqt (it ad-hoc signs the bundle): Amber's in Contents/Translations
+          # (core/path.cpp), Qt's in Contents/Resources/translations (global.cpp, kept out of Amber's language list)
+          mkdir -p Amber.app/Contents/Translations Amber.app/Contents/Resources/translations
+          cp amber_*.qm Amber.app/Contents/Translations/
+          cp "$(brew --prefix qt@6)/share/qt/translations/"qtbase_*.qm Amber.app/Contents/Resources/translations/
           curl -sL -o /tmp/frei0r.zip \
             "https://github.com/dyne/frei0r/releases/download/v2.5.4/frei0r-v2.5.4_osx.zip"
           mkdir -p /tmp/frei0r && cd /tmp/frei0r && unzip -q /tmp/frei0r.zip

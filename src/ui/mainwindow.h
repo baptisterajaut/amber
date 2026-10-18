@@ -293,141 +293,141 @@ class MainWindow : public QMainWindow {
   void update_render_queue_action();
 
   // file menu actions
-  QMenu* file_menu;
-  QMenu* new_menu;
-  QAction* open_project;
-  QMenu* open_recent;
-  QAction* open_action;
-  QAction* clear_open_recent_action;
-  QAction* save_project;
-  QAction* save_project_as;
-  QAction* import_action;
-  QAction* import_subtitle_action;
-  QAction* relink_media_action;
-  QAction* export_action;
-  QAction* render_queue_action;
-  QAction* export_frame_action;
-  QAction* exit_action;
+  QMenu* file_menu = nullptr;
+  QMenu* new_menu = nullptr;
+  QAction* open_project = nullptr;
+  QMenu* open_recent = nullptr;
+  QAction* open_action = nullptr;
+  QAction* clear_open_recent_action = nullptr;
+  QAction* save_project = nullptr;
+  QAction* save_project_as = nullptr;
+  QAction* import_action = nullptr;
+  QAction* import_subtitle_action = nullptr;
+  QAction* relink_media_action = nullptr;
+  QAction* export_action = nullptr;
+  QAction* render_queue_action = nullptr;
+  QAction* export_frame_action = nullptr;
+  QAction* exit_action = nullptr;
 
   // edit menu actions
-  QMenu* edit_menu;
-  QAction* undo_action;
-  QAction* redo_action;
-  QAction* select_all_action;
-  QAction* deselect_all_action;
-  QAction* ripple_to_in_point_;
-  QAction* ripple_to_out_point_;
-  QAction* edit_to_in_point_;
-  QAction* edit_to_out_point_;
-  QAction* delete_inout_point_;
-  QAction* ripple_delete_inout_point_;
-  QAction* setedit_marker_;
+  QMenu* edit_menu = nullptr;
+  QAction* undo_action = nullptr;
+  QAction* redo_action = nullptr;
+  QAction* select_all_action = nullptr;
+  QAction* deselect_all_action = nullptr;
+  QAction* ripple_to_in_point_ = nullptr;
+  QAction* ripple_to_out_point_ = nullptr;
+  QAction* edit_to_in_point_ = nullptr;
+  QAction* edit_to_out_point_ = nullptr;
+  QAction* delete_inout_point_ = nullptr;
+  QAction* ripple_delete_inout_point_ = nullptr;
+  QAction* setedit_marker_ = nullptr;
 
   // view menu actions
-  QMenu* view_menu;
-  QAction* zoom_in_;
-  QAction* zoom_out_;
-  QAction* increase_track_height_;
-  QAction* decrease_track_height_;
-  QAction* track_lines;
-  QAction* frames_action;
-  QAction* drop_frame_action;
-  QAction* nondrop_frame_action;
-  QAction* milliseconds_action;
-  QAction* no_autoscroll;
-  QAction* page_autoscroll;
-  QAction* smooth_autoscroll;
+  QMenu* view_menu = nullptr;
+  QAction* zoom_in_ = nullptr;
+  QAction* zoom_out_ = nullptr;
+  QAction* increase_track_height_ = nullptr;
+  QAction* decrease_track_height_ = nullptr;
+  QAction* track_lines = nullptr;
+  QAction* frames_action = nullptr;
+  QAction* drop_frame_action = nullptr;
+  QAction* nondrop_frame_action = nullptr;
+  QAction* milliseconds_action = nullptr;
+  QAction* no_autoscroll = nullptr;
+  QAction* page_autoscroll = nullptr;
+  QAction* smooth_autoscroll = nullptr;
 
-  QMenu* preview_resolution_menu;
-  QAction* preview_res_full_;
-  QAction* preview_res_half_;
-  QAction* preview_res_quarter_;
+  QMenu* preview_resolution_menu = nullptr;
+  QAction* preview_res_full_ = nullptr;
+  QAction* preview_res_half_ = nullptr;
+  QAction* preview_res_quarter_ = nullptr;
 
-  QMenu* title_safe_area_menu;
-  QAction* title_safe_off;
-  QAction* title_safe_default;
-  QAction* title_safe_43;
-  QAction* title_safe_169;
-  QAction* title_safe_custom;
+  QMenu* title_safe_area_menu = nullptr;
+  QAction* title_safe_off = nullptr;
+  QAction* title_safe_default = nullptr;
+  QAction* title_safe_43 = nullptr;
+  QAction* title_safe_169 = nullptr;
+  QAction* title_safe_custom = nullptr;
 
-  QAction* full_screen;
-  QAction* full_screen_viewer_;
-  QAction* show_all;
-  QAction* show_guides_;
-  QAction* lock_guides_;
-  QAction* show_frame_rate_;
-  QAction* show_pixel_sampler_;
-  QAction* use_proxies_;
-  QMenu* guides_menu_;
+  QAction* full_screen = nullptr;
+  QAction* full_screen_viewer_ = nullptr;
+  QAction* show_all = nullptr;
+  QAction* show_guides_ = nullptr;
+  QAction* lock_guides_ = nullptr;
+  QAction* show_frame_rate_ = nullptr;
+  QAction* show_pixel_sampler_ = nullptr;
+  QAction* use_proxies_ = nullptr;
+  QMenu* guides_menu_ = nullptr;
 
   // playback menu
-  QMenu* playback_menu;
+  QMenu* playback_menu = nullptr;
 
-  QAction* go_to_start_;
-  QAction* previous_frame_;
-  QAction* playpause_;
-  QAction* play_in_to_out_;
-  QAction* next_frame_;
-  QAction* go_to_end_;
-  QAction* previous_frames_;
-  QAction* next_frames_;
-  QAction* go_to_prev_cut_;
-  QAction* go_to_next_cut_;
-  QAction* go_to_in_point_;
-  QAction* go_to_out_point_;
-  QAction* shuttle_left_;
-  QAction* shuttle_stop_;
-  QAction* shuttle_right_;
-  QAction* loop_action_;
+  QAction* go_to_start_ = nullptr;
+  QAction* previous_frame_ = nullptr;
+  QAction* playpause_ = nullptr;
+  QAction* play_in_to_out_ = nullptr;
+  QAction* next_frame_ = nullptr;
+  QAction* go_to_end_ = nullptr;
+  QAction* previous_frames_ = nullptr;
+  QAction* next_frames_ = nullptr;
+  QAction* go_to_prev_cut_ = nullptr;
+  QAction* go_to_next_cut_ = nullptr;
+  QAction* go_to_in_point_ = nullptr;
+  QAction* go_to_out_point_ = nullptr;
+  QAction* shuttle_left_ = nullptr;
+  QAction* shuttle_stop_ = nullptr;
+  QAction* shuttle_right_ = nullptr;
+  QAction* loop_action_ = nullptr;
 
   // window menu
 
-  QMenu* window_menu;
+  QMenu* window_menu = nullptr;
 
-  QAction* window_project_action;
-  QAction* window_effectcontrols_action;
-  QAction* window_timeline_action;
-  QAction* window_graph_editor_action;
-  QAction* window_footageviewer_action;
-  QAction* window_sequenceviewer_action;
-  QAction* window_undo_history_action;
-  QAction* window_scopes_action;
-  QAction* window_subtitle_editor_action_;
+  QAction* window_project_action = nullptr;
+  QAction* window_effectcontrols_action = nullptr;
+  QAction* window_timeline_action = nullptr;
+  QAction* window_graph_editor_action = nullptr;
+  QAction* window_footageviewer_action = nullptr;
+  QAction* window_sequenceviewer_action = nullptr;
+  QAction* window_undo_history_action = nullptr;
+  QAction* window_scopes_action = nullptr;
+  QAction* window_subtitle_editor_action_ = nullptr;
 
-  QAction* maximize_panel_;
-  QAction* lock_panels_;
-  QMenu* layouts_menu_;
-  QAction* layout_default_;
-  QAction* layout_3point_;
-  QAction* layout_color_;
-  QAction* save_layout_;
-  QMenu* delete_layout_menu_;
+  QAction* maximize_panel_ = nullptr;
+  QAction* lock_panels_ = nullptr;
+  QMenu* layouts_menu_ = nullptr;
+  QAction* layout_default_ = nullptr;
+  QAction* layout_3point_ = nullptr;
+  QAction* layout_color_ = nullptr;
+  QAction* save_layout_ = nullptr;
+  QMenu* delete_layout_menu_ = nullptr;
 
   // tools menu
-  QMenu* tools_menu;
+  QMenu* tools_menu = nullptr;
 
-  QAction* pointer_tool_action;
-  QAction* edit_tool_action;
-  QAction* ripple_tool_action;
-  QAction* razor_tool_action;
-  QAction* slip_tool_action;
-  QAction* slide_tool_action;
-  QAction* track_select_tool_action;
-  QAction* hand_tool_action;
-  QAction* transition_tool_action;
-  QAction* snap_toggle;
-  QAction* color_labels_toggle;
-  QAction* rectified_waveforms;
-  QAction* autocut_silence_;
-  QAction* preferences_action_;
-  QAction* clear_undo_action_;
+  QAction* pointer_tool_action = nullptr;
+  QAction* edit_tool_action = nullptr;
+  QAction* ripple_tool_action = nullptr;
+  QAction* razor_tool_action = nullptr;
+  QAction* slip_tool_action = nullptr;
+  QAction* slide_tool_action = nullptr;
+  QAction* track_select_tool_action = nullptr;
+  QAction* hand_tool_action = nullptr;
+  QAction* transition_tool_action = nullptr;
+  QAction* snap_toggle = nullptr;
+  QAction* color_labels_toggle = nullptr;
+  QAction* rectified_waveforms = nullptr;
+  QAction* autocut_silence_ = nullptr;
+  QAction* preferences_action_ = nullptr;
+  QAction* clear_undo_action_ = nullptr;
 
   // help menu
-  QMenu* help_menu;
-  QAction* action_search_;
-  QAction* debug_log_;
-  QAction* welcome_screen_;
-  QAction* about_action_;
+  QMenu* help_menu = nullptr;
+  QAction* action_search_ = nullptr;
+  QAction* debug_log_ = nullptr;
+  QAction* welcome_screen_ = nullptr;
+  QAction* about_action_ = nullptr;
 
   // used to store the panel state when one panel is maximized
   QByteArray temp_panel_state;

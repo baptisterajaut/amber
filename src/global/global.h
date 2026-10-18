@@ -458,6 +458,11 @@ class AmberGlobal : public QObject {
   std::unique_ptr<QTranslator> translator;
 
   /**
+   * @brief Qt's own translations (qtbase_<lang>.qm) for the language of `translator`
+   */
+  std::unique_ptr<QTranslator> qt_translator;
+
+  /**
    * @brief Internal variable for whether the project has changed since the last autorecovery
    *
    * Set by set_modified(), which should be called alongside any change made to the project file and is "unset" when
