@@ -40,6 +40,7 @@ extern "C" {
 
 #include "core/audio.h"
 #include "core/headlessappcontext.h"
+#include "core/path.h"
 #include "effects/effect.h"
 #include "effects/internal/ladspaeffect.h"
 #include "engine/clip.h"
@@ -1769,6 +1770,54 @@ class TestHeadlessRender : public QObject {
       QCOMPARE(long(out[hw].video_frames), kClipOut);
     }
     QVERIFY(out[1].rgba == out[0].rgba);
+  }
+
+  // A reopened project's interlaced footage: its thumbnail comes from the cache, so no frame is decoded. The field
+  // order comes from the stream; it used to come from the thumbnail decode only, so deinterlacing turned off on every
+  // reopen.
+  void interlacingKeptWithCachedThumbnail() {
+    if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");
+    const QString video = dir_.filePath("reopen_interlaced.mp4");
+    write_interlaced_h264(video, kSourceFrames);
+    if (QTest::currentTestFailed()) return;
+    const QString audio = dir_.filePath("reopen_interlaced_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav());
+    }
+    const QString project = dir_.filePath("reopen_interlaced.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+    const QString thumbnail = QDir(get_data_dir().filePath("previews")).filePath(get_file_hash(video) + "t0");
+    for (int open = 0; open < 2; open++) {
+      // The first open decodes and caches the thumbnail, the second (the reopen) reads it back
+      QCOMPARE(QFileInfo::exists(thumbnail), open == 1);
+      bool succeeded = false;
+      auto* lt = new LoadThread(project, false);
+      QPointer<LoadThread> lt_guard(lt);
+      connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+      lt->start();
+      QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+      QVERIFY(succeeded);
+      SequencePtr seq = amber::ActiveSequence;
+      QVERIFY(seq != nullptr);
+      Footage* vf = nullptr;
+      for (const auto& c : seq->clips) {
+        QVERIFY(c->media() != nullptr);
+        Footage* f = c->media()->to_footage();
+        QPointer<PreviewGenerator> gen(f->preview_gen.load());
+        QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+        QVERIFY(f->ready);
+        if (c->track() < 0) vf = f;
+      }
+      QVERIFY(vf != nullptr);
+      QCOMPARE(int(vf->video_tracks.at(0).video_auto_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+      QCOMPARE(int(vf->video_tracks.at(0).video_interlacing), int(VIDEO_TOP_FIELD_FIRST));
+    }
   }
 
   // A nested sequence's audio must export identically to the same clips placed directly in a sequence: the outer
