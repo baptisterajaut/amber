@@ -1054,6 +1054,77 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(qAbs(left - unity) < 1e-4, qPrintable(QString("L100 left RMS %1").arg(left)));
   }
 
+  // A 0 dBFS tone through the Compressor at its defaults (-20 dB threshold, 4:1, 10 ms attack) exports at about
+  // -15 dBFS once the attack has settled: the effect runs in the export's cacher with a continuous per-stream state
+  void compressorSettlesInExport() {
+    const QString video = dir_.filePath("comp_checkerboard.y4m");
+    {
+      QFile f(video);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(checkerboard_y4m());
+    }
+    const QString audio = dir_.filePath("comp_tone.wav");
+    {
+      QFile f(audio);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(sine_wav(440.0, 32767.0 / 32768.0));
+    }
+    const QString project = dir_.filePath("comp.ove");
+    {
+      QFile f(project);
+      QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+      f.write(fixture(project, video, audio).toUtf8());
+    }
+
+    bool succeeded = false;
+    auto* lt = new LoadThread(project, false);
+    QPointer<LoadThread> lt_guard(lt);
+    connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+    lt->start();
+    QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+    QVERIFY(succeeded);
+    SequencePtr seq = amber::ActiveSequence;
+    QVERIFY(seq != nullptr);
+    Clip* audio_clip = nullptr;
+    for (const auto& c : seq->clips) {
+      QVERIFY(c->media() != nullptr);
+      QPointer<PreviewGenerator> gen(c->media()->to_footage()->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      if (c->track() >= 0) audio_clip = c.get();
+    }
+    QVERIFY(audio_clip != nullptr);
+    const EffectMeta* meta = get_meta_from_name("Compressor");
+    QVERIFY(meta != nullptr);
+    EffectPtr comp = Effect::Create(audio_clip, meta);
+    QVERIFY(comp != nullptr);
+    audio_clip->effects.append(comp);
+
+    ExportParams params{};
+    params.filename = dir_.filePath("comp.wav");
+    params.video_enabled = false;
+    params.audio_enabled = true;
+    params.audio_codec = AV_CODEC_ID_PCM_S16LE;
+    params.audio_sampling_rate = kAudioRate;
+    params.audio_bitrate = 1536;  // ignored by PCM
+    params.start_frame = 0;
+    params.end_frame = seq->getEndFrame();
+    const QString error = export_sequence(seq.get(), params);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    const Decoded d = decode_file(params.filename);
+    QVERIFY(d.ok);
+    QVERIFY(d.has_audio);
+
+    // Peak over the second half of the clip's span (167-333 ms), well past the attack
+    const int span = int(qRound64(kClipOut / kFps * kAudioRate));
+    QVERIFY(d.audio_left.size() >= span);
+    float tail = 0;
+    for (int i = span / 2; i < span; i++) tail = qMax(tail, qAbs(d.audio_left[i]));
+    const double tail_db = 20.0 * std::log10(qMax(double(tail), 1e-9));
+    qInfo("compressor export: overall peak %.4f, peak over the second half %.4f (%.2f dBFS)", d.audio_peak, tail,
+          tail_db);
+    QVERIFY2(qAbs(tail_db - -15.0) < 0.5, qPrintable(QString("%1 dBFS").arg(tail_db)));
+  }
+
   // A viewer request (start_render() without pixels or file name, published without the thread's lock) must be rendered
   // even when it lands between the thread's "anything queued?" check and its wait. Each request goes out the moment
   // the previous frame is announced, right when the thread runs that check: without the bounded wait in run() the
