@@ -460,8 +460,8 @@ class Cacher : public QThread {
   bool buffersrc_params_set_{false};
 
   // Video: the largest pts decoded since the clip opened, and the pts of the media's real last frame once a decode
-  // reached EOF (AV_NOPTS_VALUE: not known yet). video_end_pts_ is written by the worker and read by
-  // Cache(), both under queue_'s lock.
+  // reached EOF (AV_NOPTS_VALUE: not known yet). Only the worker writes them (video_end_pts_ under queue_'s lock),
+  // so it reads them freely; any other thread (Cache()) reads video_end_pts_ under queue_'s lock.
   int64_t latest_decoded_pts_{AV_NOPTS_VALUE};
   int64_t video_end_pts_{AV_NOPTS_VALUE};
   // A target past the media's real end is its last frame
