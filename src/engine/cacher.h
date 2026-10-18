@@ -339,7 +339,12 @@ class Cacher : public QThread {
   /**
    * @brief Current Sequence playhead set by Cache()
    */
-  long playhead_;
+  std::atomic<long> playhead_{0};
+
+  /**
+   * @brief The playhead_ the running video pass decodes for (passServesRequest())
+   */
+  long pass_playhead_{0};
 
   /**
    * @brief Current Sequence scrubbing state set by Cache()
@@ -477,7 +482,12 @@ class Cacher : public QThread {
    */
   void cacheVideoResetDeinterlacer();
 
-  int64_t videoTargetPts() const;
+  int64_t videoTargetPts(long playhead) const;
+
+  /**
+   * @brief Whether the running pass may serve the request waiting now (see cacher_video.cpp)
+   */
+  bool passServesRequest() const;
 
   /**
    * @brief FFmpeg buffer sink
