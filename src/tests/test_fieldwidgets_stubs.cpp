@@ -56,7 +56,7 @@ void Effect::save(QXmlStreamWriter&) {}
 void Effect::startEffect() {}
 void Effect::endEffect() {}
 void Effect::process_image(double, uint8_t*, uint8_t*, int, int, int) {}
-void Effect::process_shader(double, GLTextureCoords&, int, QByteArray&, QSize) {}
+void Effect::process_shader(double, GLTextureCoords&, int, QByteArray&, QSize, float) {}
 void Effect::process_coords(double, GLTextureCoords&, int) {}
 QRhiTexture* Effect::process_superimpose(QRhi*, QRhiResourceUpdateBatch*, double) { return nullptr; }
 void Effect::process_audio(double, double, quint8*, int, int) {}
