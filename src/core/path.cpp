@@ -122,3 +122,30 @@ QList<QString> get_language_paths() {
 
   return language_paths;
 }
+
+static QString comparable_path(const QString& path) {
+  QFileInfo info(path);
+  QString canonical = info.canonicalFilePath();
+  return canonical.isEmpty() ? QDir::cleanPath(info.absoluteFilePath()) : canonical;
+}
+
+bool same_file_path(const QString& a, const QString& b) {
+#if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
+  const Qt::CaseSensitivity cs = Qt::CaseInsensitive;
+#else
+  const Qt::CaseSensitivity cs = Qt::CaseSensitive;
+#endif
+  return comparable_path(a).compare(comparable_path(b), cs) == 0;
+}
+
+QString proxy_file_path(const QString& source, const QString& folder, const QStringList& avoid) {
+  const QString name = QFileInfo(source).baseName();
+  const QDir dir(folder);
+  for (int i = 0;; i++) {
+    QString candidate =
+        dir.filePath(i == 0 ? name + ".mov" : name + ".proxy" + (i > 1 ? QString::number(i) : QString()) + ".mov");
+    bool taken = same_file_path(candidate, source);
+    for (const QString& path : avoid) taken = taken || same_file_path(candidate, path);
+    if (!taken) return candidate;
+  }
+}

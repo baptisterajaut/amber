@@ -35,4 +35,13 @@ QList<QString> get_language_paths();
 // generate hash algorithm used to uniquely identify files
 QString get_file_hash(const QString& filename);
 
+// true if both paths name the same file: canonical paths (symlinks resolved) when the files exist, cleaned absolute
+// paths otherwise; case-insensitive on Windows and macOS
+bool same_file_path(const QString& a, const QString& b);
+
+// Proxy file for the footage at `source` inside `folder`: "<name>.mov", or "<name>.proxy.mov" (then
+// "<name>.proxy2.mov"...) when that would be `source` itself or one of `avoid` (other sources or proxies of the same
+// batch), so a proxy is never written over a source file
+QString proxy_file_path(const QString& source, const QString& folder, const QStringList& avoid);
+
 #endif // CORE_PATH_H

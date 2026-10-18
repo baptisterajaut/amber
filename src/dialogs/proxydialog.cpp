@@ -28,6 +28,7 @@
 #include <QMessageBox>
 #include <QDebug>
 
+#include "core/path.h"
 #include "project/proxygenerator.h"
 #include "project/footage.h"
 #include "ui/mainwindow.h"
@@ -94,6 +95,9 @@ void ProxyDialog::accept() {
   // set to TRUE if any existing proxies exist and the user chooses to overwrite all of them
   bool overwrite_all_existing = false;
 
+  QStringList sources;
+  for (auto i : selected_media) sources.append(i->to_footage()->url);
+
   for (auto i : selected_media) {
     // loop through selected footage and send info to the proxy queue
 
@@ -106,21 +110,13 @@ void ProxyDialog::accept() {
 
     Footage* footage = i->to_footage();
 
-    QString base_footage_fn = QFileInfo(footage->url).baseName();
+    // determine folder from input: same as source (translated "Proxy" subfolder) or the custom location
+    QString folder =
+        custom_location.isEmpty() ? QFileInfo(footage->url).dir().filePath(proxy_folder_name) : custom_location;
 
-    // TEMPORARILY hardcoded proxy format
-    base_footage_fn.append(".mov");
-
-    // determine path from input
-    if (custom_location.isEmpty()) {
-      // use same as source (proxy subfolder)
-
-      // generate full path from footage path and proxy_folder_name's translated "Proxy"
-      info.path = QDir(QFileInfo(footage->url).dir().filePath(proxy_folder_name)).filePath(base_footage_fn);
-    } else {
-      // use existing location
-      info.path = QDir(custom_location).filePath(base_footage_fn);
-    }
+    // TEMPORARILY hardcoded proxy format (.mov). Never one of the selected sources: a .mov proxied into its own
+    // folder would be truncated by the proxy writer before being read
+    info.path = proxy_file_path(footage->url, folder, sources);
 
     // if the proposed proxy file already exists & user didn't select YesToAll box
     if (QFileInfo::exists(info.path) && !overwrite_all_existing){
