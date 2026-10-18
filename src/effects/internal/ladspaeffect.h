@@ -27,6 +27,7 @@
 #include <QStringList>
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "effects/effect.h"
@@ -90,6 +91,8 @@ class LadspaEffect : public Effect {
   };
 
  private:
+  using ControlValue = std::pair<unsigned long, LADSPA_Data>;  // control input port, value
+
   struct Control {
     unsigned long port;
     EffectField* field;
@@ -105,12 +108,16 @@ class LadspaEffect : public Effect {
     std::vector<LADSPA_Data> ports[2];  // every port's control value per handle (audio ports unused)
     std::vector<float> in[2];
     std::vector<float> out[2];
-    // (Re)creates the handles at rate and connects them; false if the plugin refuses
+    int refused_rate = 0;  // the plugin wouldn't instantiate at this rate: not retried, logged once
     Instance() = default;
     Instance(const Instance&) = delete;
     Instance& operator=(const Instance&) = delete;
-    bool instantiate(const std::shared_ptr<Plugin>& p, int sample_rate);
-    void restart();  // deactivate + activate, or a fresh instance for a plugin without activate()
+    // (Re)creates the handles at rate, connects them and sets the control inputs before activate(); false if the
+    // plugin refuses
+    bool instantiate(const std::shared_ptr<Plugin>& p, int sample_rate, const std::vector<ControlValue>& values);
+    void set_controls(const std::vector<ControlValue>& values);
+    // deactivate + activate, or a fresh instance for a plugin without activate()
+    void restart(const std::vector<ControlValue>& values);
     void release();
     ~Instance() { release(); }
   };

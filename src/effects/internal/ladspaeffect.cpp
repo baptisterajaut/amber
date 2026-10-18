@@ -249,7 +249,14 @@ LadspaEffect::Plugin::~Plugin() {
   if (library.isLoaded()) library.unload();
 }
 
-bool LadspaEffect::Instance::instantiate(const std::shared_ptr<Plugin>& p, int sample_rate) {
+void LadspaEffect::Instance::set_controls(const std::vector<ControlValue>& values) {
+  for (int h = 0; h < handle_count; h++) {
+    for (const ControlValue& v : values) ports[h][v.first] = v.second;
+  }
+}
+
+bool LadspaEffect::Instance::instantiate(const std::shared_ptr<Plugin>& p, int sample_rate,
+                                         const std::vector<ControlValue>& values) {
   release();
   plugin = p;
   rate = sample_rate;
@@ -263,12 +270,12 @@ bool LadspaEffect::Instance::instantiate(const std::shared_ptr<Plugin>& p, int s
   for (int h = 0; h < count; h++) {
     handles[h] = d->instantiate(d, static_cast<unsigned long>(sample_rate));
     if (handles[h] == nullptr) {
-      qWarning() << "LADSPA:" << d->Name << "refused to instantiate at" << sample_rate << "Hz";
       release();
       return false;
     }
     handle_count = h + 1;
     ports[h].assign(d->PortCount, 0.0f);
+    for (const ControlValue& v : values) ports[h][v.first] = v.second;  // activate() may read them
     // Control outputs (latency, meters) land in their own float and are ignored
     for (unsigned long port = 0; port < d->PortCount; port++) {
       if (LADSPA_IS_PORT_CONTROL(d->PortDescriptors[port])) d->connect_port(handles[h], port, &ports[h][port]);
@@ -288,14 +295,15 @@ bool LadspaEffect::Instance::instantiate(const std::shared_ptr<Plugin>& p, int s
   return true;
 }
 
-void LadspaEffect::Instance::restart() {
+void LadspaEffect::Instance::restart(const std::vector<ControlValue>& values) {
   const LADSPA_Descriptor* d = plugin->descriptor;
   if (d->activate == nullptr) {
     // Nothing to reset its state with: start over from a new instance
     std::shared_ptr<Plugin> p = plugin;
-    instantiate(p, rate);
+    instantiate(p, rate, values);
     return;
   }
+  set_controls(values);
   for (int h = 0; h < handle_count; h++) {
     if (d->deactivate != nullptr) d->deactivate(handles[h]);
     d->activate(handles[h]);
@@ -386,19 +394,28 @@ void LadspaEffect::process_audio(double timecode_start, double, quint8* samples,
   const amber::AudioProcessContext& ctx = amber::current_audio_context();
   if (ctx.sample_rate <= 0) return;  // no audio device: a plugin instantiated at 0 Hz would divide by it
 
+  // CBA: control ports read once per chunk (≤ 4096 frames); per-sample automation and port groups if asked
+  std::vector<ControlValue> values;
+  values.reserve(controls_.size());
+  for (const Control& c : controls_) {
+    values.emplace_back(c.port, LADSPA_Data(c.range.clamp(c.field->GetValueAt(timecode_start).toDouble())));
+  }
+
   bool reset;
   std::shared_ptr<Instance> inst = states_.acquire(ctx, timecode_start, frames, &reset);
   if (inst->handle_count == 0 || inst->rate != ctx.sample_rate) {
-    if (!inst->instantiate(plugin_, ctx.sample_rate)) return;
+    if (inst->refused_rate == ctx.sample_rate) return;
+    inst->instantiate(plugin_, ctx.sample_rate, values);
   } else if (reset) {
-    inst->restart();  // no tail or delay line carried over from another position
+    inst->restart(values);  // no tail or delay line carried over from another position
+  } else {
+    inst->set_controls(values);
   }
-  if (inst->handle_count == 0) return;
-
-  // CBA: control ports read once per chunk (≤ 4096 frames); per-sample automation and port groups if asked
-  for (const Control& c : controls_) {
-    const double v = c.range.clamp(c.field->GetValueAt(timecode_start).toDouble());
-    for (int h = 0; h < inst->handle_count; h++) inst->ports[h][c.port] = LADSPA_Data(v);
+  if (inst->handle_count == 0) {
+    inst->refused_rate = ctx.sample_rate;
+    qWarning() << "LADSPA:" << meta->name << "refused to instantiate at" << ctx.sample_rate
+               << "Hz, the audio passes unprocessed";
+    return;
   }
 
   const LADSPA_Descriptor* d = plugin_->descriptor;
