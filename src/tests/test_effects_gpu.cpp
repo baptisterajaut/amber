@@ -234,6 +234,7 @@ class TestEffectsGpu : public QObject {
   void alphaMaskPositionScale();
   void alphaMaskSvg();
   void alphaMaskUnreadableFile();
+  void alphaMaskMissingFileReportsAndRetries();
   void alphaMaskSemiTransparentClip();
   void alphaMaskFillCropsSides();
   void alphaMaskHugeHeaderRejected();
@@ -4350,6 +4351,25 @@ void TestEffectsGpu::alphaMaskUnreadableFile() {
   QByteArray pixels = h_->render_frame(seq.get(), 2);
   QVERIFY(mask_value(pixels, 32, 8) >= 254);
   QVERIFY(mask_value(pixels, 32, 56) <= 1);
+}
+
+void TestEffectsGpu::alphaMaskMissingFileReportsAndRetries() {
+  // A project moved to another machine: the mask path doesn't exist. The effect passes through with its warning icon
+  // (shaderError) on, then the file copied in place is picked up on a later frame and the warning clears
+  QTemporaryDir dir;
+  const QString path = dir.filePath("later.png");
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Alpha mask: could not read"));
+  h_->assert_solid_color(h_->render_frame(seq.get(), 0), 64, 64, QColor(Qt::white), 1);
+  QVERIFY2(fx->shaderError().contains(path), qPrintable(fx->shaderError()));
+  h_->assert_solid_color(h_->render_frame(seq.get(), 1), 64, 64, QColor(Qt::white), 1);  // no retry, no warning
+
+  QCOMPARE(save_mask(dir, "later.png", split_mask(32, 32, QColor(255, 255, 255, 255), QColor(0, 0, 0, 0))), path);
+  QByteArray pixels = h_->render_frame(seq.get(), 2);
+  QVERIFY(mask_value(pixels, 32, 8) >= 254);
+  QVERIFY(mask_value(pixels, 32, 56) <= 1);
+  QVERIFY2(fx->shaderError().isEmpty(), qPrintable(fx->shaderError()));
 }
 
 void TestEffectsGpu::alphaMaskSemiTransparentClip() {

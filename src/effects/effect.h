@@ -292,8 +292,9 @@ class Effect : public QObject {
   // texture and original
   bool needsMask();
   QString currentMaskPath(double timecode);
-  // The mask texture, decoded and uploaded in `u` only when `maskPath` changed. A 1x1 placeholder with no file or a
-  // failed decode, maskSize() is then (0, 0)
+  // The mask texture, decoded and uploaded in `u` only when `maskPath` changed, or when a file that failed to decode
+  // changed on disk (appeared, rewritten). A 1x1 placeholder with no file or a failed decode, maskSize() is then
+  // (0, 0) and shaderError() names the file
   QRhiTexture* process_mask(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& maskPath);
   QSize maskSize() const { return maskSize_; }
 
@@ -307,6 +308,7 @@ class Effect : public QObject {
   QRhiTexture* maskTex_{nullptr};
   QString loadedMaskPath_;
   QSize maskSize_{0, 0};
+  QString failedMaskStamp_;  // the failed file's state on disk at the failed decode, empty after a success
 
   CurveField* curveField_{nullptr};
   bool curveFieldSearched_{false};
