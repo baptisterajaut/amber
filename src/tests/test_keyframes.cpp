@@ -26,6 +26,7 @@ class TestKeyframes : public QObject {
   void identicalTimesAreDeterministic();
   void memberChangeUndoSurvivesReallocation();
   void memberChangeIgnoresStaleIndex();
+  void keyDraggedPastNeighbourInterpolatesByTime();
 
  private:
   static EffectKeyframe key(long time, double value, int type);
@@ -184,6 +185,35 @@ void TestKeyframes::memberChangeIgnoresStaleIndex() {
   stale.redo();
   QCOMPARE(field_->keyframes.size(), 1);
   QCOMPARE(field_->keyframes.at(0).time, 0L);
+}
+
+// Graph Editor drag of the first key past the second (A5): playback, handle validation and undo all go by time, not by
+// index, so nothing needs resorting
+void TestKeyframes::keyDraggedPastNeighbourInterpolatesByTime() {
+  field_->keyframes.append(key(0, 0.0, EFFECT_KEYFRAME_LINEAR));
+  field_->keyframes.append(key(30, 100.0, EFFECT_KEYFRAME_LINEAR));
+  field_->keyframes.append(key(60, 0.0, EFFECT_KEYFRAME_LINEAR));
+
+  KeyframeMemberChange move(field_, 0, KeyframeMemberChange::kTime, qlonglong(0), qlonglong(45));
+  KeyframeMemberChange data(field_, 0, KeyframeMemberChange::kData, 0.0, 50.0);
+  move.redo();
+  data.redo();
+  // Order by time is now 30:100, 45:50, 60:0
+  QCOMPARE(value_at_frame(0), 100.0);
+  QCOMPARE(value_at_frame(40), 100.0 - 50.0 * 10.0 / 15.0);
+  QCOMPARE(value_at_frame(50), 50.0 - 50.0 * 5.0 / 15.0);
+
+  // The bezier handle of the key at 30 is validated against its new neighbour at 45, not index 0
+  field_->keyframes[0].type = EFFECT_KEYFRAME_BEZIER;
+  field_->keyframes[1].type = EFFECT_KEYFRAME_BEZIER;
+  QCOMPARE(field_->GetValidKeyframeHandlePosition(1, true), 7.5);  // +40 clamped by the key at 45 (pre -40)
+  field_->keyframes[0].type = EFFECT_KEYFRAME_LINEAR;
+  field_->keyframes[1].type = EFFECT_KEYFRAME_LINEAR;
+
+  data.undo();
+  move.undo();
+  QCOMPARE(field_->keyframes.at(0).time, 0L);
+  QCOMPARE(value_at_frame(15), 50.0);
 }
 
 QTEST_GUILESS_MAIN(TestKeyframes)

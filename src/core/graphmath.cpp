@@ -22,6 +22,22 @@ static void pad_span(double& lo, double& hi, double min_span, bool widen_only_em
   hi += span * kFitPadding;
 }
 
+long AvoidKeyCollisions(long diff, long previous_diff, const QVector<long>& old_times,
+                        const QVector<QVector<long>>& fixed_times) {
+  const long step = (previous_diff > diff) ? 1 : -1;
+  const int n = qMin(old_times.size(), fixed_times.size());
+  int fixed_count = 0;
+  for (int i = 0; i < n; i++) fixed_count += fixed_times.at(i).size();
+  // Each step clears at least one collision for good in that direction, so this ends within fixed_count steps
+  for (int guard = 0; guard <= fixed_count; guard++) {
+    bool hit = false;
+    for (int i = 0; i < n && !hit; i++) hit = fixed_times.at(i).contains(old_times.at(i) + diff);
+    if (!hit) break;
+    diff += step;
+  }
+  return diff;
+}
+
 FitRect FitRange(double min_time, double max_time, double min_value, double max_value) {
   FitRect r{min_time, max_time, min_value, max_value};
   pad_span(r.min_time, r.max_time, kFitMinTimeSpan, false);
