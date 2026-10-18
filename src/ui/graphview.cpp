@@ -336,7 +336,7 @@ void GraphView::paintEvent(QPaintEvent*) {
             int key_x = get_screen_x(key.time);
             int key_y = get_screen_y(key.data.toDouble());
 
-            if (key.type == EFFECT_KEYFRAME_BEZIER) {
+            if (keyframe_shows_handles(key.type)) {
               p.setPen(Qt::gray);
 
               // pre handle line
@@ -421,8 +421,8 @@ void GraphView::mousePressEvent(QMouseEvent* event) {
               sel_key = j;
               sel_key_field = i;
               break;
-            } else {
-              // selecting a handle
+            } else if (keyframe_shows_handles(key.type)) {
+              // selecting a handle (only drawn, so only grabbable, on bezier keys)
               QPointF pre_point(key_x + key.pre_handle_x * x_zoom, key_y - key.pre_handle_y * y_zoom);
               QPointF post_point(key_x + key.post_handle_x * x_zoom, key_y - key.post_handle_y * y_zoom);
               if (event->position().toPoint().x() > pre_point.x() - kBezierHandleSize &&
@@ -614,6 +614,8 @@ bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
       int key_y = get_screen_y(key.data.toDouble());
       QRect test_rect(key_x - KEYFRAME_SIZE, key_y - KEYFRAME_SIZE, KEYFRAME_SIZE + KEYFRAME_SIZE,
                       KEYFRAME_SIZE + KEYFRAME_SIZE);
+      if (test_rect.contains(pos)) return true;
+      if (!keyframe_shows_handles(key.type)) continue;
       QRect pre_rect(qRound(key_x + key.pre_handle_x * x_zoom - kBezierHandleSize),
                      qRound(key_y - key.pre_handle_y * y_zoom - kBezierHandleSize),
                      kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
@@ -621,7 +623,7 @@ bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
                       qRound(key_y - key.post_handle_y * y_zoom - kBezierHandleSize),
                       kBezierHandleSize + kBezierHandleSize, kBezierHandleSize + kBezierHandleSize);
 
-      if (test_rect.contains(pos) || pre_rect.contains(pos) || post_rect.contains(pos)) {
+      if (pre_rect.contains(pos) || post_rect.contains(pos)) {
         return true;
       }
     }

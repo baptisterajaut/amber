@@ -71,6 +71,10 @@ enum EffectType : uint8_t {
 
 enum EffectKeyframeType : uint8_t { EFFECT_KEYFRAME_LINEAR, EFFECT_KEYFRAME_BEZIER, EFFECT_KEYFRAME_HOLD };
 
+// Whether the Graph Editor draws a key's bezier handles, and so whether they can be grabbed: both rely on this one
+// test so a hidden handle (the default +-40 of a Linear or Hold key) is never hit.
+inline bool keyframe_shows_handles(int type) { return type == EFFECT_KEYFRAME_BEZIER; }
+
 enum EffectInternal : uint8_t {
   EFFECT_INTERNAL_TRANSFORM,
   EFFECT_INTERNAL_TEXT,

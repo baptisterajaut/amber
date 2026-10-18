@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "core/graphmath.h"
+#include "effects/effect.h"
 
 using namespace amber::graph;
 
@@ -75,6 +76,13 @@ class TestGraphViewMath : public QObject {
     QCOMPARE(r.min_time, 34.0);  // 10 frames around the key, then padded
     QCOMPARE(r.max_time, 46.0);
     QVERIFY(r.max_time > r.min_time && r.max_value > r.min_value);
+  }
+
+  void onlyBezierKeysShowHandles() {
+    // Painting and hit-testing share this test: a Linear or Hold key keeps default +-40 handles it never draws
+    QVERIFY(keyframe_shows_handles(EFFECT_KEYFRAME_BEZIER));
+    QVERIFY(!keyframe_shows_handles(EFFECT_KEYFRAME_LINEAR));
+    QVERIFY(!keyframe_shows_handles(EFFECT_KEYFRAME_HOLD));
   }
 };
 
