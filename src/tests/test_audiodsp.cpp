@@ -99,6 +99,11 @@ class TestAudioDsp : public QObject {
     QCOMPARE(qint16(sat[0] | (sat[1] << 8)), qint16(32767));
     QCOMPARE(qint16(sat[2] | (sat[3] << 8)), qint16(-32768));
     QCOMPARE(qint16(sat[4] | (sat[5] << 8)), qint16(32767));
+    // Past the long range (a plugin's overshoot): still saturates to the right sign
+    const float huge[2] = {1e15f, -1e15f};
+    float_to_s16(huge, sat, 1);
+    QCOMPARE(qint16(sat[0] | (sat[1] << 8)), qint16(32767));
+    QCOMPARE(qint16(sat[2] | (sat[3] << 8)), qint16(-32768));
   }
 
   void eqZeroGainIsIdentity() {
