@@ -11,6 +11,7 @@
 #include "effects/effectfield.h"
 #include "effects/effectpresets.h"
 #include "effects/effectrow.h"
+#include "effects/internal/voideffect.h"
 #include "engine/clip.h"
 #include "global/config.h"
 #include "tests/test_appcontext_stub.h"
@@ -192,6 +193,20 @@ class TestEffectPresets : public QObject {
     // A name that only sanitises like it gets a new file, nothing replaced
     QCOMPARE(EffectPresetSavePath("Old?one", &replaced), EffectPresetPathForName("Old?one"));
     QVERIFY(replaced.isEmpty());
+  }
+
+  void missingEffectMetaIsDefined() {
+    // A Missing Effect placeholder (no preset action for it) still has a defined subtype for the clipboard's
+    // video/audio filter, kept by its clipboard copy, and is no internal effect
+    ClipPtr video = video_clip();
+    ClipPtr audio = std::make_shared<Clip>(nullptr);
+    audio->set_track(0);
+    VoidEffect on_video(video.get(), "Gone/Video");
+    VoidEffect on_audio(audio.get(), "Gone/Audio");
+    QCOMPARE(on_video.meta->subtype, int(EFFECT_TYPE_VIDEO));
+    QCOMPARE(on_audio.meta->subtype, int(EFFECT_TYPE_AUDIO));
+    QCOMPARE(on_video.meta->internal, -1);
+    QCOMPARE(on_audio.copy(nullptr)->meta->subtype, int(EFFECT_TYPE_AUDIO));
   }
 
   void missingEffect() {
