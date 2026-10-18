@@ -347,6 +347,11 @@ class Cacher : public QThread {
   long pass_playhead_{0};
 
   /**
+   * @brief The last frame's pts out of the video decoder since the last seek, to place one that comes without any
+   */
+  int64_t last_raw_video_pts_{AV_NOPTS_VALUE};
+
+  /**
    * @brief Current Sequence scrubbing state set by Cache()
    */
   bool scrubbing_;
