@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Amber Video Editor — fork of Olive 0.1.x, free open-source non-linear video editor (GPLv3). C++17, Qt 6, FFmpeg, Qt RHI (Vulkan/Metal/D3D12/OpenGL). Targets performance on modest hardware (sub-3 MB binary, ~70 MB idle RAM).
+Amber Video Editor — fork of Olive 0.1.x, free open-source non-linear video editor (GPLv3). C++17, Qt 6, FFmpeg, Qt RHI (Vulkan/Metal/D3D12/OpenGL). Targets performance on modest hardware (sub-5 MB binary, ~70 MB idle RAM).
 
 ## Roadmap
 
