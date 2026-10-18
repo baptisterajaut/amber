@@ -63,7 +63,7 @@ Amber 2.0 accepts fragment shaders written in ShaderToy format — the de facto 
 - `textureGrad`/`textureGather`/`texture*Offset`/`textureProj` on `iChannel0` (rejected with a message: the flip can't be applied)
 
 ### New built-in effects
-- Gradient generator — 2-stop linear/radial shipped in v1.7.0; 2.0 adds "As Mask" to fill the Text / Rich Text letters above it. Remaining: a multi-stop color ramp (#21)
+- Gradient generator — 2-stop linear/radial shipped in v1.7.0; 2.0 adds "As Mask" to fill the Text / Rich Text letters above it, and a multi-stop color ramp done in 2.0: a Color Ramp row between the Start and End colors (click the bar to add a stop, drag to move, drag off to remove, double-click for its color, Reverse Ramp), up to 16 stops, not keyframeable (Start/End Color still are) (#21)
 - Timer / countdown — done in 2.0: Timer generator, counts up from the clip's start or down to 0 on its last frame, MM:SS / HH:MM:SS / seconds / hundredths, prefix and time offset
 - Progress bar — done in 2.0: Progress Bar generator, fills over the clip's duration or follows a keyframeable value, top or bottom edge, thickness, margin, direction
 - Drop Shadow — done in 2.0: drawn in sequence space from the clip as already transformed, so it works on opaque picture-in-picture clips; colour, opacity, direction, distance, softness, all keyframeable
@@ -120,7 +120,7 @@ The audio data race (`audio_ibuffer` read without lock) was fixed in 1.4.0. Rema
 
 ### Export improvements
 - Hardware encoding (NVENC, VAAPI, QSV) — hwaccel decoding exists, expose FFmpeg encoder variants in export dialog
-- **Per-codec options panel** — generalize the export dialog so each codec declares its own parameter set instead of one-off field additions. Concrete asks driving the redesign (#58): x264/x265 `-preset` (veryslow→ultrafast), SVT-AV1 (preset −2..13, CRF 0..63), rav1e (`-speed` −1..10, `-qp` 0..255), libaom-av1, AV1 2-pass encoding, average-bitrate as a compression mode for x264/x265/SVT-AV1/rav1e, FLAC compression levels, `+faststart` movflag for MOV-family containers (MP4/MOV/3GPP/FLV), per-codec pixel format filtering.
+- **Per-codec options panel** — lot 1 done in 2.0: each software encoder declares its options in `rendering/encoderoptions` (validated against the installed FFmpeg's AVOptions, unknown keys dropped). AV1 in MP4/MKV/WebM with an encoder choice (SVT-AV1, rav1e, libaom); x264/x265 speed preset; SVT-AV1 preset 0..13 + CRF 1..63; rav1e speed + QP 0..255; libaom cpu-used + CRF; average bitrate (one pass) for x264/x265/SVT-AV1/rav1e/libaom; FLAC compression level; "Fast start" (`+faststart`, on by default) for MP4/MOV/3GPP; pixel formats limited to what swscale can write; all saved in export presets. Remaining (#58): two-pass, VP9 CRF, FLV (its muxer has no faststart).
 - Render queue — non-modal export with queue UI, continue editing during render
 - Batch export — multi-sequence export in one operation
 - **Master loudness on export** — optional loudness normalization (EBU R128 `loudnorm`, e.g. −14 LUFS for YouTube) and brickwall limiter (`alimiter`) on the final mix. The export audio path uses libswresample only today, so this adds a small libavfilter graph before the encoder.
