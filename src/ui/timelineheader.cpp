@@ -450,9 +450,7 @@ void TimelineHeader::mouseDoubleClickEvent(QMouseEvent* event) {
         int marker_pos = getHeaderScreenPointFromFrame(viewer->marker_ref->at(i).frame);
         if (event->position().toPoint().x() > marker_pos - MARKER_SIZE &&
             event->position().toPoint().x() < marker_pos + MARKER_SIZE) {
-          QVector<Marker*> ptrs;
-          ptrs.append(&(*viewer->marker_ref)[i]);
-          MarkerPropertiesDialog dlg(this, ptrs, viewer->seq->frame_rate);
+          MarkerPropertiesDialog dlg(this, viewer->marker_ref, {i}, viewer->seq->frame_rate);
           dlg.exec();
           update();
           return;
@@ -658,14 +656,14 @@ void TimelineHeader::show_context_menu(const QPoint& pos) {
     QAction* props = menu.addAction(tr("Marker Properties..."));
     connect(props, &QAction::triggered, this, [this]() {
       if (viewer == nullptr || viewer->seq == nullptr || viewer->marker_ref == nullptr) return;
-      QVector<Marker*> ptrs;
+      QVector<int> indices;
       for (int idx : selected_markers) {
         if (idx >= 0 && idx < viewer->marker_ref->size()) {
-          ptrs.append(&(*viewer->marker_ref)[idx]);
+          indices.append(idx);
         }
       }
-      if (!ptrs.isEmpty()) {
-        MarkerPropertiesDialog dlg(this, ptrs, viewer->seq->frame_rate);
+      if (!indices.isEmpty()) {
+        MarkerPropertiesDialog dlg(this, viewer->marker_ref, indices, viewer->seq->frame_rate);
         dlg.exec();
         update();
       }

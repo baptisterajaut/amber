@@ -13,12 +13,15 @@ class QComboBox;
 class MarkerPropertiesDialog : public QDialog {
   Q_OBJECT
  public:
-  MarkerPropertiesDialog(QWidget* parent, QVector<Marker*> markers, double frame_rate);
+  // `indices` address markers in `array` (sequence, clip or footage markers)
+  MarkerPropertiesDialog(QWidget* parent, QVector<Marker>* array, const QVector<int>& indices, double frame_rate);
 
  protected:
   void accept() override;
 
  private:
+  QVector<Marker>* array_;
+  QVector<int> indices_;
   QVector<Marker*> markers_;
   QLineEdit* name_edit_;
   LabelSlider* frame_slider_;
@@ -28,14 +31,6 @@ class MarkerPropertiesDialog : public QDialog {
   bool frame_modified_{false};
   bool duration_modified_{false};
   bool color_modified_{false};
-
-  struct OriginalValues {
-    QString name;
-    long frame;
-    int color_label;
-    long duration;
-  };
-  QVector<OriginalValues> originals_;
 };
 
 #endif  // MARKERPROPERTIESDIALOG_H
