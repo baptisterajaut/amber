@@ -451,6 +451,17 @@ QString frame_to_timecode(long f, int view, double frame_rate) {
                  QString::number(frames).rightJustified(2, '0'));
 }
 
+QString signed_frame_to_timecode(long f, int view, double frame_rate) {
+  if (f < 0) return QStringLiteral("-") + frame_to_timecode(-f, view, frame_rate);
+  return frame_to_timecode(f, view, frame_rate);
+}
+
+long signed_timecode_to_frame(const QString& s, int view, double frame_rate) {
+  const QString t = s.trimmed();
+  if (t.startsWith(QLatin1Char('-'))) return -timecode_to_frame(t.mid(1).trimmed(), view, frame_rate);
+  return timecode_to_frame(t, view, frame_rate);
+}
+
 bool frame_rate_is_droppable(double rate) {
   return (qFuzzyCompare(rate, 23.976) || qFuzzyCompare(rate, 29.97) || qFuzzyCompare(rate, 59.94));
 }

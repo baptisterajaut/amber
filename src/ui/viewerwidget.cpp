@@ -469,20 +469,20 @@ EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
   const QRectF fr = frame_rect();
   if (gizmos != nullptr && !fr.isEmpty()) {
     // Gizmo screen_pos is in sequence pixels with Y=0 at the bottom
-    QPointF sp = amber::viewer_to_sequence(frame_geometry(), QPointF(x, y));
+    const amber::ViewerFrameGeometry fg = frame_geometry();
+    QPointF sp = amber::viewer_to_sequence(fg, QPointF(x, y));
     QPoint mouse_pos(qRound(sp.x()), qRound(viewer->seq->height - sp.y()));
-    double multiplier_x = double(viewer->seq->width) / fr.width();
-    int dot_size = 2 * qRound(GIZMO_DOT_SIZE * multiplier_x);
-    int target_size = 2 * qRound(GIZMO_TARGET_SIZE * multiplier_x);
+    auto handle_hit = [&](const QPoint& handle, double half_px) {
+      return amber::viewer_point_near(fg, QPointF(handle.x(), viewer->seq->height - handle.y()), QPointF(x, y),
+                                      half_px);
+    };
+    // Hit boxes twice the drawn handle (draw_gizmos), in widget pixels: the same grab area at any viewer zoom
     for (int i = 0; i < gizmos->gizmo_count(); i++) {
       EffectGizmo* g = gizmos->gizmo(i);
 
       switch (g->get_type()) {
         case GIZMO_TYPE_DOT:
-          if (mouse_pos.x() > g->screen_pos[0].x() - dot_size && mouse_pos.y() > g->screen_pos[0].y() - dot_size &&
-              mouse_pos.x() < g->screen_pos[0].x() + dot_size && mouse_pos.y() < g->screen_pos[0].y() + dot_size) {
-            return g;
-          }
+          if (handle_hit(g->screen_pos[0], 2 * GIZMO_DOT_SIZE)) return g;
           break;
         case GIZMO_TYPE_POLY:
           if (QPolygon(g->screen_pos).containsPoint(mouse_pos, Qt::OddEvenFill)) {
@@ -490,12 +490,7 @@ EffectGizmo* ViewerWidget::get_gizmo_from_mouse(int x, int y) {
           }
           break;
         case GIZMO_TYPE_TARGET:
-          if (mouse_pos.x() > g->screen_pos[0].x() - target_size &&
-              mouse_pos.y() > g->screen_pos[0].y() - target_size &&
-              mouse_pos.x() < g->screen_pos[0].x() + target_size &&
-              mouse_pos.y() < g->screen_pos[0].y() + target_size) {
-            return g;
-          }
+          if (handle_hit(g->screen_pos[0], 2 * GIZMO_TARGET_SIZE)) return g;
           break;
       }
     }
@@ -574,10 +569,10 @@ bool ViewerWidget::press_handle_color_pick(QMouseEvent* event) {
   return true;
 }
 
-bool ViewerWidget::press_handle_guide(int video_x, int image_y, QMouseEvent* event) {
+bool ViewerWidget::press_handle_guide(QMouseEvent* event) {
   if (event->buttons() & Qt::RightButton) {
     bool hit_mirror = false;
-    int idx = find_guide_at(video_x, image_y, &hit_mirror);
+    int idx = find_guide_at(event->position(), &hit_mirror);
     if (idx < 0) return false;
     show_guide_context_menu(idx, event->globalPosition().toPoint(), hit_mirror);
     setContextMenuPolicy(Qt::PreventContextMenu);
@@ -586,7 +581,7 @@ bool ViewerWidget::press_handle_guide(int video_x, int image_y, QMouseEvent* eve
   }
   if (event->buttons() & Qt::LeftButton) {
     bool hit_mirror = false;
-    int idx = find_guide_at(video_x, image_y, &hit_mirror);
+    int idx = find_guide_at(event->position(), &hit_mirror);
     if (idx >= 0) {
       dragging_guide_index_ = idx;
       dragging_guide_old_pos_ = viewer->seq->guides[idx].position;
@@ -623,11 +618,8 @@ void ViewerWidget::mousePressEvent(QMouseEvent* event) {
   } else if (event->buttons() & Qt::MiddleButton || panel_timeline->tool == TIMELINE_TOOL_HAND) {
     container->dragScrollPress(event->position().toPoint() * container->zoom);
   } else if (viewer->seq != nullptr && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides) {
-    QPointF sp = amber::viewer_to_sequence(frame_geometry(), event->position());
-    int video_x = qRound(sp.x());
-    int image_y = qRound(sp.y());
     bool on_handle = (event->buttons() & Qt::LeftButton) && gizmo_handle_at(event->position().toPoint());
-    if (!on_handle && press_handle_guide(video_x, image_y, event)) return;
+    if (!on_handle && press_handle_guide(event)) return;
     if (event->buttons() & Qt::LeftButton) press_set_gizmo_drag(event);
   } else if (event->buttons() & Qt::LeftButton) {
     press_set_gizmo_drag(event);
@@ -656,7 +648,7 @@ bool ViewerWidget::move_handle_guide_drag(int video_x, int image_y, const QPoint
   if (!dragging && amber::CurrentConfig.show_guides && !amber::CurrentConfig.lock_guides &&
       !gizmo_handle_at(widget_pos)) {
     bool hit_mirror = false;
-    int idx = find_guide_at(video_x, image_y, &hit_mirror);
+    int idx = find_guide_at(widget_pos, &hit_mirror);
     if (idx >= 0) {
       hovered_guide_index_ = idx;
       hovered_mirror_side_ = hit_mirror;
@@ -1008,32 +1000,33 @@ void ViewerWidget::draw_pixel_sampler(QPainter& p) {
   p.drawText(box.adjusted(pad + swatch + pad, 0, -pad, 0), Qt::AlignLeft | Qt::AlignVCenter, text);
 }
 
-int ViewerWidget::find_guide_at(int video_x, int video_y, bool* hit_mirror) const {
-  const QRectF fr = frame_rect();
-  if (viewer->seq == nullptr || fr.isEmpty()) return -1;
-  int threshold = qMax(3, int(5.0 * viewer->seq->width / fr.width()));
+int ViewerWidget::find_guide_at(const QPointF& widget_pos, bool* hit_mirror) const {
+  if (viewer->seq == nullptr || frame_rect().isEmpty()) return -1;
+  // Grab band each side of the line, widget pixels: the same on screen at any zoom
+  const double threshold = 5.0;
+  const amber::ViewerFrameGeometry fg = frame_geometry();
   for (int i = 0; i < viewer->seq->guides.size(); i++) {
     const Guide& g = viewer->seq->guides[i];
     if (g.orientation == Guide::Horizontal) {
-      if (qAbs(video_y - g.position) <= threshold) {
+      if (amber::viewer_line_distance(fg, true, g.position, widget_pos) <= threshold) {
         if (hit_mirror) *hit_mirror = false;
         return i;
       }
       if (g.mirror) {
         int mirror_pos = viewer->seq->height - g.position;
-        if (qAbs(video_y - mirror_pos) <= threshold) {
+        if (amber::viewer_line_distance(fg, true, mirror_pos, widget_pos) <= threshold) {
           if (hit_mirror) *hit_mirror = true;
           return i;
         }
       }
     } else {
-      if (qAbs(video_x - g.position) <= threshold) {
+      if (amber::viewer_line_distance(fg, false, g.position, widget_pos) <= threshold) {
         if (hit_mirror) *hit_mirror = false;
         return i;
       }
       if (g.mirror) {
         int mirror_pos = viewer->seq->width - g.position;
-        if (qAbs(video_x - mirror_pos) <= threshold) {
+        if (amber::viewer_line_distance(fg, false, mirror_pos, widget_pos) <= threshold) {
           if (hit_mirror) *hit_mirror = true;
           return i;
         }

@@ -296,7 +296,7 @@ void MainWindow::save_layout_as() {
   leave_maximized_panel();
   QDir dir = user_layouts_dir();
   dir.mkpath(".");
-  const QString path = dir.filePath(amber::sanitize_layout_name(name) + ".xml");
+  const QString path = amber::layout_file_for(dir, name);
   if (QFileInfo::exists(path) && QMessageBox::question(this, tr("Save Layout"), tr("Replace layout '%1'?").arg(name),
                                                        QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
     return;

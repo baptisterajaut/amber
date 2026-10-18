@@ -12,21 +12,16 @@
 #include "panels/panels.h"
 #include "ui/colorlabel.h"
 
-MarkerPropertiesDialog::MarkerPropertiesDialog(QWidget* parent, QVector<Marker*> markers, double frame_rate)
-    : QDialog(parent), markers_(markers) {
-  setWindowTitle((markers.size() == 1) ? tr("\"%1\" Marker Properties").arg(markers.at(0)->name.isEmpty()
-                                                                               ? tr("Untitled")
-                                                                               : markers.at(0)->name)
-                                       : tr("Multiple Marker Properties"));
+MarkerPropertiesDialog::MarkerPropertiesDialog(QWidget* parent, QVector<Marker>* array, const QVector<int>& indices,
+                                               double frame_rate)
+    : QDialog(parent), array_(array), indices_(indices) {
+  // Pointers are only read while the modal dialog is open; undo addresses markers by index (see accept())
+  for (int idx : indices_) markers_.append(&(*array_)[idx]);
 
-  // Capture original values for undo
-  originals_.resize(markers_.size());
-  for (int i = 0; i < markers_.size(); i++) {
-    originals_[i].name = markers_[i]->name;
-    originals_[i].frame = markers_[i]->frame;
-    originals_[i].color_label = markers_[i]->color_label;
-    originals_[i].duration = markers_[i]->duration;
-  }
+  setWindowTitle((markers_.size() == 1) ? tr("\"%1\" Marker Properties").arg(markers_.at(0)->name.isEmpty()
+                                                                                ? tr("Untitled")
+                                                                                : markers_.at(0)->name)
+                                        : tr("Multiple Marker Properties"));
 
   QGridLayout* layout = new QGridLayout(this);
   int row = 0;
@@ -149,39 +144,31 @@ void MarkerPropertiesDialog::accept() {
   bool any_change = false;
 
   for (int i = 0; i < markers_.size(); i++) {
-    Marker* m = markers_[i];
+    const Marker& m = *markers_[i];
+    Marker edited = m;
 
     // Name
-    if (name_modified_ && !name_edit_->text().isEmpty() && name_edit_->text() != m->name) {
-      ca->append(new SetString(&m->name, name_edit_->text()));
-      any_change = true;
-    }
+    if (name_modified_ && !name_edit_->text().isEmpty()) edited.name = name_edit_->text();
 
     // Frame
-    if (frame_modified_ && !qIsNaN(frame_slider_->value())) {
-      long new_frame = qRound(frame_slider_->value());
-      if (new_frame != m->frame) {
-        ca->append(new SetLong(&m->frame, originals_[i].frame, new_frame));
-        any_change = true;
-      }
-    }
+    if (frame_modified_ && !qIsNaN(frame_slider_->value())) edited.frame = qRound(frame_slider_->value());
 
     // Duration
     if (duration_modified_ && !qIsNaN(duration_slider_->value())) {
-      long new_duration = qMax(0L, long(qRound(duration_slider_->value())));
-      if (new_duration != m->duration) {
-        ca->append(new SetLong(&m->duration, originals_[i].duration, new_duration));
-        any_change = true;
-      }
+      edited.duration = qMax(0L, long(qRound(duration_slider_->value())));
     }
 
     // Color label
     if (color_modified_) {
       int new_label = color_combo_->currentData().toInt();
-      if (new_label >= 0 && new_label != m->color_label) {
-        ca->append(new SetInt(&m->color_label, new_label));
-        any_change = true;
-      }
+      if (new_label >= 0) edited.color_label = new_label;
+    }
+
+    if (edited.name != m.name || edited.frame != m.frame || edited.duration != m.duration ||
+        edited.color_label != m.color_label) {
+      // Index, not &m: adding a marker later can reallocate the array before this is undone
+      ca->append(new EditMarkerAction(array_, indices_[i], m, edited));
+      any_change = true;
     }
   }
 

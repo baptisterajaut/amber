@@ -92,6 +92,42 @@ class TestLayoutPresets : public QObject {
     QCOMPARE(list.at(2).name, QString("zebra"));
   }
 
+  // Names that sanitize alike used to share one file: saving the second replaced the first
+  void testFileNamesDontCollide() {
+    QTemporaryDir dir;
+    const QDir d(dir.path());
+    const QStringList names = {
+        QString::fromUtf8("色補正"), QString::fromUtf8("編集"), "Edit!", "Edit?", "Edit", "edit", "A/B", "A_B"};
+    QStringList files;
+    for (const QString& name : names) {
+      const QString path = amber::layout_file_for(d, name);
+      QVERIFY2(!QFileInfo::exists(path), qPrintable(name));  // a new name never lands on another layout's file
+      QCOMPARE(QFileInfo(path).absolutePath(), d.absolutePath());
+      QVERIFY(amber::write_layout_file(path, sample(name)));
+      files.append(QFileInfo(path).fileName().toLower());  // apart on case-insensitive file systems too
+    }
+    files.removeDuplicates();
+    QCOMPARE(files.size(), names.size());
+
+    // Stable: the same name finds its file again (Replace), and every layout reads back under its own name
+    for (const QString& name : names) {
+      amber::LayoutData read;
+      QVERIFY(amber::read_layout_file(amber::layout_file_for(d, name), &read));
+      QCOMPARE(read.name, name);
+    }
+    QCOMPARE(amber::list_layouts(d).size(), names.size());
+  }
+
+  // A layout saved by an older version as "<sanitized>.xml" still loads, and saving under its name replaces it
+  void testOldSchemeFileIsReused() {
+    QTemporaryDir dir;
+    const QDir d(dir.path());
+    QVERIFY(amber::write_layout_file(d.filePath("_talonnage.xml"), sample(QString::fromUtf8("Étalonnage"))));
+    QCOMPARE(amber::layout_file_for(d, QString::fromUtf8("Étalonnage")), d.filePath("_talonnage.xml"));
+    QVERIFY(amber::layout_file_for(d, QString::fromUtf8("Ètalonnage")) != d.filePath("_talonnage.xml"));
+    QCOMPARE(amber::list_layouts(d).size(), 1);
+  }
+
   void testListMissingDir() { QVERIFY(amber::list_layouts(QDir("/nonexistent/amber/layouts")).isEmpty()); }
 };
 

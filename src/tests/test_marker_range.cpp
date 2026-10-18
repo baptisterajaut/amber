@@ -39,6 +39,17 @@ class TestMarkerRange : public QObject {
     QCOMPARE(end_tick_at(markers, 11, to_screen), 1);
     QCOMPARE(end_tick_at(markers, 100, to_screen), -1);
   }
+  // A range marker a few pixels long: its end tick would cover the head, so a press there moves the marker
+  void shortRangeMarkerKeepsItsHead() {
+    using amber::marker_range::end_tick_at;
+    const QVector<Marker> short_marker = {marker(30, 3)};  // head x = 50, end x = 56
+    QCOMPARE(end_tick_at(short_marker, 53, to_screen), -1);
+    QCOMPARE(end_tick_at(short_marker, 56, to_screen), -1);
+    const QVector<Marker> long_enough = {marker(30, 4)};  // end x = 58: 8 px, clear of the head's band (47..53)
+    QCOMPARE(end_tick_at(long_enough, 58, to_screen), 0);
+    QCOMPARE(end_tick_at(long_enough, 55, to_screen), 0);
+    QCOMPARE(end_tick_at(long_enough, 53, to_screen), -1);
+  }
   void durationFollowsTheEnd() {
     QCOMPARE(amber::marker_range::duration_to(10, 55), 45L);
     QCOMPARE(amber::marker_range::duration_to(10, 11), 1L);

@@ -37,6 +37,44 @@ class TestConfig : public QObject {
     QVERIFY(cfg.show_frei0r_effects);
   }
 
+  // Why the subtitle editor compares the committed text with the cell's before parsing it: in the Milliseconds view at
+  // a non-integer rate the frame -> text -> frame round trip is off (h/m/s split at qRound(fps), rebuilt at the real
+  // rate). Should the conversion become symmetric, drop the QEXPECT_FAIL.
+  void millisecondsViewRoundTripIsAsymmetric() {
+    const double rate = 23.976024;
+    const QString shown = frame_to_timecode(2400, amber::kTimecodeMilliseconds, rate);
+    QCOMPARE(shown, QString("100000"));
+    QCOMPARE(frame_to_timecode(2400, amber::kTimecodeMilliseconds, rate), shown);  // the cell text is stable
+    QEXPECT_FAIL("", "timecode_to_frame() does not invert frame_to_timecode() in the Milliseconds view", Continue);
+    QCOMPARE(timecode_to_frame(shown, amber::kTimecodeMilliseconds, rate), 2400L);
+    // Integer rates and the other views round-trip
+    QCOMPARE(
+        timecode_to_frame(frame_to_timecode(2400, amber::kTimecodeMilliseconds, 24), amber::kTimecodeMilliseconds, 24),
+        2400L);
+    QCOMPARE(timecode_to_frame(frame_to_timecode(2400, amber::kTimecodeNonDrop, rate), amber::kTimecodeNonDrop, rate),
+             2400L);
+  }
+
+  // A keyframe before its clip's start (graph editor Time box): "-00:00:01:05", not "00:00:-1:-5", and it parses back
+  void negativeFramesKeepTheirSign() {
+    QCOMPARE(signed_frame_to_timecode(-29, amber::kTimecodeNonDrop, 24), QString("-00:00:01:05"));
+    QCOMPARE(signed_timecode_to_frame("-00:00:01:05", amber::kTimecodeNonDrop, 24), -29L);
+    QCOMPARE(signed_timecode_to_frame(" - 00:00:01:05 ", amber::kTimecodeNonDrop, 24), -29L);
+    QCOMPARE(signed_frame_to_timecode(-29, amber::kTimecodeFrames, 24), QString("-29"));
+    QCOMPARE(signed_timecode_to_frame("-29", amber::kTimecodeFrames, 24), -29L);
+    QCOMPARE(signed_frame_to_timecode(-1798, amber::kTimecodeDrop, 29.97), QString("-00:00:59;28"));
+    QCOMPARE(signed_timecode_to_frame("-00:00:59;28", amber::kTimecodeDrop, 29.97), -1798L);
+    // Non-negative frames: exactly the unsigned conversion
+    for (int view : {int(amber::kTimecodeDrop), int(amber::kTimecodeNonDrop), int(amber::kTimecodeFrames),
+                     int(amber::kTimecodeMilliseconds)}) {
+      for (long f : {0L, 29L, 86400L}) {
+        QCOMPARE(signed_frame_to_timecode(f, view, 29.97), frame_to_timecode(f, view, 29.97));
+        const QString tc = frame_to_timecode(f, view, 29.97);
+        QCOMPARE(signed_timecode_to_frame(tc, view, 29.97), timecode_to_frame(tc, view, 29.97));
+      }
+    }
+  }
+
   void savedTogglesRoundTrip() {
     QTemporaryDir dir;
     const QString path = dir.filePath("config.xml");

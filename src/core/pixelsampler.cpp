@@ -30,6 +30,18 @@ QPointF viewer_to_sequence(const ViewerFrameGeometry& g, const QPointF& pos) {
                  (pos.y() - r.top()) * g.sequence.height() / r.height());
 }
 
+bool viewer_point_near(const ViewerFrameGeometry& g, const QPointF& seq, const QPointF& pos, double half_px) {
+  if (viewer_frame_rect(g).isEmpty()) return false;
+  const QPointF d = sequence_to_viewer(g, seq) - pos;
+  return qAbs(d.x()) <= half_px && qAbs(d.y()) <= half_px;
+}
+
+double viewer_line_distance(const ViewerFrameGeometry& g, bool horizontal, double seq_pos, const QPointF& pos) {
+  if (viewer_frame_rect(g).isEmpty()) return qInf();
+  const QPointF line = sequence_to_viewer(g, QPointF(seq_pos, seq_pos));
+  return horizontal ? qAbs(line.y() - pos.y()) : qAbs(line.x() - pos.x());
+}
+
 bool map_viewer_point(const ViewerFrameGeometry& g, const QPointF& pos, const QSize& buffer, FramePoint* out) {
   const QRectF r = viewer_frame_rect(g);
   if (r.isEmpty() || buffer.isEmpty()) return false;

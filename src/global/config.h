@@ -149,6 +149,10 @@ enum FrameQueueType : uint8_t {
 bool frame_rate_is_droppable(double rate);
 long timecode_to_frame(const QString& s, int view, double frame_rate);
 QString frame_to_timecode(long f, int view, double frame_rate);
+// The same with a sign: a negative frame (a keyframe before its clip's start) reads "-" + the timecode of its magnitude,
+// and a leading '-' is parsed back. The unsigned pair turns a negative frame into "00:00:-3:-5".
+QString signed_frame_to_timecode(long f, int view, double frame_rate);
+long signed_timecode_to_frame(const QString& s, int view, double frame_rate);
 
 /**
  * @brief The Config struct
