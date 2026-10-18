@@ -6,6 +6,8 @@ target_sources(${OLIVE_TARGET} PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/alpha.h
   ${CMAKE_CURRENT_SOURCE_DIR}/audio.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/audio.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/decimalinput.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/decimalinput.h
   ${CMAKE_CURRENT_SOURCE_DIR}/graphmath.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/graphmath.h
   ${CMAKE_CURRENT_SOURCE_DIR}/appcontext.cpp

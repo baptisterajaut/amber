@@ -32,6 +32,7 @@
 #include "global/debug.h"
 #include "ui/styling.h"
 #include "ui/menu.h"
+#include "ui/decimalinput.h"
 
 LabelSlider::LabelSlider(QWidget* parent) : QLabel(parent) {
   // set a default frame rate - fallback, shouldn't ever really be used
@@ -340,7 +341,7 @@ void LabelSlider::ShowDialog()
     }
 
     // percentages are stored 0.0 - 1.0 but displayed as 0% - 100%
-    d = QInputDialog::getDouble(
+    d = amber::get_decimal(
           this,
           tr("Set Value"),
           tr("New value:"),

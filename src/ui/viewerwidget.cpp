@@ -56,6 +56,7 @@ extern "C" {
 #include "rendering/renderfunctions.h"
 #include "rendering/renderthread.h"
 #include "ui/collapsiblewidget.h"
+#include "ui/decimalinput.h"
 #include "ui/menu.h"
 #include "ui/timelinewidget.h"
 #include "ui/viewercontainer.h"
@@ -236,8 +237,8 @@ void ViewerWidget::set_fit_zoom() {
 
 void ViewerWidget::set_custom_zoom() {
   bool ok;
-  double d = QInputDialog::getDouble(this, tr("Viewer Zoom"), tr("Set Custom Zoom Value:"), container->zoom * 100, 0,
-                                     2147483647, 2, &ok);
+  double d = amber::get_decimal(this, tr("Viewer Zoom"), tr("Set Custom Zoom Value:"), container->zoom * 100, 0,
+                                2147483647, 2, &ok);
   if (ok) {
     container->fit = false;
     container->zoom = d * 0.01;
