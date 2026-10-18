@@ -114,6 +114,8 @@ static bool is_view_key(const QKeyEvent* e) {
   if (e->key() == Qt::Key_F9) {
     return mods == Qt::NoModifier || mods == Qt::ShiftModifier || mods == (Qt::ControlModifier | Qt::ShiftModifier);
   }
+  // Shift+F is also Freeze Frame in the main window: the Graph Editor takes it while its view has focus
+  if (e->key() == Qt::Key_F) return mods == Qt::NoModifier || mods == Qt::ShiftModifier;
   return false;
 }
 
@@ -135,8 +137,26 @@ void GraphView::keyPressEvent(QKeyEvent* e) {
   if (e->key() == Qt::Key_F9) {
     easy_ease(ctrl ? amber::graph::EaseSide::kOut
                    : (shift ? amber::graph::EaseSide::kIn : amber::graph::EaseSide::kBoth));
+  } else if (e->key() == Qt::Key_F) {
+    if (shift) {
+      frame_all();
+    } else {
+      frame_selected();
+    }
   }
 }
+
+void GraphView::frame_selected() {
+  if (row == nullptr) return;
+  drop_stale_selection(row, selected_keys, selected_keys_fields);
+  if (selected_keys.isEmpty()) {
+    set_view_to_all();
+  } else {
+    set_view_to_selection();
+  }
+}
+
+void GraphView::frame_all() { set_view_to_all(); }
 
 void GraphView::show_context_menu(const QPoint& pos) {
   Menu menu(this);
@@ -155,6 +175,7 @@ void GraphView::show_context_menu(const QPoint& pos) {
   menu.addSeparator();
 
   QAction* zoom_to_selection = menu.addAction(tr("Zoom to Selection"));
+  zoom_to_selection->setShortcut(QKeySequence(Qt::Key_F));
   if (selected_keys.size() == 0 || row == nullptr) {
     zoom_to_selection->setEnabled(false);
   } else {
@@ -162,6 +183,7 @@ void GraphView::show_context_menu(const QPoint& pos) {
   }
 
   QAction* zoom_to_all = menu.addAction(tr("Zoom to Show All"));
+  zoom_to_all->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_F));
   if (row == nullptr) {
     zoom_to_all->setEnabled(false);
   } else {
@@ -220,6 +242,7 @@ void GraphView::set_view_to_all() {
     double min_dbl = DBL_MAX;
     double max_dbl = std::numeric_limits<double>::lowest();  // not DBL_MIN, the smallest positive double
     for (int i = 0; i < row->FieldCount(); i++) {
+      if (!field_is_shown(i)) continue;  // hidden curves take no room
       for (const auto& key : row->Field(i)->keyframes) {
         min_time = qMin(key.time, min_time);
         max_time = qMax(key.time, max_time);

@@ -66,6 +66,8 @@ class GraphEditor : public Panel {
   QPushButton* bezier_button;
   QPushButton* hold_button;
   QPushButton* ease_button_;
+  QPushButton* frame_selected_button_;
+  QPushButton* frame_all_button_;
   QLabel* time_label_;
   LabelSlider* time_slider_;
   QLabel* value_label_;

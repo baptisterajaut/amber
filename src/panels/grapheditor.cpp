@@ -73,6 +73,11 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   keyframe_nav->enable_keyframes(true);
   keyframe_nav->enable_keyframe_toggle(false);
   left_tool_layout->addWidget(keyframe_nav);
+  frame_selected_button_ = new QPushButton();
+  frame_all_button_ = new QPushButton();
+  left_tool_layout->addSpacing(8);
+  left_tool_layout->addWidget(frame_selected_button_);
+  left_tool_layout->addWidget(frame_all_button_);
   left_tool_layout->addStretch();
 
   linear_button = new QPushButton();
@@ -155,6 +160,8 @@ GraphEditor::GraphEditor(QWidget* parent) : Panel(parent) {
   connect(bezier_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
   connect(hold_button, &QPushButton::clicked, this, &GraphEditor::set_keyframe_type);
   connect(ease_button_, &QPushButton::clicked, this, [this]() { view->easy_ease(amber::graph::EaseSide::kBoth); });
+  connect(frame_selected_button_, &QPushButton::clicked, view, &GraphView::frame_selected);
+  connect(frame_all_button_, &QPushButton::clicked, view, &GraphView::frame_all);
 
   Retranslate();
   set_key_button_enabled(false, -1);
@@ -169,6 +176,10 @@ void GraphEditor::Retranslate() {
   bezier_button->setText(tr("Bezier"));
   hold_button->setText(tr("Hold"));
   ease_button_->setText(tr("Easy Ease"));
+  frame_selected_button_->setText(tr("Frame Selected"));
+  frame_selected_button_->setToolTip(tr("Frame the selected keys, or all keys when none is selected (F)"));
+  frame_all_button_->setText(tr("Frame All"));
+  frame_all_button_->setToolTip(tr("Frame all keys (Shift+F)"));
   ease_button_->setToolTip(tr("Easy Ease (F9)\nEasy Ease In: Shift+F9, Easy Ease Out: Ctrl+Shift+F9"));
   time_label_->setText(tr("Time:"));
   value_label_->setText(tr("Value:"));

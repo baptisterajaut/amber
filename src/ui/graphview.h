@@ -61,6 +61,10 @@ class GraphView : public QWidget {
 
   // Easy Ease (F9), Easy Ease In (Shift+F9), Easy Ease Out (Ctrl+Shift+F9) on the selected keys, one undo step
   void easy_ease(amber::graph::EaseSide side);
+
+  // Framing (F / Shift+F): the selected keys, or all keys when none is selected; all keys
+  void frame_selected();
+  void frame_all();
  signals:
   void x_scroll_changed(int);
   void y_scroll_changed(int);
