@@ -4,6 +4,9 @@
 #include <QRegularExpression>
 #include <QTextStream>
 
+#include <algorithm>
+#include <cmath>
+
 namespace {
 
 // Parse "HH:MM:SS,mmm" → milliseconds. Returns -1 on failure.
@@ -126,16 +129,20 @@ struct SrtParserCtx {
 }  // namespace
 
 SrtParseResult parse_srt(const QString& filepath) {
-  SrtParseResult result;
-  result.skipped = 0;
-
   QFile file(filepath);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    SrtParseResult result;
+    result.skipped = 0;
     return result;
   }
 
   QTextStream stream(&file);
-  QString content = stream.readAll();
+  return parse_srt_text(stream.readAll());
+}
+
+SrtParseResult parse_srt_text(QString content) {
+  SrtParseResult result;
+  result.skipped = 0;
 
   // Skip BOM if present
   if (content.startsWith(QChar(0xFEFF))) content = content.mid(1);
@@ -166,9 +173,87 @@ SrtParseResult parse_srt(const QString& filepath) {
   // Flush last cue if file doesn't end with blank line
   if (ctx.state == READING_TEXT) ctx.flush_cue();
 
-  // Sort by start_ms
-  std::sort(result.cues.begin(), result.cues.end(),
-            [](const SubtitleCue& a, const SubtitleCue& b) { return a.start_ms < b.start_ms; });
+  sort_cues(result.cues);
 
   return result;
+}
+
+namespace {
+
+QString format_timestamp(qint64 ms) {
+  qint64 h = ms / 3600000;
+  ms -= h * 3600000;
+  qint64 m = ms / 60000;
+  ms -= m * 60000;
+  qint64 s = ms / 1000;
+  ms -= s * 1000;
+  return QStringLiteral("%1:%2:%3,%4")
+      .arg(h, 2, 10, QLatin1Char('0'))
+      .arg(m, 2, 10, QLatin1Char('0'))
+      .arg(s, 2, 10, QLatin1Char('0'))
+      .arg(ms, 3, 10, QLatin1Char('0'));
+}
+
+}  // namespace
+
+QString write_srt(const QVector<SubtitleCue>& cues, qint64 offset_ms) {
+  QString out;
+  int index = 1;
+  for (const SubtitleCue& cue : cues) {
+    qint64 start = cue.start_ms + offset_ms;
+    qint64 end = cue.end_ms + offset_ms;
+    if (end <= 0) continue;
+    if (start < 0) start = 0;
+
+    out += QString::number(index++) + QLatin1Char('\n');
+    out += format_timestamp(start) + QLatin1String(" --> ") + format_timestamp(end) + QLatin1Char('\n');
+    out += cue_text_to_lines(cue.text) + QLatin1String("\n\n");
+  }
+  return out;
+}
+
+void sort_cues(QVector<SubtitleCue>& cues) {
+  std::stable_sort(cues.begin(), cues.end(),
+                   [](const SubtitleCue& a, const SubtitleCue& b) { return a.start_ms < b.start_ms; });
+}
+
+qint64 shift_cues(QVector<SubtitleCue>& cues, const QVector<int>& indexes, qint64 delta_ms) {
+  for (int i : indexes) {
+    if (i >= 0 && i < cues.size() && cues[i].start_ms + delta_ms < 0) delta_ms = -cues[i].start_ms;
+  }
+  for (int i : indexes) {
+    if (i < 0 || i >= cues.size()) continue;
+    cues[i].start_ms += delta_ms;
+    cues[i].end_ms += delta_ms;
+  }
+  return delta_ms;
+}
+
+bool cue_times_valid(qint64 start_ms, qint64 end_ms) { return start_ms >= 0 && end_ms > start_ms; }
+
+QString cue_text_to_lines(const QString& text) {
+  static const QRegularExpression br_re(QStringLiteral("<br\\s*/?>"), QRegularExpression::CaseInsensitiveOption);
+  return QString(text).replace(br_re, QStringLiteral("\n"));
+}
+
+QString cue_lines_to_text(const QString& lines) {
+  QString text = lines;
+  text.replace(QLatin1String("\r\n"), QLatin1String("\n"));
+  text.replace(QChar(QChar::LineSeparator), QLatin1Char('\n'));
+  text.replace(QChar(QChar::ParagraphSeparator), QLatin1Char('\n'));
+  return text.replace(QLatin1Char('\n'), QLatin1String("<br>"));
+}
+
+qint64 cue_ms_at_frame(long local_frame, double frame_rate) {
+  // Same operations as get_timecode() (rendering/renderfunctions.cpp) followed by SubtitleEffect's qRound64(* 1000)
+  double timecode = double(local_frame) / frame_rate;
+  return qRound64(timecode * 1000.0);
+}
+
+long first_frame_at_or_after_ms(qint64 ms, double frame_rate) {
+  // A rounded estimate, then step: qRound64 can land either side of the exact frame
+  long f = long(std::floor(double(ms) * frame_rate / 1000.0)) - 1;
+  while (cue_ms_at_frame(f, frame_rate) < ms) f++;
+  while (cue_ms_at_frame(f - 1, frame_rate) >= ms) f--;
+  return f;
 }
