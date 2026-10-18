@@ -29,7 +29,7 @@ public:
     CornerPinEffect(Clip* c, const EffectMeta* em);
   void process_coords(double timecode, GLTextureCoords& coords, int data) override;
   void process_shader(double timecode, GLTextureCoords& coords, int iteration, QByteArray& uboData,
-                      QSize renderSize = QSize()) override;
+                      QSize renderSize = QSize(), float renderScale = 1.0f) override;
   void gizmo_draw(double timecode, GLTextureCoords& coords) override;
 private:
   DoubleField* top_left_x;

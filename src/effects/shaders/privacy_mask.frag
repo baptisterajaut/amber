@@ -8,6 +8,7 @@ layout(std140, binding = 1) uniform FragParams {
   float maskSoftness;
   float intensity;
   bool pixelateMode;
+  float render_scale;  // auto: render pixels per sequence pixel (below 1 at a preview divider)
 };
 
 layout(binding = 2) uniform sampler2D sceneTex;
@@ -31,9 +32,10 @@ void main(void) {
   float dist = distance(aspectCoord, aspectCenter);
   float size = maskRadius * 0.01;
 
-  // Smooth falloff at the mask's edge, controlled by maskSoftness
+  // Smooth falloff at the mask's edge, controlled by maskSoftness: 1 inside, 0 outside. smoothstep is undefined
+  // for edge0 >= edge1 (Softness 0 made them equal and Mesa inverted the mask), so the edges stay ordered and apart
   float innerEdge = size * (1.0 - maskSoftness * 0.01);
-  float maskFactor = smoothstep(size, innerEdge, dist);
+  float maskFactor = 1.0 - smoothstep(innerEdge, size + 1e-5, dist);
 
   vec4 sourceColor = texture(sceneTex, vTexCoord);
   vec4 censoredColor = vec4(0.0);
@@ -45,11 +47,11 @@ void main(void) {
         vec2(floor(vTexCoord.x * blocks) / blocks, floor(vTexCoord.y * (blocks / ar)) / (blocks / ar));
     censoredColor = texture(sceneTex, pixelatedCoord);
   } else {
-    // Blur: simple 9-tap box blur, pixel-sized step so the blur radius
-    // stays consistent regardless of the clip's resolution
+    // Blur: simple 9-tap box blur, step in sequence pixels so the blur radius
+    // stays consistent regardless of the clip's resolution and the preview divider
     // CBA: 9 taps stay a blur only up to ~3 px apart (wider reads as ghost copies), so this tops out
     // as a light blur; a separable multi-tap pass if it needs to hide more
-    vec2 texel = (intensity * 0.03) / resolution;
+    vec2 texel = (intensity * 0.03 * render_scale) / resolution;
     vec4 blurAccumulator = vec4(0.0);
 
     blurAccumulator += texture(sceneTex, vTexCoord + vec2(-texel.x, -texel.y));

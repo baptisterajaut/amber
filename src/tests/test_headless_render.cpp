@@ -1526,21 +1526,24 @@ class TestHeadlessRender : public QObject {
   }
 
 #ifndef NOLADSPA
-  // A Tone clip through LADSPA amp_mono at -6 dB exports at half the RMS of the same clip without it
+  // A Tone clip through LADSPA amp_mono at -6 dB exports at half the RMS of the same clip without it. Without the
+  // SDK's amp.so, through its lookalike test plugin (tests/fixtures/ladspa, 4243001)
   void ladspaAmpHalvesExport() {
     const EffectMeta* amp = nullptr;
     for (const EffectMeta& em : effects) {
-      if (em.internal == EFFECT_INTERNAL_LADSPA && em.plugin_id == 1048) amp = &em;
+      if (em.internal == EFFECT_INTERNAL_LADSPA && (em.plugin_id == 1048 || em.plugin_id == 4243001)) amp = &em;
     }
     if (amp == nullptr) {
-      for (const EffectMeta& em : amber::ladspa::scan(amber::ladspa::search_paths())) {
-        if (em.plugin_id == 1048) {
+      QStringList dirs = amber::ladspa::search_paths();
+      dirs.append(QStringLiteral(AMBER_TEST_LADSPA_DIR));
+      for (const EffectMeta& em : amber::ladspa::scan(dirs)) {
+        if (amp == nullptr && (em.plugin_id == 1048 || em.plugin_id == 4243001)) {
           effects.push_back(em);
           amp = &effects.back();
         }
       }
     }
-    if (amp == nullptr) QSKIP("amp_mono (1048, LADSPA SDK amp.so) not installed");
+    QVERIFY2(amp != nullptr, "neither amp_mono (1048) nor the test plugin amber_test_ladspa (4243001) was found");
     const EffectMeta* tone_meta = get_meta_from_name("Tone");
     QVERIFY(tone_meta != nullptr);
 

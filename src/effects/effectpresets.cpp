@@ -1,45 +1,71 @@
 #include "effectpresets.h"
 
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QSaveFile>
-#include <QStandardPaths>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 #include <algorithm>
+
+#include "core/path.h"
 
 namespace {
 
 const QLatin1String kRootTag("effectpreset");
 
-}  // namespace
-
-QString EffectPresetDir() {
-  return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/effectpresets";
+// The display name and subtype of the preset file `fi`, false if it isn't one. Only the root element is read.
+bool ReadPresetRoot(const QFileInfo& fi, QString* name, int* subtype) {
+  QFile f(fi.filePath());
+  if (!f.open(QFile::ReadOnly)) return false;
+  QXmlStreamReader stream(&f);
+  if (!stream.readNextStartElement() || stream.name() != kRootTag) return false;
+  const QXmlStreamAttributes attrs = stream.attributes();
+  bool ok = false;
+  *subtype = attrs.value("subtype").toInt(&ok);
+  if (!ok) return false;
+  *name = attrs.value("name").toString();
+  if (name->isEmpty()) *name = fi.completeBaseName();
+  return true;
 }
 
+}  // namespace
+
+QString EffectPresetDir() { return get_data_path() + "/effectpresets"; }
+
 QString EffectPresetPathForName(const QString& name) {
-  QString file_name = name;
+  QString file_name = name.left(64);
   file_name.replace(QRegularExpression("[^a-zA-Z0-9 _-]"), "_");
-  return EffectPresetDir() + "/" + file_name + ".xml";
+  const QByteArray hash = QCryptographicHash::hash(name.toUtf8(), QCryptographicHash::Sha1).toHex().left(8);
+  return EffectPresetDir() + "/" + file_name + "-" + QString::fromLatin1(hash) + ".xml";
+}
+
+QString EffectPresetSavePath(const QString& name, QString* replaced) {
+  replaced->clear();
+  QString stored;
+  int subtype = 0;
+  for (const QFileInfo& fi : QDir(EffectPresetDir()).entryInfoList({"*.xml"}, QDir::Files)) {
+    if (ReadPresetRoot(fi, &stored, &subtype) && stored == name) {
+      *replaced = stored;
+      return fi.filePath();
+    }
+  }
+  // No preset shows this name, but the file can still exist (not a preset, or unreadable): name what it holds
+  const QString path = EffectPresetPathForName(name);
+  const QFileInfo fi(path);
+  if (fi.exists()) *replaced = ReadPresetRoot(fi, &stored, &subtype) ? stored : fi.completeBaseName();
+  return path;
 }
 
 QVector<EffectPresetInfo> ListEffectPresets(int subtype) {
   QVector<EffectPresetInfo> presets;
   QDir dir(EffectPresetDir());
   for (const QFileInfo& fi : dir.entryInfoList({"*.xml"}, QDir::Files)) {
-    QFile f(fi.filePath());
-    if (!f.open(QFile::ReadOnly)) continue;
-    QXmlStreamReader stream(&f);
-    if (!stream.readNextStartElement() || stream.name() != kRootTag) continue;
-    const QXmlStreamAttributes attrs = stream.attributes();
-    bool ok = false;
-    const int file_subtype = attrs.value("subtype").toInt(&ok);
-    if (!ok || file_subtype != subtype) continue;
-    QString name = attrs.value("name").toString();
-    if (name.isEmpty()) name = fi.completeBaseName();
+    QString name;
+    int file_subtype = 0;
+    if (!ReadPresetRoot(fi, &name, &file_subtype) || file_subtype != subtype) continue;
     presets.append({name, fi.filePath(), file_subtype});
   }
   std::sort(presets.begin(), presets.end(), [](const EffectPresetInfo& a, const EffectPresetInfo& b) {

@@ -6,6 +6,7 @@ layout(std140, binding = 1) uniform FragParams {
     float radius;
     float strength;
     float detail;
+    float render_scale;  // auto: taps one sequence pixel apart, closer on a smaller render target (preview divider)
 };
 layout(binding = 2) uniform sampler2D myTexture;
 layout(location = 0) in vec2 vTexCoord;
@@ -29,8 +30,7 @@ void main(void) {
 
 	// input is premultiplied: filter the straight colour, premultiply again with the centre alpha
 	vec3 center = c.rgb / c.a;
-	// radius in render-target pixels, rounded down
-	// CBA: like Gaussian Blur it looks wider at reduced preview resolution, scale by the preview divider if it matters
+	// radius in taps, rounded down; taps are one sequence pixel apart (render_scale render pixels)
 	int r = int(radius);
 	float sigma_s = max(float(r) * 0.5, 0.5);
 	float sigma_r = mix(0.02, 0.3, strength * 0.01);
@@ -44,7 +44,7 @@ void main(void) {
 	for (int dy = -MAX_RADIUS; dy <= MAX_RADIUS; dy++) {
 		for (int dx = -MAX_RADIUS; dx <= MAX_RADIUS; dx++) {
 			if (abs(dx) > r || abs(dy) > r || (dx == 0 && dy == 0)) continue;
-			vec4 t = texture(myTexture, vTexCoord + vec2(float(dx), float(dy)) / resolution);
+			vec4 t = texture(myTexture, vTexCoord + vec2(float(dx), float(dy)) * render_scale / resolution);
 			vec3 rgb = t.a > 0.0 ? t.rgb / t.a : vec3(0.0);
 			vec3 d = rgb - center;
 			// transparent taps get weight 0

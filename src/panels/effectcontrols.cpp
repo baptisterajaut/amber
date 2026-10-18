@@ -40,6 +40,7 @@
 #include "effects/effect.h"
 #include "effects/effectloaders.h"
 #include "effects/effectpresets.h"
+#include "effects/internal/voideffect.h"
 #include "effects/transition.h"
 #include "engine/clip.h"
 #include "engine/sequence.h"
@@ -330,7 +331,8 @@ void EffectControls::save_preset(EffectUI* clicked) {
   if (clicked->IsSelected()) {
     for (auto open_effect : open_effects_) {
       Effect* e = open_effect->GetEffect();
-      if (open_effect->IsSelected() && e->meta->type == EFFECT_TYPE_EFFECT && e->meta->subtype == subtype) {
+      if (open_effect->IsSelected() && e->meta->type == EFFECT_TYPE_EFFECT && e->meta->subtype == subtype &&
+          qobject_cast<VoidEffect*>(e) == nullptr) {  // a Missing Effect could never load from the preset
         preset_effects.append(e);
       }
     }
@@ -344,9 +346,10 @@ void EffectControls::save_preset(EffectUI* clicked) {
                            .trimmed();
   if (!ok || name.isEmpty()) return;
 
-  const QString path = EffectPresetPathForName(name);
-  if (QFileInfo::exists(path) && QMessageBox::question(this, tr("Save as Preset"), tr("Replace preset '%1'?").arg(name),
-                                                       QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
+  QString replaced;
+  const QString path = EffectPresetSavePath(name, &replaced);
+  if (!replaced.isEmpty() && QMessageBox::question(this, tr("Save as Preset"), tr("Replace preset '%1'?").arg(replaced),
+                                                   QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes) {
     return;
   }
   if (!SaveEffectPreset(path, name, subtype, preset_effects)) {

@@ -44,7 +44,9 @@ void s16_to_float(const quint8* in, float* out, int frames) {
 
 void float_to_s16(const float* in, quint8* out, int frames) {
   for (int i = 0; i < frames * 2; i++) {
-    const long v = std::clamp(std::lrint(double(in[i]) * 32768.0), -32768L, 32767L);
+    // Clamped before lrint: past the long range lrint is unspecified (LONG_MIN on x86, a huge positive sample from a
+    // LADSPA plugin came out as -32768)
+    const long v = std::lrint(std::clamp(double(in[i]) * 32768.0, -32768.0, 32767.0));
     out[i * 2] = quint8(v & 0xFF);
     out[i * 2 + 1] = quint8((v >> 8) & 0xFF);
   }

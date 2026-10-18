@@ -52,6 +52,8 @@ class TestEffectsGpu : public QObject {
   void boundaryTimecodes();
   void textRenders();
   void textSizeZeroShowsNothing();
+  void textRevealKeepsAlignment_data();
+  void textRevealKeepsAlignment();
   void richTextRenders();
   void richTextShadowOpacity();
   void shakeChangesOutput();
@@ -151,6 +153,8 @@ class TestEffectsGpu : public QObject {
   void noiseShaderOutputDiffers();
   void vignetteDarkensCorners();
   void pixelateBlocks();
+  void privacyMaskHardEdgeCensorsInside_data();
+  void privacyMaskHardEdgeCensorsInside();
   void crossstitchOutputDiffers();
   void volumetricLightOutputDiffers();
 
@@ -230,9 +234,13 @@ class TestEffectsGpu : public QObject {
   void alphaMaskPositionScale();
   void alphaMaskSvg();
   void alphaMaskUnreadableFile();
+  void alphaMaskMissingFileReportsAndRetries();
   void alphaMaskSemiTransparentClip();
   void alphaMaskFillCropsSides();
   void alphaMaskHugeHeaderRejected();
+
+  // Pixel-unit shaders at a preview divider (render_scale auto uniform).
+  void pixelUnitShadersFollowPreviewDivider();
 
   // Phase 4 — YUV decode regression.
   void yuvDecodeRoundtrip();
@@ -851,6 +859,49 @@ void TestEffectsGpu::textSizeZeroShowsNothing() {
   h_->set_field_double(text_eff.get(), 6, 0, 0.0);
   QByteArray blank = h_->render_frame(seq.get(), 0);
   QCOMPARE(count_bright(blank), 0);
+}
+
+void TestEffectsGpu::textRevealKeepsAlignment_data() {
+  QTest::addColumn<int>("halign");  // the Alignment combo's item data, a Qt::Alignment flag
+  QTest::newRow("center") << int(Qt::AlignHCenter);
+  QTest::newRow("right") << int(Qt::AlignRight);
+  QTest::newRow("justify") << int(Qt::AlignJustify);
+}
+
+void TestEffectsGpu::textRevealKeepsAlignment() {
+  // A partly revealed line draws its first letters where the whole line puts them: anchors and justify spacing come
+  // from the full line, so revealing never slides centred/right text sideways or spreads justified words.
+  QFETCH(int, halign);
+  auto seq = h_->make_sequence(128, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+  h_->set_field_color(c->effects[1].get(), 2, 0, QColor(0, 0, 0, 0));
+  EffectPtr text_eff = h_->attach_internal(c, EFFECT_INTERNAL_TEXT, EFFECT_TYPE_EFFECT);
+  // Rows: 0=text, 2=reveal, 6=size, 7=colour, 8=alignment (halign, valign)
+  h_->set_field_string(text_eff.get(), 0, 0, "ABCD EFGH");  // distinct letters: no shift lands on a lookalike
+  h_->set_field_double(text_eff.get(), 6, 0, 12.0);
+  h_->set_field_color(text_eff.get(), 7, 0, QColor(Qt::white));
+  text_eff->row(8)->Field(0)->SetValueAt(0.0, halign);
+  const QByteArray whole = h_->render_frame(seq.get(), 0);
+  h_->set_field_double(text_eff.get(), 2, 0, 67.0);  // 6 of the 9 graphemes: "ABCD E"
+  const QByteArray part = h_->render_frame(seq.get(), 1);
+  QCOMPARE(part.size(), whole.size());
+
+  int ink_whole = 0;
+  int ink_part = 0;
+  for (int y = 0; y < 64; y++) {
+    for (int x = 0; x < 128; x++) {
+      const int w = pixel_at(whole, 128, x, y).r;
+      const int p = pixel_at(part, 128, x, y).r;
+      if (w > 0) ink_whole++;
+      if (p == 0) continue;
+      ink_part++;
+      QVERIFY2(
+          qAbs(p - w) <= 2,
+          qPrintable(QString("revealed pixel (%1,%2) is %3, the whole line has %4 there").arg(x).arg(y).arg(p).arg(w)));
+    }
+  }
+  QVERIFY2(ink_part > 0 && ink_part < ink_whole,
+           qPrintable(QString("expected part of the text: %1 of %2 inked pixels").arg(ink_part).arg(ink_whole)));
 }
 
 void TestEffectsGpu::richTextRenders() {
@@ -2997,6 +3048,52 @@ void TestEffectsGpu::pixelateBlocks() {
   QVERIFY2(diff_d > 4, qPrintable(QString("expected next-block pixel different, sum-diff=%1").arg(diff_d)));
 }
 
+void TestEffectsGpu::privacyMaskHardEdgeCensorsInside_data() {
+  QTest::addColumn<double>("softness");
+  QTest::newRow("softness 0") << 0.0;  // equal smoothstep edges: undefined, inverted the mask on Mesa
+  QTest::newRow("softness 50") << 50.0;
+}
+
+void TestEffectsGpu::privacyMaskHardEdgeCensorsInside() {
+  // Left-to-right gradient, mask radius 25 (16 px on 64 px) at the centre, pixelate at intensity 100 (20 blocks
+  // across, 3.2 px each). Inside the circle the row is snapped to blocks (differs from the gradient), outside it is
+  // the untouched gradient. An inverted mask censors the outside and leaves the secret clear.
+  QFETCH(double, softness);
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
+  Effect* gradient = c->effects[1].get();
+  h_->set_field_color(gradient, 1, 0, QColor(Qt::black));
+  h_->set_field_color(gradient, 2, 0, QColor(Qt::white));
+  h_->set_field_double(gradient, 4, 0, 0.0);  // left→right
+  const QByteArray baseline = h_->render_frame(seq.get(), 0);
+
+  EffectPtr fx = h_->attach_xml_shader(c, "Privacy Mask");
+  QVERIFY(fx != nullptr);
+  h_->set_field_double(fx.get(), 1, 0, 25.0);      // Radius
+  h_->set_field_double(fx.get(), 2, 0, softness);  // Softness
+  h_->set_field_double(fx.get(), 3, 0, 100.0);     // Intensity
+  h_->set_field_bool(fx.get(), 4, 0, true);        // Pixelate
+  const QByteArray pixels = h_->render_frame(seq.get(), 0);
+  QCOMPARE(pixels.size(), baseline.size());
+
+  // Inside: the 12 px around the centre (well within the soft edge too) are mostly snapped away from the gradient
+  int censored = 0;
+  for (int x = 26; x < 38; x++) {
+    if (qAbs(pixel_at(pixels, 64, x, 32).r - pixel_at(baseline, 64, x, 32).r) > 2) censored++;
+  }
+  QVERIFY2(censored >= 6, qPrintable(QString("inside the mask only %1 of 12 pixels are censored").arg(censored)));
+
+  // Outside: every pixel of the left and right bands and of the corners is the gradient
+  for (int y : {2, 32, 61}) {
+    for (int x : {0, 2, 5, 8, 56, 59, 62}) {
+      const int got = pixel_at(pixels, 64, x, y).r;
+      const int want = pixel_at(baseline, 64, x, y).r;
+      QVERIFY2(qAbs(got - want) <= 2,
+               qPrintable(QString("outside the mask (%1,%2) changed: %3 vs %4").arg(x).arg(y).arg(got).arg(want)));
+    }
+  }
+}
+
 void TestEffectsGpu::crossstitchOutputDiffers() {
   auto seq = h_->make_sequence(64, 64, 30.0);
   Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_GRADIENT);
@@ -4256,6 +4353,25 @@ void TestEffectsGpu::alphaMaskUnreadableFile() {
   QVERIFY(mask_value(pixels, 32, 56) <= 1);
 }
 
+void TestEffectsGpu::alphaMaskMissingFileReportsAndRetries() {
+  // A project moved to another machine: the mask path doesn't exist. The effect passes through with its warning icon
+  // (shaderError) on, then the file copied in place is picked up on a later frame and the warning clears
+  QTemporaryDir dir;
+  const QString path = dir.filePath("later.png");
+  auto seq = h_->make_sequence(64, 64, 30.0);
+  Effect* fx = add_masked_white(h_.get(), seq.get(), path);
+  QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Alpha mask: could not read"));
+  h_->assert_solid_color(h_->render_frame(seq.get(), 0), 64, 64, QColor(Qt::white), 1);
+  QVERIFY2(fx->shaderError().contains(path), qPrintable(fx->shaderError()));
+  h_->assert_solid_color(h_->render_frame(seq.get(), 1), 64, 64, QColor(Qt::white), 1);  // no retry, no warning
+
+  QCOMPARE(save_mask(dir, "later.png", split_mask(32, 32, QColor(255, 255, 255, 255), QColor(0, 0, 0, 0))), path);
+  QByteArray pixels = h_->render_frame(seq.get(), 2);
+  QVERIFY(mask_value(pixels, 32, 8) >= 254);
+  QVERIFY(mask_value(pixels, 32, 56) <= 1);
+  QVERIFY2(fx->shaderError().isEmpty(), qPrintable(fx->shaderError()));
+}
+
 void TestEffectsGpu::alphaMaskSemiTransparentClip() {
   // Premultiplied input: the mask scales rgb and alpha together. A white clip at alpha 128 reads back as rgb 128 where
   // kept and 0 where masked (the readback forces alpha to 255, its rgb is the premultiplied value)
@@ -4327,6 +4443,77 @@ void TestEffectsGpu::alphaMaskHugeHeaderRejected() {
 // All other slots use generator clips (RGBA-direct, bypass YUV). This slot
 // loads a committed 1-frame H.264 yuv420p MP4 containing an 8x8 checkerboard,
 // decodes it via the Cacher, and asserts the readback recovers the pattern.
+void TestEffectsGpu::pixelUnitShadersFollowPreviewDivider() {
+  // At preview 1/2 the clip textures are half size: a distance in pixels (blur sigma, sharpen radius, tap spacing,
+  // feather) must cover the same share of the frame as in the export, so the half-resolution render matches a 2 x 2
+  // box downsample of the full one. Without render_scale the half render spreads every distance twice as far.
+  QTemporaryDir dir;
+  const QString mask = save_mask(dir, "m.png", split_mask(32, 32, QColor(Qt::white), QColor(0, 0, 0, 0)));
+  QVERIFY(!mask.isEmpty());
+  struct Case {
+    const char* effect;
+    std::function<void(Effect*)> configure;
+  };
+  const Case cases[] = {
+      {"Gaussian Blur", [this](Effect* e) { h_->set_field_double(e, 0, 0, 4.0); }},  // sigma
+      {"Sharpen", [this](Effect* e) { h_->set_field_double(e, 1, 0, 4.0); }},        // radius
+      {"Find Edges", [this](Effect* e) { h_->set_field_double(e, 0, 0, 20.0); }},    // strength, unclamped edges
+      {"Glow",
+       [this](Effect* e) {
+         h_->set_field_double(e, 0, 0, 30.0);  // threshold
+         h_->set_field_double(e, 1, 0, 8.0);   // radius
+       }},
+      {"Privacy Mask",
+       [this](Effect* e) {
+         h_->set_field_double(e, 1, 0, 100.0);  // radius: the whole frame
+         h_->set_field_double(e, 2, 0, 0.0);    // softness
+         h_->set_field_bool(e, 4, 0, false);    // blur mode
+       }},
+      {"Alpha Mask", [this](Effect* e) { h_->set_field_double(e, 5, 0, 8.0); }},  // feather
+  };
+  for (const Case& cs : cases) {
+    auto seq = h_->make_sequence(64, 64, 30.0);
+    EffectPtr fx;
+    if (QLatin1String(cs.effect) == QLatin1String("Alpha Mask")) {
+      Effect* e = add_masked_white(h_.get(), seq.get(), mask);
+      cs.configure(e);
+    } else {
+      // Grey/black checkerboard, 16 px cells (aligned on the 2 x 2 downsample)
+      Clip* c = h_->add_generator_clip(seq.get(), -1, 0, 30, EFFECT_INTERNAL_SOLID);
+      Effect* solid = c->effects[1].get();
+      h_->set_field_combo(solid, 0, 0, 2);  // Type = SOLID_TYPE_CHECKERBOARD
+      h_->set_field_color(solid, 2, 0, QColor(160, 160, 160));
+      h_->set_field_double(solid, 3, 0, 16.0);
+      fx = h_->attach_xml_shader(c, cs.effect);
+      QVERIFY2(fx != nullptr, cs.effect);
+      cs.configure(fx.get());
+    }
+    const QByteArray full = h_->render_frame(seq.get(), 0);
+    const QByteArray half = h_->render_frame(seq.get(), 0, 2);
+    QCOMPARE(full.size(), 64 * 64 * 4);
+    QCOMPARE(half.size(), 32 * 32 * 4);
+    int total = 0;
+    int worst = 0;
+    for (int y = 0; y < 32; y++) {
+      for (int x = 0; x < 32; x++) {
+        const int down = (pixel_at(full, 64, 2 * x, 2 * y).r + pixel_at(full, 64, 2 * x + 1, 2 * y).r +
+                          pixel_at(full, 64, 2 * x, 2 * y + 1).r + pixel_at(full, 64, 2 * x + 1, 2 * y + 1).r + 2) /
+                         4;
+        const int d = qAbs(pixel_at(half, 32, x, y).r - down);
+        total += d;
+        worst = qMax(worst, d);
+      }
+    }
+    // Measured: 10 to 25 mean without render_scale, under 2 with it (worst taps on the edges, where the
+    // downsample itself is lossy)
+    const double mean = total / 1024.0;
+    QVERIFY2(mean <= 3.0, qPrintable(QString("%1 at 1/2: mean diff %2 (worst %3) against the downsampled full render")
+                                         .arg(cs.effect)
+                                         .arg(mean, 0, 'f', 2)
+                                         .arg(worst)));
+  }
+}
+
 void TestEffectsGpu::yuvDecodeRoundtrip() {
   if (!avcodec_find_decoder(AV_CODEC_ID_H264)) {
     QSKIP("H.264 decoder unavailable in this build of libavcodec");

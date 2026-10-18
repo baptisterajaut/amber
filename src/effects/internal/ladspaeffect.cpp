@@ -297,15 +297,16 @@ bool LadspaEffect::Instance::instantiate(const std::shared_ptr<Plugin>& p, int s
 
 void LadspaEffect::Instance::restart(const std::vector<ControlValue>& values) {
   const LADSPA_Descriptor* d = plugin->descriptor;
-  if (d->activate == nullptr) {
-    // Nothing to reset its state with: start over from a new instance
+  if (d->activate == nullptr || d->deactivate == nullptr) {
+    // Nothing to reset its state with, or no deactivate() to call before activating again (ladspa.h forbids a second
+    // activate() without one): start over from a new instance
     std::shared_ptr<Plugin> p = plugin;
     instantiate(p, rate, values);
     return;
   }
   set_controls(values);
   for (int h = 0; h < handle_count; h++) {
-    if (d->deactivate != nullptr) d->deactivate(handles[h]);
+    d->deactivate(handles[h]);
     d->activate(handles[h]);
   }
 }

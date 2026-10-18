@@ -16,11 +16,18 @@ struct EffectPresetInfo {
   int subtype;  // EFFECT_TYPE_VIDEO or EFFECT_TYPE_AUDIO
 };
 
-// AppDataLocation/effectpresets
+// <data dir>/effectpresets: AppDataLocation, or next to the executable with a `portable` marker (get_data_path)
 QString EffectPresetDir();
 
-// The file a preset of this display name is saved to: characters outside [A-Za-z0-9 _-] become '_', plus ".xml"
+// The new file for a preset of this display name: up to 64 characters of it with those outside [A-Za-z0-9 _-] as
+// '_', then '-' and 8 hex digits of the name's SHA-1, so names that sanitise alike ("Glow!", "Glow?") get their own
+// file. Stable: the same name always maps to the same file.
 QString EffectPresetPathForName(const QString& name);
+
+// Where saving a preset named `name` writes: the file of an existing preset showing this exact name (whatever scheme
+// named the file, older presets were saved without the hash), else EffectPresetPathForName(name). *replaced gets
+// the name of the preset that file holds, empty if the save creates a new file.
+QString EffectPresetSavePath(const QString& name, QString* replaced);
 
 // Presets of `subtype` in EffectPresetDir(), sorted by name case-insensitively. Only the root element of each file
 // is read; files that don't parse as a preset are skipped.

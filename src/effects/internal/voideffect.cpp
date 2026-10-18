@@ -23,6 +23,7 @@
 #include <QXmlStreamReader>
 #include <QFile>
 
+#include "engine/clip.h"
 #include "global/debug.h"
 
 VoidEffect::VoidEffect(Clip* c, const QString& n) : Effect(c, nullptr) {
@@ -38,12 +39,19 @@ VoidEffect::VoidEffect(Clip* c, const QString& n) : Effect(c, nullptr) {
 
   name = display_name;
 
+  // EffectMeta has no default for these: a clipboard paste reads subtype, a VoidEffect is no internal effect
   void_meta.type = EFFECT_TYPE_EFFECT;
+  void_meta.subtype = c == nullptr ? EFFECT_TYPE_INVALID : (c->track() < 0 ? EFFECT_TYPE_VIDEO : EFFECT_TYPE_AUDIO);
+  void_meta.internal = -1;
   meta = &void_meta;
 }
 
 EffectPtr VoidEffect::copy(Clip* c) {
-  EffectPtr copy = std::make_shared<VoidEffect>(c, name);
+  auto copy = std::make_shared<VoidEffect>(c, name);
+  copy->void_meta.subtype = void_meta.subtype;  // copies to the clipboard have no clip
+  // The stored XML and id are all a Missing Effect is: a split or duplicated clip keeps its parameters
+  copy->bytes = bytes;
+  copy->ladspa_id_ = ladspa_id_;
   copy->SetEnabled(IsEnabled());
   copy_field_keyframes(copy);
   return copy;

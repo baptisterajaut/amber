@@ -447,11 +447,14 @@ static void process_effect(Clip* c, Effect* e, double timecode, GLTextureCoords&
       }
     }
 
+    // Preview divider: the clip textures are comp-sized, the top-level sequence's size / divider, so exactly 1 at
+    // export (nested sequences share the top-level comp size, like Drop Shadow's scale)
+    const float render_scale = float(res->tex[0]->pixelSize().width()) / float(qMax(1, params.seq->width));
     for (int i = 0; i < e->getIterations(); i++) {
       QByteArray uboData;
       uboData.resize(qMax(e->fragUboSize(), e->vertUboSize()));
       uboData.fill(0);
-      e->process_shader(timecode, coords, i, uboData, res->tex[0]->pixelSize());
+      e->process_shader(timecode, coords, i, uboData, res->tex[0]->pixelSize(), render_scale);
       rhi_blit(params, res->rt[fbo_switcher], res->rpd, composite_texture, e->vertexShader(), e->fragmentShader(),
                blitMvp, uboData, qMax(e->fragUboSize(), e->vertUboSize()), extraTexture ? 2 : 1, extraTexture, nullptr,
                /*skipClipSpaceCorr=*/true);

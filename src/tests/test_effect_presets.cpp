@@ -11,6 +11,7 @@
 #include "effects/effectfield.h"
 #include "effects/effectpresets.h"
 #include "effects/effectrow.h"
+#include "effects/internal/voideffect.h"
 #include "engine/clip.h"
 #include "global/config.h"
 #include "tests/test_appcontext_stub.h"
@@ -149,7 +150,7 @@ class TestEffectPresets : public QObject {
     QVERIFY(SaveEffectPreset(EffectPresetPathForName("Zeta audio"), "Zeta audio", EFFECT_TYPE_AUDIO, {}));
     const QString accented = QString::fromUtf8("Écho doux/2");
     const QString accented_path = EffectPresetPathForName(accented);
-    QCOMPARE(QFileInfo(accented_path).fileName(), QString("_cho doux_2.xml"));
+    QVERIFY2(QFileInfo(accented_path).fileName().startsWith("_cho doux_2-"), qPrintable(accented_path));
     QVERIFY(SaveEffectPreset(accented_path, accented, EFFECT_TYPE_VIDEO, {}));
     write_file(EffectPresetDir() + "/garbage.xml", "this is <<< not xml");
     write_file(EffectPresetDir() + "/other root.xml", "<effect name=\"Blur/Box Blur\"/>");
@@ -162,6 +163,50 @@ class TestEffectPresets : public QObject {
     for (const EffectPresetInfo& p : video) QCOMPARE(p.subtype, int(EFFECT_TYPE_VIDEO));
     QCOMPARE(video.at(3).path, accented_path);
     QCOMPARE(names(ListEffectPresets(EFFECT_TYPE_AUDIO)), QStringList({"Zeta audio"}));
+  }
+
+  void namesThatSanitiseAlikeKeepTheirOwnFile() {
+    // "Glow!" and "Glow?" both sanitise to "Glow_": the hash suffix keeps them apart, and is stable
+    QVERIFY(EffectPresetPathForName("Glow!") != EffectPresetPathForName("Glow?"));
+    QCOMPARE(EffectPresetPathForName("Glow!"), EffectPresetPathForName("Glow!"));
+    QString replaced;
+    for (const QString& name : {QString("Glow!"), QString("Glow?")}) {
+      const QString path = EffectPresetSavePath(name, &replaced);
+      QVERIFY2(replaced.isEmpty(), qPrintable(name + " would replace " + replaced));
+      QVERIFY(SaveEffectPreset(path, name, EFFECT_TYPE_VIDEO, {}));
+    }
+    QCOMPARE(names(ListEffectPresets(EFFECT_TYPE_VIDEO)), QStringList({"Glow!", "Glow?"}));
+
+    // Saving a name again replaces its own file, and the prompt names it
+    QCOMPARE(EffectPresetSavePath("Glow?", &replaced), EffectPresetPathForName("Glow?"));
+    QCOMPARE(replaced, QString("Glow?"));
+  }
+
+  void presetsSavedBeforeTheHashStillWork() {
+    // A file of the old naming (sanitised name only) is listed, and saving its name again replaces it in place
+    const QString legacy = EffectPresetDir() + "/Old_one.xml";
+    QVERIFY(SaveEffectPreset(legacy, "Old/one", EFFECT_TYPE_VIDEO, {}));
+    QCOMPARE(names(ListEffectPresets(EFFECT_TYPE_VIDEO)), QStringList({"Old/one"}));
+    QString replaced;
+    QCOMPARE(EffectPresetSavePath("Old/one", &replaced), legacy);
+    QCOMPARE(replaced, QString("Old/one"));
+    // A name that only sanitises like it gets a new file, nothing replaced
+    QCOMPARE(EffectPresetSavePath("Old?one", &replaced), EffectPresetPathForName("Old?one"));
+    QVERIFY(replaced.isEmpty());
+  }
+
+  void missingEffectMetaIsDefined() {
+    // A Missing Effect placeholder (no preset action for it) still has a defined subtype for the clipboard's
+    // video/audio filter, kept by its clipboard copy, and is no internal effect
+    ClipPtr video = video_clip();
+    ClipPtr audio = std::make_shared<Clip>(nullptr);
+    audio->set_track(0);
+    VoidEffect on_video(video.get(), "Gone/Video");
+    VoidEffect on_audio(audio.get(), "Gone/Audio");
+    QCOMPARE(on_video.meta->subtype, int(EFFECT_TYPE_VIDEO));
+    QCOMPARE(on_audio.meta->subtype, int(EFFECT_TYPE_AUDIO));
+    QCOMPARE(on_video.meta->internal, -1);
+    QCOMPARE(on_audio.copy(nullptr)->meta->subtype, int(EFFECT_TYPE_AUDIO));
   }
 
   void missingEffect() {

@@ -1080,6 +1080,7 @@ void Effect::close() {
   }
   loadedMaskPath_.clear();
   maskSize_ = QSize(0, 0);
+  failedMaskStamp_.clear();
   vertexShader_ = {};
   fragmentShader_ = {};
   uniformEntries_.clear();
@@ -1119,7 +1120,8 @@ EffectPtr Effect::copy(Clip* c) {
   return copy;
 }
 
-void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData, QSize renderSize) {
+void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QByteArray& uboData, QSize renderSize,
+                            float renderScale) {
   if (uboData.size() < fragUboSize_) uboData.resize(fragUboSize_);
 
   // Use actual FBO/render size for resolution uniforms (shaders that use gl_FragCoord need this
@@ -1134,6 +1136,12 @@ void Effect::process_shader(double timecode, GLTextureCoords&, int iteration, QB
     if (entry.name == QLatin1String("lutSize")) {
       float v = float(lutSize_);
       memcpy(uboData.data() + entry.offset, &v, 4);
+    } else if (entry.name == QLatin1String("render_scale")) {
+      // CBA: only the 2.0 pixel-unit shaders read it (Gaussian Blur, Sharpen, Find Edges, Glow, Denoise, Privacy
+      // Mask, Alpha Mask); the Olive ones (Box/Directional/Radial Blur, Chromatic Aberration, Emboss, Bulge, Swirl,
+      // Cross Stitch) still work in render pixels and look wider at a preview divider. Upgrade: declare
+      // `float render_scale;` in their FragParams and multiply their pixel distances by it
+      memcpy(uboData.data() + entry.offset, &renderScale, 4);
     } else if (entry.name == QLatin1String("mask_size")) {
       // The loaded mask's pixel size, (0, 0) with none: process_effect runs process_mask before the passes
       float v[2] = {float(maskSize_.width()), float(maskSize_.height())};
@@ -1644,15 +1652,32 @@ QImage loadMaskImage(const QString& path, int maxSide) {
 }  // namespace
 
 QRhiTexture* Effect::process_mask(QRhi* rhi, QRhiResourceUpdateBatch* u, const QString& maskPath) {
+  // A failed file is retried once it changes on disk (a moved project's mask copied in place), one stat per frame
+  auto file_stamp = [](const QString& path) {
+    const QFileInfo fi(path);
+    return fi.exists() ? QString::number(fi.lastModified().toMSecsSinceEpoch()) + ':' + QString::number(fi.size())
+                       : QStringLiteral("missing");
+  };
   // maskTex_ == nullptr: first use with no file picked, the empty path equals the empty loadedMaskPath_
-  if (maskPath == loadedMaskPath_ && maskTex_ != nullptr) return maskTex_;
+  if (maskPath == loadedMaskPath_ && maskTex_ != nullptr &&
+      (failedMaskStamp_.isEmpty() || file_stamp(maskPath) == failedMaskStamp_)) {
+    return maskTex_;
+  }
 
   // CBA: synchronous decode on the render thread on file change, a worker if large masks stutter the first frame
   QImage img;
+  failedMaskStamp_.clear();
   if (!maskPath.isEmpty()) {
+    failedMaskStamp_ = file_stamp(maskPath);
     img = loadMaskImage(maskPath, qMin(4096, rhi->resourceLimit(QRhi::TextureSizeMax)));
-    if (img.isNull()) qWarning() << "Alpha mask: could not read" << maskPath << "- the effect passes through";
+    if (img.isNull()) {
+      qWarning() << "Alpha mask: could not read" << maskPath << "- the effect passes through";
+    } else {
+      failedMaskStamp_.clear();
+    }
   }
+  // The effect strip's warning icon, so an export without its mask doesn't go unnoticed
+  setShaderError(failedMaskStamp_.isEmpty() ? QString() : tr("Mask file could not be read: %1").arg(maskPath));
   // No file or a failed decode: a 1x1 placeholder keeps binding 3 valid, mask_size (0, 0) makes the shader a no-op
   maskSize_ = img.isNull() ? QSize(0, 0) : img.size();
   if (img.isNull()) {

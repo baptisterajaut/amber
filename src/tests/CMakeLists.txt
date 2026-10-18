@@ -255,12 +255,21 @@ target_compile_definitions(amber-test-effects-gpu PRIVATE SOURCE_DIR="${CMAKE_SO
 target_link_libraries(amber-test-effects-gpu PRIVATE amber-engine Qt6::Test)
 add_test(NAME amber-test-effects-gpu COMMAND amber-test-effects-gpu)
 
-# LADSPA hosting: port hints, discovery from $LADSPA_PATH, processing through the SDK's amp.so / delay.so (skipped
-# when they aren't installed)
+# LADSPA hosting: port hints, discovery from $LADSPA_PATH, processing through test-only plugins built here (gain
+# mono/stereo, a delay line), and through the SDK's amp.so / delay.so when installed (skipped otherwise)
 if(NOT NOLADSPA)
+  add_library(amber-test-ladspa-plugins MODULE fixtures/ladspa/amber_test_plugins.cpp)
+  target_include_directories(amber-test-ladspa-plugins PRIVATE ${CMAKE_SOURCE_DIR})
+  # Alone in its folder, which the tests scan as $LADSPA_PATH
+  set_target_properties(amber-test-ladspa-plugins PROPERTIES PREFIX "" OUTPUT_NAME amber_test_ladspa AUTOMOC OFF
+                        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ladspa)
+
   add_executable(amber-test-ladspa test_ladspa.cpp)
   target_include_directories(amber-test-ladspa PRIVATE ${CMAKE_SOURCE_DIR})
+  target_compile_definitions(amber-test-ladspa PRIVATE
+                             AMBER_TEST_LADSPA_DIR="$<TARGET_FILE_DIR:amber-test-ladspa-plugins>")
   target_link_libraries(amber-test-ladspa PRIVATE amber-engine Qt6::Test)
+  add_dependencies(amber-test-ladspa amber-test-ladspa-plugins)
   add_test(NAME amber-test-ladspa COMMAND amber-test-ladspa)
 endif()
 
@@ -296,6 +305,12 @@ add_test(NAME amber-test-encoder-options COMMAND amber-test-encoder-options)
 add_executable(amber-test-headless-render test_headless_render.cpp)
 target_include_directories(amber-test-headless-render PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(amber-test-headless-render PRIVATE amber-engine Qt6::Gui Qt6::Test)
+if(NOT NOLADSPA)
+  # The LADSPA export test falls back to the test gain plugin without the SDK's amp.so
+  target_compile_definitions(amber-test-headless-render PRIVATE
+                             AMBER_TEST_LADSPA_DIR="$<TARGET_FILE_DIR:amber-test-ladspa-plugins>")
+  add_dependencies(amber-test-headless-render amber-test-ladspa-plugins)
+endif()
 add_test(NAME amber-test-headless-render COMMAND amber-test-headless-render)
 
 # Render queue model — rows, refusals, the range taken at render time, sequences that left the project (rendering is

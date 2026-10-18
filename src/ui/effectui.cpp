@@ -5,6 +5,7 @@
 #include <QPointer>
 #include <QtMath>
 
+#include "effects/internal/voideffect.h"
 #include "effects/ui/effectfieldwidget.h"
 
 #include "engine/clip.h"
@@ -505,7 +506,10 @@ void EffectUI::show_context_menu(const QPoint& pos) {
 
     menu.addAction(tr("Save Settings to File"), GetEffect(), &Effect::save_to_file);
 
-    menu.addAction(tr("Save as Preset..."), this, &EffectUI::SavePresetRequested);
+    // A Missing Effect has no meta to save under: a preset of it could never load
+    if (qobject_cast<VoidEffect*>(effect_) == nullptr) {
+      menu.addAction(tr("Save as Preset..."), this, &EffectUI::SavePresetRequested);
+    }
 
     menu.exec(title_bar->mapToGlobal(pos));
   }
