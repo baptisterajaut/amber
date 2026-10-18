@@ -1369,6 +1369,8 @@ void MainWindow::relink_media() {
   } else {
     FootageRelinkDialog dlg(this, invalid);
     dlg.exec();
+    // the new paths are only saved with the project (not on the undo stack): like the relink offered at load
+    if (dlg.relinked_any()) amber::Global->set_modified(true);
   }
 }
 
