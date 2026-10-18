@@ -526,6 +526,7 @@ void GraphView::handle_mouse_rect_select(QMouseEvent* event) {
 
   for (int i = 0; i < row->FieldCount(); i++) {
     EffectField* f = row->Field(i);
+    if (!field_is_shown(i)) continue;  // a hidden curve's keys are not drawn, so not selectable
     for (int j = 0; j < f->keyframes.size(); j++) {
       bool already_selected = false;
       for (int k = 0; k < selected_keys.size(); k++) {
@@ -609,6 +610,7 @@ void GraphView::handle_mouse_bezier_handle_drag(QMouseEvent* event, double x_dif
 
 bool GraphView::is_hovering_keyframe(const QPoint& pos) const {
   for (int i = 0; i < row->FieldCount(); i++) {
+    if (!field_is_shown(i)) continue;
     for (const auto& key : row->Field(i)->keyframes) {
       int key_x = get_screen_x(key.time);
       int key_y = get_screen_y(key.data.toDouble());
@@ -929,6 +931,10 @@ void GraphView::set_selected_keyframe_type(int type) {
   }
 }
 
+bool GraphView::field_is_shown(int field) const {
+  return row->Field(field)->type() == EffectField::EFFECT_FIELD_DOUBLE && field_visibility.at(field);
+}
+
 void GraphView::set_field_visibility(int field, bool b) {
   field_visibility[field] = b;
   update();
@@ -953,6 +959,7 @@ void GraphView::select_all() {
     selected_keys_fields.clear();
     for (int i = 0; i < row->FieldCount(); i++) {
       EffectField* field = row->Field(i);
+      if (!field_is_shown(i)) continue;  // Select All then Delete must not remove a hidden curve's keys
       for (int j = 0; j < field->keyframes.size(); j++) {
         selected_keys.append(j);
         selected_keys_fields.append(i);

@@ -82,6 +82,8 @@ class GraphView : public QWidget {
   void handle_mouse_bezier_handle_drag(QMouseEvent* event, double x_diff, double y_diff);
   void handle_mouse_hover(QMouseEvent* event);
   bool is_hovering_keyframe(const QPoint& pos) const;
+  // A double field whose visibility toggle is on: the only curves drawn, hit-tested and selectable
+  bool field_is_shown(int field) const;
   bool test_click_add_on_field(QMouseEvent* event, EffectField* field, int field_index);
 
   QVector<bool> field_visibility;
