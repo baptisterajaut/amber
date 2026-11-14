@@ -20,7 +20,11 @@
 
 #include <rhi/qrhi.h>
 #include <QApplication>
+#include <QThread>
 #include <QWindow>
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
 
 #if QT_CONFIG(vulkan)
 #include <QVulkanInstance>
@@ -68,6 +72,36 @@ __attribute__((constructor(101))) static void create_thread_atexit_key_first() {
   auto thread_atexit =
       libstdcxx ? reinterpret_cast<ThreadAtexit>(GetProcAddress(libstdcxx, "__cxa_thread_atexit")) : nullptr;
   if (thread_atexit) thread_atexit(noop_thread_dtor, &thread_atexit_anchor, libstdcxx);
+}
+
+// The fix above depends on initialization order inside the toolchain's DLLs, so a Qt or MinGW update can undo
+// it silently. One QThread is ended at startup under a vectored handler, which sees the fault even though the
+// loader swallows it. If it faults, the process would hang in ExitProcess: it ends with TerminateProcess
+// instead, once main() has returned, skipping only DLL detach (everything is saved in closeEvent by then).
+static std::atomic<DWORD> probe_thread_id{0};
+static std::atomic<bool> thread_exit_faulted{false};
+static int exit_code = 0;
+static LONG CALLBACK catch_thread_exit_fault(EXCEPTION_POINTERS* e) {
+  if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && GetCurrentThreadId() == probe_thread_id)
+    thread_exit_faulted = true;
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+static void exit_without_dll_detach() {
+  fflush(nullptr);
+  TerminateProcess(GetCurrentProcess(), exit_code);
+}
+static void check_thread_exit_cleanup() {
+  PVOID handler = AddVectoredExceptionHandler(1, catch_thread_exit_fault);
+  QThread* probe = QThread::create([] { probe_thread_id = GetCurrentThreadId(); });
+  probe->start();
+  probe->wait();
+  delete probe;
+  RemoveVectoredExceptionHandler(handler);
+  if (thread_exit_faulted) {
+    qCritical() << "Qt thread cleanup faults at thread exit (QTBUG-139361 workaround not effective with this "
+                   "toolchain); the process will skip DLL detach when it exits";
+    std::atexit(exit_without_dll_detach);
+  }
 }
 #endif
 
@@ -155,6 +189,16 @@ static bool handle_flag(int argc, char* argv[], int& i, bool& launch_fullscreen,
     printf("[ERROR] No translation file specified\n");
     return false;
   }
+#if defined(Q_OS_WIN) && defined(__MINGW32__)
+  // CI smoke test of the Windows package (undocumented): exit code 1 if thread exit faults, and the job's
+  // timeout catches a process that doesn't exit at all.
+  if (!strcmp(arg, "--check-thread-exit")) {
+    check_thread_exit_cleanup();
+    exit_code = thread_exit_faulted ? 1 : 0;
+    fprintf(stderr, "thread-exit check: %s\n", thread_exit_faulted ? "FAULT (QTBUG-139361)" : "ok");
+    std::exit(exit_code);
+  }
+#endif
   printf("[ERROR] Unknown argument '%s'\n", arg);
   return false;
 }
@@ -306,6 +350,9 @@ int main(int argc, char* argv[]) {
   setup_qt_surface_format();
 
   QApplication a(argc, argv);
+#if defined(Q_OS_WIN) && defined(__MINGW32__)
+  check_thread_exit_cleanup();
+#endif
   a.setWindowIcon(QIcon(":/icons/amber64.png"));
 
   // Create Vulkan instance (needed by both QRhiWidget and offscreen QRhi when using Vulkan)
@@ -347,5 +394,8 @@ int main(int argc, char* argv[]) {
   if (w.windowHandle()) w.windowHandle()->setVulkanInstance(nullptr);
 #endif
 
+#if defined(Q_OS_WIN) && defined(__MINGW32__)
+  exit_code = ret;
+#endif
   return ret;
 }
