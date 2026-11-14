@@ -45,6 +45,32 @@ extern "C" {
 static QVulkanInstance s_vulkanInstance;
 #endif
 
+#if defined(Q_OS_WIN) && defined(__MINGW32__)
+// MinGW keeps thread_local in emutls, which frees a thread's storage from a winpthread key destructor, and
+// libstdc++ runs C++ thread_local destructors from another key. winpthread calls key destructors in creation
+// order, and the emutls key is normally created first, so Qt's per-thread cleanup (Qt 6.9+) reads its
+// already-freed currentThreadData and faults at every thread exit (QTBUG-139361). The fault is swallowed, but
+// winpthread's key lock stays read-held, so the next key create/delete, ExitProcess included, waits forever:
+// the process outlives its window and cannot be killed. Creating libstdc++'s key first makes the C++
+// destructors run while emutls storage is still alive. Priority 101 runs before every other static
+// initializer of the executable; the DLLs it loads don't touch thread_local while initializing. The
+// executable links the CRT's own __cxa_thread_atexit, so libstdc++'s (the one Qt uses) is looked up by name.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+static void noop_thread_dtor(void*) {}
+static int thread_atexit_anchor;
+__attribute__((constructor(101))) static void create_thread_atexit_key_first() {
+  using ThreadAtexit = int (*)(void (*)(void*), void*, void*);
+  HMODULE libstdcxx = GetModuleHandleW(L"libstdc++-6.dll");
+  auto thread_atexit =
+      libstdcxx ? reinterpret_cast<ThreadAtexit>(GetProcAddress(libstdcxx, "__cxa_thread_atexit")) : nullptr;
+  if (thread_atexit) thread_atexit(noop_thread_dtor, &thread_atexit_anchor, libstdcxx);
+}
+#endif
+
 static RhiBackend parseRhiBackend(const char* name) {
   if (!strcmp(name, "vulkan")) return RhiBackend::Vulkan;
   if (!strcmp(name, "metal")) return RhiBackend::Metal;
