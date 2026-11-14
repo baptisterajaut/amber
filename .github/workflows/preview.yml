@@ -76,6 +76,26 @@ jobs:
             amber-setup.exe
             amber-portable.zip
 
+  # Real Windows run of the package: the MinGW Qt build hangs in ExitProcess when Qt's thread cleanup faults
+  # (QTBUG-139361, worked around in main.cpp). Fails on a fault or on a process that never exits.
+  windows-smoke:
+    needs: windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-package
+
+      - name: Thread-exit check
+        shell: pwsh
+        run: |
+          Expand-Archive amber-portable.zip -DestinationPath pkg
+          $exe = Get-ChildItem pkg -Recurse -Filter amber-editor.exe | Select-Object -First 1
+          $p = Start-Process $exe.FullName -ArgumentList '--check-thread-exit' -WorkingDirectory $exe.DirectoryName -PassThru -NoNewWindow
+          $null = $p.Handle  # keeps ExitCode readable after the process ends
+          if (-not $p.WaitForExit(60000)) { Write-Error 'amber-editor did not exit within 60 s'; exit 1 }
+          if ($p.ExitCode -ne 0) { Write-Error "thread-exit check failed (exit code $($p.ExitCode))"; exit 1 }
+
   macos:
     needs: check-trigger
     if: needs.check-trigger.outputs.should_build == 'true'
@@ -173,7 +193,7 @@ jobs:
           path: build/Amber-*.dmg
 
   release:
-    needs: [appimage, windows, macos]
+    needs: [appimage, windows, windows-smoke, macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
