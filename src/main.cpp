@@ -92,9 +92,19 @@ static void exit_without_dll_detach() {
 }
 static void check_thread_exit_cleanup() {
   PVOID handler = AddVectoredExceptionHandler(1, catch_thread_exit_fault);
-  QThread* probe = QThread::create([] { probe_thread_id = GetCurrentThreadId(); });
+  HANDLE probe_handle = nullptr;
+  QThread* probe = QThread::create([&probe_handle] {
+    probe_thread_id = GetCurrentThreadId();
+    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &probe_handle, SYNCHRONIZE, FALSE, 0);
+  });
   probe->start();
   probe->wait();
+  // QThread::wait() returns once run() is over, possibly before the OS thread runs its exit callbacks, where the
+  // fault happens: the thread object itself is signaled only after them.
+  if (probe_handle) {
+    WaitForSingleObject(probe_handle, INFINITE);
+    CloseHandle(probe_handle);
+  }
   delete probe;
   RemoveVectoredExceptionHandler(handler);
   if (thread_exit_faulted) {
