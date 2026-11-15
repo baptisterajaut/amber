@@ -51,6 +51,8 @@ private:
   bool retrieve_preview(const QString &hash);
   void generate_waveform();
   bool setup_stream_codecs(AVCodecContext** codec_ctx, qint16*** waveform_cache_data);
+  // Counter-clockwise degrees of the stream's display matrix, NaN without one
+  double display_matrix_rotation(int stream_index);
   void process_video_frame(AVFrame* temp_frame, FootageStream* s, AVCodecContext** codec_ctx, int stream_index);
   void process_audio_frame(AVFrame* temp_frame, FootageStream* s, int stream_index,
                            qint16*** waveform_cache_data, int& waveform_cache_count, AVPacket* packet);

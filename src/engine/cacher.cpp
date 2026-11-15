@@ -257,13 +257,15 @@ void Cacher::openWorkerVideoFilter(const FootageStream* ms) {
   }
 
   AVFilterContext* last_filter = buffersrc_ctx;
+  rotation_ = ms->video_rotation;
 
   // Hardware-decoded frames reach buffersrc in the transfer's layout (NV12, P010) on a link negotiated from codecpar
-  // (yuv420p...): yadif has no NV12 support and read the missing third plane (crash on open). scale reconfigures to
-  // each frame's real format and hands yadif the negotiated one.
-  // CBA: one CPU format conversion per frame for hw-decoded interlaced clips; build the graph from the first decoded
-  // frame's real format if that cost matters
-  if (ok && hw_device_ctx != nullptr && ms->video_interlacing != VIDEO_PROGRESSIVE) {
+  // (yuv420p...): yadif has no NV12 support and read the missing third plane (crash on open), and transpose would
+  // read the frame with the wrong plane layout. scale reconfigures to each frame's real format and hands them the
+  // negotiated one.
+  // CBA: one CPU format conversion per frame for hw-decoded interlaced or turned clips; build the graph from the first
+  // decoded frame's real format if that cost matters
+  if (ok && hw_device_ctx != nullptr && (ms->video_interlacing != VIDEO_PROGRESSIVE || rotation_ != 0)) {
     AVFilterContext* hw_conv;
     if (avfilter_graph_create_filter(&hw_conv, avfilter_get_by_name("scale"), "hwconv", nullptr, nullptr,
                                      filter_graph) < 0) {
@@ -286,6 +288,33 @@ void Cacher::openWorkerVideoFilter(const FootageStream* ms) {
     } else {
       avfilter_link(last_filter, 0, yadif_filter, 0);
       last_filter = yadif_filter;
+    }
+  }
+
+  // Display matrix rotation (phone video shot upright), after deinterlacing: yadif needs the original field lines
+  // CBA: CPU transpose, ~6 ms per 4K frame on a desktop CPU (about 3x a VAAPI decode's CPU share); turn the planes in
+  // Clip's YUV->RGB pass instead if turned clips stutter on modest hardware (the CPU RGBA path keeps this filter)
+  struct Turn {
+    const char* filter;
+    const char* args;
+  };
+  Turn turns[2] = {};
+  if (rotation_ == 90) turns[0] = {"transpose", "dir=clock"};
+  if (rotation_ == 270) turns[0] = {"transpose", "dir=cclock"};
+  if (rotation_ == 180) {
+    turns[0] = {"hflip", nullptr};
+    turns[1] = {"vflip", nullptr};
+  }
+  for (const Turn& t : turns) {
+    if (!ok || t.filter == nullptr) break;
+    AVFilterContext* turn;
+    if (avfilter_graph_create_filter(&turn, avfilter_get_by_name(t.filter), t.filter, t.args, nullptr, filter_graph) <
+        0) {
+      qCritical() << "Could not create rotation filter" << t.filter;
+      ok = false;
+    } else {
+      avfilter_link(last_filter, 0, turn, 0);
+      last_filter = turn;
     }
   }
 
@@ -775,13 +804,18 @@ void Cacher::ResetAudio()
 int Cacher::media_width()
 {
   if (stream == nullptr) return 0;
-  return stream->codecpar->width;
+  return (rotation_ == 90 || rotation_ == 270) ? stream->codecpar->height : stream->codecpar->width;
 }
 
 int Cacher::media_height()
 {
   if (stream == nullptr) return 0;
-  return stream->codecpar->height;
+  return (rotation_ == 90 || rotation_ == 270) ? stream->codecpar->width : stream->codecpar->height;
+}
+
+int Cacher::coded_width() {
+  if (stream == nullptr) return 0;
+  return stream->codecpar->width;
 }
 
 AVRational Cacher::media_time_base()

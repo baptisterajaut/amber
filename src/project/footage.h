@@ -60,6 +60,9 @@ struct FootageStream {
   int audio_layout;
   int audio_frequency;
   int64_t stream_duration{-1};  // per-stream duration in AV_TIME_BASE units (-1 = unavailable)
+  // Clockwise turn (0, 90, 180, 270) the decoder applies from the file's display matrix (phone video shot upright);
+  // video_width/video_height are already the turned size
+  int video_rotation{0};
   bool enabled;
 
   // preview thumbnail/waveform
@@ -81,6 +84,10 @@ struct Footage {
   // Interlacing chosen in Media Properties, by video stream file_index, as the project file holds it: the stream's
   // analysis (PreviewGenerator::parse_media()) puts it over the detected value. Written by the loader only.
   QMap<int, int> saved_interlacing;
+  // Whether the display matrix rotation is applied (see FootageStream::video_rotation). Footage of projects saved
+  // before Amber applied it keeps it off: clips the user turned upright by hand would otherwise turn a second time.
+  // New imports have it on; saved as the footage's displayrotation attribute.
+  bool display_rotation{true};
   int save_id;
   bool ready;
   bool invalid;

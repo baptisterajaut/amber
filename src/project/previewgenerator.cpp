@@ -39,6 +39,8 @@
 #include <QHash>
 #include <QDir>
 
+#include <cmath>
+
 QSemaphore sem(5); // only 5 preview generators can run at one time
 
 PreviewGenerator::PreviewGenerator(Media* i) :
@@ -240,6 +242,15 @@ void PreviewGenerator::parse_media() {
 
         ms.video_width = fmt_ctx_->streams[i]->codecpar->width;
         ms.video_height = fmt_ctx_->streams[i]->codecpar->height;
+        // Display matrix is counter-clockwise; quarter turns only, like ffmpeg's autorotate (phones write 90/180/270)
+        // CBA: other angles and mirrored matrices play unturned, add a rotate/flip filter if such files show up
+        const double ccw = footage_->display_rotation ? display_matrix_rotation(i) : qQNaN();
+        if (!qIsNaN(ccw)) {
+          const double cw = std::fmod(360.0 - ccw, 360.0);
+          const int quarters = qRound(cw / 90.0);
+          if (qAbs(cw - quarters * 90.0) < 1.0) ms.video_rotation = (quarters % 4) * 90;
+          if (ms.video_rotation == 90 || ms.video_rotation == 270) std::swap(ms.video_width, ms.video_height);
+        }
 
         // Known here, before the footage is ready and without the thumbnail decode: a cached thumbnail (reopened
         // project) keeps it. Unknown field order: the first frame's flags, still images aside
@@ -490,6 +501,23 @@ bool PreviewGenerator::setup_stream_codecs(AVCodecContext** codec_ctx, qint16***
   return create_previews;
 }
 
+double PreviewGenerator::display_matrix_rotation(int stream_index) {
+  const int32_t* matrix = nullptr;
+
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+  // FFmpeg 7+: stream side data moved to codecpar->coded_side_data
+  const AVPacketSideData* sd = av_packet_side_data_get(fmt_ctx_->streams[stream_index]->codecpar->coded_side_data,
+                                                       fmt_ctx_->streams[stream_index]->codecpar->nb_coded_side_data,
+                                                       AV_PKT_DATA_DISPLAYMATRIX);
+  if (sd) matrix = reinterpret_cast<const int32_t*>(sd->data);
+#else
+  const uint8_t* sd = av_stream_get_side_data(fmt_ctx_->streams[stream_index], AV_PKT_DATA_DISPLAYMATRIX, nullptr);
+  if (sd) matrix = reinterpret_cast<const int32_t*>(sd);
+#endif
+
+  return matrix ? av_display_rotation_get(matrix) : qQNaN();
+}
+
 void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s,
                                            AVCodecContext** codec_ctx, int stream_index) {
   if (!temp_frame) {
@@ -538,26 +566,7 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
 
   // Apply rotation from display matrix (e.g. portrait videos from phones)
   {
-    double rotation = 0;
-    const int32_t* matrix = nullptr;
-
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
-    // FFmpeg 7+: stream side data moved to codecpar->coded_side_data
-    const AVPacketSideData* sd = av_packet_side_data_get(
-        fmt_ctx_->streams[stream_index]->codecpar->coded_side_data,
-        fmt_ctx_->streams[stream_index]->codecpar->nb_coded_side_data,
-        AV_PKT_DATA_DISPLAYMATRIX);
-    if (sd) matrix = reinterpret_cast<const int32_t*>(sd->data);
-#else
-    const uint8_t* sd = av_stream_get_side_data(
-        fmt_ctx_->streams[stream_index], AV_PKT_DATA_DISPLAYMATRIX, nullptr);
-    if (sd) matrix = reinterpret_cast<const int32_t*>(sd);
-#endif
-
-    if (matrix) {
-      rotation = av_display_rotation_get(matrix);
-    }
-
+    double rotation = display_matrix_rotation(stream_index);
     if (!qIsNaN(rotation) && qAbs(rotation) > 1.0) {
       QTransform transform;
       transform.rotate(-rotation);

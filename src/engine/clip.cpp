@@ -671,7 +671,7 @@ bool Clip::Retrieve(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceParams* par
             color_space_val = 1;  // BT.601
           } else if (frame->colorspace == AVCOL_SPC_UNSPECIFIED) {
             // Infer from resolution: SD content (width <= 720) is typically BT.601
-            if (cacher.media_width() <= 720) {
+            if (cacher.coded_width() <= 720) {
               color_space_val = 1;  // BT.601
             }
           }

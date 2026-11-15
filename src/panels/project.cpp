@@ -971,6 +971,11 @@ void Project::process_file_list(QStringList& files, bool recursive, MediaPtr rep
           m->url = file;
           m->name = get_file_name_from_path(i);
           m->start_number = start_number;
+          // The clips of the replaced footage keep the transforms made for it: a project from before the display
+          // rotation keeps it off on the replacement too
+          if (replace != nullptr && replace->to_footage() != nullptr) {
+            m->display_rotation = replace->to_footage()->display_rotation;
+          }
 
           item->set_footage(m);
 
@@ -1180,6 +1185,7 @@ void Project::save_folder(QXmlStreamWriter& stream, int type, bool set_ids_only,
 
           stream.writeAttribute("proxy", QString::number(f->proxy));
           stream.writeAttribute("proxypath", f->proxy_path);
+          if (f->display_rotation) stream.writeAttribute("displayrotation", QStringLiteral("1"));
           if (m->color_label() > 0) {
             stream.writeAttribute("label", QString::number(m->color_label()));
           }

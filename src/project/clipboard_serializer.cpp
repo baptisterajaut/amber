@@ -51,6 +51,7 @@ void write_clip(QXmlStreamWriter& stream, const ClipPtr& c, int load_id) {
       stream.writeAttribute("stream", QString::number(c->media_stream_index()));
       stream.writeAttribute("startNumber", QString::number(f->start_number));
       stream.writeAttribute("name", f->name);
+      stream.writeAttribute("displayRotation", f->display_rotation ? QStringLiteral("1") : QStringLiteral("0"));
       stream.writeEndElement();
     }
   }
@@ -77,6 +78,7 @@ struct ParsedMediaRef {
   QString name;
   int stream{-1};
   int start_number{0};
+  bool display_rotation{false};  // off when copied from an Amber that did not apply it (see Footage::display_rotation)
   bool present{false};
 };
 
@@ -156,6 +158,8 @@ ClipPtr parse_clip(QXmlStreamReader& stream, ParsedMediaRef& media_ref_out) {
         else if (attr.name() == QLatin1String("stream")) media_ref_out.stream = attr.value().toInt();
         else if (attr.name() == QLatin1String("startNumber")) media_ref_out.start_number = attr.value().toInt();
         else if (attr.name() == QLatin1String("name")) media_ref_out.name = attr.value().toString();
+        else if (attr.name() == QLatin1String("displayRotation"))
+          media_ref_out.display_rotation = attr.value() == QLatin1String("1");
       }
       media_ref_out.present = true;
     } else if (stream.name() == QLatin1String("linked")) {
@@ -190,6 +194,7 @@ MediaPtr import_media_stub(const ParsedMediaRef& ref) {
   f->url = ref.url;
   f->name = ref.name.isEmpty() ? QFileInfo(ref.url).fileName() : ref.name;
   f->start_number = ref.start_number;
+  f->display_rotation = ref.display_rotation;
   MediaPtr item = std::make_shared<Media>();
   item->set_footage(f);
   return item;

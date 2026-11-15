@@ -232,9 +232,14 @@ class Cacher : public QThread {
    *
    * @return
    *
-   * The true width of the current video file.
+   * The true width of the current video file, as decoded frames come out: turned by a quarter-turn display rotation.
    */
   int media_width();
+
+  /**
+   * @brief Width of the file's coded frames, before any display rotation
+   */
+  int coded_width();
 
   /**
    * @brief Retrieve current media height
@@ -428,6 +433,9 @@ class Cacher : public QThread {
    * @brief FFmpeg stream - used for media decoding
    */
   AVStream* stream{nullptr};
+
+  // Clockwise turn the video filter applies (FootageStream::video_rotation), set when it is built
+  int rotation_{0};
 
   /**
    * @brief FFmpeg packet - used for media decoding

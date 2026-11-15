@@ -319,6 +319,7 @@ void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& chil
   FootagePtr f = std::make_shared<Footage>();
 
   f->using_inout = false;
+  f->display_rotation = false;  // projects saved before the display matrix was applied have no attribute
 
   for (int j = 0; j < stream.attributes().size(); j++) {
     const QXmlStreamAttribute& attr = stream.attributes().at(j);
@@ -348,6 +349,8 @@ void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& chil
       f->proxy_path = attr.value().toString();
     } else if (attr.name() == QLatin1String("startnumber")) {
       f->start_number = attr.value().toInt();
+    } else if (attr.name() == QLatin1String("displayrotation")) {
+      f->display_rotation = (attr.value() == QLatin1String("1"));
     } else if (attr.name() == QLatin1String("label")) {
       item->set_color_label(attr.value().toInt());
     }
