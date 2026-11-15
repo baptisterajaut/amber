@@ -192,6 +192,9 @@ QVector<EncoderInfo> build_table() {
   vp9.quality_default = 31;
   vp9.supports_average_bitrate = true;
   vp9.supports_two_pass = true;
+  // FFmpeg's VP9 guide recommends two passes for constant quality too (-b:v 0 -crf with -pass 1/2). 640x360 testsrc2,
+  // 4 s, CRF 31, cpu-used 4: 457097 -> 420805 bytes (-8 %), PSNR 28.90 both
+  vp9.two_pass_quality_mode = true;
   vp9.options = {int_option(
       "cpu-used", QCoreApplication::translate("EncoderOptions", "Speed:"),
       QCoreApplication::translate("EncoderOptions", "Higher is faster, lower makes smaller files at the same quality"),

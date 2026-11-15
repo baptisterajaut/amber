@@ -3687,6 +3687,37 @@ class TestHeadlessRender : public QObject {
     for (const auto& c : seq->clips) QVERIFY(!c->IsOpen());
   }
 
+  // Two-pass in the quality-based mode: VP9 (two_pass_quality_mode) runs both passes and keeps every frame; x264, whose
+  // CRF needs no analysis, ignores the request and exports in one pass
+  void twoPassQualityMode() {
+    struct Row {
+      const char* encoder;
+      AVCodecID codec;
+      const char* ext;
+      int passes;
+    };
+    for (const Row& r : {Row{"libvpx-vp9", AV_CODEC_ID_VP9, "webm", 2}, Row{"libx264", AV_CODEC_ID_H264, "mp4", 0}}) {
+      if (avcodec_find_encoder_by_name(r.encoder) == nullptr) continue;
+      constexpr long kFrames = 30;
+      SequencePtr seq;
+      load_noise_project(QString("twopassq_%1").arg(r.encoder), kFrames, &seq);
+      if (QTest::currentTestFailed()) return;
+      ExportParams params = video_params(dir_.filePath(QString("twopassq_%1.%2").arg(r.encoder, r.ext)), seq.get(),
+                                         r.codec, r.encoder, COMPRESSION_TYPE_CFR, 31);
+      params.two_pass = true;
+      if (QString(r.encoder) == "libvpx-vp9") params.video_options = {{"cpu-used", "8"}};
+      int passes = 0;
+      const QString error = export_sequence(seq.get(), params, AV_PIX_FMT_YUV420P, [&](ExportThread* et) {
+        connect(et, &ExportThread::PassChanged, this, [&passes](int, int) { passes++; });
+      });
+      QVERIFY2(error.isEmpty(), qPrintable(QString("%1: %2").arg(r.encoder, error)));
+      QCOMPARE(passes, r.passes);
+      const Decoded d = decode_file(params.filename);
+      QVERIFY(d.ok);
+      QCOMPARE(long(d.video_frames), kFrames);
+    }
+  }
+
   // Cancelling during the analysis pass: no file, no stats left, no pass 2, the clips closed
   void twoPassInterruptedDuringAnalysis() {
     if (avcodec_find_encoder_by_name("libx264") == nullptr) QSKIP("libx264 not in this FFmpeg build");

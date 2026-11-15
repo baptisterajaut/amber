@@ -271,6 +271,8 @@ class TestEncoderOptions : public QObject {
       QCOMPARE(raw.supports_two_pass, two_pass.contains(raw.name));
       // Only libsvtav1's statistics depend on the SVT-AV1 FFmpeg was built against
       QCOMPARE(raw.two_pass_probe, raw.name == "libsvtav1");
+      // Quality-based two-pass only where it pays (libvpx-vp9; encoderoptions.cpp has the measurement)
+      QCOMPARE(raw.two_pass_quality_mode, raw.name == "libvpx-vp9");
       EncoderInfo info;
       if (!amber::find_encoder_info(raw.name, &info)) continue;  // not installed
       const AVCodec* codec = avcodec_find_encoder_by_name(raw.name.toUtf8().constData());

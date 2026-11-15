@@ -81,9 +81,9 @@ struct ExportParams {
   QVector<QPair<QString, QString>> audio_options;
   // movflags=+faststart when the muxer has it (MOV family): the index goes before the media data
   bool faststart = false;
-  // Analyse the whole range first, then encode (AV_CODEC_FLAG_PASS1/PASS2). Only for COMPRESSION_TYPE_TARGETBR video
-  // with an encoder that passes amber::two_pass_works() (rendering/encoderoptions.h); ignored otherwise.
-  // CBA: two-pass only in Average bitrate mode; libvpx/libaom also gain from it in quality mode
+  // Analyse the whole range first, then encode (AV_CODEC_FLAG_PASS1/PASS2). Only for COMPRESSION_TYPE_TARGETBR video,
+  // or COMPRESSION_TYPE_CFR with an EncoderInfo::two_pass_quality_mode encoder (VP9), through an encoder that passes
+  // amber::two_pass_works() (rendering/encoderoptions.h); ignored otherwise.
   bool two_pass = false;
   // Master audio, on the final mix before the encoder. Loudness: EBU R128 loudnorm in one pass (its dynamic mode: the
   // gain follows the programme, it is not one constant gain). Limiter: alimiter, sample peaks held under the ceiling.

@@ -62,6 +62,9 @@ struct EncoderInfo {
   // Whether pass 1 writes statistics also depends on the encoder library FFmpeg was built against, which libavcodec
   // doesn't tell: two_pass_works() checks it with a test encode
   bool two_pass_probe = false;
+  // Two-pass is offered in the quality-based mode too, where it measurably helps (libvpx-vp9: same PSNR, smaller
+  // file). x264/x265 CRF is already optimal in one pass; libaom came out larger in two passes at the same PSNR.
+  bool two_pass_quality_mode = false;
   QVector<EncoderOption> options;
   // Passed with the quality key in the quality-based mode (VAAPI: rc_mode=CQP)
   EncoderOptionValues quality_mode_options;

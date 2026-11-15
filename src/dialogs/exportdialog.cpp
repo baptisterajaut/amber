@@ -981,10 +981,11 @@ void ExportDialog::comp_type_changed(int) {
 }
 
 void ExportDialog::update_two_pass() {
-  // Average bitrate first: two_pass_works() may run a test encode
-  twoPassCheckbox->setVisible(has_vencoder_info_ &&
-                              compressionTypeCombobox->currentData().toInt() == COMPRESSION_TYPE_TARGETBR &&
-                              amber::two_pass_works(vencoder_info_));
+  // The compression type first: two_pass_works() may run a test encode
+  const int type = compressionTypeCombobox->currentData().toInt();
+  const bool mode_ok = type == COMPRESSION_TYPE_TARGETBR ||
+                       (type == COMPRESSION_TYPE_CFR && has_vencoder_info_ && vencoder_info_.two_pass_quality_mode);
+  twoPassCheckbox->setVisible(has_vencoder_info_ && mode_ok && amber::two_pass_works(vencoder_info_));
   fit_height();
 }
 
@@ -1101,7 +1102,8 @@ void ExportDialog::setup_ui() {
   compressionTypeCombobox = new QComboBox(videoGroupbox);
   videoGridLayout->addWidget(compressionTypeCombobox, 5, 1, 1, 1);
 
-  // Hidden unless Average bitrate with an encoder that has two-pass (update_two_pass)
+  // Hidden unless Average bitrate (or quality-based, for EncoderInfo::two_pass_quality_mode) with an encoder that has
+  // two-pass (update_two_pass)
   twoPassCheckbox = new QCheckBox(tr("Two-pass encoding"), videoGroupbox);
   twoPassCheckbox->setToolTip(
       tr("Analyses the whole sequence first, then encodes, so the bitrate goes where the picture needs it. The export "

@@ -967,17 +967,22 @@ bool ExportThread::RenderPass(long& file_audio_samples) {
   return frames_ok && !interrupt_;
 }
 
-// params_.two_pass, when it can apply: Average bitrate video through an encoder whose FFmpeg wrapper implements
-// two-pass. Sets stats_key_ for an encoder that keeps its stats in a file.
+// params_.two_pass, when it can apply: Average bitrate video (or quality-based, for an encoder with
+// two_pass_quality_mode) through an encoder whose FFmpeg wrapper implements two-pass. Sets stats_key_ for an encoder
+// that keeps its stats in a file.
 bool ExportThread::TwoPassApplies() {
   if (!params_.two_pass) return false;
   const AVCodec* codec = params_.video_enabled
                              ? amber::find_encoder(params_.video_encoder, static_cast<AVCodecID>(params_.video_codec))
                              : nullptr;
   amber::EncoderInfo info;
-  if (params_.video_compression_type != COMPRESSION_TYPE_TARGETBR || codec == nullptr ||
-      !amber::find_encoder_info(QString::fromUtf8(codec->name), &info) || !amber::two_pass_works(info)) {
-    qInfo() << "Export: two-pass ignored, it needs Average bitrate video through an encoder that supports it";
+  const bool known = codec != nullptr && amber::find_encoder_info(QString::fromUtf8(codec->name), &info);
+  const bool mode_ok =
+      params_.video_compression_type == COMPRESSION_TYPE_TARGETBR ||
+      (params_.video_compression_type == COMPRESSION_TYPE_CFR && known && info.two_pass_quality_mode);
+  if (!known || !mode_ok || !amber::two_pass_works(info)) {
+    qInfo() << "Export: two-pass ignored, it needs Average bitrate video (or quality-based VP9) through an encoder "
+               "that supports it";
     return false;
   }
   stats_key_ = info.two_pass_stats_key;
