@@ -65,11 +65,11 @@ std::vector<float> impulse(int n) {
 }
 
 // Impulse response of a fresh reverb, 100 % wet, processed in cacher-sized chunks
-std::vector<float> reverb_ir(double room, double damp, double width, int n) {
+std::vector<float> reverb_ir(double room, double damp, double width, int n, double pre_delay_ms = 0) {
   std::vector<float> v = impulse(n);
   Reverb r;
   r.reset(kRate);
-  r.set(room, damp, width, 1.0);
+  r.set(room, damp, width, 1.0, pre_delay_ms);
   for (int i = 0; i < n; i += 4096) r.process(v.data() + size_t(i) * 2, std::min(4096, n - i));
   return v;
 }
@@ -341,6 +341,51 @@ class TestAudioDsp : public QObject {
     QVERIFY(peak(v, kRate / 10) > 0);  // still ringing after 100 ms
     QVERIFY(early > 0);
     QVERIFY(late < early);
+  }
+
+  // A pre-delay shifts the whole impulse response by its length, sample for sample, across chunk boundaries (60 ms is
+  // 2880 samples, the 4096-sample chunks split the delayed response); 0 ms is the plain reverb
+  void reverbPreDelayShiftsResponse() {
+    const int n = kRate;
+    const std::vector<float> plain = reverb_ir(0.5, 0.5, 1.0, n);
+    const std::vector<float> zero = reverb_ir(0.5, 0.5, 1.0, n, 0.0);
+    QVERIFY(zero == plain);
+    const int shift = kRate * 60 / 1000;
+    const std::vector<float> delayed = reverb_ir(0.5, 0.5, 1.0, n, 60.0);
+    QCOMPARE(peak(std::vector<float>(delayed.begin(), delayed.begin() + size_t(shift) * 2), 0), 0.0);
+    for (int i = shift; i < n; i++) {
+      for (int ch = 0; ch < 2; ch++) {
+        QCOMPARE(delayed[size_t(i) * 2 + ch], plain[size_t(i - shift) * 2 + ch]);
+      }
+    }
+    // Clamped to the line: past kMaxPreDelayMs it stays at 200 ms
+    const std::vector<float> over = reverb_ir(0.5, 0.5, 1.0, n, 500.0);
+    const std::vector<float> max = reverb_ir(0.5, 0.5, 1.0, n, Reverb::kMaxPreDelayMs);
+    QVERIFY(over == max);
+  }
+
+  // Pre-delay 60 ms on noise, then 0 ms for 1 s of silence, then 60 ms again: the line holds that silence, so the
+  // tank gets the same input as a reverb left at 0 ms (it used to replay the noise left in the line)
+  void reverbPreDelayReenableReadsRecentInput() {
+    const int n = kRate;
+    auto run = [n](double last_pre_delay_ms) {
+      std::vector<float> noise(size_t(n / 5) * 2);
+      std::mt19937 rng(99);
+      std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+      for (float& x : noise) x = dist(rng);
+      Reverb r;
+      r.reset(kRate);
+      r.set(0.5, 0.5, 1.0, 1.0, 60.0);
+      r.process(noise.data(), n / 5);
+      std::vector<float> silence(size_t(n) * 2, 0.0f);
+      r.set(0.5, 0.5, 1.0, 1.0, 0.0);
+      r.process(silence.data(), n);
+      std::vector<float> tail(size_t(n) * 2, 0.0f);
+      r.set(0.5, 0.5, 1.0, 1.0, last_pre_delay_ms);
+      r.process(tail.data(), n);
+      return tail;
+    };
+    QVERIFY(run(60.0) == run(0.0));
   }
 
   void reverbLargerRoomRingsLonger() {

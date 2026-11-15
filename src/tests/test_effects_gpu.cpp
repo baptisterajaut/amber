@@ -1701,11 +1701,12 @@ void TestEffectsGpu::limiterHoldsFullScaleSquare() {
 }
 
 void TestEffectsGpu::reverbChorusMixZeroIsBitExact() {
-  // Mix 0 skips the processing: the samples come out byte for byte. Mix is row 3 of Reverb, row 2 of Chorus.
+  // Mix 0 skips the processing: the samples come out byte for byte. Mix is row 4 of Reverb (after Pre-delay), row 2 of
+  // Chorus.
   const struct {
     EffectInternal id;
     int mix_row;
-  } cases[] = {{EFFECT_INTERNAL_REVERB, 3}, {EFFECT_INTERNAL_CHORUS, 2}};
+  } cases[] = {{EFFECT_INTERNAL_REVERB, 4}, {EFFECT_INTERNAL_CHORUS, 2}};
   for (const auto& tc : cases) {
     auto seq = h_->make_sequence(64, 64, 30.0);
     Clip* c = h_->add_audio_generator_clip(seq.get(), 0, 0, 30, EFFECT_INTERNAL_TONE);

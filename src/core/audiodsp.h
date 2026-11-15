@@ -97,15 +97,19 @@ class DelayLine {
 
 // Freeverb (Jezar at Dreampoint, public domain): per channel 8 parallel lowpass-feedback combs into 4 series
 // allpasses, fed (L + R) * 0.015. The tunings are Freeverb's 44.1 kHz ones scaled to the stream's rate, allocated by
-// reset().
+// reset(). A pre-delay line in front of the tank holds the reverb back from the dry sound.
 class Reverb {
  public:
   static constexpr int kCombs = 8;
   static constexpr int kAllpasses = 4;
-  // Empties the tank; reallocates only when the rate changes
+  static constexpr double kMaxPreDelayMs = 200;
+  // Empties the tank and the pre-delay line; reallocates only when the rate changes
   void reset(int rate);
-  // All in [0, 1]. Width 0 is a mono tank, 1 keeps the two channels' tanks apart.
-  void set(double room, double damp, double width, double mix);
+  // room, damp, width, mix in [0, 1]. Width 0 is a mono tank, 1 keeps the two channels' tanks apart. pre_delay_ms in
+  // [0, kMaxPreDelayMs], whole samples; 0 feeds the tank directly. Call after reset() (it needs the rate).
+  // CBA: a pre-delay changed while the tank rings jumps its read point (a click on a keyframed sweep); a fractional,
+  // smoothed delay if that is ever automated
+  void set(double room, double damp, double width, double mix, double pre_delay_ms = 0);
   void process(float* frames, int n);
 
  private:
@@ -120,6 +124,9 @@ class Reverb {
   };
   Comb combs_[2][kCombs];
   Allpass allpasses_[2][kAllpasses];
+  std::vector<float> pre_;  // mono tank input, kMaxPreDelayMs + 1 sample
+  int pre_write_ = 0;
+  int pre_delay_ = 0;  // samples
   int rate_ = 0;
   float feedback_ = 0;
   float damp_ = 0;

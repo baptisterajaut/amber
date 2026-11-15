@@ -33,6 +33,7 @@ class ReverbEffect : public Effect {
                      int channel_count) override;
 
  private:
+  DoubleField* predelay_val;
   DoubleField* room_val;
   DoubleField* damping_val;
   DoubleField* width_val;

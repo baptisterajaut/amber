@@ -23,6 +23,12 @@
 #include <vector>
 
 ReverbEffect::ReverbEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
+  // Rows are found by field id when a project loads: this first row leaves older projects at 0 ms, as they sounded
+  predelay_val = new DoubleField(new EffectRow(this, tr("Pre-delay (ms)")), "predelay");
+  predelay_val->SetMinimum(0);
+  predelay_val->SetMaximum(amber::audiodsp::Reverb::kMaxPreDelayMs);
+  predelay_val->SetDefault(0);
+
   room_val = new DoubleField(new EffectRow(this, tr("Room Size (%)")), "room");
   room_val->SetMinimum(0);
   room_val->SetMaximum(100);
@@ -60,7 +66,7 @@ void ReverbEffect::process_audio(double timecode_start, double, quint8* samples,
   // the clip's end, like Delay's echoes (effects run on the clip's own samples).
   if (reset) reverb->reset(ctx.sample_rate);
   reverb->set(room_val->GetDoubleAt(timecode_start) * 0.01, damping_val->GetDoubleAt(timecode_start) * 0.01,
-              width_val->GetDoubleAt(timecode_start) * 0.01, mix);
+              width_val->GetDoubleAt(timecode_start) * 0.01, mix, predelay_val->GetDoubleAt(timecode_start));
 
   std::vector<float> buf(size_t(frames) * 2);
   amber::audiodsp::s16_to_float(samples, buf.data(), frames);

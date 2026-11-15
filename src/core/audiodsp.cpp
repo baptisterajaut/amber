@@ -215,10 +215,14 @@ void Reverb::reset(int rate) {
       allpasses_[ch][k].index = 0;
     }
   }
+  clear_line(pre_, int(std::ceil(kMaxPreDelayMs * rate / 1000.0)) + 1);
+  pre_write_ = 0;
   rate_ = rate;
 }
 
-void Reverb::set(double room, double damp, double width, double mix) {
+void Reverb::set(double room, double damp, double width, double mix, double pre_delay_ms) {
+  pre_delay_ = int(std::clamp(std::lround(std::clamp(pre_delay_ms, 0.0, kMaxPreDelayMs) * rate_ / 1000.0), 0L,
+                              long(pre_.size()) - 1));
   feedback_ = float(std::clamp(room, 0.0, 1.0) * kScaleRoom + kOffsetRoom);
   damp_ = float(std::clamp(damp, 0.0, 1.0) * kScaleDamp);
   width = std::clamp(width, 0.0, 1.0);
@@ -230,7 +234,16 @@ void Reverb::set(double room, double damp, double width, double mix) {
 void Reverb::process(float* frames, int n) {
   if (rate_ == 0) return;
   for (int i = 0; i < n; i++) {
-    const float input = (frames[i * 2] + frames[i * 2 + 1]) * kFixedGain;
+    float input = (frames[i * 2] + frames[i * 2 + 1]) * kFixedGain;
+    // Written even at 0 ms, so a pre-delay raised again later reads recent input, not what was left before it fell to 0
+    const int capacity = int(pre_.size());
+    pre_[size_t(pre_write_)] = input;
+    if (pre_delay_ > 0) {
+      int read = pre_write_ - pre_delay_;
+      if (read < 0) read += capacity;
+      input = pre_[size_t(read)];
+    }
+    if (++pre_write_ == capacity) pre_write_ = 0;
     float tank[2];
     for (int ch = 0; ch < 2; ch++) {
       float out = 0;
