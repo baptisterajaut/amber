@@ -1,5 +1,6 @@
 #include "trackheaderwidget.h"
 
+#include <QContextMenuEvent>
 #include <QCursor>
 #include <QHelpEvent>
 #include <QMouseEvent>
@@ -15,7 +16,9 @@
 #include "engine/undo/undostack.h"
 #include "panels/panels.h"
 #include "panels/timeline.h"
+#include "ui/decimalinput.h"
 #include "ui/icons.h"
+#include "ui/menu.h"
 #include "ui/styling.h"
 #include "ui/timelinewidget.h"
 
@@ -331,15 +334,21 @@ void TrackHeaderWidget::end_value_drag() {
 }
 
 void TrackHeaderWidget::reset_value(int track, Value value) {
+  set_value(track, value, 0, value == kValueVolume ? tr("Reset Track Volume") : tr("Reset Track Pan"));
+}
+
+void TrackHeaderWidget::set_value(int track, Value value, double v, const QString& undo_text) {
   Sequence* seq = amber::ActiveSequence.get();
   if (seq == nullptr || value == kValueNone) return;
   TrackState s = seq->track_state(track);
   if (value == kValueVolume) {
-    if (s.volume_db == 0.0) return;
-    s.volume_db = 0.0;
+    const double db = qBound(amber::kTrackVolumeMinDb, qRound(v * 10.0) / 10.0, amber::kTrackVolumeMaxDb);
+    if (s.volume_db == db) return;
+    s.volume_db = db;
   } else {
-    if (s.pan == 0) return;
-    s.pan = 0;
+    const int pan = qBound(-amber::kTrackPanLimit, int(qRound(v)), amber::kTrackPanLimit);
+    if (s.pan == pan) return;
+    s.pan = pan;
   }
   const QMap<int, TrackState> old_states = seq->track_states;
   QMap<int, TrackState> new_states = old_states;
@@ -349,8 +358,39 @@ void TrackHeaderWidget::reset_value(int track, Value value) {
     new_states.insert(track, s);
   }
   auto* cmd = new SetTrackStateCommand(seq, old_states, new_states);
-  cmd->setText(value == kValueVolume ? tr("Reset Track Volume") : tr("Reset Track Pan"));
+  cmd->setText(undo_text);
   amber::UndoStack.push(cmd);
+}
+
+void TrackHeaderWidget::edit_value(int track, Value value) {
+  if (amber::ActiveSequence == nullptr || value == kValueNone) return;
+  const TrackState s = amber::ActiveSequence->track_state(track);
+  bool ok = false;
+  double v;
+  if (value == kValueVolume) {
+    v = amber::get_decimal(this, tr("Track Volume"),
+                           tr("Volume in dB (%1 is silence):").arg(amber::kTrackVolumeMinDb, 0, 'f', 0), s.volume_db,
+                           amber::kTrackVolumeMinDb, amber::kTrackVolumeMaxDb, 1, &ok);
+  } else {
+    v = amber::get_decimal(this, tr("Track Pan"), tr("Pan (-100 is full left, 100 full right):"), s.pan,
+                           -amber::kTrackPanLimit, amber::kTrackPanLimit, 0, &ok);
+  }
+  // The active sequence may have changed while the dialog was open: the value goes to the one now shown, as a drag's
+  // would. CBA: a typed value lands on whichever sequence is active when OK is pressed
+  if (ok) set_value(track, value, v, value == kValueVolume ? tr("Change Track Volume") : tr("Change Track Pan"));
+}
+
+void TrackHeaderWidget::contextMenuEvent(QContextMenuEvent* event) {
+  int track;
+  Value value;
+  if (amber::ActiveSequence == nullptr || drag_value_ != kValueNone || !hit_value(event->pos(), &track, &value)) {
+    return;
+  }
+  Menu menu(this);
+  menu.addAction(tr("&Edit..."), this, [this, track, value]() { edit_value(track, value); });
+  menu.addSeparator();
+  menu.addAction(tr("&Reset"), this, [this, track, value]() { reset_value(track, value); });
+  menu.exec(event->globalPos());
 }
 
 void TrackHeaderWidget::draw_value(QPainter& p, const QRect& r, const QString& text, Qt::Alignment align,

@@ -28,6 +28,8 @@ class TrackHeaderWidget : public QWidget {
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void mouseDoubleClickEvent(QMouseEvent* event) override;
+  // Right-click on a volume or pan value: Edit... (type it) and Reset, as Effect Controls' sliders offer
+  void contextMenuEvent(QContextMenuEvent* event) override;
   void leaveEvent(QEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
   bool event(QEvent* event) override;
@@ -65,6 +67,11 @@ class TrackHeaderWidget : public QWidget {
   // Stops the drag and pushes it as one undo entry if it changed something and is still valid
   void end_value_drag();
   void reset_value(int track, Value value);
+  // Sets one track's volume (dB, rounded to 0.1 as the drag does) or pan as one undo entry named undo_text; nothing
+  // when it doesn't change
+  void set_value(int track, Value value, double v, const QString& undo_text);
+  // Asks for the value (the range of the drag) and sets it
+  void edit_value(int track, Value value);
 
   TimelineWidget* timeline_;
   QScrollBar* vertical_scrollbar_;
