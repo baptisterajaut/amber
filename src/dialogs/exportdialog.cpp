@@ -82,6 +82,8 @@ enum ExportFormats {
 constexpr int kVideoOptionRow = 8;
 constexpr int kLastRow = 50;
 constexpr int kAudioOptionRow = 4;
+// Master audio rows (loudness, limiter), far below any encoder's option rows; empty grid rows take no space
+constexpr int kAudioMasterRow = 100;
 
 ExportDialog::ExportDialog(QWidget* parent, const QVector<SequencePtr>& batch)
     : QDialog(parent), batch_(batch), ref_seq_(batch.isEmpty() ? amber::ActiveSequence.get() : batch.first().get()) {
@@ -469,6 +471,10 @@ ExportParams ExportDialog::build_export_params(const QString& filename) const {
     params.audio_bitrate = audiobitrateSpinbox->value();
     params.audio_encoder = aencoder_name_;
     params.audio_options = option_values(audio_option_rows_);
+    params.loudness_normalize = loudnessCheckbox->isEnabled() && loudnessCheckbox->isChecked();
+    params.loudness_target = loudnessSpinbox->value();
+    params.peak_limit = limiterCheckbox->isEnabled() && limiterCheckbox->isChecked();
+    params.peak_ceiling = ceilingSpinbox->value();
   }
   params.faststart = !faststartCheckbox->isHidden() && faststartCheckbox->isChecked();
   params.start_frame = 0;
@@ -1140,6 +1146,44 @@ void ExportDialog::setup_ui() {
   audiobitrateSpinbox->setValue(256);
   audioGridLayout->addWidget(audiobitrateSpinbox, 3, 1, 1, 1);
 
+  // Master audio, below any number of encoder option rows
+  loudnessCheckbox = new QCheckBox(tr("Normalize Loudness:"), audioGroupbox);
+  loudnessCheckbox->setToolTip(
+      tr("Brings the whole mix to this EBU R128 loudness: -14 LUFS suits YouTube and streaming, -23 LUFS broadcast. "
+         "Done in one pass, so the gain follows the audio and brings quiet and loud passages a little closer."));
+  loudnessSpinbox = new QDoubleSpinBox(audioGroupbox);
+  loudnessSpinbox->setRange(-70.0, -5.0);  // loudnorm's I
+  loudnessSpinbox->setDecimals(1);
+  loudnessSpinbox->setSingleStep(0.5);
+  loudnessSpinbox->setSuffix(tr(" LUFS"));
+  loudnessSpinbox->setValue(-14.0);
+  loudnessSpinbox->setEnabled(false);
+  connect(loudnessCheckbox, &QCheckBox::toggled, loudnessSpinbox, &QWidget::setEnabled);
+  audioGridLayout->addWidget(loudnessCheckbox, kAudioMasterRow, 0, 1, 1);
+  audioGridLayout->addWidget(loudnessSpinbox, kAudioMasterRow, 1, 1, 1);
+
+  limiterCheckbox = new QCheckBox(tr("Limit Peaks:"), audioGroupbox);
+  limiterCheckbox->setToolTip(tr("Brickwall limiter on the final mix: no sample goes over this level."));
+  ceilingSpinbox = new QDoubleSpinBox(audioGroupbox);
+  ceilingSpinbox->setRange(-24.0, 0.0);  // alimiter's limit, 0.0625 to 1
+  ceilingSpinbox->setDecimals(1);
+  ceilingSpinbox->setSingleStep(0.5);
+  ceilingSpinbox->setSuffix(tr(" dBFS"));
+  ceilingSpinbox->setValue(-1.0);
+  ceilingSpinbox->setEnabled(false);
+  connect(limiterCheckbox, &QCheckBox::toggled, ceilingSpinbox, &QWidget::setEnabled);
+  audioGridLayout->addWidget(limiterCheckbox, kAudioMasterRow + 1, 0, 1, 1);
+  audioGridLayout->addWidget(ceilingSpinbox, kAudioMasterRow + 1, 1, 1, 1);
+
+  if (!amber::master_loudness_available()) {
+    loudnessCheckbox->setEnabled(false);
+    loudnessCheckbox->setToolTip(tr("Not available: this FFmpeg has no loudnorm filter."));
+  }
+  if (!amber::master_limiter_available()) {
+    limiterCheckbox->setEnabled(false);
+    limiterCheckbox->setToolTip(tr("Not available: this FFmpeg's alimiter filter is too old."));
+  }
+
   verticalLayout->addWidget(audioGroupbox);
 
   QHBoxLayout* progressLayout = new QHBoxLayout();
@@ -1254,6 +1298,10 @@ void ExportDialog::preset_selected(int index) {
     samplingRateSpinbox->setValue(ref_seq_->audio_frequency);
     audiobitrateSpinbox->setValue(256);
     faststartCheckbox->setChecked(true);
+    loudnessCheckbox->setChecked(false);
+    loudnessSpinbox->setValue(-14.0);
+    limiterCheckbox->setChecked(false);
+    ceilingSpinbox->setValue(-1.0);
     return;
   }
   QString name = preset_combo_->itemText(index);
@@ -1329,6 +1377,10 @@ void ExportDialog::SavePreset(const QString& name) {
   }
 
   stream.writeTextElement("faststart", QString::number(faststartCheckbox->isChecked() ? 1 : 0));
+  stream.writeTextElement("loudness_normalize", QString::number(loudnessCheckbox->isChecked() ? 1 : 0));
+  stream.writeTextElement("loudness_target", QString::number(loudnessSpinbox->value()));
+  stream.writeTextElement("peak_limit", QString::number(limiterCheckbox->isChecked() ? 1 : 0));
+  stream.writeTextElement("peak_ceiling", QString::number(ceilingSpinbox->value()));
 
   stream.writeEndElement();  // export_preset
   stream.writeEndDocument();
@@ -1375,6 +1427,11 @@ void ExportDialog::LoadPreset(const QString& name) {
   amber::EncoderOptionValues video_options;
   amber::EncoderOptionValues audio_options;
   int faststart = -1;
+  // Master audio: off with its default levels in presets saved before it existed
+  int loudness_normalize = 0;
+  double loudness_target = -14.0;
+  int peak_limit = 0;
+  double peak_ceiling = -1.0;
 
   while (!stream.atEnd()) {
     stream.readNext();
@@ -1416,6 +1473,14 @@ void ExportDialog::LoadPreset(const QString& name) {
         (tag == "video_option" ? video_options : audio_options).append({key, value});
       } else if (tag == "faststart") {
         faststart = stream.readElementText().toInt();
+      } else if (tag == "loudness_normalize") {
+        loudness_normalize = stream.readElementText().toInt();
+      } else if (tag == "loudness_target") {
+        loudness_target = stream.readElementText().toDouble();
+      } else if (tag == "peak_limit") {
+        peak_limit = stream.readElementText().toInt();
+      } else if (tag == "peak_ceiling") {
+        peak_ceiling = stream.readElementText().toDouble();
       }
     }
   }
@@ -1494,4 +1559,9 @@ void ExportDialog::LoadPreset(const QString& name) {
 
   // On by default, older presets included
   faststartCheckbox->setChecked(faststart != 0);
+
+  loudnessSpinbox->setValue(loudness_target);
+  loudnessCheckbox->setChecked(loudness_normalize != 0 && loudnessCheckbox->isEnabled());
+  ceilingSpinbox->setValue(peak_ceiling);
+  limiterCheckbox->setChecked(peak_limit != 0 && limiterCheckbox->isEnabled());
 }

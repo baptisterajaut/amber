@@ -3106,6 +3106,95 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(qAbs(tail_db - -15.0) < 0.5, qPrintable(QString("%1 dBFS").arg(tail_db)));
   }
 
+  // Master audio on export (ExportParams::loudness_normalize / peak_limit) on a 12 s Tone (1 kHz at its defaults, 0.165
+  // peak): the length doesn't change (the graph's lookahead is drained), two loudness targets 6 dB apart come out 6 dB
+  // apart once loudnorm has settled, the limiter holds the peak under its ceiling and leaves a signal already under it
+  // alone (alimiter's auto level, which would raise it to the ceiling, is off)
+  void masterAudioExport() {
+    if (!amber::master_loudness_available() || !amber::master_limiter_available()) {
+      QSKIP("this FFmpeg lacks loudnorm, or alimiter's level/latency options");
+    }
+    const EffectMeta* tone_meta = get_meta_from_name("Tone");
+    QVERIFY(tone_meta != nullptr);
+    constexpr long kFrames = 360;  // 12 s, four times loudnorm's 3 s window
+    struct Case {
+      const char* name;
+      bool loud;
+      double target;
+      bool limit;
+      double ceiling;
+    };
+    const Case cases[] = {{"plain", false, 0, false, 0},
+                          {"loud20", true, -20.0, false, 0},
+                          {"loud26", true, -26.0, false, 0},
+                          {"limit18", false, 0, true, -18.0},
+                          {"limit6", false, 0, true, -6.0}};
+    QMap<QString, Decoded> out;
+    for (const Case& c : cases) {
+      SequencePtr seq;
+      load_ramp_project(dir_.filePath(QString("master_%1.ove").arg(c.name)), QString(), 0, kFrames, 1.0, false, &seq);
+      if (QTest::currentTestFailed()) return;
+      Clip* clip = seq->clips.at(0).get();
+      EffectPtr gen = Effect::Create(clip, tone_meta);
+      QVERIFY(gen != nullptr);
+      clip->effects.append(gen);
+
+      ExportParams params{};
+      params.filename = dir_.filePath(QString("master_%1.wav").arg(c.name));
+      params.video_enabled = false;
+      params.audio_enabled = true;
+      params.audio_codec = AV_CODEC_ID_PCM_S16LE;
+      params.audio_sampling_rate = kAudioRate;
+      params.audio_bitrate = 1536;  // ignored by PCM
+      params.start_frame = 0;
+      params.end_frame = seq->getEndFrame();
+      params.loudness_normalize = c.loud;
+      params.loudness_target = c.target;
+      params.peak_limit = c.limit;
+      params.peak_ceiling = c.ceiling;
+      const QString error = export_sequence(seq.get(), params);
+      QVERIFY2(error.isEmpty(), qPrintable(QString("%1: %2").arg(c.name, error)));
+      const Decoded d = decode_file(params.filename);
+      QVERIFY(d.ok);
+      QVERIFY(d.has_audio);
+      out.insert(c.name, d);
+    }
+
+    auto tail_rms = [](const Decoded& d) {  // channel 0 over the second half, past loudnorm's settling
+      const int n = d.audio_left.size();
+      double sum = 0;
+      for (int i = n / 2; i < n; i++) sum += double(d.audio_left[i]) * d.audio_left[i];
+      return qSqrt(sum / qMax(1, n - n / 2));
+    };
+    const Decoded& plain = out["plain"];
+    QVERIFY2(plain.audio_peak > 0.1, qPrintable(QString("plain peak %1").arg(plain.audio_peak)));
+    for (auto it = out.cbegin(); it != out.cend(); ++it) {
+      QVERIFY2(qAbs(it.value().audio_samples - plain.audio_samples) <= 256,
+               qPrintable(QString("%1: %2 samples, plain %3")
+                              .arg(it.key())
+                              .arg(it.value().audio_samples)
+                              .arg(plain.audio_samples)));
+    }
+
+    const double rms_plain = tail_rms(plain);
+    const double rms20 = tail_rms(out["loud20"]);
+    const double rms26 = tail_rms(out["loud26"]);
+    const double ratio = rms26 / rms20;
+    qInfo("master loudness: tail RMS plain %.4f, -20 LUFS %.4f, -26 LUFS %.4f, ratio %.4f (0.501 expected)", rms_plain,
+          rms20, rms26, ratio);
+    QVERIFY2(qAbs(ratio - 0.501) < 0.02, qPrintable(QString("ratio %1").arg(ratio)));
+    // The tone is about -16 LUFS: -20 LUFS brings it down by some 4 dB
+    QVERIFY2(rms20 < rms_plain * 0.8 && rms20 > rms_plain * 0.4, qPrintable(QString("rms -20 %1").arg(rms20)));
+
+    const double ceiling18 = qPow(10.0, -18.0 / 20.0);
+    const double peak18 = out["limit18"].audio_peak;
+    const double peak6 = out["limit6"].audio_peak;
+    qInfo("master limiter: peak plain %.4f, ceiling -18 dBFS (%.4f) %.4f, ceiling -6 dBFS %.4f", plain.audio_peak,
+          ceiling18, peak18, peak6);
+    QVERIFY2(peak18 <= ceiling18 * 1.01 && peak18 > ceiling18 * 0.8, qPrintable(QString("peak %1").arg(peak18)));
+    QVERIFY2(qAbs(peak6 - plain.audio_peak) < 0.005, qPrintable(QString("peak %1").arg(peak6)));
+  }
+
 #ifndef NOLADSPA
   // A Tone clip through LADSPA amp_mono at -6 dB exports at half the RMS of the same clip without it. Without the
   // SDK's amp.so, through its lookalike test plugin (tests/fixtures/ladspa, 4243001)

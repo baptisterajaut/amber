@@ -406,6 +406,127 @@ bool ExportThread::SetupPaletteGraph() {
   return true;
 }
 
+static bool filter_has_option(const char* filter, const char* option) {
+  const AVFilter* f = avfilter_get_by_name(filter);
+  return f != nullptr && f->priv_class != nullptr &&
+         av_opt_find(const_cast<AVClass**>(&f->priv_class), option, nullptr, 0, AV_OPT_SEARCH_FAKE_OBJ) != nullptr;
+}
+
+bool amber::master_loudness_available() {
+  return avfilter_get_by_name("loudnorm") != nullptr && avfilter_get_by_name("aresample") != nullptr;
+}
+
+bool amber::master_limiter_available() {
+  return filter_has_option("alimiter", "level") && filter_has_option("alimiter", "latency");
+}
+
+// A filter option's number as an integer fraction FFmpeg evaluates: it reads a decimal with strtod, in the
+// application's locale (a decimal comma in French, which would also split the chain)
+static QString option_number(double v) { return QString("%1/1000000").arg(qRound64(v * 1000000.0)); }
+
+QByteArray amber::master_audio_chain(const ExportParams& params, int sample_rate) {
+  QStringList filters;
+  if (params.loudness_normalize && master_loudness_available()) {
+    // loudnorm's own true-peak target: the limiter's ceiling when that is on, the usual -1 dBTP otherwise
+    const double true_peak = params.peak_limit ? qBound(-9.0, params.peak_ceiling, 0.0) : -1.0;
+    // CBA: one pass (loudnorm's dynamic mode rides the gain, LRA 11 limits how far); a measuring first pass would
+    // allow its linear mode (one constant gain)
+    filters << QString("loudnorm=I=%1:TP=%2:LRA=11")
+                   .arg(option_number(qBound(-70.0, params.loudness_target, -5.0)), option_number(true_peak));
+    filters << QString("aresample=%1").arg(sample_rate);  // loudnorm works and outputs at 192 kHz
+  }
+  if (params.peak_limit && master_limiter_available()) {
+    const double limit = qBound(0.0625, std::pow(10.0, params.peak_ceiling / 20.0), 1.0);
+    // level=0: no make-up gain to the ceiling; latency=1: its lookahead doesn't delay the audio against the video
+    filters << QString("alimiter=limit=%1:level=0:latency=1").arg(option_number(limit));
+  }
+  if (filters.isEmpty()) return {};
+  filters << QString("aformat=sample_fmts=s16:sample_rates=%1:channel_layouts=stereo").arg(sample_rate);
+  return filters.join(',').toUtf8();
+}
+
+// The mix (S16 stereo, audio_frame) through amber::master_audio_chain, back out in frames of audio_frame's size so the
+// resampler and the encoder see what they would without it. Cleanup() frees the graph, on failure too.
+bool ExportThread::SetupMasterAudioGraph() {
+  const QByteArray chain = amber::master_audio_chain(params_, acodec_ctx->sample_rate);
+  if (chain.isEmpty()) return true;
+
+  master_graph = avfilter_graph_alloc();
+  bool ok = master_graph != nullptr;
+
+  char args[256];
+  snprintf(args, sizeof(args), "time_base=1/%d:sample_rate=%d:sample_fmt=s16:channel_layout=stereo",
+           acodec_ctx->sample_rate, acodec_ctx->sample_rate);
+  ok = ok && avfilter_graph_create_filter(&master_src, avfilter_get_by_name("abuffer"), "in", args, nullptr,
+                                          master_graph) >= 0;
+  ok = ok && avfilter_graph_create_filter(&master_sink, avfilter_get_by_name("abuffersink"), "out", nullptr, nullptr,
+                                          master_graph) >= 0;
+
+  AVFilterInOut* outputs = avfilter_inout_alloc();
+  AVFilterInOut* inputs = avfilter_inout_alloc();
+  ok = ok && outputs != nullptr && inputs != nullptr;
+  if (ok) {
+    outputs->name = av_strdup("in");
+    outputs->filter_ctx = master_src;
+    outputs->pad_idx = 0;
+    outputs->next = nullptr;
+    inputs->name = av_strdup("out");
+    inputs->filter_ctx = master_sink;
+    inputs->pad_idx = 0;
+    inputs->next = nullptr;
+    ok = avfilter_graph_parse_ptr(master_graph, chain.constData(), &inputs, &outputs, nullptr) >= 0;
+  }
+  avfilter_inout_free(&inputs);
+  avfilter_inout_free(&outputs);
+  ok = ok && avfilter_graph_config(master_graph, nullptr) >= 0;
+  if (ok) av_buffersink_set_frame_size(master_sink, audio_frame->nb_samples);
+
+  master_frame = av_frame_alloc();
+  ok = ok && master_frame != nullptr;
+
+  if (!ok) {
+    qCritical() << "Could not set up the master audio filter graph" << chain;
+    export_error = tr("could not set up the master audio filters (%1)").arg(QString::fromUtf8(chain));
+    return false;
+  }
+  qInfo() << "Export master audio:" << chain;
+  return true;
+}
+
+// Resample one mix frame to the encoder's format and encode it. False on encoder error.
+bool ExportThread::EncodeMixFrame(AVFrame* frame, long& file_audio_samples) {
+  swr_convert_frame(swr_ctx, swr_frame, frame);
+  swr_frame->pts = file_audio_samples;
+  if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) return false;
+  file_audio_samples += swr_frame->nb_samples;
+  return true;
+}
+
+// Encode every frame the master audio graph has ready. False on error.
+bool ExportThread::EncodeMasterAudioFrames(long& file_audio_samples) {
+  while ((ret = av_buffersink_get_frame(master_sink, master_frame)) >= 0) {
+    const bool ok = EncodeMixFrame(master_frame, file_audio_samples);
+    av_frame_unref(master_frame);
+    if (!ok) return false;
+  }
+  if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) return true;
+  qCritical() << "Failed to read from the master audio filter graph." << ret;
+  export_error = tr("failed to read from the master audio filters (%1)").arg(QString::number(ret));
+  return false;
+}
+
+// End of the mix: the graph releases what its lookahead still holds. False on error.
+bool ExportThread::FlushMasterAudioGraph(long& file_audio_samples) {
+  if (master_graph == nullptr) return true;
+  ret = av_buffersrc_add_frame_flags(master_src, nullptr, 0);
+  if (ret < 0) {
+    qCritical() << "Failed to flush the master audio filter graph." << ret;
+    export_error = tr("failed to flush the master audio filters (%1)").arg(QString::number(ret));
+    return false;
+  }
+  return EncodeMasterAudioFrames(file_audio_samples);
+}
+
 bool ExportThread::SetupAudio() {
   // if video is disabled, no setup necessary
   if (!params_.audio_enabled) return true;
@@ -540,7 +661,7 @@ bool ExportThread::SetupAudio() {
 
   av_frame_make_writable(swr_frame);
 
-  return true;
+  return SetupMasterAudioGraph();
 }
 
 bool ExportThread::SetupContainer() {
@@ -712,7 +833,9 @@ bool ExportThread::EncodeAudioFrames(long& file_audio_samples, double timecode_s
   }
 
   audio_write_lock.lock();
-  while (!interrupt_ && file_audio_samples <= (timecode_secs * params_.audio_sampling_rate)) {
+  // The master graph's lookahead holds samples back: its loop counts what was read, not what came out encoded
+  while (!interrupt_ && (master_graph != nullptr ? audio_fed_samples_ : file_audio_samples) <=
+                            (timecode_secs * params_.audio_sampling_rate)) {
     int adjusted_read = audio_ibuffer_read.load() % audio_ibuffer_size;
     int copylen = qMin(aframe_bytes, audio_ibuffer_size - adjusted_read);
     memcpy(audio_frame->data[0], audio_ibuffer + adjusted_read, copylen);
@@ -726,14 +849,26 @@ bool ExportThread::EncodeAudioFrames(long& file_audio_samples, double timecode_s
       audio_ibuffer_read.fetch_add(remainder_len);
     }
 
-    swr_convert_frame(swr_ctx, swr_frame, audio_frame);
-    swr_frame->pts = file_audio_samples;
-
-    if (!Encode(fmt_ctx, acodec_ctx, swr_frame, audio_pkt, audio_stream)) {
+    bool ok;
+    if (master_graph != nullptr) {
+      audio_frame->pts = audio_fed_samples_;
+      ret = av_buffersrc_add_frame_flags(master_src, audio_frame, AV_BUFFERSRC_FLAG_KEEP_REF);
+      ok = ret >= 0;
+      if (!ok) {
+        qCritical() << "Failed to send audio to the master audio filter graph." << ret;
+        export_error = tr("failed to send audio to the master audio filters (%1)").arg(QString::number(ret));
+      }
+      audio_fed_samples_ += audio_frame->nb_samples;
+      ok = ok && EncodeMasterAudioFrames(file_audio_samples);
+      // The graph may still hold a reference to audio_frame's buffer: the next read gets a buffer of its own
+      ok = ok && av_frame_make_writable(audio_frame) >= 0;
+    } else {
+      ok = EncodeMixFrame(audio_frame, file_audio_samples);
+    }
+    if (!ok) {
       audio_write_lock.unlock();
       return false;
     }
-    file_audio_samples += swr_frame->nb_samples;
   }
   audio_write_lock.unlock();
   return true;
@@ -794,6 +929,7 @@ bool ExportThread::EncodeAllFrames(RenderThread* renderer, long& file_audio_samp
 // Flush swresample residual audio after the encode loop. Returns false on encoder error.
 bool ExportThread::FlushSwrAudio(long& file_audio_samples) {
   if (!params_.audio_enabled) return true;
+  if (!FlushMasterAudioGraph(file_audio_samples)) return false;
   int flush_iter = 0;
   do {
     ret = swr_convert_frame(swr_ctx, swr_frame, nullptr);
@@ -916,6 +1052,7 @@ bool ExportThread::Export() {
   }
 
   long file_audio_samples = 0;
+  audio_fed_samples_ = 0;
   if (!RenderPass(file_audio_samples)) return false;
 
   if (!FlushSwrAudio(file_audio_samples)) return false;
@@ -985,6 +1122,13 @@ void ExportThread::Cleanup() {
 
   if (palette_graph != nullptr) {
     avfilter_graph_free(&palette_graph);
+  }
+
+  if (master_graph != nullptr) {
+    avfilter_graph_free(&master_graph);
+  }
+  if (master_frame != nullptr) {
+    av_frame_free(&master_frame);
   }
 
   if (swr_ctx != nullptr) {

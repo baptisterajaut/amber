@@ -428,6 +428,14 @@ private:
   QCheckBox* faststartCheckbox;
 
   /**
+   * @brief Master audio (ExportParams::loudness_normalize / peak_limit), at the bottom of the audio group
+   */
+  QCheckBox* loudnessCheckbox;
+  QDoubleSpinBox* loudnessSpinbox;
+  QCheckBox* limiterCheckbox;
+  QDoubleSpinBox* ceilingSpinbox;
+
+  /**
    * @brief Two-pass encoding (ExportParams::two_pass), under the compression type
    */
   QCheckBox* twoPassCheckbox;

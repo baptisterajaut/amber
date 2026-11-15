@@ -85,7 +85,23 @@ struct ExportParams {
   // with an encoder that passes amber::two_pass_works() (rendering/encoderoptions.h); ignored otherwise.
   // CBA: two-pass only in Average bitrate mode; libvpx/libaom also gain from it in quality mode
   bool two_pass = false;
+  // Master audio, on the final mix before the encoder. Loudness: EBU R128 loudnorm in one pass (its dynamic mode: the
+  // gain follows the programme, it is not one constant gain). Limiter: alimiter, sample peaks held under the ceiling.
+  bool loudness_normalize = false;
+  double loudness_target = -14.0;  // integrated LUFS
+  bool peak_limit = false;
+  double peak_ceiling = -1.0;  // dBFS
 };
+
+namespace amber {
+// The master audio filter chain for the export's mix (S16 stereo at sample_rate in, the same out), empty when neither
+// loudness nor limiter is on or available
+QByteArray master_audio_chain(const ExportParams& params, int sample_rate);
+// The installed FFmpeg has the filter (loudnorm), or the alimiter options the limiter needs (level off, latency
+// compensated: older versions always raise the output to the ceiling or delay it)
+bool master_loudness_available();
+bool master_limiter_available();
+}  // namespace amber
 
 struct VideoCodecParams {
   int pix_fmt;
@@ -129,6 +145,10 @@ class ExportThread : public QThread {
   bool RenderPass(long& file_audio_samples);
   bool TwoPassApplies();
   bool AnalysisPass();
+  bool SetupMasterAudioGraph();
+  bool EncodeMixFrame(AVFrame* frame, long& file_audio_samples);
+  bool EncodeMasterAudioFrames(long& file_audio_samples);
+  bool FlushMasterAudioGraph(long& file_audio_samples);
   bool FlushSwrAudio(long& file_audio_samples);
   bool FlushEncoders();
 
@@ -176,6 +196,13 @@ class ExportThread : public QThread {
   AVPacket* video_pkt{nullptr};
   AVPacket* audio_pkt{nullptr};
   SwrContext* swr_ctx{nullptr};
+  // Master audio (amber::master_audio_chain): abuffer -> chain -> abuffersink, frames of audio_frame's size. Its
+  // lookahead holds samples back, so the read loop counts the samples fed in, not the ones encoded
+  AVFilterGraph* master_graph{nullptr};
+  AVFilterContext* master_src{nullptr};
+  AVFilterContext* master_sink{nullptr};
+  AVFrame* master_frame{nullptr};
+  long audio_fed_samples_{0};
 
   int aframe_bytes;
   int ret;
