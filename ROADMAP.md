@@ -111,7 +111,7 @@ Backported from Oak, adapted to QRhi (originally GL-based):
 
 ### FFmpeg API migration
 
-- **Buffersink `channel_layouts` → `ch_layouts`** — FFmpeg 7+ deprecates the `channel_layouts` option on abuffersink in favor of `ch_layouts` (string). However, `ch_layouts` with "stereo" silently fails the filter init on some versions (returns success, configures nothing). Current code uses `channel_layouts` first with `ch_layouts` fallback — works on all versions (3.4–8) but prints a cosmetic deprecation warning on FFmpeg 7+. Revisit when FFmpeg removes `channel_layouts` or when the `ch_layouts` string parsing is fixed upstream.
+- ~~**Buffersink `channel_layouts` → `ch_layouts`**~~ — obsolete: the cacher (2.0.x and main) no longer sets any option on abuffersink, an `aformat` filter fixes the layout, and `aformat`'s `channel_layouts` is not deprecated (checked on FFmpeg 9.0.2: no warning).
 
 ### Audio pipeline cleanup
 
