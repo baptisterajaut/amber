@@ -228,6 +228,20 @@ class TestEngine : public QObject {
     seq->clips.clear();  // before m goes out of scope: the clip points at it
   }
 
+  // MP4 durations measured with ffprobe on libx264 files at 30 fps: the container rounds them just under the frames
+  void footageLengthContainerRounding() {
+    Footage f;
+    f.length = 33333;  // 1 frame, 0.033333 s: was 0 frames, the media had no length and its clip never opened
+    QCOMPARE(f.get_length_in_frames(30.0), 1L);
+    f.length = 166016;  // 5 frames
+    QCOMPARE(f.get_length_in_frames(30.0), 5L);
+    f.length = 333008;  // 10 frames
+    QCOMPARE(f.get_length_in_frames(30.0), 10L);
+    f.length = 150000;  // 4.5 frames: a partial frame still doesn't count
+    QCOMPARE(f.get_length_in_frames(30.0), 4L);
+    f.ready_lock.unlock();
+  }
+
   void footageLengthZeroSpeed() {
     Footage f;
     f.length = AV_TIME_BASE;

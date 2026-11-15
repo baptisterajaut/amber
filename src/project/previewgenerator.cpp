@@ -520,6 +520,7 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
     return;
   }
   if (s->preview_done) return;
+  if (temp_frame->width <= 0 || temp_frame->height <= 0) return;
 
   int dstH = amber::CurrentConfig.thumbnail_resolution;
   int dstW = qRound(dstH * (float(temp_frame->width) / float(temp_frame->height)));
@@ -527,6 +528,10 @@ void PreviewGenerator::process_video_frame(AVFrame* temp_frame, FootageStream* s
   SwsContext* sws_ctx =
       sws_getContext(temp_frame->width, temp_frame->height, static_cast<AVPixelFormat>(temp_frame->format), dstW, dstH,
                      static_cast<AVPixelFormat>(AV_PIX_FMT_RGBA), SWS_FAST_BILINEAR, nullptr, nullptr, nullptr);
+  if (sws_ctx == nullptr) {
+    qWarning() << "Could not convert the frame for the thumbnail, format" << temp_frame->format;
+    return;
+  }
 
   int linesize[AV_NUM_DATA_POINTERS];
   linesize[0] = dstW * 4;
@@ -701,8 +706,9 @@ bool PreviewGenerator::read_next_decodable_packet(AVPacket* packet, AVCodecConte
 // Returns true if a frame was decoded, false if end-of-file was reached.
 bool PreviewGenerator::advance_until_frame(AVPacket* packet, AVFrame* temp_frame, AVCodecContext** codec_ctx,
                                            bool& end_of_file) {
+  // A decode error (not EAGAIN) leaves temp_frame empty: read on rather than hand it over as a frame
   while (codec_ctx[packet->stream_index] == nullptr ||
-         avcodec_receive_frame(codec_ctx[packet->stream_index], temp_frame) == AVERROR(EAGAIN)) {
+         avcodec_receive_frame(codec_ctx[packet->stream_index], temp_frame) != 0) {
     av_packet_unref(packet);
     int read_ret = av_read_frame(fmt_ctx_, packet);
     if (read_ret < 0) {
@@ -771,6 +777,27 @@ void PreviewGenerator::run_decode_loop(AVFrame* temp_frame, AVCodecContext** cod
       if (done) break;
     }
     av_packet_unref(packet);
+  }
+
+  // A decoder holds its last frames (reordering, frame threads) until it is flushed: a video shorter than that delay
+  // (one or two frames) had no thumbnail, and a counted length (retrieve_duration_) missed the last frames
+  if (end_of_file && !cancelled_) {
+    av_packet_unref(packet);
+    for (unsigned int sidx = 0; sidx < fmt_ctx_->nb_streams; sidx++) {
+      if (codec_ctx[sidx] == nullptr) continue;
+      const bool is_video = fmt_ctx_->streams[sidx]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO;
+      FootageStream* s = footage_->get_stream_from_file_index(is_video, int(sidx));
+      if (s == nullptr || avcodec_send_packet(codec_ctx[sidx], nullptr) < 0) continue;
+      // process_video_frame() frees the decoder once the thumbnail is made (unless counting frames)
+      while (!cancelled_ && codec_ctx[sidx] != nullptr && avcodec_receive_frame(codec_ctx[sidx], temp_frame) == 0) {
+        if (is_video) {
+          process_video_frame(temp_frame, s, codec_ctx, int(sidx));
+          media_lengths[sidx]++;
+        } else if (fmt_ctx_->streams[sidx]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+          process_audio_frame(temp_frame, s, int(sidx), waveform_cache_data, waveform_cache_count[sidx], packet);
+        }
+      }
+    }
   }
 
   av_packet_free(&packet);

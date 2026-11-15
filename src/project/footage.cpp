@@ -70,7 +70,12 @@ void Footage::reset() {
 long Footage::get_length_in_frames(double frame_rate) {
   if (length >= 0) {
     if (qFuzzyIsNull(speed)) return LONG_MAX;
-    return static_cast<long>(std::floor((double(length) / double(AV_TIME_BASE)) * frame_rate / speed));
+    // A container's duration is rounded to its time scale: an MP4 of 5 frames at 30 fps says 0.166016 s (4.98
+    // frames), one of 1 frame 0.033333 s (0.99999). Whole frames short by that rounding count; 2 ms covers MP4's
+    // 1/1000 and 1/1024 s scales
+    constexpr double kDurationRounding = 0.002;
+    return static_cast<long>(
+        std::floor((double(length) / double(AV_TIME_BASE) + kDurationRounding) * frame_rate / speed));
   }
   return 0;
 }
