@@ -263,7 +263,7 @@ class TestRenderQueue : public QObject {
   void clearedAtQuit() {
     RenderQueue& q = amber::render_queue();
     QVERIFY(q.Add(job(sequence("Deleted", 10), "/out/deleted.mp4")).isEmpty());
-    QTimer::singleShot(0, qApp, &QCoreApplication::quit);
+    QTimer::singleShot(0, QCoreApplication::instance(), &QCoreApplication::quit);  // qApp casts to QApplication: UB here
     QCoreApplication::exec();
     QCOMPARE(q.Count(), 0);
   }
