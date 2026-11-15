@@ -33,6 +33,21 @@ SrtParseResult parse_srt_text(QString content);
 // dropped and one that starts before 0 starts at 0. The caller encodes it (UTF-8).
 QString write_srt(const QVector<SubtitleCue>& cues, qint64 offset_ms = 0);
 
+// WebVTT text that is already decoded: the "WEBVTT" header block and the NOTE, STYLE and REGION blocks are skipped, a
+// cue is an optional identifier line, "[HH:]MM:SS.mmm --> [HH:]MM:SS.mmm" (cue settings after it ignored) and its text.
+// The text keeps <i>, <b> and <u> (classes dropped: <i.loud> is <i>), loses WebVTT's other tags (<c>, <v Name>,
+// <lang>, <ruby>, <rt>, inline timestamps) and has its character references decoded (&amp; &lt; &gt; &nbsp; &lrm;
+// &rlm;).
+SrtParseResult parse_vtt_text(QString content);
+
+// WebVTT with write_srt()'s cues and offset rules: "WEBVTT", a blank line, then per cue its times (HH:MM:SS.mmm) and
+// text lines. '&' and every '<' or '>' outside an <i>, <b> or <u> tag are escaped; <s> (no WebVTT tag) is dropped.
+QString write_vtt(const QVector<SubtitleCue>& cues, qint64 offset_ms = 0);
+
+// Reads a subtitle file and decodes it with decode_srt_bytes(): WebVTT when the text starts with "WEBVTT", SRT
+// otherwise
+SrtParseResult parse_subtitle_file(const QString& filepath);
+
 // Stable sort by start time (cues starting together keep their order)
 void sort_cues(QVector<SubtitleCue>& cues);
 

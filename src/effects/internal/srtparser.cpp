@@ -211,17 +211,18 @@ QStringList non_blank_lines(const QString& lines) {
   return kept;
 }
 
-QString format_timestamp(qint64 ms) {
+QString format_timestamp(qint64 ms, QChar ms_separator = QLatin1Char(',')) {
   qint64 h = ms / 3600000;
   ms -= h * 3600000;
   qint64 m = ms / 60000;
   ms -= m * 60000;
   qint64 s = ms / 1000;
   ms -= s * 1000;
-  return QStringLiteral("%1:%2:%3,%4")
+  return QStringLiteral("%1:%2:%3%4%5")
       .arg(h, 2, 10, QLatin1Char('0'))
       .arg(m, 2, 10, QLatin1Char('0'))
       .arg(s, 2, 10, QLatin1Char('0'))
+      .arg(ms_separator)
       .arg(ms, 3, 10, QLatin1Char('0'));
 }
 
@@ -241,6 +242,156 @@ QString write_srt(const QVector<SubtitleCue>& cues, qint64 offset_ms) {
     out += non_blank_lines(cue_text_to_lines(cue.text)).join(QLatin1Char('\n')) + QLatin1String("\n\n");
   }
   return out;
+}
+
+namespace {
+
+// "[HH:]MM:SS.mmm" -> milliseconds, -1 on failure (WebVTT's hours are optional and may have more than two digits)
+qint64 parse_vtt_timestamp(QStringView s) {
+  static const QRegularExpression re(QStringLiteral("^(?:(\\d+):)?(\\d{2}):(\\d{2})\\.(\\d{3})$"));
+  QRegularExpressionMatch m = re.matchView(s);
+  if (!m.hasMatch()) return -1;
+  const qint64 h = m.captured(1).isEmpty() ? 0 : m.captured(1).toLongLong();
+  const qint64 min = m.captured(2).toLongLong();
+  const qint64 sec = m.captured(3).toLongLong();
+  if (min > 59 || sec > 59) return -1;
+  return h * 3600000 + min * 60000 + sec * 1000 + m.captured(4).toLongLong();
+}
+
+// "00:01.000 --> 00:04.000 line:90% align:start": the cue settings after the end time are ignored
+bool parse_vtt_timing(QStringView line, qint64& start_ms, qint64& end_ms) {
+  const qsizetype arrow = line.indexOf(QLatin1String("-->"));
+  if (arrow < 0) return false;
+  QStringView left = line.left(arrow).trimmed();
+  QStringView right = line.mid(arrow + 3).trimmed();
+  for (qsizetype i = 0; i < right.size(); i++) {
+    if (right[i].isSpace()) {
+      right = right.left(i);
+      break;
+    }
+  }
+  start_ms = parse_vtt_timestamp(left);
+  end_ms = parse_vtt_timestamp(right);
+  return start_ms >= 0 && end_ms > start_ms;
+}
+
+// One WebVTT text line as cue text: <i>/<b>/<u> kept without their classes, the other tags dropped, references decoded
+QString vtt_line_to_cue_text(const QString& line) {
+  static const QRegularExpression drop_re(QStringLiteral("</?(?:c|v|lang|ruby|rt)(?:[.\\s][^>]*)?>|<\\d[^>]*>"),
+                                          QRegularExpression::CaseInsensitiveOption);
+  static const QRegularExpression class_re(QStringLiteral("<(i|b|u)\\.[^>]*>"),
+                                           QRegularExpression::CaseInsensitiveOption);
+  QString text = QString(line).remove(drop_re);
+  text.replace(class_re, QStringLiteral("<\\1>"));
+  // CBA: an escaped tag ("&lt;i&gt;") decodes to a real style tag; nobody writes those in subtitles
+  text.replace(QLatin1String("&lt;"), QLatin1String("<"))
+      .replace(QLatin1String("&gt;"), QLatin1String(">"))
+      .replace(QLatin1String("&nbsp;"), QString(QChar(0x00A0)))
+      .replace(QLatin1String("&lrm;"), QString(QChar(0x200E)))
+      .replace(QLatin1String("&rlm;"), QString(QChar(0x200F)))
+      .replace(QLatin1String("&amp;"), QLatin1String("&"));  // last: "&amp;lt;" stays "&lt;"
+  return text.trimmed();
+}
+
+// Cue text line as WebVTT text: <i>/<b>/<u> kept, <s> dropped, every other '<', '>' and '&' escaped
+QString cue_line_to_vtt(const QString& line) {
+  static const QRegularExpression tag_re(QStringLiteral("</?(?:i|b|u|s)>"), QRegularExpression::CaseInsensitiveOption);
+  auto escaped = [](QStringView s) {
+    return s.toString()
+        .replace(QLatin1Char('&'), QLatin1String("&amp;"))
+        .replace(QLatin1Char('<'), QLatin1String("&lt;"))
+        .replace(QLatin1Char('>'), QLatin1String("&gt;"));
+  };
+  QString out;
+  qsizetype pos = 0;
+  for (QRegularExpressionMatchIterator it = tag_re.globalMatch(line); it.hasNext();) {
+    QRegularExpressionMatch m = it.next();
+    out += escaped(QStringView(line).mid(pos, m.capturedStart() - pos));
+    const QString tag = m.captured().toLower();
+    if (tag != QLatin1String("<s>") && tag != QLatin1String("</s>")) out += tag;
+    pos = m.capturedEnd();
+  }
+  out += escaped(QStringView(line).mid(pos));
+  return out;
+}
+
+}  // namespace
+
+SrtParseResult parse_vtt_text(QString content) {
+  SrtParseResult result;
+  result.skipped = 0;
+  if (content.startsWith(QChar(0xFEFF))) content = content.mid(1);
+  content.replace(QLatin1String("\r\n"), QLatin1String("\n"));
+  content.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+
+  // Blocks of lines; the first is the WEBVTT header. Only an empty line ends a block: a line of spaces is cue text
+  // (YouTube's automatic captions start their cues with one)
+  QVector<QStringList> blocks(1);
+  for (const QString& line : content.split(QLatin1Char('\n'))) {
+    if (line.isEmpty()) {
+      if (!blocks.last().isEmpty()) blocks.append(QStringList());
+    } else {
+      blocks.last().append(line);
+    }
+  }
+  for (int b = 0; b < blocks.size(); b++) {
+    const QStringList& block = blocks[b];
+    if (block.isEmpty()) continue;
+    const QString first = block.first().trimmed();
+    if (b == 0 && first.startsWith(QLatin1String("WEBVTT"))) continue;
+    static const QRegularExpression meta_re(QStringLiteral("^(?:NOTE|STYLE|REGION)(?:\\s|$)"));
+    if (meta_re.match(first).hasMatch()) continue;
+
+    int timing = -1;
+    if (block.first().contains(QLatin1String("-->"))) {
+      timing = 0;
+    } else if (block.size() > 1 && block[1].contains(QLatin1String("-->"))) {
+      timing = 1;  // after the cue identifier
+    }
+    SubtitleCue cue;
+    if (timing < 0 || !parse_vtt_timing(QStringView(block[timing]).trimmed(), cue.start_ms, cue.end_ms)) {
+      result.skipped++;
+      continue;
+    }
+    QStringList text;
+    for (int i = timing + 1; i < block.size(); i++) {
+      const QString t = vtt_line_to_cue_text(block[i]);
+      if (!t.isEmpty()) text.append(t);
+    }
+    if (text.isEmpty()) continue;  // an empty cue shows nothing
+    cue.text = text.join(QLatin1String("<br>"));
+    result.cues.append(cue);
+  }
+  sort_cues(result.cues);
+  return result;
+}
+
+QString write_vtt(const QVector<SubtitleCue>& cues, qint64 offset_ms) {
+  QString out = QStringLiteral("WEBVTT\n\n");
+  for (const SubtitleCue& cue : cues) {
+    qint64 start = cue.start_ms + offset_ms;
+    const qint64 end = cue.end_ms + offset_ms;
+    if (end <= 0) continue;
+    if (start < 0) start = 0;
+    out += format_timestamp(start, QLatin1Char('.')) + QLatin1String(" --> ") +
+           format_timestamp(end, QLatin1Char('.')) + QLatin1Char('\n');
+    QStringList lines;
+    for (const QString& line : non_blank_lines(cue_text_to_lines(cue.text))) lines.append(cue_line_to_vtt(line));
+    out += lines.join(QLatin1Char('\n')) + QLatin1String("\n\n");
+  }
+  return out;
+}
+
+SrtParseResult parse_subtitle_file(const QString& filepath) {
+  QFile file(filepath);
+  if (!file.open(QIODevice::ReadOnly)) {
+    SrtParseResult result;
+    result.skipped = 0;
+    return result;
+  }
+  const QString text = decode_srt_bytes(file.readAll());
+  const QStringView body = text.startsWith(QChar(0xFEFF)) ? QStringView(text).mid(1) : QStringView(text);
+  return body.startsWith(QLatin1String("WEBVTT")) ? parse_vtt_text(text) : parse_srt_text(text);
 }
 
 void sort_cues(QVector<SubtitleCue>& cues) {

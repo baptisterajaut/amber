@@ -279,14 +279,14 @@ void SubtitleEditor::Retranslate() {
   setWindowTitle(tr("Subtitle Editor"));
   filter_edit_->setPlaceholderText(tr("Find..."));
   table_->setHorizontalHeaderLabels({tr("#"), tr("Start"), tr("End"), tr("Duration"), tr("Text")});
-  hint_label_->setText(tr("Select a subtitle clip, or use File > Import Subtitle (.srt)."));
+  hint_label_->setText(tr("Select a subtitle clip, or use File > Import Subtitle (.srt, .vtt)."));
   add_button_->setText(tr("Add"));
   add_button_->setToolTip(tr("Add a subtitle at the playhead"));
   delete_button_->setText(tr("Delete"));
   shift_button_->setText(tr("Shift..."));
   shift_button_->setToolTip(tr("Move the selected subtitles, or all of them when none is selected"));
-  import_button_->setText(tr("Import .srt..."));
-  export_button_->setText(tr("Export .srt..."));
+  import_button_->setText(tr("Import .srt/.vtt..."));
+  export_button_->setText(tr("Export .srt/.vtt..."));
   refresh();
 }
 
@@ -814,11 +814,12 @@ void SubtitleEditor::import_srt() {
     return;
   }
 
-  const QString path = QFileDialog::getOpenFileName(this, tr("Import Subtitles"), QString(),
-                                                    tr("SRT Subtitle Files (*.srt);;All Files (*)"));
+  const QString path = QFileDialog::getOpenFileName(
+      this, tr("Import Subtitles"), QString(),
+      tr("Subtitle Files (*.srt *.vtt);;SRT Subtitle Files (*.srt);;WebVTT Subtitle Files (*.vtt);;All Files (*)"));
   if (path.isEmpty()) return;
 
-  SrtParseResult result = parse_srt(path);
+  SrtParseResult result = parse_subtitle_file(path);
   if (result.cues.isEmpty()) {
     QMessageBox::warning(this, tr("Import Failed"), tr("No valid subtitle cues found in the file."));
     return;
@@ -849,9 +850,18 @@ void SubtitleEditor::export_srt() {
   ClipPtr clip = clip_.lock();
   if (effect_ == nullptr || clip == nullptr || cues_.isEmpty()) return;
 
-  const QString path = QFileDialog::getSaveFileName(this, tr("Export Subtitles"), clip->name() + QStringLiteral(".srt"),
-                                                    tr("SRT Subtitle Files (*.srt)"));
+  const QString srt_filter = tr("SRT Subtitle Files (*.srt)");
+  const QString vtt_filter = tr("WebVTT Subtitle Files (*.vtt)");
+  QString selected = srt_filter;
+  QString path = QFileDialog::getSaveFileName(this, tr("Export Subtitles"), clip->name() + QStringLiteral(".srt"),
+                                              srt_filter + QStringLiteral(";;") + vtt_filter, &selected);
   if (path.isEmpty()) return;
+  // The typed extension wins; without one, the chosen file type's
+  bool vtt = path.endsWith(QLatin1String(".vtt"), Qt::CaseInsensitive);
+  if (!vtt && !path.endsWith(QLatin1String(".srt"), Qt::CaseInsensitive)) {
+    vtt = selected == vtt_filter;
+    path += vtt ? QStringLiteral(".vtt") : QStringLiteral(".srt");
+  }
 
   // What the sequence shows: each cue cut to the clip's span, in sequence time
   const qint64 visible_start = frame_to_cue_ms(timeline_in_);
@@ -865,7 +875,8 @@ void SubtitleEditor::export_srt() {
   const qint64 offset = qRound64(double(timeline_in_ - clip_in_) * 1000.0 / frame_rate_);
 
   QSaveFile file(path);
-  if (!file.open(QIODevice::WriteOnly) || file.write(write_srt(visible, offset).toUtf8()) < 0 || !file.commit()) {
+  if (!file.open(QIODevice::WriteOnly) ||
+      file.write((vtt ? write_vtt(visible, offset) : write_srt(visible, offset)).toUtf8()) < 0 || !file.commit()) {
     QMessageBox::critical(this, tr("Export Failed"), tr("Could not write \"%1\".").arg(path));
     return;
   }

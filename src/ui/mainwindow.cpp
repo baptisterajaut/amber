@@ -1162,7 +1162,7 @@ void MainWindow::Retranslate() {
   save_project_as->setStatusTip(tr("Save the current project to a new file"));
   import_action->setText(tr("&Import..."));
   import_action->setStatusTip(tr("Import media files into the project"));
-  import_subtitle_action->setText(tr("Import Subtitle (.srt)..."));
+  import_subtitle_action->setText(tr("Import Subtitle (.srt, .vtt)..."));
   relink_media_action->setText(tr("Relink Media..."));
   relink_media_action->setStatusTip(tr("Reconnect media files that have moved or are missing"));
   export_action->setText(tr("&Export..."));
@@ -1582,12 +1582,13 @@ void MainWindow::import_subtitle() {
     return;
   }
 
-  QString filepath = QFileDialog::getOpenFileName(this, tr("Import Subtitle"), QString(),
-                                                  tr("SRT Subtitle Files (*.srt);;All Files (*)"));
+  QString filepath = QFileDialog::getOpenFileName(
+      this, tr("Import Subtitle"), QString(),
+      tr("Subtitle Files (*.srt *.vtt);;SRT Subtitle Files (*.srt);;WebVTT Subtitle Files (*.vtt);;All Files (*)"));
 
   if (filepath.isEmpty()) return;
 
-  SrtParseResult result = parse_srt(filepath);
+  SrtParseResult result = parse_subtitle_file(filepath);
 
   if (result.cues.isEmpty()) {
     QMessageBox::warning(this, tr("Import Failed"), tr("No valid subtitle cues found in the file."));

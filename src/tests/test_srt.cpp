@@ -33,6 +33,13 @@ class TestSrt : public QObject {
   void testTextLines();
   void testBlankLinesDropped();
   void testFrameMapping();
+  void testVttParse();
+  void testVttTagsAndReferences();
+  void testVttMetaBlocksSkipped();
+  void testVttWrite();
+  void testVttRoundTrip();
+  void testSubtitleFileDispatch();
+  void testVttYouTubeCaptions();
 };
 
 void TestSrt::testBasicParse() {
@@ -359,6 +366,96 @@ void TestSrt::testFrameMapping() {
   for (long f : {0L, 1L, 149L, 150L, 107892L}) {
     QCOMPARE(first_frame_at_or_after_ms(cue_ms_at_frame(f, fr), fr), f);
   }
+}
+
+void TestSrt::testVttParse() {
+  // Header text, a cue identifier, hours optional, cue settings after the end time, a malformed timing skipped
+  const SrtParseResult r = parse_vtt_text(
+      QStringLiteral("WEBVTT - a title\n\nintro\n00:01.000 --> 00:04.500 line:90% align:start\nHello\nworld\n\n"
+                     "01:00:00.250 --> 01:00:02.000\nAn hour in\n\n00:05.000 -> 00:06.000\nbroken arrow\n"));
+  QCOMPARE(r.cues.size(), 2);
+  QCOMPARE(r.skipped, 1);
+  QCOMPARE(r.cues[0].start_ms, qint64(1000));
+  QCOMPARE(r.cues[0].end_ms, qint64(4500));
+  QCOMPARE(r.cues[0].text, QStringLiteral("Hello<br>world"));
+  QCOMPARE(r.cues[1].start_ms, qint64(3600250));
+  QCOMPARE(r.cues[1].text, QStringLiteral("An hour in"));
+}
+
+void TestSrt::testVttTagsAndReferences() {
+  const SrtParseResult r = parse_vtt_text(
+      QStringLiteral("WEBVTT\n\n00:00.000 --> 00:01.000\n<v Anna>Tom &amp; <i.loud>Jerry</i> <c.yellow>say</c> "
+                     "&lt;hi&gt;<00:00.500> now</v>\n"));
+  QCOMPARE(r.cues.size(), 1);
+  QCOMPARE(r.cues[0].text, QStringLiteral("Tom & <i>Jerry</i> say <hi> now"));
+  // What the renderer then gets: the style tag kept, the decoded brackets escaped
+  QCOMPARE(cue_text_to_html(r.cues[0].text), QStringLiteral("Tom & <i>Jerry</i> say &lt;hi&gt; now"));
+}
+
+void TestSrt::testVttMetaBlocksSkipped() {
+  const SrtParseResult r = parse_vtt_text(
+      QStringLiteral("\xFEFFWEBVTT\r\n\r\nSTYLE\r\n::cue { color: red }\r\n\r\nNOTE a comment\r\nover two lines\r\n\r\n"
+                     "REGION\r\nid:r1\r\n\r\n00:02.000 --> 00:03.000\r\nOnly cue\r\n"));
+  QCOMPARE(r.cues.size(), 1);
+  QCOMPARE(r.skipped, 0);
+  QCOMPARE(r.cues[0].text, QStringLiteral("Only cue"));
+}
+
+void TestSrt::testVttWrite() {
+  QVector<SubtitleCue> cues;
+  cues.append({1000, 4500, QStringLiteral("Tom & <i>Jerry</i><br><s>a < b</s>")});
+  cues.append({-2000, -500, QStringLiteral("before 0, dropped")});
+  QCOMPARE(write_vtt(cues, 0),
+           QStringLiteral("WEBVTT\n\n00:00:01.000 --> 00:00:04.500\nTom &amp; <i>Jerry</i>\na &lt; b\n\n"));
+  // The offset rules are write_srt()'s: shifted earlier, a cue ending at or before 0 is dropped, one starting before
+  // 0 starts at 0
+  QCOMPARE(write_vtt({{1000, 4500, QStringLiteral("x")}}, -2000),
+           QStringLiteral("WEBVTT\n\n00:00:00.000 --> 00:00:02.500\nx\n\n"));
+}
+
+void TestSrt::testVttRoundTrip() {
+  QVector<SubtitleCue> cues;
+  cues.append({0, 1500, QStringLiteral("<b>One</b><br>two")});
+  cues.append({3723004, 3725000, QStringLiteral("Tom & Jerry <u>under</u>")});
+  const SrtParseResult r = parse_vtt_text(write_vtt(cues));
+  QCOMPARE(r.skipped, 0);
+  QCOMPARE(r.cues.size(), cues.size());
+  for (int i = 0; i < cues.size(); i++) {
+    QCOMPARE(r.cues[i].start_ms, cues[i].start_ms);
+    QCOMPARE(r.cues[i].end_ms, cues[i].end_ms);
+    QCOMPARE(r.cues[i].text, cues[i].text);
+  }
+}
+
+void TestSrt::testSubtitleFileDispatch() {
+  // The content decides, not the extension: a WebVTT file named .srt still reads as WebVTT, and the other way round
+  QTemporaryFile vtt(QDir::tempPath() + QStringLiteral("/XXXXXX.srt"));
+  QVERIFY(vtt.open());
+  vtt.write("\xEF\xBB\xBFWEBVTT\n\n00:01.000 --> 00:02.000\nweb\n");
+  vtt.close();
+  SrtParseResult r = parse_subtitle_file(vtt.fileName());
+  QCOMPARE(r.cues.size(), 1);
+  QCOMPARE(r.cues[0].text, QStringLiteral("web"));
+  QTemporaryFile srt(QDir::tempPath() + QStringLiteral("/XXXXXX.vtt"));
+  QVERIFY(srt.open());
+  srt.write("1\n00:00:01,000 --> 00:00:02,000\nsub\n");
+  srt.close();
+  r = parse_subtitle_file(srt.fileName());
+  QCOMPARE(r.cues.size(), 1);
+  QCOMPARE(r.cues[0].text, QStringLiteral("sub"));
+}
+
+void TestSrt::testVttYouTubeCaptions() {
+  // YouTube's automatic captions: header metadata, a line of one space opening the cue, word timestamps with <c>
+  const SrtParseResult r = parse_vtt_text(QStringLiteral(
+      "WEBVTT\nKind: captions\nLanguage: en\n\n00:00:00.160 --> 00:00:02.869 align:start position:0%\n \n"
+      "so<00:00:00.640><c> today</c><00:00:01.040><c> we're</c>\n\n"
+      "00:00:02.879 --> 00:00:05.110 align:start position:0%\nso today we're\nto<00:00:03.120><c> talk</c>\n"));
+  QCOMPARE(r.skipped, 0);
+  QCOMPARE(r.cues.size(), 2);
+  QCOMPARE(r.cues[0].start_ms, qint64(160));
+  QCOMPARE(r.cues[0].text, QStringLiteral("so today we're"));
+  QCOMPARE(r.cues[1].text, QStringLiteral("so today we're<br>to talk"));
 }
 
 QTEST_GUILESS_MAIN(TestSrt)
