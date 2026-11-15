@@ -35,6 +35,7 @@ class ChorusEffect : public Effect {
  private:
   DoubleField* rate_val;
   DoubleField* depth_val;
+  DoubleField* feedback_val;
   DoubleField* mix_val;
 
   amber::StreamStates<amber::audiodsp::Chorus> states_;

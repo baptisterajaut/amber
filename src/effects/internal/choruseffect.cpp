@@ -33,6 +33,12 @@ ChorusEffect::ChorusEffect(Clip* c, const EffectMeta* em) : Effect(c, em) {
   depth_val->SetMaximum(amber::audiodsp::Chorus::kMaxDepthMs);
   depth_val->SetDefault(3);
 
+  // Rows are found by field id when a project loads: older projects get 0 %, the chorus they had
+  feedback_val = new DoubleField(new EffectRow(this, tr("Feedback (%)")), "feedback");
+  feedback_val->SetMinimum(0);
+  feedback_val->SetMaximum(amber::audiodsp::Chorus::kMaxFeedback * 100);
+  feedback_val->SetDefault(0);
+
   mix_val = new DoubleField(new EffectRow(this, tr("Mix (%)")), "mix");
   mix_val->SetMinimum(0);
   mix_val->SetMaximum(100);
@@ -52,7 +58,8 @@ void ChorusEffect::process_audio(double timecode_start, double, quint8* samples,
   std::shared_ptr<amber::audiodsp::Chorus> chorus = states_.acquire(ctx, timecode_start, frames, &reset);
   // A fresh stream (or a seek) starts with an empty line and the LFO at 0
   if (reset) chorus->reset(ctx.sample_rate);
-  chorus->set(rate_val->GetDoubleAt(timecode_start), depth_val->GetDoubleAt(timecode_start), mix, ctx.sample_rate);
+  chorus->set(rate_val->GetDoubleAt(timecode_start), depth_val->GetDoubleAt(timecode_start), mix, ctx.sample_rate,
+              feedback_val->GetDoubleAt(timecode_start) * 0.01);
 
   std::vector<float> buf(size_t(frames) * 2);
   amber::audiodsp::s16_to_float(samples, buf.data(), frames);

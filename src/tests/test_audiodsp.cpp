@@ -494,6 +494,38 @@ class TestAudioDsp : public QObject {
     QVERIFY2(d < 1e-4, qPrintable(QString("max delta %1").arg(d)));
   }
 
+  // Feedback with a fixed delay (depth 0): an impulse comes back every 7 ms (336 frames), each repeat at feedback times
+  // the previous one, and nothing in between; the most feedback still dies out on full-scale noise
+  void chorusFeedbackRecirculates() {
+    const int lag = 336;
+    std::vector<float> v = impulse(lag * 5);
+    Chorus c;
+    c.reset(kRate);
+    c.set(1.0, 0.0, 1.0, kRate, 0.5);
+    c.process(v.data(), lag * 5);
+    for (int i = 0; i < lag * 5; i++) {
+      const double expected = (i > 0 && i % lag == 0) ? std::pow(0.5, i / lag - 1) : 0.0;
+      for (int ch = 0; ch < 2; ch++) {
+        QVERIFY2(std::fabs(v[size_t(i) * 2 + ch] - expected) < 1e-6,
+                 qPrintable(QString("frame %1: %2, expected %3").arg(i).arg(v[size_t(i) * 2 + ch]).arg(expected)));
+      }
+    }
+
+    const int n = kRate * 5;
+    std::vector<float> noise(size_t(n) * 2);
+    std::mt19937 rng(7);
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+    for (float& x : noise) x = dist(rng);
+    Chorus loud;
+    loud.reset(kRate);
+    loud.set(5.0, Chorus::kMaxDepthMs, 1.0, kRate, 2.0);  // clamped to kMaxFeedback
+    loud.process(noise.data(), n);
+    const double p = peak(noise, 0);
+    qInfo("chorus, full-scale noise, feedback %.0f %%: peak %.3f", Chorus::kMaxFeedback * 100, p);
+    QVERIFY(std::isfinite(p));
+    QVERIFY(p < 12.0);  // a 90 % loop gains at most 1 / (1 - 0.9) = 10 on a correlated input
+  }
+
   void chorusSineStaysBoundedAndWide() {
     std::vector<float> v = sine(440, 0.5, kRate);
     Chorus c;

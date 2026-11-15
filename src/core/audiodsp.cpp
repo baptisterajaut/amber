@@ -281,7 +281,8 @@ void Chorus::reset(int rate) {
   phase_ = 0;
 }
 
-void Chorus::set(double rate_hz, double depth_ms, double mix, int rate) {
+void Chorus::set(double rate_hz, double depth_ms, double mix, int rate, double feedback) {
+  feedback_ = float(std::clamp(feedback, 0.0, kMaxFeedback));
   phase_step_ = 2.0 * M_PI * std::max(rate_hz, 0.0) / rate;
   base_ = kBaseMs * rate / 1000.0;
   depth_ = std::clamp(depth_ms, 0.0, kMaxDepthMs) * rate / 1000.0;
@@ -294,7 +295,6 @@ void Chorus::process(float* frames, int n) {
   for (int i = 0; i < n; i++) {
     for (int ch = 0; ch < 2; ch++) {
       const float dry = frames[i * 2 + ch];
-      buffer_[size_t(write_) * 2 + ch] = dry;
       // Right channel a quarter turn ahead: the two sweeps never line up, which is the stereo width
       const double lfo = (1.0 + std::sin(phase_ + (ch ? M_PI / 2 : 0.0))) / 2.0;
       const double delay = std::min(base_ + depth_ * lfo, max_delay);
@@ -303,6 +303,8 @@ void Chorus::process(float* frames, int n) {
       const int a = (write_ - whole + capacity_) % capacity_;
       const int b = (a - 1 + capacity_) % capacity_;
       const float delayed = buffer_[size_t(a) * 2 + ch] * (1.0f - frac) + buffer_[size_t(b) * 2 + ch] * frac;
+      // Read before writing: the delay is at least kBaseMs, so the slot written now is never one just read
+      buffer_[size_t(write_) * 2 + ch] = float(flush_denormal(dry + delayed * feedback_));
       frames[i * 2 + ch] = dry * (1.0f - mix_) + delayed * mix_;
     }
     write_ = (write_ + 1) % capacity_;

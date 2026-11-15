@@ -142,11 +142,13 @@ class Chorus {
  public:
   static constexpr double kBaseMs = 7;
   static constexpr double kMaxDepthMs = 10;
-  static constexpr double kBufferMs = 50;  // >= kBaseMs + kMaxDepthMs, with room to spare
+  static constexpr double kBufferMs = 50;      // >= kBaseMs + kMaxDepthMs, with room to spare
+  static constexpr double kMaxFeedback = 0.9;  // the recirculation always dies out
   // Empties the buffer and zeros the LFO; reallocates only when the rate changes
   void reset(int rate);
-  // depth_ms in [0, kMaxDepthMs], mix in [0, 1]
-  void set(double rate_hz, double depth_ms, double mix, int rate);
+  // depth_ms in [0, kMaxDepthMs], mix in [0, 1], feedback in [0, kMaxFeedback]: that share of the swept signal goes
+  // back into the line (a thicker, more metallic chorus); 0 is the plain chorus
+  void set(double rate_hz, double depth_ms, double mix, int rate, double feedback = 0);
   void process(float* frames, int n);
 
  private:
@@ -158,6 +160,7 @@ class Chorus {
   double base_ = 1;   // frames
   double depth_ = 0;  // frames
   float mix_ = 0;
+  float feedback_ = 0;
 };
 
 }  // namespace audiodsp
