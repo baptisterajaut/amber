@@ -147,6 +147,7 @@ static void save_footage_item(QXmlStreamWriter& stream, Media* m, int media_id_v
   stream.writeAttribute("startnumber", QString::number(f->start_number));
   stream.writeAttribute("proxy", QString::number(f->proxy));
   stream.writeAttribute("proxypath", f->proxy_path);
+  if (f->display_rotation) stream.writeAttribute("displayrotation", QStringLiteral("1"));
   if (m->color_label() > 0) {
     stream.writeAttribute("label", QString::number(m->color_label()));
   }

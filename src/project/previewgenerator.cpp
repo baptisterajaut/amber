@@ -204,6 +204,15 @@ bool PreviewGenerator::parse_video_stream(int stream_index, FootageStream& ms) {
 
   ms.video_width = stream->codecpar->width;
   ms.video_height = stream->codecpar->height;
+  // The display matrix is counter-clockwise; quarter turns only, like ffmpeg's autorotate (phones write 90/180/270)
+  // CBA: other angles and mirrored matrices play unturned, add a rotate/flip filter if such files show up
+  const double ccw = footage_->display_rotation ? display_matrix_rotation(stream_index) : qQNaN();
+  if (!qIsNaN(ccw)) {
+    const double cw = std::fmod(360.0 - ccw, 360.0);
+    const int quarters = qRound(cw / 90.0);
+    if (qAbs(cw - quarters * 90.0) < 1.0) ms.video_rotation = (quarters % 4) * 90;
+    if (ms.video_rotation == 90 || ms.video_rotation == 270) std::swap(ms.video_width, ms.video_height);
+  }
   // Known here, before the footage is ready and without the thumbnail decode: a cached thumbnail (reopened project)
   // keeps it. Unknown field order: the first frame's flags, still images aside
   int interlacing = interlacing_from_field_order(stream->codecpar->field_order);
@@ -471,7 +480,7 @@ bool PreviewGenerator::setup_stream_codecs(AVCodecContext** codec_ctx, qint16***
   return create_previews;
 }
 
-void PreviewGenerator::apply_rotation_to_preview(FootageStream* s, int stream_index) {
+double PreviewGenerator::display_matrix_rotation(int stream_index) {
   const int32_t* matrix = nullptr;
 
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
@@ -484,8 +493,11 @@ void PreviewGenerator::apply_rotation_to_preview(FootageStream* s, int stream_in
   if (sd) matrix = reinterpret_cast<const int32_t*>(sd);
 #endif
 
-  if (!matrix) return;
-  double rotation = av_display_rotation_get(matrix);
+  return matrix ? av_display_rotation_get(matrix) : qQNaN();
+}
+
+void PreviewGenerator::apply_rotation_to_preview(FootageStream* s, int stream_index) {
+  double rotation = display_matrix_rotation(stream_index);
   if (!qIsNaN(rotation) && qAbs(rotation) > 1.0) {
     QTransform transform;
     transform.rotate(-rotation);

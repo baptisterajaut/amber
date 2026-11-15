@@ -1,6 +1,8 @@
 #include <QtTest>
 
 #include "engine/clip.h"
+#include "project/footage.h"
+#include "project/media.h"
 #include "project/clipboard.h"
 #include "project/clipboard_serializer.h"
 
@@ -27,6 +29,7 @@ class TestClipboardSerializer : public QObject {
  private slots:
   void cleanup() { clear_clipboard(); }
   void clipAttributesRoundTrip();
+  void displayRotationCrossesProjects();
 };
 
 void TestClipboardSerializer::clipAttributesRoundTrip() {
@@ -92,6 +95,49 @@ void TestClipboardSerializer::clipAttributesRoundTrip() {
   QCOMPARE(ra->linked, QVector<int>({1, 2}));
   QCOMPARE(rb->linked, QVector<int>({0, 2}));
   QCOMPARE(rc->linked, QVector<int>({0, 1}));
+}
+
+// A clip pasted into another project brings its media as a stub: the stub keeps whether the display rotation applies,
+// so a phone video imported before the fix doesn't turn upright in the other project (and one imported after stays
+// upright). A clipboard from an Amber without the attribute pastes with the rotation off, like the project it came from
+void TestClipboardSerializer::displayRotationCrossesProjects() {
+  clear_clipboard();
+  clipboard_type = CLIPBOARD_TYPE_CLIP;
+  Media rotated, legacy;
+  auto rotated_footage = std::make_shared<Footage>();
+  rotated_footage->url = "/nonexistent/new-import.mp4";
+  rotated_footage->display_rotation = true;
+  rotated.set_footage(rotated_footage);
+  auto legacy_footage = std::make_shared<Footage>();
+  legacy_footage->url = "/nonexistent/old-import.mp4";
+  legacy_footage->display_rotation = false;
+  legacy.set_footage(legacy_footage);
+
+  ClipPtr a = make_clip("A", -1, 0, 30);
+  a->set_media(&rotated, 0);
+  ClipPtr b = make_clip("B", -1, 30, 60);
+  b->set_media(&legacy, 0);
+  clipboard.append(a);
+  clipboard.append(b);
+  const QByteArray xml = amber::serialize_clipboard_to_xml();
+  clear_clipboard();  // the clips point at the Media above
+
+  QVector<MediaPtr> imported;
+  QVERIFY(amber::deserialize_clipboard_from_xml(xml, imported));
+  QCOMPARE(imported.size(), 2);
+  QCOMPARE(imported.at(0)->to_footage()->url, rotated_footage->url);
+  QCOMPARE(imported.at(0)->to_footage()->display_rotation, true);
+  QCOMPARE(imported.at(1)->to_footage()->display_rotation, false);
+  clear_clipboard();
+
+  QByteArray old_xml = xml;
+  old_xml.replace(" displayRotation=\"1\"", "");
+  QVERIFY(old_xml != xml);
+  imported.clear();
+  QVERIFY(amber::deserialize_clipboard_from_xml(old_xml, imported));
+  QCOMPARE(imported.size(), 2);
+  QCOMPARE(imported.at(0)->to_footage()->display_rotation, false);
+  clear_clipboard();
 }
 
 QTEST_GUILESS_MAIN(TestClipboardSerializer)

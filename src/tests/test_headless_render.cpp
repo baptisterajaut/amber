@@ -12,6 +12,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavfilter/avfilter.h>
 #include <libavformat/avformat.h>
+#include <libavutil/display.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/log.h>
 #include <libavutil/pixdesc.h>
@@ -672,6 +673,82 @@ void write_offset_mp4(const QString& path, int frames, int64_t start, int frames
     memset(frame->data[0], 24 + 16 * (i / frames_per_step), frame->linesize[0] * kSize);
     memset(frame->data[1], 128, frame->linesize[1] * kSize / 2);
     memset(frame->data[2], 128, frame->linesize[2] * kSize / 2);
+    frame->pts = i;
+    avcodec_send_frame(enc, frame);
+    write_packets();
+  }
+  avcodec_send_frame(enc, nullptr);
+  write_packets();
+  QVERIFY(av_write_trailer(fmt) >= 0);
+  av_frame_free(&frame);
+  av_packet_free(&pkt);
+  avcodec_free_context(&enc);
+  avio_closep(&fmt->pb);
+  avformat_free_context(fmt);
+}
+
+// frames frames of 64x32, the left half white and the right half black, as MPEG-4 Part 2 in MP4 with a display matrix
+// turning it cw degrees clockwise for display (av_display_rotation_set(); a phone's portrait recording stored
+// landscape)
+void write_rotated_mp4(const QString& path, int frames, double cw) {
+  constexpr int kW = 64;
+  constexpr int kH = 32;
+  const AVRational rate{int(kFps), 1};
+  const QByteArray p = path.toUtf8();
+  const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_MPEG4);
+  QVERIFY(codec != nullptr);
+  AVFormatContext* fmt = nullptr;
+  QVERIFY(avformat_alloc_output_context2(&fmt, nullptr, nullptr, p.constData()) >= 0);
+  AVStream* st = avformat_new_stream(fmt, nullptr);
+  AVCodecContext* enc = avcodec_alloc_context3(codec);
+  enc->width = kW;
+  enc->height = kH;
+  enc->pix_fmt = AV_PIX_FMT_YUV420P;
+  enc->framerate = rate;
+  enc->time_base = av_inv_q(rate);
+  enc->bit_rate = 2000000;
+  if (fmt->oformat->flags & AVFMT_GLOBALHEADER) enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+  QVERIFY(avcodec_open2(enc, codec, nullptr) >= 0);
+  avcodec_parameters_from_context(st->codecpar, enc);
+  st->time_base = enc->time_base;
+  int32_t matrix[9];
+  av_display_rotation_set(matrix, cw);
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(61, 0, 0)
+  AVPacketSideData* sd = av_packet_side_data_new(&st->codecpar->coded_side_data, &st->codecpar->nb_coded_side_data,
+                                                 AV_PKT_DATA_DISPLAYMATRIX, sizeof(matrix), 0);
+  QVERIFY(sd != nullptr);
+  memcpy(sd->data, matrix, sizeof(matrix));
+#else
+  uint8_t* sd = av_stream_new_side_data(st, AV_PKT_DATA_DISPLAYMATRIX, sizeof(matrix));
+  QVERIFY(sd != nullptr);
+  memcpy(sd, matrix, sizeof(matrix));
+#endif
+  QVERIFY(avio_open(&fmt->pb, p.constData(), AVIO_FLAG_WRITE) >= 0);
+  QVERIFY(avformat_write_header(fmt, nullptr) >= 0);
+
+  AVPacket* pkt = av_packet_alloc();
+  auto write_packets = [&]() {
+    while (avcodec_receive_packet(enc, pkt) >= 0) {
+      if (pkt->duration == 0) pkt->duration = 1;  // in enc->time_base: else FFmpeg 9's edit list drops the last frame
+      av_packet_rescale_ts(pkt, enc->time_base, st->time_base);
+      pkt->stream_index = st->index;
+      av_interleaved_write_frame(fmt, pkt);
+      av_packet_unref(pkt);
+    }
+  };
+  AVFrame* frame = av_frame_alloc();
+  frame->width = kW;
+  frame->height = kH;
+  frame->format = AV_PIX_FMT_YUV420P;
+  QVERIFY(av_frame_get_buffer(frame, 0) >= 0);
+  for (int i = 0; i < frames; i++) {
+    av_frame_make_writable(frame);
+    for (int y = 0; y < kH; y++) {
+      memset(frame->data[0] + y * frame->linesize[0], 235, kW / 2);
+      memset(frame->data[0] + y * frame->linesize[0] + kW / 2, 16, kW / 2);
+    }
+    memset(frame->data[1], 128, frame->linesize[1] * kH / 2);
+    memset(frame->data[2], 128, frame->linesize[2] * kH / 2);
     frame->pts = i;
     avcodec_send_frame(enc, frame);
     write_packets();
@@ -2889,6 +2966,73 @@ class TestHeadlessRender : public QObject {
     QVERIFY2(qAbs(ratio - 0.501) < 0.005, qPrintable(QString("ratio %1").arg(ratio)));
     QVERIFY2(right < 1e-4, qPrintable(QString("R100 left RMS %1").arg(right)));
     QVERIFY2(qAbs(left - unity) < 1e-4, qPrintable(QString("L100 left RMS %1").arg(left)));
+  }
+
+  // A phone video stored landscape with a display matrix (90 degrees clockwise): footage imported with the display
+  // rotation on (displayrotation="1", what a new import saves) turns 64x32 into 32x64 and exports with the white left
+  // half at the top, as ffmpeg's autorotate (transpose=clock); footage of a project saved before (no attribute) keeps
+  // 64x32 and no turn
+  void displayRotationNewImportsOnly() {
+    const QString video = dir_.filePath("rot_cw90.mp4");
+    write_rotated_mp4(video, 10, 90.0);
+    if (QTest::currentTestFailed()) return;
+    for (const bool new_import : {true, false}) {
+      const QString project = dir_.filePath(new_import ? "rot_new.ove" : "rot_old.ove");
+      {
+        QFile f(project);
+        QVERIFY(f.open(QFile::WriteOnly | QFile::Truncate));
+        f.write(QString(R"(<?xml version="1.0" encoding="UTF-8"?>
+<project><version>%1</version><url>%2</url><folders/>
+<media><footage id="1" folder="0" name="rot" url="%3" duration="0" using_inout="0" in="0" out="0" speed="1"
+ alphapremul="0" startnumber="0" proxy="0" proxypath=""%4/></media>
+<sequences><sequence id="1" folder="0" name="Rot" width="32" height="64" framerate="%5" afreq="%6" alayout="3"
+ open="1"><clip id="0" enabled="1" name="rot" clipin="0" in="0" out="10" track="-1" r="128" g="128" b="192"
+ autoscale="1" type="0" media="1" stream="0" speed="1.0000000000" maintainpitch="0" reverse="0"><linked></linked></clip>
+</sequence></sequences></project>
+)")
+                    .arg(QString::number(amber::kSaveVersion), project.toHtmlEscaped(), video.toHtmlEscaped(),
+                         new_import ? QString(R"( displayrotation="1")") : QString(), QString::number(kFps, 'f', 10),
+                         QString::number(kAudioRate))
+                    .toUtf8());
+      }
+      bool succeeded = false;
+      auto* lt = new LoadThread(project, false);
+      QPointer<LoadThread> lt_guard(lt);
+      connect(lt, &LoadThread::success, this, [&succeeded]() { succeeded = true; });
+      lt->start();
+      QTRY_VERIFY_WITH_TIMEOUT(lt_guard.isNull(), 10000);
+      QVERIFY(succeeded);
+      SequencePtr seq = amber::ActiveSequence;
+      QVERIFY(seq != nullptr && seq->clips.size() == 1);
+      Footage* f = seq->clips.at(0)->media()->to_footage();
+      QPointer<PreviewGenerator> gen(f->preview_gen.load());
+      QTRY_VERIFY_WITH_TIMEOUT(gen.isNull(), 10000);
+      QVERIFY(f->ready);
+      QCOMPARE(f->display_rotation, new_import);
+      const FootageStream& ms = f->video_tracks.at(0);
+      QCOMPARE(ms.video_rotation, new_import ? 90 : 0);
+      QCOMPARE(ms.video_width, new_import ? 32 : 64);
+      QCOMPARE(ms.video_height, new_import ? 64 : 32);
+
+      if (new_import) {
+        ExportParams params = video_params(dir_.filePath("rot_out.mp4"), seq.get(), AV_CODEC_ID_MPEG4, QString(),
+                                           COMPRESSION_TYPE_CBR, 2.0);
+        params.video_width = 32;
+        params.video_height = 64;
+        const QString error = export_sequence(seq.get(), params);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        const Decoded out = decode_file(params.filename);
+        QVERIFY(out.ok);
+        QCOMPARE(out.width, 32);
+        QCOMPARE(out.height, 64);
+        const int top = uchar(out.first_rgba[(8 * 32 + 16) * 4]);
+        const int bottom = uchar(out.first_rgba[(56 * 32 + 16) * 4]);
+        qInfo("turned export: top %d, bottom %d", top, bottom);
+        QVERIFY2(top > 180 && bottom < 80, qPrintable(QString("top %1 bottom %2").arg(top).arg(bottom)));
+      }
+      amber::ActiveSequence = nullptr;
+      amber::project_model.clear();
+    }
   }
 
   // A 0 dBFS tone through the Compressor at its defaults (-20 dB threshold, 4:1, 10 ms attack) exports at about

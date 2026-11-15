@@ -370,6 +370,8 @@ static void parse_footage_attr(const QXmlStreamAttribute& attr, Footage* f, int&
     f->proxy_path = value.toString();
   } else if (name == QLatin1String("startnumber")) {
     f->start_number = value.toInt();
+  } else if (name == QLatin1String("displayrotation")) {
+    f->display_rotation = (value == QLatin1String("1"));
   } else if (name == QLatin1String("label") && item) {
     item->set_color_label(value.toInt());
   }
@@ -381,6 +383,7 @@ void LoadThread::parse_footage(QXmlStreamReader& stream, const QStringView& chil
   MediaPtr item = std::make_shared<Media>();
   FootagePtr f = std::make_shared<Footage>();
   f->using_inout = false;
+  f->display_rotation = false;  // projects saved before the display matrix was applied have no attribute
 
   for (int j = 0; j < stream.attributes().size(); j++) {
     parse_footage_attr(stream.attributes().at(j), f.get(), folder, item.get(),

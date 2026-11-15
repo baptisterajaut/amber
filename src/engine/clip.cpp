@@ -648,7 +648,7 @@ bool Clip::retrieveYuvGpuPath(QRhi* rhi, QRhiCommandBuffer* cb, ComposeSequenceP
     int color_space_val = 0;  // 0 = BT.709 (default)
     if (frame->colorspace == AVCOL_SPC_BT470BG || frame->colorspace == AVCOL_SPC_SMPTE170M) {
       color_space_val = 1;  // BT.601
-    } else if (frame->colorspace == AVCOL_SPC_UNSPECIFIED && cacher.media_width() <= 720) {
+    } else if (frame->colorspace == AVCOL_SPC_UNSPECIFIED && cacher.coded_width() <= 720) {
       color_space_val = 1;  // Infer BT.601 for SD content
     }
 
