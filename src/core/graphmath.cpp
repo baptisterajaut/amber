@@ -71,6 +71,30 @@ bool SnapKeyDrag(long& diff, const QVector<long>& old_times, const QVector<QVect
   return found;
 }
 
+bool SnapValueDrag(double& diff, const QVector<double>& old_values, const QVector<QVector<double>>& targets,
+                   double range, double* target) {
+  bool found = false;
+  double best_shift = 0;
+  double best_target = 0;
+  const int n = qMin(old_values.size(), targets.size());
+  for (int i = 0; i < n; i++) {
+    const double v = old_values.at(i) + diff;
+    for (double candidate : targets.at(i)) {
+      const double shift = candidate - v;
+      if (std::abs(shift) <= range && (!found || std::abs(shift) < std::abs(best_shift))) {
+        found = true;
+        best_shift = shift;
+        best_target = candidate;
+      }
+    }
+  }
+  if (found) {
+    diff += best_shift;
+    if (target) *target = best_target;
+  }
+  return found;
+}
+
 double ValueGridStep(double px_per_unit) {
   if (!(px_per_unit > 0) || std::isinf(px_per_unit)) return 1.0;
   const double min_step = kValueGridMinPx / px_per_unit;

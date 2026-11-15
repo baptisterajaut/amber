@@ -46,6 +46,10 @@ long AvoidKeyCollisions(long diff, long previous_diff, const QVector<long>& old_
 constexpr int kSnapRangePx = 10;  // as Timeline::get_snap_range(), in the Graph Editor's own zoom
 bool SnapKeyDrag(long& diff, const QVector<long>& old_times, const QVector<QVector<long>>& targets, double range,
                  long* target);
+// The same for values: of all moving keys (old_values[i] + diff), the one closest to one of its targets within range
+// units brings the whole drag onto that value (*target).
+bool SnapValueDrag(double& diff, const QVector<double>& old_values, const QVector<QVector<double>>& targets,
+                   double range, double* target);
 
 // Adaptive grid. Value lines every 1, 2 or 5 x 10^n units: the smallest such step at least kValueGridMinPx apart.
 constexpr double kValueGridMinPx = 40;

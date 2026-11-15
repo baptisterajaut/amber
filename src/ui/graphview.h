@@ -130,6 +130,8 @@ class GraphView : public QWidget {
   bool snapped;          // the key drag snapped, to the playhead or to snap_time (key time)
   bool snap_is_playhead;
   long snap_time;
+  bool value_snapped;  // the key drag's value snapped to snap_value, another key's value
+  double snap_value;
 
   int current_handle;
 

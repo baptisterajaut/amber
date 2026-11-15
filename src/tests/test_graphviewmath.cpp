@@ -121,6 +121,24 @@ class TestGraphViewMath : public QObject {
     QCOMPARE(target, 29L);
   }
 
+  void valueSnapToNearestKeyValue() {
+    // A key at 0.2 dragged by 0.25 (to 0.45), another key at 0.5, range 0.1: lands on 0.5
+    double target = -1;
+    double diff = 0.25;
+    QVERIFY(SnapValueDrag(diff, {0.2}, {{0.5, 0.9}}, 0.1, &target));
+    QCOMPARE(diff, 0.3);
+    QCOMPARE(target, 0.5);
+    // Out of range: unchanged
+    diff = 0.1;
+    QVERIFY(!SnapValueDrag(diff, {0.2}, {{0.5}}, 0.1, &target));
+    QCOMPARE(diff, 0.1);
+    // Two moving keys: the one closer to its target decides (0 + 47 is 3 from 50, 100 + 47 is 1 from 148)
+    diff = 47;
+    QVERIFY(SnapValueDrag(diff, {0, 100}, {{50}, {148}}, 5, &target));
+    QCOMPARE(diff, 48.0);
+    QCOMPARE(target, 148.0);
+  }
+
   void snapRangeFollowsZoom() {
     // 10 px: 1 frame at 10 px/frame, 5 frames at 2 px/frame
     long diff = 7;

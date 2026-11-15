@@ -100,6 +100,8 @@ GraphView::GraphView(QWidget* parent) : QWidget(parent) {
   snapped = false;
   snap_is_playhead = false;
   snap_time = 0;
+  value_snapped = false;
+  snap_value = 0;
   current_handle = kBezierHandleNone;
   rect_select = false;
   visible_in = 0;
@@ -455,6 +457,11 @@ void GraphView::paintEvent(QPaintEvent*) {
         p.setPen(Qt::white);
         p.drawLine(get_screen_x(snap_time), 0, get_screen_x(snap_time), height());
       }
+      // and a key's value snapped to another key's: white line at that value
+      if (value_snapped && mousedown && moved_keys) {
+        p.setPen(Qt::white);
+        p.drawLine(0, get_screen_y(snap_value), width(), get_screen_y(snap_value));
+      }
 
       // draw playhead (only meaningful when a row is selected; visible_in is row-dependent)
       p.setPen((dragging_snapped && snap_is_playhead) ? Qt::white : Qt::red);
@@ -697,16 +704,38 @@ void GraphView::handle_mouse_keyframe_drag(QMouseEvent* event) {
   if (frame_diff != wanted_diff) snapped = false;
   last_frame_diff = frame_diff;
 
+  // Value snapping (same toggle): onto the value of a key that isn't moving, in any shown curve, its own included
+  // (lines a key up with its neighbour's level). Shift keeps the values as they were.
+  const bool keep_values = event->modifiers() & Qt::ShiftModifier;
+  double value_diff = double(start_y - event->position().toPoint().y()) / y_zoom;
+  value_snapped = false;
+  if (!keep_values && panel_timeline->snapping) {
+    QVector<QVector<double>> value_targets(selected_keys.size());
+    for (int i = 0; i < selected_keys.size(); i++) {
+      for (int f = 0; f < row->FieldCount(); f++) {
+        if (!field_is_shown(f) || row->Field(f)->type() != EffectField::EFFECT_FIELD_DOUBLE) continue;
+        for (int j = 0; j < row->Field(f)->keyframes.size(); j++) {
+          bool moving = false;
+          for (int k = 0; k < selected_keys.size() && !moving; k++) {
+            moving = (selected_keys.at(k) == j && selected_keys_fields.at(k) == f);
+          }
+          if (!moving) value_targets[i].append(row->Field(f)->keyframes.at(j).data.toDouble());
+        }
+      }
+    }
+    value_snapped = amber::graph::SnapValueDrag(value_diff, selected_keys_old_doubles, value_targets,
+                                                amber::graph::kSnapRangePx / y_zoom, &snap_value);
+  }
+
   for (int i = 0; i < selected_keys.size(); i++) {
     EffectField* field = row->Field(selected_keys_fields.at(i));
     field->keyframes[selected_keys.at(i)].time = selected_keys_old_vals.at(i) + frame_diff;
-    if (event->modifiers() & Qt::ShiftModifier) {
+    if (keep_values) {
       field->keyframes[selected_keys.at(i)].data = selected_keys_old_doubles.at(i);
     } else {
       // Unrounded: a 0-1 field (opacity) must not jump between whole numbers
-      field->keyframes[selected_keys.at(i)].data = clamp_to_field(
-          field, selected_keys_old_doubles.at(i) + (double(start_y - event->position().toPoint().y()) / y_zoom),
-          selected_keys_old_doubles.at(i));
+      field->keyframes[selected_keys.at(i)].data =
+          clamp_to_field(field, selected_keys_old_doubles.at(i) + value_diff, selected_keys_old_doubles.at(i));
     }
   }
   moved_keys = true;
@@ -926,13 +955,14 @@ void GraphView::mouseReleaseEvent(QMouseEvent*) {
   moved_keys = false;
   mousedown = false;
   snapped = false;
+  value_snapped = false;
   click_add = false;
   click_add_proc = false;
   if (rect_select) {
     rect_select = false;
     selection_update();
-    update();
   }
+  update();  // drops the snap lines drawn during the drag
 }
 
 static void wheel_prepare_deltas(bool zooming, bool shift, bool alt, int& delta_h, int& delta_v) {
